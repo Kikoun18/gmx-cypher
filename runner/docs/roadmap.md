@@ -21,7 +21,7 @@ Order as approved in [`phase0.md`](phase0.md) §10: R5 before R4b, and R4d after
 - [x] R1a `runner/` scaffold, Morpheus theme and fonts, the empty-`app/`-diff check
 - [x] R1b Server: 127.0.0.1, token, `Host`/`Origin` check, static GUI
 - [x] R1c `gmx` configuration and detection (`--version`); a fake `gmx` for tests
-- [ ] R1d Job runner: spawn without a shell, stream progress, cancel the process group, keep state across reloads
+- [x] R1d Job runner: spawn without a shell, stream progress, cancel the process group, keep state across reloads
 
 ### Phase 2: Inputs and groups (R2, R3)
 - [ ] R2a Choosing files by path (server-side browser within allowed folders) and by upload

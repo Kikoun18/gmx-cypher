@@ -6,6 +6,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { fileURLToPath } from 'node:url';
 import { makeApi } from './api';
 import { detectGmx } from './gmx';
+import { Jobs } from './jobs';
 import { startServer } from './http';
 import { loadConfig, saveConfig, stateDir } from './state';
 
@@ -22,7 +23,8 @@ const home = stateDir();
 const config = loadConfig(home);
 if (flag('--gmx')) { config.gmx = flag('--gmx')!; saveConfig(home, config); }
 const gmx = await detectGmx(config.gmx);
-const api = makeApi({ home, version: VERSION, config, gmx });
+const jobs = new Jobs(home + '/jobs');
+const api = makeApi({ home, version: VERSION, config, gmx, jobs });
 
 let viteMiddleware: ((req: IncomingMessage, res: ServerResponse) => void) | null = null;
 const server = await startServer({
@@ -44,6 +46,7 @@ console.log('gmx-cypher ' + VERSION + (dev ? ' (development)' : '') + ' is runni
 console.log(gmx.ok ? 'gmx: ' + gmx.path + ' · ' + gmx.version : 'gmx: ✗ ' + gmx.error);
 console.log('Through an SSH tunnel: ssh -L ' + actual + ':127.0.0.1:' + actual + ' <this machine>, then the same address.');
 
-const stop = () => { server.close(); process.exit(0); };
+// Stopping the runner cancels its jobs first, so none is left running unrecorded (T6).
+const stop = async () => { server.close(); await jobs.stopAll(); process.exit(0); };
 process.on('SIGINT', stop);
 process.on('SIGTERM', stop);
