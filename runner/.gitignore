@@ -1,0 +1,7 @@
+node_modules
+dist
+# generated from src/tokens.json by scripts/tokens.ts
+src/tokens.css
+test-results
+playwright-report
+*.log
