@@ -1,0 +1,250 @@
+nvt.tpr:
+inputrec:
+   integrator                     = md
+   tinit                          = 0
+   dt                             = 0.001
+   nsteps                         = 20000
+   init-step                      = 0
+   simulation-part                = 1
+   mts                            = false
+   mass-repartition-factor        = 1
+   comm-mode                      = Linear
+   nstcomm                        = 100
+   bd-fric                        = 0
+   ld-seed                        = 48456
+   emtol                          = 10
+   emstep                         = 0.01
+   niter                          = 20
+   fcstep                         = 0
+   nstcgsteep                     = 1000
+   nbfgscorr                      = 10
+   rtpi                           = 0.05
+   nstxout                        = 0
+   nstvout                        = 0
+   nstfout                        = 0
+   nstlog                         = 100
+   nstcalcenergy                  = 100
+   nstenergy                      = 100
+   nstxout-compressed             = 1000
+   compressed-x-precision         = 1000
+   cutoff-scheme                  = Verlet
+   nstlist                        = 10
+   pbc                            = xyz
+   periodic-molecules             = false
+   verlet-buffer-tolerance        = 0.005
+   verlet-buffer-pressure-tolerance = 0.5
+   rlist                          = 1
+   coulombtype                    = PME
+   coulomb-modifier               = Potential-shift
+   rcoulomb-switch                = 0
+   rcoulomb                       = 1
+   epsilon-r                      = 1
+   epsilon-rf                     = inf
+   vdw-type                       = Cut-off
+   vdw-modifier                   = Potential-shift
+   rvdw-switch                    = 0
+   rvdw                           = 1
+   DispCorr                       = No
+   table-extension                = 1
+   fourierspacing                 = 0.1
+   fourier-nx                     = 36
+   fourier-ny                     = 36
+   fourier-nz                     = 36
+   pme-order                      = 4
+   ewald-rtol                     = 1e-05
+   ewald-rtol-lj                  = 0.001
+   lj-pme-comb-rule               = Geometric
+   ewald-geometry                 = 3d
+   epsilon-surface                = 0
+   ensemble-temperature-setting   = constant
+   ensemble-temperature           = 360
+   tcoupl                         = V-rescale
+   nsttcouple                     = 100
+   nh-chain-length                = 0
+   print-nose-hoover-chain-variables = false
+   pcoupl                         = No
+   refcoord-scaling               = No
+   posres-com: not available
+   posres-comB: not available
+   QMMM                           = false
+qm-opts:
+   ngQM                           = 0
+   constraint-algorithm           = Lincs
+   continuation                   = false
+   Shake-SOR                      = false
+   shake-tol                      = 0.0001
+   lincs-order                    = 4
+   lincs-iter                     = 1
+   lincs-warnangle                = 30
+   nwall                          = 0
+   wall-type                      = 9-3
+   wall-r-linpot                  = -1
+   wall-atomtype[0]               = -1
+   wall-atomtype[1]               = -1
+   wall-density[0]                = 0
+   wall-density[1]                = 0
+   wall-ewald-zfac                = 3
+   pull                           = false
+   awh                            = false
+   rotation                       = false
+   interactiveMD                  = false
+   disre                          = No
+   disre-weighting                = Conservative
+   disre-mixed                    = false
+   dr-fc                          = 1000
+   dr-tau                         = 0
+   nstdisreout                    = 100
+   orire-fc                       = 0
+   orire-tau                      = 0
+   nstorireout                    = 100
+   free-energy                    = no
+   cos-acceleration               = 0
+   deform (3x3):
+      deform[    0]={ 0.00000e+00,  0.00000e+00,  0.00000e+00}
+      deform[    1]={ 0.00000e+00,  0.00000e+00,  0.00000e+00}
+      deform[    2]={ 0.00000e+00,  0.00000e+00,  0.00000e+00}
+   simulated-tempering            = false
+   swapcoords                     = no
+   userint1                       = 0
+   userint2                       = 0
+   userint3                       = 0
+   userint4                       = 0
+   userreal1                      = 0
+   userreal2                      = 0
+   userreal3                      = 0
+   userreal4                      = 0
+   applied-forces:
+     electric-field:
+       x:
+         E0                       = 0
+         omega                    = 0
+         t0                       = 0
+         sigma                    = 0
+       y:
+         E0                       = 0
+         omega                    = 0
+         t0                       = 0
+         sigma                    = 0
+       z:
+         E0                       = 0
+         omega                    = 0
+         t0                       = 0
+         sigma                    = 0
+     density-guided-simulation:
+       active                     = false
+       group                      = protein
+       similarity-measure         = inner-product
+       atom-spreading-weight      = unity
+       force-constant             = 1e+09
+       gaussian-transform-spreading-width = 0.2
+       gaussian-transform-spreading-range-in-multiples-of-width = 4
+       reference-density-filename = reference.mrc
+       nst                        = 1
+       normalize-densities        = true
+       adaptive-force-scaling     = false
+       adaptive-force-scaling-time-constant = 4
+       shift-vector               = 
+       transformation-matrix      = 
+     qmmm-cp2k:
+       active                     = false
+       qmgroup                    = System
+       qmmethod                   = PBE
+       qmfilenames                = 
+       qmcharge                   = 0
+       qmmultiplicity             = 1
+     colvars:
+       active                     = false
+       configfile                 = 
+       seed                       = -1
+     nnpot:
+       active                     = false
+       modelfile                  = model.pt
+       input-group                = System
+       model-input1               = 
+       model-input2               = 
+       model-input3               = 
+       model-input4               = 
+grpopts:
+   nrdf:     4797.08     125.923
+   ref-t:         360         360
+   tau-t:         0.5         0.5
+annealing:          No          No
+annealing-npoints:           0           0
+   acc:	           0           0           0
+   nfreeze:           N           N           N
+   energygrp-flags[  0]: 0
+header:
+   bIr    = present
+   bBox   = present
+   bTop   = present
+   bX     = present
+   bV     = present
+   bF     = not present
+   natoms = 3242
+   lambda = 0.000000e+00
+   buffer size = 86407
+topology:
+   name="Na2-SO4 solution"
+   #atoms                         = 3242
+   #molblock                      = 3
+   molblock (0):
+      moltype              = 0 "SO4"
+      #molecules                     = 6
+      #posres_xA                     = 0
+      #posres_xB                     = 0
+   molblock (1):
+      moltype              = 1 "Na"
+      #molecules                     = 12
+      #posres_xA                     = 0
+      #posres_xB                     = 0
+   molblock (2):
+      moltype              = 2 "SOL"
+      #molecules                     = 800
+      #posres_xA                     = 0
+      #posres_xB                     = 0
+   bIntermolecularInteractions    = false
+   ffparams:
+      atnr=6
+      ntypes=40
+         functype[0]=LJ_SR, c6= 1.58768776e-03, c12= 5.25156793e-06
+         functype[1]=LJ_SR, c6= 3.66648147e-03, c12= 9.48372053e-06
+         functype[2]=LJ_SR, c6= 8.01286427e-04, c12= 6.90746560e-07
+         functype[3]=LJ_SR, c6= 2.28824699e-03, c12= 4.29735155e-06
+         functype[4]=LJ_SR, c6= 0.00000000e+00, c12= 0.00000000e+00
+         functype[5]=LJ_SR, c6= 0.00000000e+00, c12= 0.00000000e+00
+         functype[6]=LJ_SR, c6= 3.66648147e-03, c12= 9.48372053e-06
+         functype[7]=LJ_SR, c6= 8.37855786e-03, c12= 1.67702401e-05
+         functype[8]=LJ_SR, c6= 1.73676643e-03, c12= 1.09887173e-06
+         functype[9]=LJ_SR, c6= 5.15442202e-03, c12= 7.38373274e-06
+         functype[10]=LJ_SR, c6= 0.00000000e+00, c12= 0.00000000e+00
+         functype[11]=LJ_SR, c6= 0.00000000e+00, c12= 0.00000000e+00
+         functype[12]=LJ_SR, c6= 8.01286427e-04, c12= 6.90746560e-07
+         functype[13]=LJ_SR, c6= 1.73676643e-03, c12= 1.09887173e-06
+         functype[14]=LJ_SR, c6= 2.73491896e-04, c12= 4.15543404e-08
+         functype[15]=LJ_SR, c6= 9.92991263e-04, c12= 4.17897951e-07
+         functype[16]=LJ_SR, c6= 0.00000000e+00, c12= 0.00000000e+00
+         functype[17]=LJ_SR, c6= 0.00000000e+00, c12= 0.00000000e+00
+         functype[18]=LJ_SR, c6= 2.28824699e-03, c12= 4.29735155e-06
+         functype[19]=LJ_SR, c6= 5.15442202e-03, c12= 7.38373274e-06
+         functype[20]=LJ_SR, c6= 9.92991263e-04, c12= 4.17897951e-07
+         functype[21]=LJ_SR, c6= 3.10893077e-03, c12= 3.12502425e-06
+         functype[22]=LJ_SR, c6= 0.00000000e+00, c12= 0.00000000e+00
+         functype[23]=LJ_SR, c6= 0.00000000e+00, c12= 0.00000000e+00
+         functype[24]=LJ_SR, c6= 0.00000000e+00, c12= 0.00000000e+00
+         functype[25]=LJ_SR, c6= 0.00000000e+00, c12= 0.00000000e+00
+         functype[26]=LJ_SR, c6= 0.00000000e+00, c12= 0.00000000e+00
+         functype[27]=LJ_SR, c6= 0.00000000e+00, c12= 0.00000000e+00
+         functype[28]=LJ_SR, c6= 0.00000000e+00, c12= 0.00000000e+00
+         functype[29]=LJ_SR, c6= 0.00000000e+00, c12= 0.00000000e+00
+         functype[30]=LJ_SR, c6= 0.00000000e+00, c12= 0.00000000e+00
+         functype[31]=LJ_SR, c6= 0.00000000e+00, c12= 0.00000000e+00
+         functype[32]=LJ_SR, c6= 0.00000000e+00, c12= 0.00000000e+00
+         functype[33]=LJ_SR, c6= 0.00000000e+00, c12= 0.00000000e+00
+         functype[34]=LJ_SR, c6= 0.00000000e+00, c12= 0.00000000e+00
+         functype[35]=LJ_SR, c6= 0.00000000e+00, c12= 0.00000000e+00
+         functype[36]=BONDS, b0A= 1.52000e-01, cbA= 3.76560e+04, b0B= 1.52000e-01, cbB= 3.76560e+04
+         functype[37]=ANGLES, thA= 1.09500e+02, ctA= 5.20000e+02, thB= 1.09500e+02, ctB= 5.20000e+02
+         functype[38]=SETTLE, doh= 9.57200006e-02, dhh= 1.51390001e-01
+         functype[39]=VSITE3, a= 8.96079987e-02, b= 8.96079987e-02
+      reppow                         = 12
+      fudgeQQ                        = 0.833

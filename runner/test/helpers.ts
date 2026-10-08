@@ -27,3 +27,6 @@ export async function api<T = unknown>(r: Started, path: string, body?: unknown)
   const res = await fetch(new URL(path, r.url), body === undefined ? { headers: { cookie: r.cookie } } : { method: 'POST', headers: { cookie: r.cookie, 'content-type': 'application/json' }, body: JSON.stringify(body) });
   return { status: res.status, json: (await res.json()) as T };
 }
+
+/** The fake gmx (T9): real GROMACS text, driven by its arguments. */
+export const FAKE_GMX = RUNNER + 'test/fake-gmx.mjs';

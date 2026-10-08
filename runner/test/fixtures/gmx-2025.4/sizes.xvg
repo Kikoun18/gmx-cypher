@@ -1,0 +1,27 @@
+# This file was created Thu Oct  8 23:09:37 2026
+# Created by:
+#                      :-) GROMACS - gmx select, 2025.4 (-:
+# 
+# Executable:   /opt/gromacs-2025.4/bin/gmx
+# Data prefix:  /opt/gromacs-2025.4
+# Working dir:  /home/user/sim/na2so4/nvt
+# Command line:
+#   gmx select -s nvt.tpr -n groups.ndx -select 'group 0' 'group 1' 'group 2' -os sizes.xvg
+# gmx select is part of G R O M A C S:
+#
+# GROwing Monsters And Cloning Shrimps
+#
+@    title "Selection size"
+@    xaxis  label "Time (ps)"
+@    yaxis  label "Number"
+@TYPE xy
+@ view 0.15, 0.15, 0.75, 0.85
+@ legend on
+@ legend box on
+@ legend loctype view
+@ legend 0.78, 0.8
+@ legend length 2
+@ s0 legend "sulfur"
+@ s1 legend "water_O"
+@ s2 legend "sodium"
+      0.000    6.000  800.000   12.000

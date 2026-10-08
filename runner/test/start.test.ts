@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { api, startRunner, type Started } from './helpers';
+import { readFileSync } from 'node:fs';
+import { api, FAKE_GMX, startRunner, type Started } from './helpers';
 
 let running: Started[] = [];
 afterEach(() => { for (const r of running) r.proc.kill('SIGTERM'); running = []; });
@@ -22,5 +23,23 @@ describe('starting the runner', () => {
   it('makes a new token at every start', async () => {
     const a = await start(), b = await start();
     expect(new URL(a.url).searchParams.get('token')).not.toBe(new URL(b.url).searchParams.get('token'));
+  });
+});
+
+describe('gmx in the running server', () => {
+  it('reports the configured gmx, and re-checks it when the setting changes', async () => {
+    const r = await startRunner(['--gmx', FAKE_GMX]);
+    running.push(r);
+    const s = await api<{ gmx: { ok: boolean; version: string; path: string } }>(r, '/api/state');
+    expect(s.json.gmx).toMatchObject({ ok: true, version: '2025.4-PLUMED_spack', path: FAKE_GMX });
+    const c = await api<{ gmx: { ok: boolean; error: string } }>(r, '/api/config', { gmx: '/no/such/gmx' });
+    expect(c.json.gmx).toMatchObject({ ok: false, error: '/no/such/gmx: not found' });
+    expect(readFileSync(r.home + '/config.json', 'utf8')).toContain('/no/such/gmx');
+  });
+
+  it('refuses settings it does not know', async () => {
+    const r = await startRunner();
+    running.push(r);
+    expect((await api(r, '/api/config', { shell: '/bin/sh' })).status).toBe(400);
   });
 });

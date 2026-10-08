@@ -1,0 +1,21 @@
+                       :-) GROMACS - gmx rdf, 2025.4 (-:
+
+Executable:   /opt/gromacs-2025.4/bin/gmx
+Data prefix:  /opt/gromacs-2025.4
+Working dir:  /home/user/sim/na2so4/nvt
+Command line:
+  gmx rdf -f nvt.xtc -s nvt.tpr -n groups.ndx -ref 'group 0' -sel 'group 7' -o bad.xvg
+
+
+-------------------------------------------------------
+Program:     gmx rdf, version 2025.4
+Source file: src/gromacs/selection/selectioncollection.cpp (line 702)
+Function:    void gmx::SelectionCollection::setIndexGroups(gmx_ana_indexgrps_t*)
+
+Inconsistency in user input:
+Invalid index group reference(s)
+  Cannot match 'group 7', because no such index group can be found.
+
+For more information and tips for troubleshooting, please check the GROMACS
+website at https://manual.gromacs.org/current/user-guide/run-time-errors.html
+-------------------------------------------------------
