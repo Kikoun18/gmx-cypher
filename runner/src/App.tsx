@@ -8,10 +8,12 @@ import { ToggleGroup, ToggleGroupItem } from './ui/toggle-group'
 import { getJson, type AppState } from './api'
 import { readThemePref, saveThemePref, themeOf, type ThemePref } from './lib/theme'
 import { useJobs } from './jobs'
+import { useDraft } from './draft'
+import { Inputs } from './views/Inputs'
 import { JobsView } from './views/Jobs'
 import { Settings } from './views/Settings'
 
-const TABS = ['jobs'] as const
+const TABS = ['inputs', 'jobs'] as const
 type Tab = (typeof TABS)[number]
 
 /** The open tab lives in the address (#jobs), so a reload keeps it. */
@@ -48,6 +50,7 @@ export function App() {
   const [settings, setSettings] = React.useState(false)
   const [tab, setTab] = useTab()
   const jobs = useJobs()
+  const [draft, setDraft] = useDraft()
   const [selectedJob, setSelectedJob] = React.useState<string | null>(null)
   const running = jobs.jobs.filter(j => j.status === 'running').length
   React.useEffect(() => { getJson<AppState>('/api/state').then(setState, e => setError(String(e.message || e))) }, [])
@@ -67,6 +70,7 @@ export function App() {
       </header>
       <Tabs value={tab} onValueChange={v => setTab(v as Tab)} className="flex-1 gap-0">
         <TabsList className="px-3">
+          <TabsTrigger value="inputs">inputs</TabsTrigger>
           <TabsTrigger value="jobs">jobs {jobs.jobs.length > 0 && <TabsCount>{running ? running + ' running' : String(jobs.jobs.length).padStart(2, '0')}</TabsCount>}</TabsTrigger>
         </TabsList>
       <main className="flex flex-col gap-4 p-5">
@@ -79,6 +83,7 @@ export function App() {
             <AlertActions><Button variant="outline" size="sm" onClick={() => setSettings(true)}>set gmx</Button></AlertActions>
           </Alert>
         )}
+        <TabsContent value="inputs">{state && <Inputs state={state} draft={draft} setDraft={setDraft} onSettings={() => setSettings(true)} />}</TabsContent>
         <TabsContent value="jobs"><JobsView {...jobs} selected={selectedJob} onSelect={setSelectedJob} /></TabsContent>
       </main>
       </Tabs>

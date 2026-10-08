@@ -4,7 +4,7 @@ import { randomBytes } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { fileURLToPath } from 'node:url';
-import { makeApi } from './api';
+import { makeApi, realFolders } from './api';
 import { detectGmx } from './gmx';
 import { Jobs } from './jobs';
 import { startServer } from './http';
@@ -22,6 +22,9 @@ const token = randomBytes(32).toString('base64url');
 const home = stateDir();
 const config = loadConfig(home);
 if (flag('--gmx')) { config.gmx = flag('--gmx')!; saveConfig(home, config); }
+// --allow <folder>, as often as needed: folders the file browser may show.
+const allow = args.flatMap((a, i) => (a === '--allow' && args[i + 1] ? [args[i + 1]] : []));
+if (allow.length) { config.allow = [...new Set([...config.allow, ...realFolders(allow)])]; saveConfig(home, config); }
 const gmx = await detectGmx(config.gmx);
 const jobs = new Jobs(home + '/jobs');
 const api = makeApi({ home, version: VERSION, config, gmx, jobs });

@@ -30,3 +30,20 @@ export async function api<T = unknown>(r: Started, path: string, body?: unknown)
 
 /** The fake gmx (T9): real GROMACS text, driven by its arguments. */
 export const FAKE_GMX = RUNNER + 'test/fake-gmx.mjs';
+
+/** The API in-process on an ephemeral port, for route tests. */
+export async function apiServer(patch: Partial<import('../server/api').Ctx> = {}) {
+  const { makeApi } = await import('../server/api');
+  const { startServer } = await import('../server/http');
+  const { Jobs } = await import('../server/jobs');
+  const { DEFAULT_CONFIG } = await import('../server/state');
+  const home = tmp('home'), token = 'k'.repeat(43);
+  const ctx = { home, version: '0', config: { ...DEFAULT_CONFIG }, gmx: { ok: true, name: 'gmx', path: FAKE_GMX }, jobs: new Jobs(home + '/jobs'), ...patch };
+  const server = await startServer({ token, port: 0, api: makeApi(ctx) });
+  const base = 'http://127.0.0.1:' + (server.address() as import('node:net').AddressInfo).port, headers = { cookie: 'gmx-cypher=' + token };
+  const call = async <T = any>(path: string, body?: unknown, raw?: BodyInit) => {
+    const res = await fetch(base + path, body === undefined && raw === undefined ? { headers } : { method: 'POST', headers: { ...headers, 'content-type': raw ? 'application/octet-stream' : 'application/json' }, body: raw ?? JSON.stringify(body), ...(raw ? { duplex: 'half' } : {}) } as RequestInit);
+    return { status: res.status, json: (await res.json()) as T };
+  };
+  return { ctx, base, headers, call, close: () => new Promise<void>(r => server.close(() => r())) };
+}

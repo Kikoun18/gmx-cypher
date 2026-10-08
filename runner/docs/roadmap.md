@@ -24,7 +24,7 @@ Order as approved in [`phase0.md`](phase0.md) §10: R5 before R4b, and R4d after
 - [x] R1d Job runner: spawn without a shell, stream progress, cancel the process group, keep state across reloads
 
 ### Phase 2: Inputs and groups (R2, R3)
-- [ ] R2a Choosing files by path (server-side browser within allowed folders) and by upload
+- [x] R2a Choosing files by path (server-side browser within allowed folders) and by upload
 - [ ] R2b Checking inputs: formats, atom counts of structure, run input and trajectory
 - [ ] R3a 3D view with a drawn-atom → GROMACS-number map
 - [ ] R3b Groups: click, residue, rule; reference and selections; overlap warning

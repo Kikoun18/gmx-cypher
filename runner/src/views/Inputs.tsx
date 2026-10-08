@@ -1,0 +1,147 @@
+import * as React from 'react'
+import { FileText, Folder, FolderOpen, Upload } from 'lucide-react'
+import { toast } from 'sonner'
+import { Badge } from '../ui/badge'
+import { Button } from '../ui/button'
+import { Card } from '../ui/card'
+import { Dropzone } from '../ui/dropzone'
+import { Section } from '../ui/separator'
+import { getJson, type AppState } from '../api'
+import type { Draft, Picked } from '../draft'
+import { inputRole, type Role, type Slot } from '../lib/inputs'
+import { cn } from '../lib/utils'
+import { fmtBytes } from '../../../app/src/lib/structFile'
+
+interface Entry { name: string; kind: 'dir' | 'file'; size: number; mtime: number; role: Role | 'output' | null }
+interface Listing { path: string; parent: string | null; entries: Entry[]; hidden: number }
+
+const SLOTS: { slot: Slot; label: string; accepts: Role[]; optional?: boolean }[] = [
+  { slot: 'trajectory', label: 'trajectory', accepts: ['trajectory', 'structure'] },
+  { slot: 'runInput', label: 'run input', accepts: ['run input'] },
+  { slot: 'structure', label: 'structure', accepts: ['structure'] },
+  { slot: 'index', label: 'index', accepts: ['index'], optional: true },
+]
+const SLOT_OF: Partial<Record<Role, Slot>> = { trajectory: 'trajectory', 'run input': 'runInput', structure: 'structure', index: 'index' }
+
+/** A folder as `root-name/rest`, relative to the allowed folder it is in. */
+const short = (dir: string, roots: string[]) => { const r = roots.find(x => dir === x || dir.startsWith(x + '/')); return r ? r.split('/').pop() + dir.slice(r.length) : dir }
+const join = (dir: string, name: string) => (dir.endsWith('/') ? dir : dir + '/') + name
+const when = (ms: number) => { const d = new Date(ms), p = (n: number) => String(n).padStart(2, '0'); return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes()) }
+
+function Browser({ roots, path, onPath, used, onFile }: { roots: string[]; path: string | null; onPath: (p: string) => void; used: Set<string>; onFile: (p: string, e: Entry) => void }) {
+  const [listing, setListing] = React.useState<Listing | null>(null)
+  const [error, setError] = React.useState('')
+  React.useEffect(() => {
+    if (!path) return
+    getJson<Listing>('/api/ls?path=' + encodeURIComponent(path)).then(l => { setListing(l); setError('') }, e => setError(String(e.message || e)))
+  }, [path])
+  const root = roots.find(r => path === r || path?.startsWith(r + '/'))
+  const crumbs = root && path ? [root, ...path.slice(root.length).split('/').filter(Boolean)] : []
+  return (
+    <Card className="gap-0 p-0">
+      <div className="flex min-h-11 flex-wrap items-center gap-1 border-b border-border px-4 py-2.5 text-control">
+        <FolderOpen className="size-4 text-muted-foreground" />
+        {crumbs.map((c, i) => {
+          const to = i === 0 ? c : root + '/' + crumbs.slice(1, i + 1).join('/')
+          const label = i === 0 ? c.split('/').pop() : c
+          return <React.Fragment key={to}>{i > 0 && <span className="text-muted-foreground">/</span>}{i < crumbs.length - 1 ? <button className="text-coral-strong hover:underline" title={to} onClick={() => onPath(to)}>{label}</button> : <span className="font-bold" title={to}>{label}</span>}</React.Fragment>
+        })}
+        <span className="flex-1" />
+        {listing && <span className="text-caption text-muted-foreground">{listing.entries.filter(e => e.kind === 'file').length} files{listing.hidden ? ' · ' + listing.hidden + ' other files not shown' : ''}</span>}
+      </div>
+      {error && <p className="m-0 px-4 py-3 text-control text-destructive">✗ {error}</p>}
+      {listing && (
+        <table className="w-full text-control">
+          <thead><tr className="text-left text-label uppercase text-muted-foreground"><th className="px-4 py-2 font-normal">name</th><th className="font-normal">kind</th><th className="font-normal">size</th><th className="pr-4 font-normal">modified</th></tr></thead>
+          <tbody>
+            {listing.parent && <tr className="border-t border-border"><td colSpan={4} className="px-4 py-1.5"><button className="inline-flex items-center gap-2 hover:underline" onClick={() => onPath(listing.parent!)}><Folder className="size-4 text-muted-foreground" />..</button></td></tr>}
+            {listing.entries.map(e => {
+              const p = join(listing.path, e.name)
+              return (
+                <tr key={e.name} className={cn('border-t border-border hover:bg-accent', used.has(p) && 'bg-secondary font-bold')}>
+                  <td className="px-4 py-1.5">
+                    <button className="inline-flex items-center gap-2 text-left" onClick={() => (e.kind === 'dir' ? onPath(p) : onFile(p, e))} disabled={e.kind === 'file' && e.role === 'output'}>
+                      {e.kind === 'dir' ? <Folder className="size-4 text-muted-foreground" /> : <FileText className="size-4 text-muted-foreground" />}{e.name}
+                    </button>
+                  </td>
+                  <td>{e.kind === 'dir' ? <span className="text-muted-foreground">folder</span> : e.role && <Badge variant="outline">{e.role}</Badge>}</td>
+                  <td>{e.kind === 'dir' ? '—' : fmtBytes(e.size)}</td>
+                  <td className="pr-4 text-muted-foreground">{when(e.mtime)}</td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      )}
+    </Card>
+  )
+}
+
+export function Inputs({ state, draft, setDraft, onSettings, children }: { state: AppState; draft: Draft; setDraft: React.Dispatch<React.SetStateAction<Draft>>; onSettings: () => void; children?: React.ReactNode }) {
+  const roots = state.config.allow
+  const [path, setPath] = React.useState<string | null>(() => { const t = draft.inputs.trajectory?.path; return t ? t.slice(0, t.lastIndexOf('/')) : roots[0] || null })
+  const [picking, setPicking] = React.useState<Slot | null>(null)
+  const fileRef = React.useRef<HTMLInputElement>(null)
+  const used = new Set(Object.values(draft.inputs).map(p => p!.path))
+
+  const set = (slot: Slot, p: Picked) => setDraft(d => ({ ...d, inputs: { ...d.inputs, [slot]: p } }))
+  const assign = async (p: string, role: Role | 'output' | null) => {
+    const slot = picking || (role && role !== 'output' ? SLOT_OF[role] : undefined)
+    const ok = slot && SLOTS.find(s => s.slot === slot)!.accepts.includes(role as Role)
+    if (!slot || !ok) { toast.error('✗ ' + p.split('/').pop() + ' is not a ' + (picking ? SLOTS.find(s => s.slot === picking)!.label : 'GROMACS input')); return }
+    setPicking(null)
+    if (slot !== 'trajectory') { set(slot, { path: p, why: 'picked' }); return }
+    try { setDraft(d => ({ ...d, inputs: {} })); const s = await getJson<Draft['inputs']>('/api/suggest?trajectory=' + encodeURIComponent(p)); setDraft(d => ({ ...d, inputs: s })) }
+    catch (e) { toast.error('✗ ' + (e as Error).message) }
+  }
+  const upload = async (files: File[]) => {
+    for (const f of files) {
+      const role = inputRole(f.name)
+      if (!role || role === 'output') { toast.error('✗ ' + f.name + ' is not a GROMACS input (.xtc .trr .tng .tpr .gro .pdb .ndx); not uploaded'); continue }
+      try {
+        const r = await fetch('/api/upload?name=' + encodeURIComponent(f.name), { method: 'POST', body: f })
+        const body = await r.json()
+        if (!r.ok) throw new Error(body.error)
+        toast('✓ ' + f.name + ' uploaded · ' + fmtBytes(body.size))
+        await assign(body.path, role)
+      } catch (e) { toast.error('✗ ' + f.name + ': ' + (e as Error).message) }
+    }
+  }
+
+  return (
+    <div className="grid grid-cols-[minmax(0,1fr)_360px] gap-5">
+      <div className="flex min-w-0 flex-col gap-4">
+        <Section label="Allowed folders"><Button variant="ghost" size="sm" onClick={onSettings}>+ folder</Button></Section>
+        {roots.length ? (
+          <div className="flex flex-wrap gap-2">
+            {roots.map(r => <button key={r} onClick={() => setPath(r)}><Badge tone={path?.startsWith(r) ? 'stone' : undefined} appearance="solid" variant="outline">{r}</Badge></button>)}
+          </div>
+        ) : <p className="m-0 text-control text-muted-foreground">no folder is allowed yet · add one in settings, or start with --allow &lt;folder&gt;</p>}
+        {picking && <p className="m-0 text-control" aria-live="polite">pick the {SLOTS.find(s => s.slot === picking)!.label} · <button className="text-coral-strong hover:underline" onClick={() => setPicking(null)}>stop picking</button></p>}
+        {path && <Browser roots={[...roots, ...Object.values(draft.inputs).map(p => p!.path.slice(0, p!.path.lastIndexOf('/')))]} path={path} onPath={setPath} used={used} onFile={(p, e) => assign(p, e.role)} />}
+        <input ref={fileRef} type="file" multiple hidden onChange={e => { upload(Array.from(e.target.files || [])); e.target.value = '' }} />
+        <Dropzone className="max-w-none py-6" title="Drop files here" description="any GROMACS input, by upload into gmx-cypher's own folder · large trajectories are better picked by path, where they are"
+          onFiles={upload} action={<Button variant="outline" onClick={() => fileRef.current?.click()}><Upload /> choose files</Button>} />
+      </div>
+      <div className="flex flex-col gap-4">
+        <Section label="This run" />
+        {SLOTS.map(({ slot, label, optional }) => {
+          const p = draft.inputs[slot]
+          return (
+            <div key={slot} className="flex items-start gap-3">
+              <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                <span className="text-label uppercase text-muted-foreground">{label}{optional && ' · optional'}</span>
+                <span className="truncate text-body font-bold">{p ? p.path.split('/').pop() : '—'}</span>
+                {p && <span className="truncate text-caption text-muted-foreground" title={p.path}>{short(p.path.slice(0, p.path.lastIndexOf('/')), roots)}</span>}
+                {p && <span className="text-caption text-muted-foreground">{p.why}</span>}
+              </div>
+              {p && optional && <Button variant="ghost" size="sm" onClick={() => setDraft(d => { const { [slot]: _gone, ...rest } = d.inputs; return { ...d, inputs: rest } })}>clear</Button>}
+              <Button variant={picking === slot ? 'secondary' : 'ghost'} size="sm" onClick={() => setPicking(picking === slot ? null : slot)}>{p ? 'change' : 'pick'}</Button>
+            </div>
+          )
+        })}
+        {children}
+      </div>
+    </div>
+  )
+}
