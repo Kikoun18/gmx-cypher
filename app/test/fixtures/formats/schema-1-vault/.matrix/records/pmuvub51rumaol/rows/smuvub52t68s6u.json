@@ -1,0 +1,51 @@
+{
+  "analyses": [],
+  "desc": "",
+  "dirs": {
+    "cells": {
+      "ha": "sugar-pmfs--pmuvub51rumaol/ha--ha/krwycr--smuvub52t68s6u"
+    },
+    "row": null
+  },
+  "files": [
+    {
+      "id": "fmuvub52tcpgz8",
+      "kind": "pmf-xvg",
+      "mime": "",
+      "name": "hmrfast6_ha_a_t200000.xvg",
+      "origin": "upload",
+      "owner": "rmuvub52tth0ix",
+      "path": "sugar-pmfs--pmuvub51rumaol/ha--ha/krwycr--smuvub52t68s6u/hmrfast6_ha_a_t200000.xvg",
+      "sha256": "eac75cf451ca03b4df43abbd2fd4758c512adb3349f63d2abc97e8502a65db59",
+      "size": 9516,
+      "uploaded": "2026-10-05T22:47:19.936Z"
+    }
+  ],
+  "group": "",
+  "id": "smuvub52t68s6u",
+  "literature": {},
+  "name": "KRWYCR",
+  "notes": {
+    "cells": {}
+  },
+  "runs": [
+    {
+      "added": "2026-10-05",
+      "column": "ha",
+      "file": "fmuvub52tcpgz8",
+      "id": "rmuvub52tth0ix",
+      "methods": {},
+      "parse": {
+        "xCol": 1,
+        "yCol": 2
+      },
+      "slot": "a",
+      "temp": 310.15,
+      "time": "200000"
+    }
+  ],
+  "seq": "KRWYCR",
+  "structures": [],
+  "type": "row",
+  "visibility": {}
+}

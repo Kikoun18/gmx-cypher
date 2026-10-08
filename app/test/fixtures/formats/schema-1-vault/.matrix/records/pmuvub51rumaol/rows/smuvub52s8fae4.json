@@ -1,0 +1,171 @@
+{
+  "analyses": [
+    {
+      "added": "2026-10-05",
+      "column": "ha",
+      "curves": [
+        {
+          "file": "fmuvub52vwbdzu",
+          "id": "cmuvub52vf7nta",
+          "label": "Protein",
+          "parse": {
+            "xCol": 1,
+            "xScale": 1,
+            "yCol": 2
+          }
+        }
+      ],
+      "dir": "sugar-pmfs--pmuvub51rumaol/ha--ha/wrwycr--smuvub52s8fae4/rdf-run-1--xmuvub52xvs7r0",
+      "id": "xmuvub52xvs7r0",
+      "slot": "a",
+      "time": "",
+      "type": "rdf"
+    }
+  ],
+  "desc": "Frozen schema-1 fixture row",
+  "dirs": {
+    "cells": {
+      "ha": "sugar-pmfs--pmuvub51rumaol/ha--ha/wrwycr--smuvub52s8fae4",
+      "pg": "sugar-pmfs--pmuvub51rumaol/pg--pg/wrwycr--smuvub52s8fae4"
+    },
+    "row": "sugar-pmfs--pmuvub51rumaol/_sequences/wrwycr--smuvub52s8fae4"
+  },
+  "files": [
+    {
+      "id": "fmuvub52s1gbhm",
+      "kind": "pmf-xvg",
+      "mime": "",
+      "name": "hmrfast6_ha_a_t200000.xvg",
+      "origin": "upload",
+      "owner": "rmuvub52sk2272",
+      "path": "sugar-pmfs--pmuvub51rumaol/ha--ha/wrwycr--smuvub52s8fae4/hmrfast6_ha_a_t200000.xvg",
+      "sha256": "eac75cf451ca03b4df43abbd2fd4758c512adb3349f63d2abc97e8502a65db59",
+      "size": 9516,
+      "uploaded": "2026-10-05T22:47:19.933Z"
+    },
+    {
+      "id": "fmuvub52ths98j",
+      "kind": "pmf-xvg",
+      "mime": "",
+      "name": "hmrfast6_ha_b_t200000.xvg",
+      "origin": "upload",
+      "owner": "rmuvub52s7zkmi",
+      "path": "sugar-pmfs--pmuvub51rumaol/ha--ha/wrwycr--smuvub52s8fae4/hmrfast6_ha_b_t200000.xvg",
+      "sha256": "eac75cf451ca03b4df43abbd2fd4758c512adb3349f63d2abc97e8502a65db59",
+      "size": 9516,
+      "uploaded": "2026-10-05T22:47:19.933Z"
+    },
+    {
+      "id": "fmuvub52tzrc5s",
+      "kind": "pmf-xvg",
+      "mime": "",
+      "name": "hmrfast6_pg_a_t200000.xvg",
+      "origin": "upload",
+      "owner": "rmuvub52tq4af1",
+      "path": "sugar-pmfs--pmuvub51rumaol/pg--pg/wrwycr--smuvub52s8fae4/hmrfast6_pg_a_t200000.xvg",
+      "sha256": "eac75cf451ca03b4df43abbd2fd4758c512adb3349f63d2abc97e8502a65db59",
+      "size": 9516,
+      "uploaded": "2026-10-05T22:47:19.934Z"
+    },
+    {
+      "id": "fmuvub52vwbdzu",
+      "kind": "analysis-xvg",
+      "mime": "",
+      "name": "07.md_rdf_protein_sugar.xvg",
+      "origin": "upload",
+      "owner": "xmuvub52xvs7r0",
+      "path": "sugar-pmfs--pmuvub51rumaol/ha--ha/wrwycr--smuvub52s8fae4/rdf-run-1--xmuvub52xvs7r0/07.md_rdf_protein_sugar.xvg",
+      "sha256": "ac2dcac57f5e469c8491e047705e661140bb3b345f063bbb5e0a3059cc3da26c",
+      "size": 32107,
+      "uploaded": "2026-10-05T22:47:19.935Z"
+    },
+    {
+      "id": "fmuvub52x9ukkn",
+      "kind": "structure",
+      "mime": "",
+      "name": "test.pdb",
+      "origin": "upload",
+      "owner": "stmuvub52x9ukkn",
+      "path": "sugar-pmfs--pmuvub51rumaol/_sequences/wrwycr--smuvub52s8fae4/test.pdb",
+      "sha256": "9fb5286ada07337029a7c82da72356053737f3939dbcef4ca6ac78c6b137496c",
+      "size": 4709,
+      "uploaded": "2026-10-05T22:47:19.935Z"
+    }
+  ],
+  "group": "hmr+fast+6",
+  "id": "smuvub52s8fae4",
+  "literature": {},
+  "name": "WRWYCR",
+  "notes": {
+    "cells": {},
+    "row": "nmuvub534mz407"
+  },
+  "runs": [
+    {
+      "added": "2026-10-05",
+      "column": "ha",
+      "file": "fmuvub52s1gbhm",
+      "id": "rmuvub52sk2272",
+      "methods": {
+        "add": true,
+        "fast": true,
+        "hmr": true,
+        "prosecco75": false
+      },
+      "parse": {
+        "xCol": 1,
+        "yCol": 2
+      },
+      "slot": "a",
+      "temp": 310.15,
+      "time": "200000"
+    },
+    {
+      "added": "2026-10-05",
+      "column": "ha",
+      "file": "fmuvub52ths98j",
+      "id": "rmuvub52s7zkmi",
+      "methods": {
+        "add": false,
+        "fast": true,
+        "hmr": true
+      },
+      "parse": {
+        "xCol": 1,
+        "yCol": 2
+      },
+      "slot": "b",
+      "temp": 310.15,
+      "time": "200000"
+    },
+    {
+      "added": "2026-10-05",
+      "column": "pg",
+      "file": "fmuvub52tzrc5s",
+      "id": "rmuvub52tq4af1",
+      "methods": {
+        "prosecco75": true
+      },
+      "parse": {
+        "xCol": 1,
+        "yCol": 2
+      },
+      "slot": "a",
+      "temp": 310.15,
+      "time": "200000"
+    }
+  ],
+  "seq": "WRWYCR",
+  "structures": [
+    {
+      "added": "2026-10-05",
+      "atoms": 0,
+      "file": "fmuvub52x9ukkn",
+      "format": "pdb",
+      "id": "stmuvub52x9ukkn",
+      "title": ""
+    }
+  ],
+  "type": "row",
+  "visibility": {}
+}

@@ -1,0 +1,425 @@
+{
+  "analyses": [
+    {
+      "added": "2026-10-06",
+      "column": "ha",
+      "curves": [
+        {
+          "file": "fmux8q7bvmdbf1",
+          "id": "cmux8q7bwxck4r",
+          "label": "Protein",
+          "parse": {
+            "xCol": 1,
+            "xScale": 1,
+            "yCol": 2
+          }
+        },
+        {
+          "custom": true,
+          "file": "fmux8q7c6tjxqb",
+          "id": "cmux8q7c7hih88",
+          "label": "second sugar",
+          "parse": {
+            "xCol": 1,
+            "xScale": 1,
+            "yCol": 2
+          }
+        }
+      ],
+      "dir": "sugar-pmfs--pmux8q7cs3ypk8/ha--ha/wrwycr--smux8q7bk29dtx/rdf-run-1--xmux8q7car42p8",
+      "id": "xmux8q7car42p8",
+      "slot": "a",
+      "time": "",
+      "type": "rdf"
+    },
+    {
+      "added": "2026-10-06",
+      "column": "ha",
+      "curves": [
+        {
+          "file": "fmux8q7cguvtl2",
+          "id": "cmux8q7cgxqjyj",
+          "label": "col 2",
+          "parse": {
+            "xCol": 1,
+            "xScale": 1,
+            "yCol": 2
+          }
+        },
+        {
+          "file": "fmux8q7cguvtl2",
+          "id": "cmux8q7cghrjrw",
+          "label": "col 3",
+          "parse": {
+            "xCol": 1,
+            "xScale": 1,
+            "yCol": 3
+          }
+        },
+        {
+          "file": "fmux8q7cguvtl2",
+          "id": "cmux8q7cgi2nra",
+          "label": "col 4",
+          "parse": {
+            "xCol": 1,
+            "xScale": 1,
+            "yCol": 4
+          }
+        },
+        {
+          "file": "fmux8q7cguvtl2",
+          "id": "cmux8q7chtlku7",
+          "label": "col 5",
+          "parse": {
+            "xCol": 1,
+            "xScale": 1,
+            "yCol": 5
+          }
+        },
+        {
+          "file": "fmux8q7cguvtl2",
+          "id": "cmux8q7chxn8b1",
+          "label": "col 6",
+          "parse": {
+            "xCol": 1,
+            "xScale": 1,
+            "yCol": 6
+          }
+        },
+        {
+          "file": "fmux8q7cguvtl2",
+          "id": "cmux8q7chpsfa0",
+          "label": "col 7",
+          "parse": {
+            "xCol": 1,
+            "xScale": 1,
+            "yCol": 7
+          }
+        },
+        {
+          "file": "fmux8q7cguvtl2",
+          "id": "cmux8q7chm0fxh",
+          "label": "col 8",
+          "parse": {
+            "xCol": 1,
+            "xScale": 1,
+            "yCol": 8
+          }
+        },
+        {
+          "file": "fmux8q7cguvtl2",
+          "id": "cmux8q7chsygzs",
+          "label": "col 9",
+          "parse": {
+            "xCol": 1,
+            "xScale": 1,
+            "yCol": 9
+          }
+        },
+        {
+          "file": "fmux8q7cguvtl2",
+          "id": "cmux8q7chm8tjj",
+          "label": "col 10",
+          "parse": {
+            "xCol": 1,
+            "xScale": 1,
+            "yCol": 10
+          }
+        },
+        {
+          "file": "fmux8q7cguvtl2",
+          "id": "cmux8q7chj7hmj",
+          "label": "col 11",
+          "parse": {
+            "xCol": 1,
+            "xScale": 1,
+            "yCol": 11
+          }
+        },
+        {
+          "file": "fmux8q7cguvtl2",
+          "id": "cmux8q7ch36d7k",
+          "label": "col 12",
+          "parse": {
+            "xCol": 1,
+            "xScale": 1,
+            "yCol": 12
+          }
+        },
+        {
+          "file": "fmux8q7cguvtl2",
+          "id": "cmux8q7chtyqzh",
+          "label": "col 13",
+          "parse": {
+            "xCol": 1,
+            "xScale": 1,
+            "yCol": 13
+          }
+        },
+        {
+          "file": "fmux8q7cguvtl2",
+          "id": "cmux8q7ci39mqp",
+          "label": "col 14",
+          "parse": {
+            "xCol": 1,
+            "xScale": 1,
+            "yCol": 14
+          }
+        },
+        {
+          "file": "fmux8q7cguvtl2",
+          "id": "cmux8q7ciex2ve",
+          "label": "col 15",
+          "parse": {
+            "xCol": 1,
+            "xScale": 1,
+            "yCol": 15
+          }
+        },
+        {
+          "file": "fmux8q7cguvtl2",
+          "id": "cmux8q7cip6yqw",
+          "label": "col 16",
+          "parse": {
+            "xCol": 1,
+            "xScale": 1,
+            "yCol": 16
+          }
+        },
+        {
+          "file": "fmux8q7cguvtl2",
+          "id": "cmux8q7cime59t",
+          "label": "col 17",
+          "parse": {
+            "xCol": 1,
+            "xScale": 1,
+            "yCol": 17
+          }
+        },
+        {
+          "file": "fmux8q7cguvtl2",
+          "id": "cmux8q7ciaamlm",
+          "label": "col 18",
+          "parse": {
+            "xCol": 1,
+            "xScale": 1,
+            "yCol": 18
+          }
+        },
+        {
+          "file": "fmux8q7cguvtl2",
+          "id": "cmux8q7ci3ifpz",
+          "label": "col 19",
+          "parse": {
+            "xCol": 1,
+            "xScale": 1,
+            "yCol": 19
+          }
+        },
+        {
+          "file": "fmux8q7cguvtl2",
+          "id": "cmux8q7ciufrc7",
+          "label": "col 20",
+          "parse": {
+            "xCol": 1,
+            "xScale": 1,
+            "yCol": 20
+          }
+        },
+        {
+          "file": "fmux8q7cguvtl2",
+          "id": "cmux8q7ci7addp",
+          "label": "col 21",
+          "parse": {
+            "xCol": 1,
+            "xScale": 1,
+            "yCol": 21
+          }
+        },
+        {
+          "file": "fmux8q7cguvtl2",
+          "id": "cmux8q7cirif1j",
+          "label": "col 22",
+          "parse": {
+            "xCol": 1,
+            "xScale": 1,
+            "yCol": 22
+          }
+        }
+      ],
+      "dir": "sugar-pmfs--pmux8q7cs3ypk8/ha--ha/wrwycr--smux8q7bk29dtx/hist-run-2--xmux8q7cjhdzdb",
+      "id": "xmux8q7cjhdzdb",
+      "slot": "b",
+      "time": "",
+      "type": "hist"
+    }
+  ],
+  "desc": "",
+  "dirs": {
+    "cells": {
+      "ha": "sugar-pmfs--pmux8q7cs3ypk8/ha--ha/wrwycr--smux8q7bk29dtx",
+      "pg": "sugar-pmfs--pmux8q7cs3ypk8/pg--pg/wrwycr--smux8q7bk29dtx"
+    },
+    "row": "sugar-pmfs--pmux8q7cs3ypk8/_sequences/wrwycr--smux8q7bk29dtx"
+  },
+  "files": [
+    {
+      "id": "fmux8q7blsndb3",
+      "kind": "pmf-xvg",
+      "mime": "",
+      "name": "hmrfast6_ha_a_t200000.xvg",
+      "origin": "upload",
+      "owner": "rmux8q7bkc7pt5",
+      "path": "sugar-pmfs--pmux8q7cs3ypk8/ha--ha/wrwycr--smux8q7bk29dtx/hmrfast6_ha_a_t200000.xvg",
+      "sha256": "eac75cf451ca03b4df43abbd2fd4758c512adb3349f63d2abc97e8502a65db59",
+      "size": 9516,
+      "uploaded": "2026-10-06T22:18:43.544Z"
+    },
+    {
+      "id": "fmux8q7bmnkylw",
+      "kind": "pmf-xvg",
+      "mime": "",
+      "name": "hmrfast6_ha_b_t200000.xvg",
+      "origin": "upload",
+      "owner": "rmux8q7bmtqwdt",
+      "path": "sugar-pmfs--pmux8q7cs3ypk8/ha--ha/wrwycr--smux8q7bk29dtx/hmrfast6_ha_b_t200000.xvg",
+      "sha256": "eac75cf451ca03b4df43abbd2fd4758c512adb3349f63d2abc97e8502a65db59",
+      "size": 9516,
+      "uploaded": "2026-10-06T22:18:43.545Z"
+    },
+    {
+      "id": "fmux8q7bnj6nov",
+      "kind": "pmf-xvg",
+      "mime": "",
+      "name": "hmrfast6_pg_a_t200000.xvg",
+      "origin": "upload",
+      "owner": "rmux8q7bmqwe93",
+      "path": "sugar-pmfs--pmux8q7cs3ypk8/pg--pg/wrwycr--smux8q7bk29dtx/hmrfast6_pg_a_t200000.xvg",
+      "sha256": "eac75cf451ca03b4df43abbd2fd4758c512adb3349f63d2abc97e8502a65db59",
+      "size": 9516,
+      "uploaded": "2026-10-06T22:18:43.545Z"
+    },
+    {
+      "id": "fmux8q7bvmdbf1",
+      "kind": "analysis-xvg",
+      "mime": "",
+      "name": "07.md_rdf_protein_sugar.xvg",
+      "origin": "upload",
+      "owner": "xmux8q7car42p8",
+      "path": "sugar-pmfs--pmux8q7cs3ypk8/ha--ha/wrwycr--smux8q7bk29dtx/rdf-run-1--xmux8q7car42p8/07.md_rdf_protein_sugar.xvg",
+      "sha256": "ac2dcac57f5e469c8491e047705e661140bb3b345f063bbb5e0a3059cc3da26c",
+      "size": 32107,
+      "uploaded": "2026-10-06T22:18:43.546Z"
+    },
+    {
+      "id": "fmux8q7c6tjxqb",
+      "kind": "analysis-xvg",
+      "mime": "",
+      "name": "rdf_copy.xvg",
+      "origin": "upload",
+      "owner": "xmux8q7car42p8",
+      "path": "sugar-pmfs--pmux8q7cs3ypk8/ha--ha/wrwycr--smux8q7bk29dtx/rdf-run-1--xmux8q7car42p8/rdf_copy.xvg",
+      "sha256": "ac2dcac57f5e469c8491e047705e661140bb3b345f063bbb5e0a3059cc3da26c",
+      "size": 32107,
+      "uploaded": "2026-10-06T22:18:43.547Z"
+    },
+    {
+      "id": "fmux8q7cguvtl2",
+      "kind": "analysis-xvg",
+      "mime": "",
+      "name": "hist_500000.xvg",
+      "origin": "upload",
+      "owner": "xmux8q7cjhdzdb",
+      "path": "sugar-pmfs--pmux8q7cs3ypk8/ha--ha/wrwycr--smux8q7bk29dtx/hist-run-2--xmux8q7cjhdzdb/hist_500000.xvg",
+      "sha256": "079fe57ce87ffe7dee83f7cf76499c715c79ec4df364065583bfcd4a5788d5d9",
+      "size": 58143,
+      "uploaded": "2026-10-06T22:18:43.547Z"
+    },
+    {
+      "id": "fmux8q7cjhl3yz",
+      "kind": "structure",
+      "mime": "",
+      "name": "test.pdb",
+      "origin": "upload",
+      "owner": "stmux8q7cjhl3yz",
+      "path": "sugar-pmfs--pmux8q7cs3ypk8/_sequences/wrwycr--smux8q7bk29dtx/test.pdb",
+      "sha256": "9fb5286ada07337029a7c82da72356053737f3939dbcef4ca6ac78c6b137496c",
+      "size": 4709,
+      "uploaded": "2026-10-06T22:18:43.548Z"
+    }
+  ],
+  "group": "hmr+fast+6",
+  "id": "smux8q7bk29dtx",
+  "literature": {},
+  "name": "WRWYCR",
+  "notes": {
+    "cells": {},
+    "row": "nmux8q7dp5ygf7"
+  },
+  "runs": [
+    {
+      "added": "2026-10-06",
+      "column": "ha",
+      "file": "fmux8q7blsndb3",
+      "id": "rmux8q7bkc7pt5",
+      "parse": {
+        "xCol": 1,
+        "yCol": 2
+      },
+      "slot": "a",
+      "tags": [
+        "add",
+        "hmr"
+      ],
+      "temp": 310.15,
+      "time": "200000"
+    },
+    {
+      "added": "2026-10-06",
+      "column": "ha",
+      "file": "fmux8q7bmnkylw",
+      "id": "rmux8q7bmtqwdt",
+      "parse": {
+        "xCol": 1,
+        "yCol": 2
+      },
+      "slot": "b",
+      "tags": [
+        "fast"
+      ],
+      "temp": 310.15,
+      "time": "200000"
+    },
+    {
+      "added": "2026-10-06",
+      "column": "pg",
+      "file": "fmux8q7bnj6nov",
+      "id": "rmux8q7bmqwe93",
+      "parse": {
+        "xCol": 1,
+        "yCol": 2
+      },
+      "slot": "a",
+      "tags": [],
+      "temp": 310.15,
+      "time": "200000"
+    }
+  ],
+  "seq": "WRWYCR",
+  "structures": [
+    {
+      "added": "2026-10-06",
+      "atoms": 58,
+      "file": "fmux8q7cjhl3yz",
+      "format": "pdb",
+      "id": "stmux8q7cjhl3yz",
+      "title": ""
+    }
+  ],
+  "type": "row",
+  "visibility": {
+    "pg": {
+      "a": "dim"
+    }
+  }
+}
