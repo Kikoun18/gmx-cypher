@@ -21,6 +21,11 @@ describe('picking a trajectory suggests the rest', () => {
       want: { runInput: ['07_md.tpr', 'same name as the trajectory'], structure: ['07_md.gro', 'same name as the trajectory'], index: ['../index.ndx', 'index.ndx in the folder above'] },
     },
     {
+      case: 'index.ndx one folder up beats an index some other tool wrote here (gmx hbond -hbn)',
+      traj: '07_md.xtc', here: ['07.md_hbindex_protein_sugar.ndx', '07_md.tpr', '07_md.xtc'], parent: ['07_md', 'index.ndx'],
+      want: { runInput: ['07_md.tpr', 'same name as the trajectory'], index: ['../index.ndx', 'index.ndx in the folder above'] },
+    },
+    {
       case: 'other names: the only one of its kind in the folder',
       traj: 'traj_comp.xtc', here: ['confout.gro', 'topol.tpr', 'traj_comp.xtc', 'groups.ndx'], parent: [],
       want: { runInput: ['topol.tpr', 'the only .tpr in the folder'], structure: ['confout.gro', 'the only structure in the folder'], index: ['groups.ndx', 'the only .ndx in the folder'] },

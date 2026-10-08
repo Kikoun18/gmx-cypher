@@ -18,8 +18,8 @@ export interface Suggestion { name: string; why: string }
 
 /**
  * Picking `trajectory` (a name in `here`) suggests the run input, structure and index: the same stem first,
- * else the only one of its kind in the folder; for the index also index.ndx here, then in the folder above
- * (`parent`), as your own commands use `-n ../index.ndx`. Two candidates and no same name: no guess.
+ * else the only one of its kind in the folder. For the index: the same name, index.ndx here, index.ndx in the
+ * folder above (`parent`, as your commands use `-n ../index.ndx`), then a lone .ndx here. Two candidates: no guess.
  */
 export function suggestInputs(trajectory: string, here: string[], parent: string[]): Partial<Record<Exclude<Slot, 'trajectory'>, Suggestion>> {
   const s = stem(trajectory), out: Partial<Record<Exclude<Slot, 'trajectory'>, Suggestion>> = {};
@@ -32,7 +32,9 @@ export function suggestInputs(trajectory: string, here: string[], parent: string
   const structure = ['.gro', '.pdb'].includes(ext(trajectory)) ? { name: trajectory, why: 'the trajectory itself' } : pick(['.gro', '.pdb'], 'structure');
   const index = here.includes(s + '.ndx') ? { name: s + '.ndx', why: 'same name as the trajectory' }
     : here.includes('index.ndx') ? { name: 'index.ndx', why: 'index.ndx in the same folder' }
-    : pick(['.ndx'], '.ndx') ?? (parent.includes('index.ndx') ? { name: '../index.ndx', why: 'index.ndx in the folder above' } : undefined);
+    // Before a lone .ndx here: tools write index files next to their outputs (gmx hbond -hbn).
+    : parent.includes('index.ndx') ? { name: '../index.ndx', why: 'index.ndx in the folder above' }
+    : pick(['.ndx'], '.ndx');
   if (runInput) out.runInput = runInput;
   if (structure) out.structure = structure;
   if (index) out.index = index;

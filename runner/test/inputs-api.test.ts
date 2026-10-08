@@ -50,3 +50,16 @@ describe('inputs over HTTP', () => {
     await s.close();
   });
 });
+
+describe('the input check over HTTP', () => {
+  it('answers with the counts and the problems', async () => {
+    const { root, nvt } = sim(), s = await apiServer();
+    await s.call('/api/config', { allow: [root] });
+    const r = await s.call('/api/check', { inputs: { trajectory: join(nvt, '07_md.xtc'), runInput: join(nvt, '07_md.tpr'), structure: join(nvt, '07_md.gro') } });
+    expect(r.status).toBe(200);
+    expect(r.json.ok).toBe(false);
+    expect(r.json.problems).toEqual(['the structure: no atoms could be read from it (a .gro or .pdb?)']);
+    expect(r.json.counts).toEqual({ structure: null, runInput: 3242, trajectory: 3242 });
+    await s.close();
+  });
+});

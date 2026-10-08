@@ -5,6 +5,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { basename, dirname, join } from 'node:path';
 import { TOKENS } from '../../app/src/lib/seq';
 import { suggestInputs } from '../src/lib/inputs';
+import { checkInputs } from './check';
 import { inside, listFolder, namesIn, saveUpload } from './files';
 import { detectGmx, type GmxState } from './gmx';
 import { HttpError, readJson, type Api } from './http';
@@ -58,6 +59,7 @@ export function makeApi(ctx: Ctx): Api {
       const got = suggestInputs(basename(trajectory), namesIn(dir, roots()), namesIn(dirname(dir), roots()));
       return { body: { trajectory: { path: trajectory, why: 'picked' }, ...Object.fromEntries(Object.entries(got).map(([k, v]) => [k, { path: join(dir, v!.name), why: v!.why }])) } };
     }
+    if (is(req, 'POST', url, '/api/check')) return { body: await checkInputs((await readJson<{ inputs: Record<string, string> }>(req)).inputs || {}, ctx.gmx, roots()) };
     if (is(req, 'POST', url, '/api/upload')) return { body: await saveUpload(req, ctx.home, url.searchParams.get('name') || 'upload') };
     const job = /^\/api\/jobs\/([\w-]+)(\/cancel)?$/.exec(url.pathname);
     if (job) {

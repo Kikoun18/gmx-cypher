@@ -65,6 +65,12 @@ function rewrite(text, groups, ref) {
   return out.join('\n');
 }
 
+/** Atoms of the file given: a .gro text (line 2), else FAKE_GMX_NATOMS, else your test system's 3242. */
+function natomsOf(file) {
+  try { const n = parseInt(readFileSync(file, 'utf8').split('\n')[1], 10); if (n > 0) return n; } catch { /* not readable as text */ }
+  return Number(process.env.FAKE_GMX_NATOMS || 3242);
+}
+
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 async function rdf() {
@@ -90,4 +96,6 @@ async function rdf() {
 if (argv[0] === '--version') process.stdout.write(read('version.txt'));
 else if (tool === 'rdf' && argv[1] === '-h') process.stdout.write(read('rdf-h.txt'));
 else if (tool === 'rdf') await rdf();
+else if (tool === 'dump') { process.stderr.write(banner('dump')); process.stdout.write(read('dump-head.txt').replace(/natoms = 3242/g, 'natoms = ' + natomsOf(one('-s')))); }
+else if (tool === 'check') { process.stdout.write('Checking file ' + one('-f') + '\n'); process.stderr.write(read('check.stderr').replace('# Atoms  3242', '# Atoms  ' + natomsOf(one('-f')))); }
 else { process.stderr.write('fake gmx: unsupported: ' + argv.join(' ') + '\n'); process.exit(1); }

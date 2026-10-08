@@ -6,7 +6,9 @@ import { Button } from '../ui/button'
 import { Card } from '../ui/card'
 import { Dropzone } from '../ui/dropzone'
 import { Section } from '../ui/separator'
-import { getJson, type AppState } from '../api'
+import { X } from 'lucide-react'
+import { Alert, AlertDescription, AlertTitle } from '../ui/alert'
+import { getJson, postJson, type AppState } from '../api'
 import type { Draft, Picked } from '../draft'
 import { inputRole, type Role, type Slot } from '../lib/inputs'
 import { cn } from '../lib/utils'
@@ -77,7 +79,53 @@ function Browser({ roots, path, onPath, used, onFile }: { roots: string[]; path:
   )
 }
 
-export function Inputs({ state, draft, setDraft, onSettings, children }: { state: AppState; draft: Draft; setDraft: React.Dispatch<React.SetStateAction<Draft>>; onSettings: () => void; children?: React.ReactNode }) {
+interface InputCheck {
+  ok: boolean; problems: string[]
+  counts: { structure: number | null; runInput: number | null; trajectory: number | null }
+  index?: { groups: number; maxAtom: number }; estimate?: { frames: number; start: number; end: number } | null
+}
+
+/** Re-checked whenever an input changes: counts as gmx reads them, and every problem in words (R2b). */
+function useInputCheck(inputs: Draft['inputs']) {
+  const key = JSON.stringify(Object.fromEntries(Object.entries(inputs).map(([k, v]) => [k, v!.path])))
+  const complete = !!(inputs.trajectory && inputs.runInput && inputs.structure)
+  const [result, setResult] = React.useState<{ key: string; check: InputCheck } | null>(null)
+  React.useEffect(() => {
+    if (!complete) return
+    let alive = true
+    const fail = (e: Error) => ({ ok: false, problems: [e.message], counts: { structure: null, runInput: null, trajectory: null } })
+    postJson<InputCheck>('/api/check', { inputs: JSON.parse(key) }).then(c => alive && setResult({ key, check: c }), e => alive && setResult({ key, check: fail(e) }))
+    return () => { alive = false }
+  }, [key, complete])
+  // The result shown is only ever the one for the current inputs.
+  return { check: complete && result?.key === key ? result.check : null, busy: complete && result?.key !== key }
+}
+
+function Checks({ check, busy }: ReturnType<typeof useInputCheck>) {
+  if (busy) return <p className="m-0 text-control text-muted-foreground" aria-live="polite">checking…</p>
+  if (!check) return <p className="m-0 text-control text-muted-foreground">pick a trajectory, a run input and a structure</p>
+  const row = (label: string, how: string, n: number | null) => (
+    <tr key={label}><td className="py-1 text-muted-foreground">{label}</td><td className="text-caption text-muted-foreground">{how}</td><td className="text-right font-bold">{n == null ? '—' : n + ' atoms'}</td></tr>
+  )
+  return (
+    <div className="flex flex-col gap-3" aria-live="polite">
+      <table className="text-control"><tbody>
+        {row('structure', 'read here', check.counts.structure)}
+        {row('run input', 'gmx dump', check.counts.runInput)}
+        {row('trajectory', 'gmx check', check.counts.trajectory)}
+        {check.index && <tr><td className="py-1 text-muted-foreground">index</td><td className="text-caption text-muted-foreground">{check.index.groups} groups</td><td className="text-right font-bold">atoms ≤ {check.index.maxAtom}</td></tr>}
+      </tbody></table>
+      {check.ok ? (
+        <p className="m-0 text-control text-mint-strong">✓ the inputs agree{check.estimate ? ' · ≈' + check.estimate.frames + ' frames, ' + check.estimate.start + '–' + check.estimate.end + ' ps (from the run input)' : ''}</p>
+      ) : (
+        <Alert variant="destructive"><X /><AlertTitle>✗ these inputs can't run together</AlertTitle><AlertDescription>{check.problems.map(p => <p key={p}>{p}</p>)}</AlertDescription></Alert>
+      )}
+    </div>
+  )
+}
+
+export function Inputs({ state, draft, setDraft, onSettings, onNext }: { state: AppState; draft: Draft; setDraft: React.Dispatch<React.SetStateAction<Draft>>; onSettings: () => void; onNext?: () => void }) {
+  const checked = useInputCheck(draft.inputs)
   const roots = state.config.allow
   const [path, setPath] = React.useState<string | null>(() => { const t = draft.inputs.trajectory?.path; return t ? t.slice(0, t.lastIndexOf('/')) : roots[0] || null })
   const [picking, setPicking] = React.useState<Slot | null>(null)
@@ -140,7 +188,9 @@ export function Inputs({ state, draft, setDraft, onSettings, children }: { state
             </div>
           )
         })}
-        {children}
+        <Section label="Checks" />
+        <Checks {...checked} />
+        {onNext && <Button size="lg" className="self-start" disabled={!checked.check?.ok || !state.gmx.ok} onClick={onNext}>use these inputs</Button>}
       </div>
     </div>
   )
