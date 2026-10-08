@@ -63,3 +63,20 @@ describe('the input check over HTTP', () => {
     await s.close();
   });
 });
+
+describe('reading a structure or an index for the GUI', () => {
+  it('serves the text of a .gro, .pdb or .ndx inside the allowed folders, and nothing else', async () => {
+    const { root, nvt } = sim(), s = await apiServer();
+    await s.call('/api/config', { allow: [root] });
+    writeFileSync(join(nvt, 'notes.txt'), 'private');
+    const get = (p: string) => fetch(s.base + '/api/file?path=' + encodeURIComponent(p), { headers: s.headers });
+    const gro = await get(join(nvt, '07_md.gro'));
+    expect(gro.status).toBe(200);
+    expect(await gro.text()).toBe('07_md.gro');
+    expect((await get(join(root, 'index.ndx'))).status).toBe(200);
+    expect((await get(join(nvt, '07_md.xtc'))).status).toBe(400);
+    expect((await get(join(nvt, 'notes.txt'))).status).toBe(400);
+    expect((await get('/etc/hostname')).status).toBe(403);
+    await s.close();
+  });
+});

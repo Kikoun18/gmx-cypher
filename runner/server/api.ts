@@ -1,6 +1,6 @@
 // The API: thin routes that call the pure functions in src/lib and the side effects in server/.
 
-import { realpathSync, statSync } from 'node:fs';
+import { createReadStream, realpathSync, statSync } from 'node:fs';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { basename, dirname, join } from 'node:path';
 import { TOKENS } from '../../app/src/lib/seq';
@@ -58,6 +58,14 @@ export function makeApi(ctx: Ctx): Api {
       const trajectory = inside(url.searchParams.get('trajectory') || '', roots()), dir = dirname(trajectory);
       const got = suggestInputs(basename(trajectory), namesIn(dir, roots()), namesIn(dirname(dir), roots()));
       return { body: { trajectory: { path: trajectory, why: 'picked' }, ...Object.fromEntries(Object.entries(got).map(([k, v]) => [k, { path: join(dir, v!.name), why: v!.why }])) } };
+    }
+    if (is(req, 'GET', url, '/api/file')) {
+      // Structures and indexes only: the GUI draws and reads them. Trajectories stay on the server.
+      const path = inside(url.searchParams.get('path') || '', roots());
+      if (!/\.(gro|pdb|ndx)$/i.test(path)) throw new HttpError(400, 'only .gro, .pdb and .ndx files are sent to the browser');
+      res.writeHead(200, { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' });
+      createReadStream(path).pipe(res);
+      return 'handled';
     }
     if (is(req, 'POST', url, '/api/check')) return { body: await checkInputs((await readJson<{ inputs: Record<string, string> }>(req)).inputs || {}, ctx.gmx, roots()) };
     if (is(req, 'POST', url, '/api/upload')) return { body: await saveUpload(req, ctx.home, url.searchParams.get('name') || 'upload') };
