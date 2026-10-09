@@ -2,13 +2,24 @@
 // never data. Jobs and outputs live on the server.
 
 import * as React from 'react'
+import type { Group } from './lib/groups'
 import type { Slot } from './lib/inputs'
 
 export interface Picked { path: string; why: string }
-export interface Draft { inputs: Partial<Record<Slot, Picked>> }
+export interface Draft {
+  inputs: Partial<Record<Slot, Picked>>
+  /** The reference first, then the selections. */
+  groups: Group[]
+  /** gmx rdf options set so far, by flag without its dash (R4a). */
+  options: Record<string, string | boolean>
+}
 
 const KEY = 'gmx-cypher-draft'
-const EMPTY: Draft = { inputs: {} }
+export const NEW_GROUPS: Group[] = [
+  { role: 'reference', name: 'reference', tone: 'coral', steps: [] },
+  { role: 'selection', name: 'selection', tone: 'sky', steps: [] },
+]
+const EMPTY: Draft = { inputs: {}, groups: NEW_GROUPS, options: {} }
 
 function read(): Draft {
   try { return { ...EMPTY, ...JSON.parse(localStorage.getItem(KEY) || '{}') } } catch { return EMPTY }

@@ -9,6 +9,12 @@ import type { Tone } from '../lib/tones'
 export type PickHow = 'atom' | 'residue' | 'name'
 
 const LOOKS: { v: Look; label: string }[] = [{ v: 'cartoon', label: 'cartoon' }, { v: 'stick', label: 'sticks' }, { v: 'sphere', label: 'spheres' }, { v: 'line', label: 'lines' }]
+/** A group's atoms in the current look, coloured: spheres stay spheres, the rest are sticks with a small ball. */
+const groupStyle = (look: Look, color: string) =>
+  look === 'sphere' ? { sphere: { scale: 0.9, color } } : { stick: { radius: look === 'line' ? 0.06 : 0.16, color }, sphere: { scale: 0.28, color } }
+/** The rest in one neutral colour: 3Dmol takes one opacity per model, so fading by opacity would fade the groups too. */
+const neutral = (style: Record<string, unknown>, color: string) =>
+  Object.fromEntries(Object.entries(style).map(([k, v]) => { const { colorscheme: _, ...rest } = v as Record<string, unknown>; return [k, { ...rest, color }] }))
 const cssVar = (name: string) => getComputedStyle(document.documentElement).getPropertyValue(name).trim()
 
 /** The theme in use, so colours read from the tokens follow a switch. */
@@ -25,7 +31,7 @@ function useThemeName() {
 /**
  * The structure drawn with PMF Sequences' toPdb, structStyle and defaultView (R3a). It is loaded with keepH
  * and hydrogens are hidden by style, so 3Dmol's atom index k is always the k-th drawn atom, whose GROMACS
- * number is drawnNumbers(atoms)[k] (T14). Group atoms get a ball in their hue's strong ink.
+ * number is drawnNumbers(atoms)[k] (T14). Group atoms are drawn in their hue's strong ink.
  */
 export function Viewer({ text, format, atoms, colour, onPick, describe }: {
   text: string; format: 'gro' | 'pdb'; atoms: Atom[]
@@ -68,11 +74,14 @@ export function Viewer({ text, format, atoms, colour, onPick, describe }: {
     if (!viewer) return
     viewer.setBackgroundColor(cssVar('--card'), 1)
     viewer.setStyle({}, {})
-    for (const [sel, style] of structStyle(info, look, solvent).styles) viewer.setStyle(sel as never, style as never)
+    // With groups, the rest is drawn in a neutral grey, so a group's hue never hides among element colours (oxygen red vs coral).
+    const rest = colour.size > 0 ? cssVar('--input') : null
+    for (const [sel, style] of structStyle(info, look, solvent).styles) viewer.setStyle(sel as never, (rest ? neutral(style, rest) : style) as never)
     if (!hydrogens) viewer.setStyle({ elem: 'H' } as never, {} as never)
     const byTone = new Map<Tone, number[]>()
-    for (const [nr, tone] of colour) { const k = index.get(nr); if (k != null) byTone.set(tone, [...(byTone.get(tone) || []), k]) }
-    for (const [tone, ks] of byTone) viewer.addStyle({ index: ks } as never, { sphere: { scale: 0.32, color: cssVar('--' + tone + '-strong') } } as never)
+    for (const [nr, tone] of colour) { const k = index.get(nr); if (k != null) { if (!byTone.has(tone)) byTone.set(tone, []); byTone.get(tone)!.push(k) } }
+    // Group atoms are drawn in the look itself, in their hue, and always shown (hydrogens and water included).
+    for (const [tone, ks] of byTone) viewer.setStyle({ index: ks } as never, groupStyle(look, cssVar('--' + tone + '-strong')) as never)
     viewer.render()
   }, [viewer, info, look, solvent, hydrogens, colour, index, theme])
 

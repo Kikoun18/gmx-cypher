@@ -27,7 +27,7 @@ Order as approved in [`phase0.md`](phase0.md) §10: R5 before R4b, and R4d after
 - [x] R2a Choosing files by path (server-side browser within allowed folders) and by upload
 - [x] R2b Checking inputs: formats, atom counts of structure, run input and trajectory
 - [x] R3a 3D view with a drawn-atom → GROMACS-number map
-- [ ] R3b Groups: click, residue, rule; reference and selections; overlap warning
+- [x] R3b Groups: click, residue, rule; reference and selections; overlap warning
 - [ ] R3c `.ndx` read and write; existing groups shown in 3D
 
 ### Phase 3: RDF (R4, R5)

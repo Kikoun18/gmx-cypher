@@ -86,7 +86,7 @@ export function App() {
           </Alert>
         )}
         <TabsContent value="inputs">{state && <Inputs state={state} draft={draft} setDraft={setDraft} onSettings={() => setSettings(true)} onNext={() => setTab('groups')} />}</TabsContent>
-        <TabsContent value="groups"><Groups draft={draft} /></TabsContent>
+        <TabsContent value="groups"><Groups draft={draft} setDraft={setDraft} /></TabsContent>
         <TabsContent value="jobs"><JobsView {...jobs} selected={selectedJob} onSelect={setSelectedJob} /></TabsContent>
       </main>
       </Tabs>
