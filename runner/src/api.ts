@@ -6,7 +6,7 @@ export interface AppState { name: string; version: string; tokens: { t: string; 
 
 async function reply<T>(res: Response): Promise<T> {
   const body = await res.json().catch(() => ({ error: res.statusText }));
-  if (!res.ok) throw new Error(body.error || res.statusText);
+  if (!res.ok) throw Object.assign(new Error(body.error || res.statusText), { status: res.status });
   return body as T;
 }
 

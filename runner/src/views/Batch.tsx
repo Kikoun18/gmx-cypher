@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { X } from 'lucide-react'
+import { TriangleAlert, X } from 'lucide-react'
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert'
 import { Button } from '../ui/button'
 import { Checkbox } from '../ui/checkbox'
@@ -10,6 +10,7 @@ import { Section } from '../ui/separator'
 import { getJson, postJson, type AppState } from '../api'
 import type { Draft } from '../draft'
 import { STATUS, type Job } from '../jobs'
+import { batchSummary, sentSummary } from '../lib/batch'
 import { recipeFromDraft, type Recipe } from '../lib/recipe'
 import { cn } from '../lib/utils'
 import { FIELD_LABEL } from '../../../app/src/lib/seq'
@@ -52,7 +53,8 @@ function BatchCard({ b, jobs, vault, onOpenJob }: { b: Batch; jobs: Job[]; vault
     <section className="flex flex-col gap-2 rounded-lg border border-border bg-card p-3" aria-label={'batch ' + b.recipe}>
       <div className="flex flex-wrap items-center gap-3">
         <span className="text-control font-bold">{b.recipe}</span>
-        <span className="min-w-0 flex-1 truncate text-caption text-muted-foreground">{b.template} · {b.concurrency} at a time · {done} of {b.items.length} done</span>
+        <span className="min-w-0 flex-1 truncate text-caption text-muted-foreground">{b.template} · {b.concurrency} at a time</span>
+        <span className="text-caption" aria-live="polite">{batchSummary(b.items, id => job(id)?.status)}</span>
         {running && <Button variant="destructive" size="sm" onClick={() => { if (armed) { postJson('/api/batches/' + b.id + '/cancel', {}).catch(() => {}); setArmed(false) } else setArmed(true) }}>{armed ? 'click again to cancel all' : 'cancel all'}</Button>}
       </div>
       <table className="text-control"><tbody>
@@ -76,7 +78,7 @@ function BatchCard({ b, jobs, vault, onOpenJob }: { b: Batch; jobs: Job[]; vault
             </Select>
           )}
           <Button variant="outline" size="sm" disabled={!project || !!sent} onClick={sendAll}>{sent ? '✓ sent' : 'send all to vault'}</Button>
-          <span className="text-caption text-muted-foreground">each by the rule of a single send: only where PMF Sequences would put it where its path says; the rest are listed</span>
+          <span className="text-caption text-muted-foreground" aria-live="polite">{sent ? sentSummary(sent) : 'each by the rule of a single send: only where PMF Sequences would put it where its path says; the rest are listed'}</span>
         </div>
       )}
       {error && <FieldHint error>✗ {error}</FieldHint>}
@@ -92,6 +94,7 @@ export function BatchView({ state, draft, jobs, onOpenJob }: { state: AppState; 
   const [template, setTemplate] = React.useState('')
   const [concurrency, setConcurrency] = React.useState(String(state.config.concurrency))
   const [items, setItems] = React.useState<Item[] | null>(null)
+  const [unread, setUnread] = React.useState<string[]>([])
   const [chosen, setChosen] = React.useState<Set<string>>(new Set())
   const [error, setError] = React.useState('')
   const [busy, setBusy] = React.useState(false)
@@ -101,8 +104,8 @@ export function BatchView({ state, draft, jobs, onOpenJob }: { state: AppState; 
   const preview = async () => {
     setBusy(true); setError('')
     try {
-      const r = await postJson<{ items: Item[] }>('/api/batch/preview', { root, template, recipe: await recipe() })
-      setItems(r.items); setChosen(new Set(r.items.filter(i => !i.problems.length).map(i => i.rel)))
+      const r = await postJson<{ items: Item[]; unread: string[] }>('/api/batch/preview', { root, template, recipe: await recipe() })
+      setItems(r.items); setUnread(r.unread); setChosen(new Set(r.items.filter(i => !i.problems.length).map(i => i.rel)))
     } catch (e) { setError((e as Error).message); setItems(null) } finally { setBusy(false) }
   }
   const run = async () => {
@@ -145,6 +148,10 @@ export function BatchView({ state, draft, jobs, onOpenJob }: { state: AppState; 
         <span className="text-caption text-muted-foreground" aria-live="polite">{items ? items.length + ' trajectories match · nothing runs until you press run' : 'nothing runs until you have seen the preview'}</span>
       </div>
       {error && <Alert variant="destructive"><X /><AlertTitle>no batch</AlertTitle><AlertDescription><p className="whitespace-pre-line">{error}</p></AlertDescription></Alert>}
+      {items && unread.length > 0 && (
+        <Alert variant="warning"><TriangleAlert /><AlertTitle>{unread.length === 1 ? 'one place was not looked into' : unread.length + ' places were not looked into'}</AlertTitle>
+          <AlertDescription>{unread.map(u => <p key={u} className="break-all">{u}</p>)}</AlertDescription></Alert>
+      )}
       {items && (
         <table className="text-control">
           <thead><tr className="text-left text-label uppercase text-muted-foreground"><th className="w-8" /><th className="py-1 pr-3 font-normal">trajectory</th><th className="pr-3 font-normal">fields</th><th className="pr-3 font-normal">inputs</th><th className="pr-3 font-normal">atoms per group</th><th className="font-normal">problems</th></tr></thead>

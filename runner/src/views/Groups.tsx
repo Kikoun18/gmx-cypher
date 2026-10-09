@@ -12,6 +12,7 @@ import type { Draft } from '../draft'
 import { useIndex, useStructure } from '../structure'
 import { fromRanges, toRanges, type Atom } from '../lib/atoms'
 import { clickStep, groupAtoms, nameProblem, ruleText, shared, type Group, type Rule, type Step } from '../lib/groups'
+import { fitKeys, initialKeys, removeKey } from '../lib/keys'
 import type { NdxGroup } from '../lib/ndx'
 import { TONES, toneSolid, toneText, type Tone } from '../lib/tones'
 import { cn } from '../lib/utils'
@@ -132,6 +133,10 @@ export function Groups({ draft, setDraft }: { draft: Draft; setDraft: React.Disp
   const indexGroups = useIndex(draft.inputs.index?.path)
   const index = React.useMemo(() => ({ file: draft.inputs.index?.path.split('/').pop() || '', groups: indexGroups }), [draft.inputs.index, indexGroups])
   const [current, setCurrent] = React.useState(0)
+  // Each card keeps its own key, so removing one doesn't pass its state to the next (review finding 7).
+  const [cardKeys, setCardKeys] = React.useState(() => initialKeys(draft.groups.length))
+  const keys = fitKeys(cardKeys, draft.groups.length)
+  if (keys !== cardKeys) setCardKeys(keys)
   const atoms = structure && !('error' in structure) ? structure.atoms : null
   const sets = React.useMemo(() => (atoms ? draft.groups.map(g => groupAtoms(atoms, g.steps)) : []), [atoms, draft.groups])
   const colour = React.useMemo(() => {
@@ -168,8 +173,8 @@ export function Groups({ draft, setDraft }: { draft: Draft; setDraft: React.Disp
         <Section label={'Selections ' + String(draft.groups.length - 1).padStart(2, '0')}><Button variant="dashed" size="sm" shape="pill" onClick={addSelection}><Plus /> group</Button></Section>
         {draft.groups.slice(1).map((g, k) => {
           const i = k + 1
-          return <GroupCard key={i} group={g} atoms={structure.atoms} index={index} nrs={sets[i]} others={names(i)} current={current === i} onCurrent={() => setCurrent(i)} onChange={x => setGroup(i, x)}
-            onRemove={draft.groups.length > 2 ? () => { setDraft(d => ({ ...d, groups: d.groups.filter((_, j) => j !== i) })); setCurrent(0) } : undefined} />
+          return <GroupCard key={keys.keys[i]} group={g} atoms={structure.atoms} index={index} nrs={sets[i]} others={names(i)} current={current === i} onCurrent={() => setCurrent(i)} onChange={x => setGroup(i, x)}
+            onRemove={draft.groups.length > 2 ? () => { setDraft(d => ({ ...d, groups: d.groups.filter((_, j) => j !== i) })); setCardKeys(c => removeKey(c, i)); setCurrent(0) } : undefined} />
         })}
         {draft.groups.slice(1).map((g, k) => {
           const both = shared(sets[0], sets[k + 1])

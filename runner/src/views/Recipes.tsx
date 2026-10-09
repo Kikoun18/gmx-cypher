@@ -8,19 +8,29 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Section } from '../ui/separator'
 import { getJson, postJson } from '../api'
 import type { Draft } from '../draft'
-import { draftFromRecipe, recipeFileProblems, recipeFromDraft, type Recipe } from '../lib/recipe'
+import { draftFromRecipe, recipeFileProblems, recipeFromDraft, recipeId, type Recipe } from '../lib/recipe'
 
 /** Recipes (R7a): this run's options, groups and names saved under a name, loaded again, exported and imported as JSON. */
 export function Recipes({ draft, setDraft }: { draft: Draft; setDraft: React.Dispatch<React.SetStateAction<Draft>> }) {
   const [list, setList] = React.useState<{ id: string; name: string; saved: string }[]>([])
   const [name, setName] = React.useState('')
   const [error, setError] = React.useState('')
+  // A taken name arms the save button: the second click replaces the saved recipe (review finding 11).
+  const [armed, setArmed] = React.useState(false)
+  React.useEffect(() => { if (!armed) return; const t = setTimeout(() => setArmed(false), 2600); return () => clearTimeout(t) }, [armed])
   const fileRef = React.useRef<HTMLInputElement>(null)
   const refresh = React.useCallback(() => { getJson<typeof list>('/api/recipes').then(setList, () => {}) }, [])
   React.useEffect(refresh, [refresh])
   const apply = (r: Recipe, how: string) => { setDraft(d => draftFromRecipe(r, d)); setName(r.name); setError(''); toast('✓ ' + how + ' ' + r.name + ': its groups and options are in the form') }
-  const save = async (r: Recipe) => {
-    try { await postJson('/api/recipes', r); refresh(); setError(''); return true } catch (e) { setError((e as Error).message); return false }
+  const save = async (r: Recipe, replace = false) => {
+    // A taken name is known from the list, so the usual case asks nothing of the server; its 409 stays for a race.
+    const taken = !replace && list.find(x => x.id === recipeId(r.name))
+    if (taken) { setError('a recipe named "' + taken.name + '" is saved already: click save again to replace it'); setArmed(true); return false }
+    try { await postJson('/api/recipes' + (replace ? '?replace=1' : ''), r); refresh(); setError(''); setArmed(false); return true }
+    catch (e) {
+      const taken = (e as { status?: number }).status === 409
+      setError((e as Error).message + (taken ? ': click save again to replace it' : '')); setArmed(taken); return false
+    }
   }
   const load = async (id: string) => { try { apply(await getJson<Recipe>('/api/recipes/' + encodeURIComponent(id)), 'loaded') } catch (e) { setError((e as Error).message) } }
   const exportIt = () => {
@@ -33,7 +43,8 @@ export function Recipes({ draft, setDraft }: { draft: Draft; setDraft: React.Dis
     try {
       const r = JSON.parse(await f.text()), problems = recipeFileProblems(r)
       if (problems.length) { setError(f.name + ': ' + problems.join('; ')); return }
-      if (await save(r)) apply(r, 'imported')
+      apply(r, 'imported')
+      await save(r)
     } catch { setError(f.name + ' is not JSON') }
   }
   return (
@@ -44,8 +55,8 @@ export function Recipes({ draft, setDraft }: { draft: Draft; setDraft: React.Dis
           <SelectTrigger size="sm" className="w-44" aria-label="load a recipe" disabled={!list.length}><SelectValue placeholder={list.length ? 'load…' : 'none saved yet'} /></SelectTrigger>
           <SelectContent>{list.map(r => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}</SelectContent>
         </Select>
-        <Input size="sm" className="w-40" value={name} placeholder="name" aria-label="recipe name" onChange={e => setName(e.target.value)} />
-        <Button variant="outline" size="sm" disabled={!name.trim()} onClick={async () => { if (await save(recipeFromDraft(draft, name.trim()))) toast('✓ saved recipe ' + name.trim()) }}>save</Button>
+        <Input size="sm" className="w-40" value={name} placeholder="name" aria-label="recipe name" onChange={e => { setName(e.target.value); setArmed(false) }} />
+        <Button variant={armed ? 'destructive' : 'outline'} size="sm" disabled={!name.trim()} onClick={async () => { if (await save(recipeFromDraft(draft, name.trim()), armed)) toast('✓ saved recipe ' + name.trim()) }}>{armed ? 'click again to replace' : 'save'}</Button>
         <Button variant="ghost" size="sm" onClick={exportIt} aria-label="export the recipe as JSON"><Download /> export</Button>
         <Button variant="ghost" size="sm" onClick={() => fileRef.current?.click()} aria-label="import a recipe from JSON"><Upload /> import</Button>
         <input ref={fileRef} type="file" accept=".json,application/json" hidden onChange={e => { const f = e.target.files?.[0]; if (f) importIt(f); e.target.value = '' }} />

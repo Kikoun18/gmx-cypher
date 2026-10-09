@@ -2,7 +2,7 @@
 // spawn, each group's size confirmed by gmx select, the index written next to the outputs with O_EXCL, gmx
 // started without a shell, and the run record written when it ends. Nothing existing is ever replaced.
 
-import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, statSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import { atomTable, type Atom } from '../src/lib/atoms';
 import { groupAtoms, nameProblem, type Group } from '../src/lib/groups';
@@ -16,7 +16,7 @@ import { buildRecord, type FileInfo, type Output, type RunRecord } from '../src/
 import { structFormat } from '../../app/src/lib/structFile';
 import type { Ctx } from './api';
 import { checkSizes, dumpRunInput } from './check';
-import { inside, sha256File } from './files';
+import { inside, sha256File, within } from './files';
 import { rdfHelp } from './gmx';
 import { HttpError } from './http';
 import type { Job } from './jobs';
@@ -43,6 +43,9 @@ export async function planRun(ctx: Ctx, req: RunRequest, roots: string[]): Promi
   // Uploaded inputs have no folder of their own: their outputs go to the state folder's workspace.
   const uploaded = trajectory.startsWith(join(ctx.home, 'uploads') + '/');
   const outDir = req.outDir ? inside(req.outDir, roots) : uploaded ? join(ctx.home, 'workspace') : join(dirname(trajectory), 'rdf');
+  // The vault is written only by sending, into a project's _inbox (review finding 11).
+  const vault = ctx.config.vault && existsSync(ctx.config.vault) ? realpathSync(ctx.config.vault) : null;
+  if (vault && within(outDir, vault)) throw new HttpError(400, outDir + ' is inside the PMF Sequences vault; results go there only by send to vault');
   let stem: string;
   try { stem = renderStem(req.template || DEFAULT_TEMPLATE, { ...req.names, analysis: 'rdf', trajectory: basename(trajectory).replace(/\.[^.]+$/, '') }); }
   catch (e) {

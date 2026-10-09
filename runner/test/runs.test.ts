@@ -66,6 +66,15 @@ describe('a run writes four new files under one stem' + (REAL ? ' (a real gmx)' 
     await s.close();
   });
 
+  it('refuses an output folder inside the PMF Sequences vault: results go there only by sending (review finding 11)', async () => {
+    const { dir, s, req, roots } = await setup();
+    mkdirSync(join(dir, 'vault/ions'), { recursive: true });
+    s.ctx.config.vault = join(dir, 'vault');
+    await expect(startRun(s.ctx, { ...req, outDir: join(dir, 'vault/ions') }, roots)).rejects.toThrow(join(dir, 'vault/ions') + ' is inside the PMF Sequences vault; results go there only by send to vault');
+    expect(readdirSync(join(dir, 'vault/ions'))).toEqual([]);
+    await s.close();
+  });
+
   it('refuses before starting: options gmx would refuse, a group without atoms, a name gmx would cut', async () => {
     const { s, req, roots } = await setup();
     await expect(startRun(s.ctx, { ...req, options: { excl: true, seltype: 'mol_com' } }, roots)).rejects.toThrow('-excl needs atom positions');

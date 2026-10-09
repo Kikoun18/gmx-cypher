@@ -9,8 +9,8 @@ import { safeFileName } from '../../app/src/lib/storage/path';
 import { inputRole } from '../src/lib/inputs';
 import { HttpError } from './http';
 
-const within = (p: string, root: string) => p === root || p.startsWith(root + sep);
-const real = (p: string) => { try { return realpathSync(p); } catch { return null; } };
+export const within = (p: string, root: string) => p === root || p.startsWith(root + sep);
+export const real = (p: string) => { try { return realpathSync(p); } catch { return null; } };
 
 /** The real path of `path`, if it exists and lies inside one of `roots` once every link is followed. */
 export function inside(path: string, roots: string[]): string {

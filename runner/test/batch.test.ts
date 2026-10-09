@@ -1,6 +1,6 @@
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { matchTrajectory, vaultFields } from '../src/lib/batch';
+import { batchSummary, matchTrajectory, sentSummary, vaultFields } from '../src/lib/batch';
 import { recipeFromDraft } from '../src/lib/recipe';
 import { findTrajectories } from '../server/batch';
 import { clusterCopy, tmp } from './helpers';
@@ -53,6 +53,27 @@ describe('the preview of a batch: every match, its inputs, its groups\' atoms, a
   });
 });
 
+describe('the walk under the root (review finding 11)', () => {
+  it('follows linked folders inside the allowed ones, stops at loops, and names what it could not look into', async () => {
+    const { mkdirSync, renameSync, symlinkSync } = await import('node:fs');
+    const root = clusterCopy(), elsewhere = tmp('elsewhere'), pg = join(root, 'hmr+fast+6/pg');
+    mkdirSync(join(root, 'store'));
+    renameSync(pg, join(root, 'store/pg'));
+    symlinkSync(join(root, 'store/pg'), pg);
+    symlinkSync(join(root, 'hmr+fast+6'), join(root, 'hmr+fast+6/ha/loop'));
+    symlinkSync(elsewhere, join(root, 'out'));
+    symlinkSync(join(root, 'gone'), join(root, 'broken'));
+    // The same runs again through a link whose path sorts first but doesn't match: they stay listed under the matching path, once.
+    symlinkSync(join(root, 'hmr+fast+6'), join(root, 'a-copy'));
+    const unread: string[] = [];
+    const items = findTrajectories(root, TEMPLATE, recipe, [root], unread);
+    expect(items.map(i => i.rel)).toEqual([
+      'hmr+fast+6/ha/WRWYCR/9.multiwalker/1/07_md.xtc', 'hmr+fast+6/ha/WRWYCR/9.multiwalker/2/07_md.xtc', 'hmr+fast+6/pg/WRWYCR/9.multiwalker/1/07_md.xtc',
+    ]);
+    expect(unread.sort()).toEqual(['a-copy/ha/loop: a link back to a folder above it', 'broken: a link to nothing', 'hmr+fast+6/ha/loop: a link back to a folder above it', 'out: a link out of the allowed folders']);
+  });
+});
+
 describe('batches over HTTP', () => {
   it('preview, run the chosen matches, then send all to the vault, file by file by the rule of R6', async () => {
     const { NodeBackend } = await import('../../app/scripts/node-backend');
@@ -81,6 +102,33 @@ describe('batches over HTTP', () => {
       { rel: 'hmr+fast+6/ha/WRWYCR/9.multiwalker/2/07_md.xtc', sent: expect.stringMatching(/\/_inbox\/hmr\+fast\+6_ha_WRWYCR_2\.xvg$/) },
     ]);
     expect((await s.call('/api/batches/' + b.id + '/cancel', {})).json).toMatchObject({ cancelled: true });
+    await s.close();
+  });
+});
+
+describe('send all, item by item (review finding 10)', () => {
+  it('an item that fails is listed with its reason, and the others are still sent', async () => {
+    const { renameSync } = await import('node:fs');
+    const { NodeBackend } = await import('../../app/scripts/node-backend');
+    const { newVault } = await import('../../app/test/helpers');
+    const { apiServer } = await import('./helpers');
+    const { Batches, sendAll } = await import('../server/batch');
+    const root = clusterCopy(), vdir = tmp('vault'), { svc, vault } = await newVault(new NodeBackend(vdir));
+    svc.commit({ ...svc.store, settings: { ...svc.store.settings, pathPattern: '{method}/{column}/{seq}/{*}/{run}', pattern: '{method}_{column}_{seq}_{run}.xvg' } });
+    await svc.flush();
+    await vault.close();
+    const s = await apiServer(), roots = [root];
+    await s.call('/api/config', { allow: [root], vault: vdir });
+    const batches = new Batches(s.ctx, () => roots);
+    const b = await batches.done(batches.start(recipe, root, TEMPLATE, findTrajectories(root, TEMPLATE, recipe, roots).slice(0, 2), 2).id);
+    await new Promise(r => setTimeout(r, 300));
+    const first = s.ctx.jobs.get(b.items[0].job!)!.meta!.record as string;
+    renameSync(first, first + '.away');
+    const sent = await sendAll(s.ctx, b, (await s.call('/api/vault')).json.projects[0].id);
+    expect(sent).toEqual([
+      { rel: b.items[0].rel, skipped: expect.stringMatching(/^could not be sent: ENOENT/) },
+      { rel: b.items[1].rel, sent: expect.stringMatching(/\/_inbox\/hmr\+fast\+6_ha_WRWYCR_2\.xvg$/) },
+    ]);
     await s.close();
   });
 });
@@ -134,5 +182,19 @@ describe('a batch checks each structure against its run input (review finding 1)
     const preview = await s.call('/api/batch/preview', { root, template: TEMPLATE, recipe });
     expect(preview.json.items.map((i: { problems: string[] }) => i.problems)).toEqual([[], ['the structure has 3212 atoms, the run input 3242: its groups would be other atoms'], []]);
     await s.close();
+  });
+});
+
+describe("a batch's progress in words, for its live region (review finding 9)", () => {
+  const jobs: Record<string, string> = { a: 'done', b: 'running', c: 'failed', d: 'interrupted' };
+  it('done first, then each other state that has items', () => {
+    expect(batchSummary([{ status: 'started', job: 'a' }, { status: 'started', job: 'b' }, { status: 'starting' }, { status: 'queued' }], id => jobs[id])).toBe('1 of 4 done · 2 running · 1 waiting');
+    expect(batchSummary([{ status: 'started', job: 'a' }, { status: 'started', job: 'c' }, { status: 'started', job: 'd' }, { status: 'refused' }, { status: 'cancelled' }], id => jobs[id]))
+      .toBe('1 of 5 done · 1 failed · 1 interrupted · 1 refused · 1 cancelled');
+  });
+
+  it('what send all did', () => {
+    expect(sentSummary([{ sent: '/v/p/_inbox/a.xvg' }, { skipped: 'no run' }, { sent: '/v/p/_inbox/b.xvg' }])).toBe('2 sent to the vault · 1 not sent, listed above');
+    expect(sentSummary([{ sent: '/v/p/_inbox/a.xvg' }])).toBe('1 sent to the vault');
   });
 });

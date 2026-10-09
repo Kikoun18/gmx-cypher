@@ -3,7 +3,7 @@
 // size check, job and record. A refusal or a failure stops only that match.
 
 import { EventEmitter } from 'node:events';
-import { readdirSync, readFileSync } from 'node:fs';
+import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { basename, dirname, join, relative } from 'node:path';
 import { structFormat } from '../../app/src/lib/structFile';
 import { atomTable } from '../src/lib/atoms';
@@ -15,7 +15,7 @@ import { structureMismatch } from '../src/lib/checks';
 import type { RunRecord } from '../src/lib/record';
 import type { Ctx } from './api';
 import { dumpRunInput } from './check';
-import { inside, namesIn } from './files';
+import { inside, namesIn, real, within } from './files';
 import { HttpError } from './http';
 import type { Job } from './jobs';
 import { startRun } from './runs';
@@ -28,17 +28,35 @@ export interface BatchItem extends BatchMatch {
 
 const MAX_FILES = 20_000;
 
-/** Every trajectory under root that the template takes, with the inputs beside it and the recipe's groups counted on its structure. */
-export function findTrajectories(rootPath: string, template: string, recipe: Recipe, roots: string[]): BatchItem[] {
-  const root = inside(rootPath, roots), found: string[] = [];
-  const walk = (d: string) => {
-    for (const e of readdirSync(d, { withFileTypes: true })) {
+/**
+ * Every trajectory under root that the template takes, with the inputs beside it and the recipe's groups
+ * counted on its structure. Linked folders inside the allowed ones are followed; what can't be looked into
+ * (an unreadable folder, a link out or to nothing, a loop) is added to `unread`, and the rest goes on
+ * (review finding 11). A trajectory reached twice through links is listed once.
+ */
+export function findTrajectories(rootPath: string, template: string, recipe: Recipe, roots: string[], unread: string[] = []): BatchItem[] {
+  const root = inside(rootPath, roots), found: string[] = [], allowed = roots.map(real).filter(r => r !== null);
+  const at = (p: string) => relative(root, p).split('\\').join('/');
+  const walk = (d: string, above: string[]) => {
+    let entries;
+    try { entries = readdirSync(d, { withFileTypes: true }); } catch (e) { unread.push(at(d) + ': ' + ((e as NodeJS.ErrnoException).code === 'EACCES' ? 'not readable' : (e as Error).message)); return; }
+    for (const e of entries) {
       if (found.length >= MAX_FILES || e.name.startsWith('.')) continue;
       const p = join(d, e.name);
-      if (e.isDirectory()) walk(p); else if (inputRole(e.name) === 'trajectory') found.push(p);
+      let dir = e.isDirectory(), file = e.isFile();
+      const r = e.isSymbolicLink() || dir ? real(p) : p;
+      if (e.isSymbolicLink()) {
+        if (!r) { unread.push(at(p) + ': a link to nothing'); continue; }
+        if (!allowed.some(a => within(r, a))) { unread.push(at(p) + ': a link out of the allowed folders'); continue; }
+        const st = statSync(r);
+        dir = st.isDirectory(); file = st.isFile();
+      }
+      if (dir) { if (above.includes(r!)) unread.push(at(p) + ': a link back to a folder above it'); else walk(p, [...above, r!]); }
+      else if (file && inputRole(e.name) === 'trajectory') found.push(p);
     }
   };
-  walk(root);
+  walk(root, [root]);
+  const once = new Set<string>();
   return found.flatMap(abs => {
     const rel = relative(root, abs).split('\\').join('/'), m = matchTrajectory(rel, template);
     if (!m) return [];
@@ -53,7 +71,7 @@ export function findTrajectories(rootPath: string, template: string, recipe: Rec
       else problems.push(basename(structure) + ' is not a .gro or .pdb');
     }
     return [{ ...m, rel, trajectory: abs, runInput, structure, atoms, counts, problems }];
-  }).sort((a, b) => a.rel.localeCompare(b.rel));
+  }).sort((a, b) => a.rel.localeCompare(b.rel)).filter(i => { const r = real(i.trajectory)!; return !once.has(r) && !!once.add(r); });
 }
 
 /** Each match's structure against its run input as gmx reads it, a few at a time (review finding 1). Without a working gmx, the run itself checks. */
@@ -163,13 +181,16 @@ export async function sendAll(ctx: Ctx, b: Batch, project: string): Promise<{ re
   for (const i of b.items) {
     const j = i.job ? ctx.jobs.get(i.job) : undefined;
     if (!j || j.status !== 'done') { out.push({ rel: i.rel, skipped: i.error || 'not run to the end' }); continue; }
-    const names = j.meta!.names as { xvg: string }, xvg = join(String(j.meta!.outDir), names.xvg), rec = JSON.parse(readFileSync(String(j.meta!.record), 'utf8')) as RunRecord;
-    const file = { name: names.xvg, text: readFileSync(xvg, 'utf8'), lastTime: rec.frames?.lastTime ?? null };
-    const first = await landingFor(v, project, file, {}), own = vaultFields(i);
-    const fields = { ...first.fields, ...Object.fromEntries(Object.entries(own).filter(([, x]) => x)) };
-    const l = await landingFor(v, project, file, { fields });
-    const why = [...l.missing.map(t => 'no value for ' + t), ...l.preview.problems, ...l.reasons];
-    out.push(why.length ? { rel: i.rel, skipped: why.join('; ') } : { rel: i.rel, sent: sendToInbox(v, p, xvg, l.name, ctx.config.pmfUrl).path });
+    // Each item on its own (review finding 10): one that fails is listed, and the rest are still sent.
+    try {
+      const names = j.meta!.names as { xvg: string }, xvg = join(String(j.meta!.outDir), names.xvg), rec = JSON.parse(readFileSync(String(j.meta!.record), 'utf8')) as RunRecord;
+      const file = { name: names.xvg, text: readFileSync(xvg, 'utf8'), lastTime: rec.frames?.lastTime ?? null };
+      const first = await landingFor(v, project, file, {}), own = vaultFields(i);
+      const fields = { ...first.fields, ...Object.fromEntries(Object.entries(own).filter(([, x]) => x)) };
+      const l = await landingFor(v, project, file, { fields });
+      const why = [...l.missing.map(t => 'no value for ' + t), ...l.preview.problems, ...l.reasons];
+      out.push(why.length ? { rel: i.rel, skipped: why.join('; ') } : { rel: i.rel, sent: sendToInbox(v, p, xvg, l.name, ctx.config.pmfUrl).path });
+    } catch (e) { out.push({ rel: i.rel, skipped: 'could not be sent: ' + (e as Error).message }); }
   }
   return out;
 }

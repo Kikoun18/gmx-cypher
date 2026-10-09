@@ -57,7 +57,7 @@ ssh -L 8765:127.0.0.1:8765 workstation      # then open the same address here
    (and, optionally, the address where you open PMF Sequences).
 2. **inputs.** Browse to a run and click its trajectory (`.xtc`, `.trr`, `.tng`). The run input (`.tpr`),
    structure (`.gro` or `.pdb`) and an index (`.ndx`), if any, are suggested from the same folder, each
-   with its reason; change any with *pick*. Small files can also be uploaded. gmx-cypher then checks that
+   with its reason; change any with *pick*. Small GROMACS inputs can also be uploaded. gmx-cypher then checks that
    the structure, the run input (`gmx dump`) and the trajectory (`gmx check`) have the same number of
    atoms, and that an index fits. *use these inputs* opens groups.
 3. **groups.** One reference and one or more selections, each with a name (the curve's label in PMF
@@ -88,13 +88,15 @@ ssh -L 8765:127.0.0.1:8765 workstation      # then open the same address here
    *Vault → Untracked files → attach*. Its upload dialog shows the same landing.
 
 **Recipes** (in rdf): save the options, groups, file name and folder under a name, load them again for
-another trajectory of the same system, export or import them as JSON.
+another trajectory of the same system, export or import them as JSON. Saving under a name that is taken
+asks first (*click again to replace*).
 
 **Batches** (batch tab): one recipe over every trajectory a path template finds under a root, for
 example `hmr+fast+6/{column}/{seq}/9.multiwalker/{run}/07_md.xtc`. *preview* lists every match, its
 fields, the inputs beside it, each group's atom count there, and any problem (no run input, a structure
 whose atom count isn't the run input's, a file-name token the path doesn't give); nothing runs until you
-press *run*. The queue runs a few at a time (2 by default), each as an ordinary run with its own record;
+press *run*. Linked folders inside the allowed ones are followed; a place it could not look into (an
+unreadable folder, a link out of the allowed folders or to nothing) is named above the list. The queue runs a few at a time (2 by default), each as an ordinary run with its own record;
 runs that share an output folder each take the next free name. *cancel all* stops them; *send all to
 vault* sends each by the same rule as a single send.
 
@@ -102,7 +104,7 @@ vault* sends each by the same rule as a single send.
 
 | What | Where |
 |---|---|
-| A run's outputs | `<trajectory folder>/rdf/<stem>.xvg`, `<stem>_cn.xvg`, `<stem>.ndx`, `<stem>.run.json`, or another allowed folder you choose |
+| A run's outputs | `<trajectory folder>/rdf/<stem>.xvg`, `<stem>_cn.xvg`, `<stem>.ndx`, `<stem>.run.json`, or another allowed folder you choose (not inside the vault) |
 | Outputs of uploaded inputs | `~/.gmx-cypher/workspace/` |
 | Uploads | `~/.gmx-cypher/uploads/<time>-<id>/<name>` |
 | Group size checks | `~/.gmx-cypher/checks/<time>-<id>/` (`groups.ndx`, `sizes.xvg`) |

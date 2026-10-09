@@ -5,6 +5,7 @@
 import { toRanges, type Atom } from './atoms';
 import { groupAtoms, type Group } from './groups';
 import type { Options } from './rdf';
+import { safeFileName } from '../../../app/src/lib/storage/path';
 
 export interface Recipe {
   format: 'gmx-cypher recipe';
@@ -59,3 +60,6 @@ export function applyRecipe(r: Recipe, atoms: Atom[]): { counts: number[]; probl
   });
   return { counts, problems };
 }
+
+/** The file a recipe is saved in, `<id>.json`: its name made safe as PMF Sequences makes file names. Two names can share one. */
+export const recipeId = (name: string) => safeFileName(name + '.json').slice(0, -'.json'.length);

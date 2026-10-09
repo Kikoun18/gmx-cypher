@@ -60,7 +60,7 @@ function Browser({ roots, path, onPath, used, onFile }: { roots: string[]; path:
             {listing.entries.map(e => {
               const p = join(listing.path, e.name)
               return (
-                <tr key={e.name} className={cn('border-t border-border hover:bg-accent', used.has(p) && 'bg-secondary font-bold')}>
+                <tr key={e.name} className={cn('border-t border-border hover:bg-background', used.has(p) && 'bg-background font-bold')}>
                   <td className="px-4 py-1.5">
                     <button className="inline-flex items-center gap-2 text-left" onClick={() => (e.kind === 'dir' ? onPath(p) : onFile(p, e))} disabled={e.kind === 'file' && e.role === 'output'}>
                       {e.kind === 'dir' ? <Folder className="size-4 text-muted-foreground" /> : <FileText className="size-4 text-muted-foreground" />}{e.name}

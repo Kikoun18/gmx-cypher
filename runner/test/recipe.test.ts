@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { atomTable } from '../src/lib/atoms';
 import type { Group } from '../src/lib/groups';
-import { applyRecipe, draftFromRecipe, recipeFileProblems, recipeFromDraft } from '../src/lib/recipe';
+import { applyRecipe, draftFromRecipe, recipeFileProblems, recipeFromDraft, recipeId } from '../src/lib/recipe';
 
 const nvt = atomTable(readFileSync(new URL('./fixtures/nvt/nvt.gro', import.meta.url), 'utf8'), 'gro');
 // Another system of the same kind: two waters (TIP4P) and one sodium, numbered differently.
@@ -46,15 +46,25 @@ describe('recipes (T37)', () => {
   });
 });
 
+describe('a recipe\'s file name', () => {
+  it('is its name made safe as PMF Sequences makes file names, the same in the page and the server (review finding 11)', () => {
+    expect(recipeId('ion pairs / v1')).toBe('ion pairs _ v1');
+    expect(recipeId('ion pairs _ v1')).toBe(recipeId('ion pairs / v1'));
+  });
+});
+
 describe('recipes in the state folder', () => {
-  it('saved by name (a second save replaces it, atomically), listed, read back; anything else refused', async () => {
+  it('saved by name (a second save replaces it only when asked to, atomically), listed, read back; anything else refused', async () => {
     const { existsSync, readdirSync } = await import('node:fs');
     const { join } = await import('node:path');
     const { apiServer } = await import('./helpers');
     const s = await apiServer(), r = recipeFromDraft(draft, 'ion pairs / v1', '2026-10-09T01:00:00.000Z');
     expect((await s.call('/api/recipes')).json).toEqual([]);
     expect((await s.call('/api/recipes', r)).json).toEqual({ id: 'ion pairs _ v1' });
-    expect((await s.call('/api/recipes', { ...r, options: { bin: '0.01' }, saved: '2026-10-09T02:00:00.000Z' })).json).toEqual({ id: 'ion pairs _ v1' });
+    // A name taken, or one that becomes the same file name, is refused unless replacing is asked for (review finding 11).
+    expect(await s.call('/api/recipes', { ...r, options: { bin: '0.01' } })).toEqual({ status: 409, json: { error: 'a recipe named "ion pairs / v1" is saved already' } });
+    expect((await s.call('/api/recipes', { ...r, name: 'ion pairs _ v1' })).json).toEqual({ error: 'a recipe named "ion pairs / v1" is saved already' });
+    expect((await s.call('/api/recipes?replace=1', { ...r, options: { bin: '0.01' }, saved: '2026-10-09T02:00:00.000Z' })).json).toEqual({ id: 'ion pairs _ v1' });
     expect(readdirSync(join(s.ctx.home, 'recipes'))).toEqual(['ion pairs _ v1.json']);
     expect((await s.call('/api/recipes')).json).toEqual([{ id: 'ion pairs _ v1', name: 'ion pairs / v1', saved: '2026-10-09T02:00:00.000Z' }]);
     expect((await s.call('/api/recipes/' + encodeURIComponent('ion pairs _ v1'))).json).toMatchObject({ name: 'ion pairs / v1', options: { bin: '0.01' } });

@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { apiServer, tmp } from './helpers';
@@ -47,6 +47,17 @@ describe('inputs over HTTP', () => {
     expect(new Uint8Array(readFileSync(r.json.path))).toEqual(bytes);
     const l = await s.call('/api/ls?path=' + encodeURIComponent(join(r.json.path, '..')));
     expect(l.json.entries[0]).toMatchObject({ name: 'nvt.tpr', role: 'run input', size: 5 });
+    await s.close();
+  });
+});
+
+describe('uploads are GROMACS inputs only (review finding 11)', () => {
+  it('another kind of file, or an output, is refused and nothing is stored', async () => {
+    const s = await apiServer();
+    for (const name of ['notes.pdf', 'rdf.xvg', 'run.sh']) {
+      expect(await s.call('/api/upload?name=' + encodeURIComponent(name), undefined, new Blob(['x']))).toEqual({ status: 400, json: { error: name + ' is not a GROMACS input (.xtc .trr .tng .tpr .gro .pdb .ndx); not uploaded' } });
+    }
+    expect(existsSync(join(s.ctx.home, 'uploads'))).toBe(false);
     await s.close();
   });
 });

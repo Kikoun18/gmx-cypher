@@ -4,7 +4,7 @@ import { existsSync, readFileSync, realpathSync, statSync } from 'node:fs';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { basename, dirname, join } from 'node:path';
 import { TOKENS } from '../../app/src/lib/seq';
-import { suggestInputs } from '../src/lib/inputs';
+import { inputRole, suggestInputs } from '../src/lib/inputs';
 import { fromRanges } from '../src/lib/atoms';
 import { nameProblem } from '../src/lib/groups';
 import { checkInputs, checkSizes } from './check';
@@ -136,7 +136,8 @@ export function makeApi(ctx: Ctx): Api {
     }
     if (is(req, 'POST', url, '/api/batch/preview')) {
       const b = await readJson<{ root: string; template: string; recipe: unknown }>(req);
-      return { body: { items: await checkRunInputs(ctx, findTrajectories(b.root, String(b.template || ''), checked(b.recipe), roots())) } };
+      const unread: string[] = [], items = await checkRunInputs(ctx, findTrajectories(b.root, String(b.template || ''), checked(b.recipe), roots(), unread));
+      return { body: { items, unread } };
     }
     if (is(req, 'GET', url, '/api/batches')) return { body: batches.list() };
     if (is(req, 'POST', url, '/api/batches')) {
@@ -155,7 +156,7 @@ export function makeApi(ctx: Ctx): Api {
       return { body: await sendAll(ctx, b, (await readJson<{ project: string }>(req)).project) };
     }
     if (is(req, 'GET', url, '/api/recipes')) return { body: listRecipes(ctx.home) };
-    if (is(req, 'POST', url, '/api/recipes')) return { body: saveRecipe(ctx.home, await readJson(req)) };
+    if (is(req, 'POST', url, '/api/recipes')) return { body: saveRecipe(ctx.home, await readJson(req), url.searchParams.get('replace') === '1') };
     const recipe = /^\/api\/recipes\/([^/]+)$/.exec(url.pathname);
     if (recipe && req.method === 'GET') return { body: readRecipe(ctx.home, decodeURIComponent(recipe[1])) };
     if (is(req, 'POST', url, '/api/plan')) {
@@ -164,7 +165,12 @@ export function makeApi(ctx: Ctx): Api {
       catch (e) { if (e instanceof HttpError) return { body: { error: e.message } }; throw e; }
     }
     if (is(req, 'POST', url, '/api/runs')) return { body: summary((await startRun(ctx, await readJson(req), roots())).job) };
-    if (is(req, 'POST', url, '/api/upload')) return { body: await saveUpload(req, ctx.home, url.searchParams.get('name') || 'upload') };
+    if (is(req, 'POST', url, '/api/upload')) {
+      // GROMACS inputs only, as the page offers them (review finding 11).
+      const name = url.searchParams.get('name') || 'upload', role = inputRole(name);
+      if (!role || role === 'output') throw new HttpError(400, name + ' is not a GROMACS input (.xtc .trr .tng .tpr .gro .pdb .ndx); not uploaded');
+      return { body: await saveUpload(req, ctx.home, name) };
+    }
     const job = /^\/api\/jobs\/([\w-]+)(\/cancel|\/record|\/output)?$/.exec(url.pathname);
     if (job) {
       const j = ctx.jobs.get(job[1]);

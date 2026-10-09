@@ -72,7 +72,7 @@ export function JobsView({ jobs, logs, loadLog, selected, onSelect, onRunAgain, 
         <Section label={'Jobs ' + String(jobs.length).padStart(2, '0')} />
         {jobs.map(j => (
           <button key={j.id} onClick={() => onSelect(j.id)} aria-current={j.id === job?.id ? 'true' : undefined}
-            className={cn('flex flex-col items-start gap-0.5 rounded-lg px-3 py-2 text-left hover:bg-accent', j.id === job?.id && 'bg-secondary')}>
+            className={cn('flex flex-col items-start gap-0.5 rounded-lg px-3 py-2 text-left hover:bg-muted', j.id === job?.id && 'bg-muted ring-1 ring-inset ring-border')}>
             <span className="text-control font-bold">{j.title}</span>
             <span className="block w-full truncate text-caption"><span className={STATUS[j.status].className}>{STATUS[j.status].word}</span> <span className="text-muted-foreground">· {jobLine(j)}</span></span>
           </button>

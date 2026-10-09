@@ -24,3 +24,21 @@ export function nameValues(m: BatchMatch): Record<string, string> {
   const f = m.fields, v: Record<string, string | undefined> = { method: f.group, column: f.col, name: f.name, seq: f.seq, time: f.time, temp: f.temp, run: m.run ? String(m.run) : undefined };
   return Object.fromEntries(Object.entries(v).filter(([, x]) => x)) as Record<string, string>;
 }
+
+const STATES = ['running', 'waiting', 'failed', 'interrupted', 'refused', 'cancelled'] as const;
+
+/** A batch's progress in one sentence, for its live region (review finding 9): done first, then each other state that has items. */
+export function batchSummary(items: { status: string; job?: string }[], jobStatus: (id: string) => string | undefined): string {
+  const n: Record<string, number> = {};
+  for (const i of items) {
+    const s = i.status === 'started' ? jobStatus(i.job!) ?? 'running' : i.status === 'starting' ? 'running' : i.status === 'queued' ? 'waiting' : i.status;
+    n[s] = (n[s] || 0) + 1;
+  }
+  return [(n.done || 0) + ' of ' + items.length + ' done', ...STATES.filter(s => n[s]).map(s => n[s] + ' ' + s)].join(' · ');
+}
+
+/** What send all did, in one sentence. */
+export function sentSummary(results: { sent?: string; skipped?: string }[]): string {
+  const sent = results.filter(r => r.sent).length, not = results.length - sent;
+  return sent + ' sent to the vault' + (not ? ' · ' + not + ' not sent, listed above' : '');
+}
