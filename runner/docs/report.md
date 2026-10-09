@@ -2,7 +2,8 @@
 
 Branch `claude/quirky-cray-q845sa`, on the baseline `e8a452c` (PMF Sequences from the zip, unchanged).
 Everything in the spec's roadmap (R1–R7) is built, tested and checked by hand, with the exceptions and
-deviations listed below. `app/` is unchanged (checked by every `npm test`).
+deviations listed below. A fresh-context review found eleven problems, one of them a blocker (a structure
+from another system ran); all are fixed. `app/` is unchanged (checked by every `npm test`).
 
 ## What was built
 
@@ -55,18 +56,35 @@ cases at that commit (counted by checking each commit out in a temporary worktre
 | R7a recipes | `cf7e42c` | 159 | 66 | 239 |
 | R7b batches and queue | `209520b` | 381 | 161 | 252 |
 | Phase 6 README | `2bad561` | 0 | 0 | 252 |
+| Phase 6 QA fixes: focus after dialogs, no batch run without gmx | `b17ff39` | 13 | 0 | 252 |
+| Phase 6 report draft and QA screenshots | `e876bd8` | 0 | 0 | 252 |
+| Review fixes 1–6 | `41ccb30` | 128 | 120 | 262 |
+| Review fixes 7–11 | `9b4351f` | 143 | 150 | 273 |
+| Phase 6 final report | this commit | 0 | 0 | 273 |
 
 ¹ My staging mistake: that commit took `server/api.ts` with R6a's routes, which import `server/vault.ts`
 from the next commit, so `aea4829` alone doesn't build and 19 tests fail there. `e682d8a` completes it.
 History was not rewritten (your rule), and its message says so.
 
-Totals now: 3,993 lines of code (plus 1,092 copied Morpheus UI lines), 2,298 lines of tests;
-252 Vitest cases pass, 1 is skipped without `GMX` (with `GMX` set, 12 real-gmx cases pass), 390 PMF
-Sequences tests pass, and the Playwright smoke test passes in about 6 s.
+Totals now: 4,166 lines of code (plus 1,092 copied Morpheus UI lines), 2,554 lines of tests;
+273 Vitest cases pass, 1 is skipped without `GMX` (with `GMX` set, 14 real-gmx cases pass), 390 PMF
+Sequences tests pass, and the Playwright smoke test passes in about 6 s (8 runs in 8 with the unit tests
+running beside it).
 
 ## Acceptance criteria
 
-*Pending: the fresh-context review is running; its verdict per criterion goes here.*
+The reviewer's verdict at `2bad561` (before its findings were fixed), and where each stands now.
+
+| Criterion | Reviewer | Now | Why |
+|---|---|---|---|
+| A Runs safely | partly met | met | No shell; token, Host and now an exact Origin (T77); files created exclusively; cancel leaves no process. Fixed: a read error no longer stops the server (T76), gmx runs with `GMX_MAXBACKUP=99` (T80), no outputs inside the vault (T87), uploads are GROMACS inputs only (T88). |
+| B Groups are right | partly met | met | Positional atom map, sizes confirmed by `gmx select`, overlaps flagged. Fixed: a structure whose atom count isn't the run input's is refused, in a run and in the batch preview (T75); tested with real 2025.4 on your system minus its sulfate. |
+| C RDF is right | met | met | The reviewer hand-ran a recorded argv with real 2025.4: only the two header lines differ (T28), as in my check below. |
+| D Reproducible | met | met | Record v1 and *run again*; the record now also keeps `GMX_MAXBACKUP=99`. |
+| E PMF Sequences takes it | met (tests) | met (tests and its own code) | Contract tests pass; the attach was checked with PMF Sequences' own code in Node, not in its page and not on your vault (see Manual QA). |
+| F Flexible | partly met | met | Fixed: PMF Sequences' tokens in a batch's output names (T78), runs of a batch sharing an output folder (T79). |
+| G Morpheus | mostly met | met | Fixed: text on marked rows at 4.5:1 or more in both themes (T83), batch progress announced (T84). Checked at 1024 px, light and dark, with no console messages. |
+| H Quality | met so far | met | Lint, build, all tests, real-gmx tests, the smoke test and `app/` unchanged, at every commit since; the table above is committed. |
 
 ## Manual QA
 
@@ -106,12 +124,39 @@ recorded argv run by hand in the same folder, both `.xvg` files diffed:
 
 **Tests with the real gmx** (`GMX=…/gmx2025/bin/gmx`): input checks on your system (3,242 × 3, the
 index fits, 21 frames estimated), `gmx select` sizes (sulfur 6, water_O 800, sodium 12; atom 9999
-refused), whole runs (four files, record, a taken name → `rdf_nvt (2)`, refusals) and `--version`:
-12 passed. The fake-gmx-only cases (files made to appear during a run) are skipped with a real gmx.
+refused), whole runs (four files, record, a taken name → `rdf_nvt (2)`, refusals, a structure of
+another size, an output folder in the vault) and `--version`: 14 passed. The fake-gmx-only cases (files made to appear during a run) are skipped with a real gmx.
 
 ## Fresh-context review
 
-*Pending: the reviewer's findings, and what was fixed or recorded, go here.*
+A separate agent that had not seen this work reviewed the branch at `2bad561` against section 15, read
+only. It tested a `git archive` copy in the scratchpad (the working tree was changing under it), ran
+every check, hand-ran a recorded command with real 2025.4, and wrote its own probes (Origin and Host,
+the batch race, the stream crash, the structure mismatch with real gmx, name tokens, the page at 1024 px).
+Its eleven findings, most severe first, all fixed with a test written first:
+
+| # | Finding | Fix | Commit |
+|---|---|---|---|
+| 1 | **Blocker:** a run went ahead with a structure that wasn't the run input's system: "sodium" became sulfate atoms, and `gmx select` agreed because it counts numbers | refused before anything is written, in runs and the batch preview (T75) | `41ccb30` |
+| 2 | **Major:** a picked `.gro` that couldn't be read (a folder named `dir.gro`) stopped the server and with it the jobs | one `sendFile`; a read error ends that answer only (T76) | `41ccb30` |
+| 3 | **Major, security:** a page on any other port of 127.0.0.1 passed the Origin check and got the cookie | Origin must equal the Host; POSTs must be JSON (T77) | `41ccb30` |
+| 4 | **Major:** PMF Sequences' tokens in output names never had values; a batch previewed clean, then every item was refused | batch path fields fill them; the preview and a single run say which tokens exist (T78) | `41ccb30` |
+| 5 | Runs of a batch sharing an output folder raced for one name; about one per slot was refused | the stem claimed by an exclusive `.ndx`; a batch run takes the next free name (T79) | `41ccb30` |
+| 6 | gmx inherited `GMX_MAXBACKUP=-1` from cluster shells, so a file appearing mid-run was overwritten (verified with 2025.4) | jobs set `GMX_MAXBACKUP=99`, shown and recorded (T80) | `41ccb30` |
+| 7 | Group cards keyed by position: removing one armed the next | stable keys (T82) | `9b4351f` |
+| 8 | Light-theme contrast on `secondary` 4.18–4.32 | marked rows on `muted`/`background`, tested from the tokens (T83) | `9b4351f` |
+| 9 | Batch progress not announced | one polite live region (T84) | `9b4351f` |
+| 10 | Send all not isolated per item; a retry duplicated files | caught per item (T85) | `9b4351f` |
+| 11 | Nits: a recipe replaced silently; an output folder inside the vault; any upload type; one unreadable folder failed the preview, linked folders skipped | asked first (T86); refused (T87, T88); the walk goes on and names what it skipped (T89) | `9b4351f` |
+
+Found while checking the fixes: the smoke test failed 1 run in 8 under load, on a 404 the browser
+logged while the page polled for a record still being written. The server now waits for it (T81), and
+the test passed 12 runs in 12 under load after. The fixes were checked in the page too:
+[preview with the mismatch and a skipped link](img/qa/review-batch-preview-dark.png),
+[recipe name taken](img/qa/review-recipe-armed-light.png), [batch done and sent](img/qa/review-batch-sent-light.png),
+[the command with `GMX_MAXBACKUP=99`](img/qa/review-jobs-light.png).
+
+The fixes themselves have not had a second fresh review.
 
 ## Deviations and things to know
 
@@ -124,6 +169,9 @@ refused), whole runs (four files, record, a taken name → `rdf_nvt (2)`, refusa
   file pattern). So criterion E holds without typing only when the project's patterns give the
   sequence, or the row is new.
 - **Uploads' outputs** go to one `<state>/workspace/` folder, not one per job (T57).
+- **Output names in a single run** have only `{analysis}` and `{trajectory}`; PMF Sequences' tokens get
+  values only in a batch, from its path template (T78). Sending fills the project's own pattern either way.
+- **A second save of a recipe name** now asks before replacing (T86, changing T71).
 - **Test-first** was followed for most items; for R5's run pipeline and R6b's landing preview I wrote the
   code first (to see what `planBatch` returns), then the tests, and checked R5's no-overwrite test by
   removing the re-check (it failed).

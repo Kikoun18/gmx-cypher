@@ -48,9 +48,9 @@ Order as approved in [`phase0.md`](phase0.md) §10: R5 before R4b, and R4d after
 
 ### Phase 6: Finish
 - [x] `runner/README.md`
-- [ ] Manual QA in Chrome, with my real test system and real `gmx`; results recorded (passed, failed or not run)
-- [ ] Fresh-context review of the whole branch against section 15 (a reviewer that didn't write the code); findings fixed or recorded
-- [ ] Final report `runner/docs/report.md`
+- [x] Manual QA in Chrome, with my real test system and real `gmx`; results recorded (passed, failed or not run) — done here in headless Chromium with your test system and GROMACS 2025.4 built here; your Chrome, your vault and your `gmx_mpi` not run (report.md)
+- [x] Fresh-context review of the whole branch against section 15 (a reviewer that didn't write the code); findings fixed or recorded — 11 findings, all fixed (`41ccb30`, `9b4351f`)
+- [x] Final report `runner/docs/report.md`
 
 ### Backlog (not in this task)
 - Next analyses, each as a small addition: `gmx mindist`, contact numbers, H-bonds (real outputs are in `app/test/fixtures/gmx/`), RMSD, Rg.
