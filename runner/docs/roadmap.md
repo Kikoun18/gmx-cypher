@@ -33,7 +33,7 @@ Order as approved in [`phase0.md`](phase0.md) §10: R5 before R4b, and R4d after
 ### Phase 3: RDF (R4, R5)
 - [x] R4a Options read from the installed `gmx rdf -h`; recipe form; command preview
 - [x] R5 Output names, folders, run record, nothing overwritten
-- [ ] R4b Run, progress, frames read, cancel, log
+- [x] R4b Run, progress, frames read, cancel, log
 - [ ] R4c Result chart (Morpheus LineChart) and summary
 - [ ] R4d Playwright smoke test: start, pick, run with the fake `gmx`, see the chart
 

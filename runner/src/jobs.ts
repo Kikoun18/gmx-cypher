@@ -41,8 +41,36 @@ export function useJobs() {
   return { jobs, logs, loadLog }
 }
 
+type Estimate = { frames: number; start: number; end: number }
+export const estimateOf = (j: Job) => (j.meta?.estimate as Estimate | null | undefined) ?? null
+
+/** Frames and time as gmx prints them, against the run's estimate when there is one (R4b). */
 export function progressText(j: Job): string {
-  const p = j.progress
+  const p = j.progress, est = estimateOf(j)
   if (p.analysed) return p.analysed.frames + ' frames analysed · last time ' + p.analysed.lastTime + ' ps'
-  return p.frame == null ? (j.status === 'running' ? 'starting…' : '—') : 'frame ' + p.frame + ' · t = ' + p.time + ' ps'
+  if (p.frame == null) return j.status === 'running' ? 'starting…' : '—'
+  return 'frame ' + p.frame + (est ? ' of ≈' + est.frames : '') + ' · t = ' + p.time + ' ps' + (est ? ' of ≈' + est.end + ' ps' : '')
+}
+
+/** How far a running job is (0–1) by time read, or null without an estimate. */
+export function fraction(j: Job): number | null {
+  const est = estimateOf(j), t = j.progress.time
+  if (!est || t == null) return est ? 0 : null
+  return est.end > est.start ? Math.min(1, Math.max(0, (t - est.start) / (est.end - est.start))) : 1
+}
+
+/** 0:02, 12:40, 1:05:03 */
+export function clock(ms: number): string {
+  const s = Math.max(0, Math.round(ms / 1000)), h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = String(s % 60).padStart(2, '0')
+  return h ? h + ':' + String(m).padStart(2, '0') + ':' + sec : m + ':' + sec
+}
+
+/** A job's line in the list: its state's detail (frame and time, frames and duration, gmx's error, where it stopped). */
+export function jobLine(j: Job): string {
+  const took = j.started && j.ended ? ' · ' + clock(Date.parse(j.ended) - Date.parse(j.started)) : ''
+  if (j.status === 'failed' && j.error) return j.error.split('\n').pop()!.trim()
+  if (j.status === 'done' && j.progress.analysed) return j.progress.analysed.frames + ' frames' + took
+  if ((j.status === 'cancelled' || j.status === 'interrupted') && j.progress.frame != null) return 'at frame ' + j.progress.frame
+  if (j.status === 'running' && j.progress.frame != null) return 'frame ' + j.progress.frame + ' · ' + j.progress.time + ' ps'
+  return progressText(j)
 }

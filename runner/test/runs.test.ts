@@ -28,6 +28,7 @@ describe('a run writes four new files under one stem' + (REAL ? ' (a real gmx)' 
     const { dir, s, req, roots } = await setup();
     const { job, record } = await startRun(s.ctx, req, roots);
     expect(job.cwd).toBe(dir);
+    expect(job.meta?.estimate).toEqual({ frames: 21, start: 0, end: 20 });
     expect(job.args).toEqual(['rdf', '-f', 'nvt.xtc', '-s', 'nvt.tpr', '-n', 'rdf/rdf_nvt.ndx', '-o', 'rdf/rdf_nvt.xvg', '-cn', 'rdf/rdf_nvt_cn.xvg', '-ref', 'group 0', '-sel', 'group 1', 'group 2']);
     const r = await record;
     expect(readdirSync(join(dir, 'rdf')).sort()).toEqual(['rdf_nvt.ndx', 'rdf_nvt.run.json', 'rdf_nvt.xvg', 'rdf_nvt_cn.xvg']);

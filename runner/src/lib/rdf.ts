@@ -93,3 +93,15 @@ export function rdfIo(inputs: { trajectory: string; runInput: string }, outDir: 
   const cwd = inputs.trajectory.slice(0, inputs.trajectory.lastIndexOf('/')) || '/', n = outputNames(stem), out = (f: string) => relPath(cwd, outDir + '/' + f);
   return { cwd, io: { trajectory: relPath(cwd, inputs.trajectory), runInput: relPath(cwd, inputs.runInput), index: out(n.ndx), output: out(n.xvg), cn: out(n.cn) } };
 }
+
+export interface Estimate { frames: number; start: number; end: number }
+
+/** The frames a run will read (≈): the trajectory's estimate narrowed by -b, -e and -dt; null if -b is past its end. */
+export function runEstimate(est: Estimate | null, opt: Options): Estimate | null {
+  if (!est) return null;
+  const num = (f: string) => Number(opt[f]) || 0, b = num('b'), e = num('e');
+  const start = Math.max(est.start, b), end = e > 0 ? Math.min(est.end, e) : est.end;
+  if (start > end) return null;
+  const every = Math.max(est.frames > 1 ? (est.end - est.start) / (est.frames - 1) : 0, num('dt'));
+  return { frames: every ? Math.floor((end - start) / every + 1e-9) + 1 : 1, start, end };
+}

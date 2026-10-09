@@ -13,7 +13,7 @@ import { getJson, postJson, type GmxState } from '../api'
 import type { Draft } from '../draft'
 import { commandText } from '../lib/command'
 import type { HelpOption } from '../lib/gmxText'
-import { groupAtoms } from '../lib/groups'
+import { groupAtoms, nameProblem } from '../lib/groups'
 import { DEFAULT_TEMPLATE, NAME_TOKENS } from '../lib/names'
 import { FORM, isDefault, recipeProblems, type RdfIo } from '../lib/rdf'
 import { toneText } from '../lib/tones'
@@ -39,9 +39,14 @@ function useHelp(gmx: GmxState) {
 interface Plan { cwd: string; outDir: string; stem: string; names: { xvg: string; cn: string; ndx: string; record: string }; io: RdfIo; file: string; argv: string[]; problems: string[] }
 
 /** Where and under which free names the run would write now, as the server sees the folder (T30); asked again 250 ms after a change. */
-function usePlan(draft: Draft) {
+/** The run as the server takes it (POST /api/plan and /api/runs): input paths, groups as steps, options, names. */
+function runBody(draft: Draft) {
   const { trajectory, runInput, structure } = draft.inputs
-  const body = trajectory && runInput ? { inputs: { trajectory: trajectory.path, runInput: runInput.path, structure: structure?.path }, groups: draft.groups, options: draft.options, template: draft.template, outDir: draft.outDir } : null
+  return trajectory && runInput ? { inputs: { trajectory: trajectory.path, runInput: runInput.path, structure: structure?.path }, groups: draft.groups, options: draft.options, template: draft.template, outDir: draft.outDir } : null
+}
+
+function usePlan(draft: Draft) {
+  const body = runBody(draft)
   const key = JSON.stringify(body)
   const [p, setP] = React.useState<{ key: string; plan?: Plan; error?: string } | null>(null)
   React.useEffect(() => {
@@ -120,9 +125,11 @@ function Names({ draft, setDraft, plan }: { draft: Draft; setDraft: React.Dispat
   )
 }
 
-export function Rdf({ gmx, draft, setDraft }: { gmx: GmxState; draft: Draft; setDraft: React.Dispatch<React.SetStateAction<Draft>> }) {
+export function Rdf({ gmx, draft, setDraft, onStarted }: { gmx: GmxState; draft: Draft; setDraft: React.Dispatch<React.SetStateAction<Draft>>; onStarted: (id: string) => void }) {
   const h = useHelp(gmx)
   const planned = usePlan(draft)
+  const [starting, setStarting] = React.useState(false)
+  const [refused, setRefused] = React.useState<{ key: string; message: string } | null>(null)
   const structure = useStructure(draft.inputs.structure?.path)
   const [more, setMore] = React.useState(false)
   const options = draft.options
@@ -140,6 +147,20 @@ export function Rdf({ gmx, draft, setDraft }: { gmx: GmxState; draft: Draft; set
   const atoms = structure && !('error' in structure) ? structure.atoms : null
   const counts = atoms ? draft.groups.map(g => groupAtoms(atoms, g.steps).length) : null
   const plan = planned?.plan
+  const names = draft.groups.map(g => g.name)
+  const blockers = [
+    !draft.inputs.structure && 'pick a structure in inputs: the groups are built on it',
+    problems.length && 'change the options gmx would refuse',
+    counts?.some(n => !n) && 'every group needs atoms',
+    draft.groups.some((g, i) => nameProblem(g.name, names.filter((_, j) => j !== i))) && 'a group name gmx can\'t read (see groups)',
+  ].filter(Boolean) as string[]
+  const key = JSON.stringify(runBody(draft))
+  const start = async () => {
+    setStarting(true)
+    try { onStarted((await postJson<{ id: string }>('/api/runs', runBody(draft))).id) }
+    catch (e) { setRefused({ key, message: (e as Error).message }) }
+    finally { setStarting(false) }
+  }
   const where = plan && (plan.outDir === plan.cwd + '/rdf' ? "rdf/ in the trajectory's folder" : plan.outDir)
 
   const field = (flag: string) => { const f = FORM.find(x => x.flag === flag)!, o = by.get(flag); return o ? <OptionField key={flag} f={f} o={o} value={options[flag]} set={v => set(flag, v)} /> : null }
@@ -190,6 +211,13 @@ export function Rdf({ gmx, draft, setDraft }: { gmx: GmxState; draft: Draft; set
           <p className="m-0 text-caption text-muted-foreground">
             {[plan.names.xvg, ...(options.cn === true ? [plan.names.cn] : []), plan.names.ndx, plan.names.record].join(' · ')} — in {where} · new names, nothing overwritten
           </p>
+          {refused?.key === key && (
+            <Alert variant="destructive"><X /><AlertTitle>gmx-cypher didn't start this run</AlertTitle><AlertDescription><p className="whitespace-pre-line">{refused.message}</p></AlertDescription></Alert>
+          )}
+          <div className="flex flex-wrap items-center gap-3">
+            <Button size="lg" disabled={!!blockers.length || starting} onClick={start}>{starting ? 'checking groups with gmx…' : 'run'}</Button>
+            <span className="text-caption text-muted-foreground" aria-live="polite">{blockers[0] || 'gmx select confirms each group first; the run continues if this page closes'}</span>
+          </div>
         </>}
       </aside>
     </div>

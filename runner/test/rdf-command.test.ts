@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { parseHelp } from '../src/lib/gmxText';
-import { FORM, rdfArgs, rdfIo, recipeProblems, relPath } from '../src/lib/rdf';
+import { FORM, rdfArgs, rdfIo, recipeProblems, relPath, runEstimate } from '../src/lib/rdf';
 
 const help = parseHelp(readFileSync(new URL('./fixtures/gmx-2025.4/rdf-h.txt', import.meta.url), 'utf8'));
 const io = { trajectory: 'nvt.xtc', runInput: 'nvt.tpr', index: 'rdf/rdf_nvt.ndx', output: 'rdf/rdf_nvt.xvg', cn: 'rdf/rdf_nvt_cn.xvg' };
@@ -72,4 +72,17 @@ describe('paths as gmx gets them: relative to the trajectory folder (T29)', () =
     });
     expect(rdfIo({ trajectory: '/sim/nvt/nvt.xtc', runInput: '/sim/nvt/nvt.tpr' }, '/out', 'rdf_nvt (2)').io).toMatchObject({ output: '../../out/rdf_nvt (2).xvg', index: '../../out/rdf_nvt (2).ndx' });
   });
+});
+
+describe('the frames a run will read, for its progress (≈, from the run input)', () => {
+  const est = { frames: 21, start: 0, end: 20 };
+  it.each<[Record<string, string | boolean>, { frames: number; start: number; end: number } | null]>([
+    [{}, est],
+    [{ b: '5', e: '15' }, { frames: 11, start: 5, end: 15 }],
+    [{ dt: '2' }, { frames: 11, start: 0, end: 20 }],
+    [{ dt: '0.5' }, est],
+    [{ e: '50' }, est],
+    [{ b: '100' }, null],
+  ])('%j → %j', (options, want) => expect(runEstimate(est, options)).toEqual(want));
+  it('without an estimate there is none', () => expect(runEstimate(null, {})).toBeNull());
 });

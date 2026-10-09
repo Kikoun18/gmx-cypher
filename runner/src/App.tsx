@@ -90,7 +90,7 @@ export function App() {
         )}
         <TabsContent value="inputs">{state && <Inputs state={state} draft={draft} setDraft={setDraft} onSettings={() => setSettings(true)} onNext={() => setTab('groups')} />}</TabsContent>
         <TabsContent value="groups"><Groups draft={draft} setDraft={setDraft} /></TabsContent>
-        <TabsContent value="rdf">{state && <Rdf gmx={state.gmx} draft={draft} setDraft={setDraft} />}</TabsContent>
+        <TabsContent value="rdf">{state && <Rdf gmx={state.gmx} draft={draft} setDraft={setDraft} onStarted={id => { setSelectedJob(id); setTab('jobs') }} />}</TabsContent>
         <TabsContent value="jobs"><JobsView {...jobs} selected={selectedJob} onSelect={setSelectedJob} onRunAgain={r => { setDraft(d => ({ ...d, ...recipeFromRecord(r) })); setTab('rdf') }} /></TabsContent>
       </main>
       </Tabs>

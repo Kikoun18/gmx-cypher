@@ -9,13 +9,14 @@ import { groupAtoms, nameProblem, type Group } from '../src/lib/groups';
 import type { Slot } from '../src/lib/inputs';
 import { DEFAULT_TEMPLATE, freeStem, outputNames, renderStem } from '../src/lib/names';
 import { writeNdx } from '../src/lib/ndx';
-import { rdfArgs, rdfIo, recipeProblems, type Options, type RdfIo } from '../src/lib/rdf';
+import { frameEstimate, parseDump } from '../src/lib/gmxText';
+import { rdfArgs, rdfIo, recipeProblems, runEstimate, type Options, type RdfIo } from '../src/lib/rdf';
 import { buildRecord, type FileInfo, type Output, type RunRecord } from '../src/lib/record';
 import { structFormat } from '../../app/src/lib/structFile';
 import type { Ctx } from './api';
 import { checkSizes } from './check';
 import { inside, sha256File } from './files';
-import { rdfHelp } from './gmx';
+import { capture, rdfHelp } from './gmx';
 import { HttpError } from './http';
 import type { Job } from './jobs';
 
@@ -88,10 +89,13 @@ export async function startRun(ctx: Ctx, req: RunRequest, roots: string[]): Prom
 
   const inputs: RunRecord['inputs'] = {};
   for (const [slot, p] of Object.entries(req.inputs) as [Slot, string][]) if (p) inputs[slot] = await fileInfo(inside(p, roots), slot !== 'trajectory' || ctx.config.hashTrajectories);
+  // The frames it will read (≈), for its progress: the run input's schedule narrowed by -b, -e and -dt.
+  const dump = await capture(ctx.gmx.path!, ['dump', '-s', runInput], { cwd: plan.cwd, until: /^\s*natoms\s*=\s*\d+/m });
+  const estimate = runEstimate(frameEstimate(parseDump(dump.stdout), inputs.trajectory!.path), req.options || {});
   const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => k.startsWith('GMX'))) as Record<string, string>;
   const job = ctx.jobs.start({
     kind: 'rdf', title: plan.stem + ' · ' + req.groups[0].name + ' → ' + req.groups.slice(1).map(g => g.name).join(', '),
-    file: plan.file, args: plan.argv, cwd: plan.cwd, meta: { stem: plan.stem, outDir: plan.outDir, record: recordPath, names: plan.names },
+    file: plan.file, args: plan.argv, cwd: plan.cwd, meta: { stem: plan.stem, outDir: plan.outDir, record: recordPath, names: plan.names, estimate },
   });
 
   const record = new Promise<RunRecord>((done, fail) => {

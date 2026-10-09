@@ -5,7 +5,7 @@ import { Badge } from '../ui/badge'
 import { Button } from '../ui/button'
 import { Section } from '../ui/separator'
 import { postJson } from '../api'
-import { progressText, STATUS, type Job, type useJobs } from '../jobs'
+import { clock, fraction, jobLine, progressText, STATUS, type Job, type useJobs } from '../jobs'
 import { commandText } from '../lib/command'
 import { asTerminal } from '../lib/progress'
 import { cn } from '../lib/utils'
@@ -20,12 +20,20 @@ function useArmed(): [boolean, () => boolean] {
   return [armed, () => { if (armed) { setArmed(false); return true } setArmed(true); return false }]
 }
 
+/** The time now, every second while `on`: a running job's clock. */
+function useNow(on: boolean) {
+  const [now, setNow] = React.useState(() => Date.now())
+  React.useEffect(() => { if (!on) return; const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t) }, [on])
+  return now
+}
+
 function JobDetail({ job, log, onRunAgain }: { job: Job; log: string | undefined; onRunAgain: (r: RunRecord) => void }) {
   const [armed, press] = useArmed()
   const logRef = React.useRef<HTMLDivElement>(null)
   React.useEffect(() => { const el = logRef.current?.querySelector('pre'); if (el) el.scrollTop = el.scrollHeight }, [log])
   const cancel = () => { if (press()) postJson('/api/jobs/' + job.id + '/cancel', {}).catch(() => {}) }
-  const s = STATUS[job.status]
+  const s = STATUS[job.status], running = job.status === 'running', now = useNow(running), f = fraction(job)
+  const took = job.started ? clock((job.ended ? Date.parse(job.ended) : now) - Date.parse(job.started)) : ''
   return (
     <div className="flex min-w-0 flex-col gap-4">
       <div className="flex items-center gap-3">
@@ -34,10 +42,15 @@ function JobDetail({ job, log, onRunAgain }: { job: Job; log: string | undefined
         <span className="flex-1" />
         {job.status === 'running' && <Button variant="destructive" onClick={cancel}>{armed ? 'click again to cancel' : 'cancel'}</Button>}
       </div>
-      {(job.status === 'running' || job.progress.frame != null) && <p className="m-0 text-control" aria-live="polite">{progressText(job)}</p>}
       {job.status === 'failed' && job.error && (
         <Alert variant="destructive"><X /><AlertTitle>gmx stopped with an error</AlertTitle><AlertDescription><p className="whitespace-pre-wrap">{job.error}</p></AlertDescription></Alert>
       )}
+      {running && f != null && (
+        <div role="progressbar" aria-label="frames read" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(f * 100)} className="h-2 overflow-hidden rounded-full bg-muted">
+          <div className="h-full rounded-full bg-butter transition-[width] duration-300" style={{ width: f * 100 + '%' }} />
+        </div>
+      )}
+      {(running || job.progress.frame != null) && <p className="m-0 text-control" aria-live="polite">{job.status === 'failed' || job.status === 'cancelled' ? 'stopped at ' : ''}{progressText(job)}{took && ' · ' + took}</p>}
       {job.status === 'interrupted' && <p className="m-0 text-caption text-muted-foreground">{job.error}</p>}
       <RunFiles job={job} onRunAgain={onRunAgain} />
       <Section label="Command" />
@@ -61,7 +74,7 @@ export function JobsView({ jobs, logs, loadLog, selected, onSelect, onRunAgain }
           <button key={j.id} onClick={() => onSelect(j.id)} aria-current={j.id === job?.id ? 'true' : undefined}
             className={cn('flex flex-col items-start gap-0.5 rounded-lg px-3 py-2 text-left hover:bg-accent', j.id === job?.id && 'bg-secondary')}>
             <span className="text-control font-bold">{j.title}</span>
-            <span className="block w-full truncate text-caption"><span className={STATUS[j.status].className}>{STATUS[j.status].word}</span> <span className="text-muted-foreground">· {j.status === 'failed' && j.error ? j.error.split('\n').pop()!.trim() : progressText(j)}</span></span>
+            <span className="block w-full truncate text-caption"><span className={STATUS[j.status].className}>{STATUS[j.status].word}</span> <span className="text-muted-foreground">· {jobLine(j)}</span></span>
           </button>
         ))}
       </nav>
