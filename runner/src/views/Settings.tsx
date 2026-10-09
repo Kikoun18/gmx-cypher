@@ -13,6 +13,9 @@ export function Settings({ state, open, onOpenChange, onState }: { state: AppSta
   const [folderError, setFolderError] = React.useState('')
   const [vault, setVault] = React.useState(state.config.vault || '')
   const [vaultError, setVaultError] = React.useState('')
+  const [pmfUrl, setPmfUrl] = React.useState(state.config.pmfUrl || '')
+  const [pmfError, setPmfError] = React.useState('')
+  const savePmfUrl = async () => { try { onState(await postJson<AppState>('/api/config', { pmfUrl: pmfUrl.trim() || null })); setPmfError('') } catch (e) { setPmfError((e as Error).message) } }
   const chooseVault = async (path: string | null) => {
     try { onState(await postJson<AppState>('/api/config', { vault: path })); setVaultError(''); if (!path) setVault('') } catch (e) { setVaultError((e as Error).message) }
   }
@@ -69,6 +72,14 @@ export function Settings({ state, open, onOpenChange, onState }: { state: AppSta
             </div>
             {vaultError ? <FieldHint error>✗ {vaultError}</FieldHint> : state.config.vault && <FieldHint>✓ {state.config.vault}</FieldHint>}
             <FieldHint>Read only: projects, rows and patterns, for where a result lands. A result you send goes into the project's _inbox folder; nothing else in the vault is ever written.</FieldHint>
+          </Field>
+          <Field>
+            <Label htmlFor="pmf-url">PMF Sequences address · optional</Label>
+            <div className="flex gap-2">
+              <Input id="pmf-url" size="sm" value={pmfUrl} placeholder="http://localhost:5173/" onChange={e => setPmfUrl(e.target.value)} onKeyDown={e => e.key === 'Enter' && savePmfUrl()} />
+              <Button variant="outline" onClick={savePmfUrl} disabled={pmfUrl.trim() === (state.config.pmfUrl || '')}>save</Button>
+            </div>
+            {pmfError ? <FieldHint error>✗ {pmfError}</FieldHint> : <FieldHint>Where you open PMF Sequences; after sending, gmx-cypher links to the project there.</FieldHint>}
           </Field>
         </DialogBody>
         <DialogFooter><Button variant="ghost" onClick={() => onOpenChange(false)}>close</Button></DialogFooter>

@@ -30,8 +30,9 @@ const FOLDERS = '{method}/{column}/{name}/{*}/{run}';
 
 describe("where PMF Sequences will put a result: its own planBatch (T33)", () => {
   it('folder pattern only: every field from the header\'s working directory', () => {
+    // PMF Sequences matches a row by group, name and sequence: no sequence here, so a second NA2SO4 row (found by attaching it with PMF Sequences' code).
     expect(landing(using({ pathPattern: FOLDERS }), 'rdf_nvt.xvg', text)).toEqual({
-      ok: true, row: 'NA2SO4', rowNew: false, group: 'hmr+fast+6', col: { k: 'so4', label: 'SO4', isNew: false }, run: 2,
+      ok: true, row: 'NA2SO4', seq: '', rowNew: true, twin: { seq: 'NA2SO4', group: 'hmr+fast+6' }, group: 'hmr+fast+6', col: { k: 'so4', label: 'SO4', isNew: false }, run: 2,
       type: { k: 'rdf', label: 'RDF', how: 'header' }, curves: { imported: ['water_O'], inFile: ['water_O', 'sodium'] },
       from: { group: 'header', col: 'header', name: 'header', run: 'header' }, replaces: false, problems: [],
     });
@@ -70,7 +71,7 @@ describe("the file name from the project's pattern (T34)", () => {
   it('fills every token it can, and reads back to the same place', () => {
     const { name, missing } = nameFromPattern('{method}_{column}_{seq}_t{time}.xvg', f);
     expect([name, missing]).toEqual(['hmr+fast+6_SO4_NA2SO4_t20.xvg', []]);
-    expect(landing(using({ pattern: '{method}_{column}_{seq}_t{time}.xvg' }), name, text)).toMatchObject({ ok: true, row: 'NA2SO4', col: { k: 'so4' }, run: 1 });
+    expect(landing(using({ pattern: '{method}_{column}_{seq}_t{time}.xvg' }), name, text)).toMatchObject({ ok: true, row: 'NA2SO4', seq: 'NA2SO4', rowNew: false, col: { k: 'so4' }, run: 1 });
   });
   it('lists the tokens without a value; {*} and a missing extension are filled', () => {
     expect(nameFromPattern('{method}_{column}_{seq}_t{time}', { ...f, time: '' })).toEqual({ name: 'hmr+fast+6_SO4_NA2SO4_t{time}.xvg', missing: ['{time}'] });

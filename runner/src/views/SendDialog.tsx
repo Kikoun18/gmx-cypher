@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { Info, X } from 'lucide-react'
+import { Check, Info, X } from 'lucide-react'
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert'
 import { Button } from '../ui/button'
 import { Dialog, DialogBody, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogHeading, DialogTitle } from '../ui/dialog'
@@ -12,6 +12,7 @@ import type { Job } from '../jobs'
 import type { Fields, Landing, Source } from '../lib/landing'
 
 interface VaultInfo { path: string; projects: { id: string; name: string; dir: string }[]; error?: string }
+interface Sent { path: string; name: string; renamed: boolean; next: string[]; link?: string }
 interface Preview {
   project: { id: string; name: string; dir: string }; pattern: string; pathPattern: string
   fields: Fields; from: Partial<Record<string, Source>>; name: string; missing: string[]; preview: Landing; reasons: string[]
@@ -28,6 +29,9 @@ export function SendDialog({ job, open, onOpenChange }: { job: Job; open: boolea
   const [typed, setTyped] = React.useState<Set<keyof Fields>>(new Set())
   const [name, setName] = React.useState<string | null>(null)
   const [p, setP] = React.useState<{ key: string; preview?: Preview; error?: string } | null>(null)
+  const [sent, setSent] = React.useState<Sent | null>(null)
+  const [sending, setSending] = React.useState(false)
+  const [sendError, setSendError] = React.useState('')
   React.useEffect(() => {
     if (!open) return
     getJson<VaultInfo>('/api/vault').then(v => { setVault(v); setProject(id => id ?? v.projects?.[0]?.id ?? null) }, e => setVault({ path: '', projects: [], error: (e as Error).message }))
@@ -45,9 +49,16 @@ export function SendDialog({ job, open, onOpenChange }: { job: Job; open: boolea
   const hint = (k: keyof Fields) => (typed.has(k) ? 'typed' : pv?.from[FIELD_KEY[k]] ? FROM[pv.from[FIELD_KEY[k]]!] : k === 'time' && shown?.time ? "the run's last time (ps)" : 'not in the folder or the file name: type it')
   const needsTime = !!pv && /\{t(ime)?\}/i.test(pv.pattern)
   const lost = l ? l.curves.inFile.filter(c => !l.curves.imported.includes(c)) : []
+  const fileName = name ?? pv?.name ?? ''
+  const ready = !!l && l.ok && !pv!.reasons.length && !pv!.missing.length
+  const send = async () => {
+    setSending(true); setSendError('')
+    try { setSent(await postJson<Sent>('/api/send', { job: job.id, project, name: fileName })) } catch (e) { setSendError((e as Error).message) } finally { setSending(false) }
+  }
+  const close = (o: boolean) => { if (!o) { setSent(null); setSendError('') } onOpenChange(o) }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={close}>
       <DialogContent className="max-w-[720px]">
         <DialogHeader>
           <DialogHeading>
@@ -55,6 +66,16 @@ export function SendDialog({ job, open, onOpenChange }: { job: Job; open: boolea
             <DialogDescription>send {String(job.meta?.stem)} to the vault · {vault?.path.split('/').pop()}{pv && ' · ' + pv.project.name}</DialogDescription>
           </DialogHeading>
         </DialogHeader>
+        {sent ? (
+          <DialogBody>
+            <Alert variant="success"><Check /><AlertTitle>sent: {sent.path}</AlertTitle>
+              <AlertDescription>{sent.renamed && <p>A file of that name was already in the inbox, so this one is {sent.name}.</p>}<p>Nothing else in the vault changed. The run's own files stay where they are.</p></AlertDescription>
+            </Alert>
+            <Section label="In PMF Sequences" />
+            <ol className="m-0 flex list-decimal flex-col gap-1 pl-5 text-control">{sent.next.map(x => <li key={x}>{x}</li>)}</ol>
+            {sent.link && <a className="self-start text-control text-coral-strong underline-offset-[3px] hover:underline" href={sent.link} target="_blank" rel="noopener noreferrer">open {pv?.project.name} in PMF Sequences ↗</a>}
+          </DialogBody>
+        ) : (
         <DialogBody>
           {vault?.error && <FieldHint error>✗ {vault.error}</FieldHint>}
           {vault && vault.projects.length > 1 && (
@@ -103,6 +124,11 @@ export function SendDialog({ job, open, onOpenChange }: { job: Job; open: boolea
                   </AlertDescription>
                 </Alert>
               )}
+              {l.twin && (
+                <Alert variant="warning"><Info /><AlertTitle>PMF Sequences would start a second row {l.row}</AlertTitle>
+                  <AlertDescription><p>It matches a row by group, name and sequence together. The row {l.row} there has {l.twin.seq ? 'sequence ' + l.twin.seq : 'no sequence'}{l.twin.group ? ' and group ' + l.twin.group : ''}; this file gives {l.seq ? 'sequence ' + l.seq : 'no sequence'}{l.group ? ' and group ' + l.group : ''}. When you attach it, type {l.twin.seq ? 'the sequence ' + l.twin.seq : 'the group ' + l.twin.group} in PMF Sequences' upload dialog, or add {'{seq}'} to the project's file pattern.</p></AlertDescription>
+                </Alert>
+              )}
               {lost.length > 0 && (
                 <Alert variant="warning"><Info /><AlertTitle>{l.curves.inFile.length} curves in this file, {l.curves.imported.length} will be imported</AlertTitle>
                   <AlertDescription><p>The project's {l.type.label} reads {l.curves.imported.join(', ')} only. To keep {lost.join(', ')} too, set {l.type.label} y columns to all in PMF Sequences → Settings → Analyses.</p></AlertDescription>
@@ -110,9 +136,15 @@ export function SendDialog({ job, open, onOpenChange }: { job: Job; open: boolea
               )}
             </div>
           )}
+          {pv && <FieldHint>copies to {pv.project.dir}/_inbox/{fileName} · only g(r), not the cumulative number · nothing else in the vault changes</FieldHint>}
+          {sendError && <FieldHint error>✗ {sendError}</FieldHint>}
         </DialogBody>
+        )}
         <DialogFooter>
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>close</Button>
+          {sent ? <Button variant="ghost" onClick={() => close(false)}>close</Button> : <>
+            <Button variant="ghost" onClick={() => close(false)}>cancel</Button>
+            <Button disabled={!ready || sending} onClick={send}>{sending ? 'sending…' : 'send to vault'}</Button>
+          </>}
         </DialogFooter>
       </DialogContent>
     </Dialog>

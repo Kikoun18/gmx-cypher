@@ -13,6 +13,7 @@ import { detectGmx, rdfHelp, type GmxState } from './gmx';
 import { HttpError, readJson, type Api } from './http';
 import type { Job, Jobs } from './jobs';
 import { planRun, startRun } from './runs';
+import { sendToInbox } from './send';
 import { landingFor, listProjects, openVault, projectSummary, readProject } from './vault';
 import type { Fields } from '../src/lib/landing';
 import type { RunRecord } from '../src/lib/record';
@@ -36,7 +37,7 @@ function events(jobs: Jobs, res: ServerResponse) {
 }
 
 /** What the GUI may change (T5); anything else is refused. */
-const SETTABLE: (keyof Config)[] = ['gmx', 'allow', 'vault'];
+const SETTABLE: (keyof Config)[] = ['gmx', 'allow', 'vault', 'pmfUrl'];
 
 /** Allowed folders as real paths; each must exist and be a folder. */
 export function realFolders(paths: string[]): string[] {
@@ -115,6 +116,17 @@ export function makeApi(ctx: Ctx): Api {
       if (!(await listProjects(v)).some(p => p.id === b.project)) throw new HttpError(404, 'no project ' + b.project + ' in the vault');
       return { body: await landingFor(v, b.project, { name: names.xvg, text: readFileSync(join(String(j.meta!.outDir), names.xvg), 'utf8'), lastTime: rec.frames?.lastTime ?? null }, b) };
     }
+    if (is(req, 'POST', url, '/api/send')) {
+      const b = await readJson<{ job: string; project: string; name: string }>(req);
+      const j = ctx.jobs.get(b.job);
+      if (!j || j.kind !== 'rdf') throw new HttpError(404, 'no rdf run ' + b.job);
+      if (j.status !== 'done') throw new HttpError(409, 'only a finished run can be sent');
+      if (!ctx.config.vault) throw new HttpError(409, 'no vault set');
+      const v = await openVault(ctx.config.vault), project = (await listProjects(v)).find(p => p.id === b.project);
+      if (!project) throw new HttpError(404, 'no project ' + b.project + ' in the vault');
+      // Only g(r): the cumulative-number file is titled "Cumulative Number RDF", which PMF Sequences would read as another RDF (T35).
+      return { body: sendToInbox(v, project, join(String(j.meta!.outDir), (j.meta!.names as { xvg: string }).xvg), String(b.name ?? ''), ctx.config.pmfUrl) };
+    }
     if (is(req, 'POST', url, '/api/plan')) {
       // Asked while typing (a template, a folder): a refusal is an answer, not a failed request.
       try { return { body: await planRun(ctx, await readJson(req), roots()) }; }
@@ -149,6 +161,7 @@ export function makeApi(ctx: Ctx): Api {
       const unknown = Object.keys(patch || {}).filter(k => !SETTABLE.includes(k as keyof Config));
       if (unknown.length) throw new HttpError(400, 'unknown setting: ' + unknown.join(', '));
       if (patch.allow) patch.allow = realFolders(patch.allow);
+      if (patch.pmfUrl && !/^https?:\/\/[^\s]+$/.test(patch.pmfUrl)) throw new HttpError(400, 'the PMF Sequences address must start with http:// or https://');
       // A vault is checked before it is kept: PMF Sequences' manifest, schema 1–3 (T32).
       if (patch.vault) patch.vault = (await openVault(patch.vault).catch(e => { throw new HttpError(400, (e as Error).message); })).path;
       ctx.config = { ...ctx.config, ...patch };
