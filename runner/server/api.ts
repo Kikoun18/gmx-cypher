@@ -90,7 +90,7 @@ export function makeApi(ctx: Ctx): Api {
     if (is(req, 'POST', url, '/api/plan')) return { body: await planRun(ctx, await readJson(req), roots()) };
     if (is(req, 'POST', url, '/api/runs')) return { body: summary((await startRun(ctx, await readJson(req), roots())).job) };
     if (is(req, 'POST', url, '/api/upload')) return { body: await saveUpload(req, ctx.home, url.searchParams.get('name') || 'upload') };
-    const job = /^\/api\/jobs\/([\w-]+)(\/cancel|\/record)?$/.exec(url.pathname);
+    const job = /^\/api\/jobs\/([\w-]+)(\/cancel|\/record|\/output)?$/.exec(url.pathname);
     if (job) {
       const j = ctx.jobs.get(job[1]);
       if (!j) throw new HttpError(404, 'no job ' + job[1]);
@@ -100,6 +100,16 @@ export function makeApi(ctx: Ctx): Api {
         const path = j.meta?.record as string | undefined;
         if (!path || !existsSync(path)) throw new HttpError(404, j.ended ? 'this run has no record' : 'the record is written when the run ends');
         return { body: JSON.parse(readFileSync(path, 'utf8')) };
+      }
+      if (req.method === 'GET' && job[2] === '/output') {
+        // A run's own .xvg files only, by kind: the chart reads them.
+        const kind = url.searchParams.get('kind') || '', names = j.meta?.names as Record<string, string> | undefined;
+        if (kind !== 'xvg' && kind !== 'cn') throw new HttpError(400, 'no output ' + kind + ': xvg or cn');
+        const path = names && join(String(j.meta!.outDir), names[kind]);
+        if (!path || !existsSync(path)) throw new HttpError(404, 'this run wrote no ' + kind + ' file');
+        res.writeHead(200, { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' });
+        createReadStream(path).pipe(res);
+        return 'handled';
       }
     }
     if (is(req, 'POST', url, '/api/config')) {

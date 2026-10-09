@@ -3,6 +3,7 @@
 
 import type { HelpOption } from './gmxText';
 import { outputNames } from './names';
+import { parseTable } from '../../../app/src/lib/seq';
 
 export type Options = Record<string, string | boolean>;
 export interface Recipe { options: Options; selections: number }
@@ -104,4 +105,34 @@ export function runEstimate(est: Estimate | null, opt: Options): Estimate | null
   if (start > end) return null;
   const every = Math.max(est.frames > 1 ? (est.end - est.start) / (est.frames - 1) : 0, num('dt'));
   return { frames: every ? Math.floor((end - start) / every + 1e-9) + 1 : 1, start, end };
+}
+
+/** One curve per y column of an .xvg, named by its legend, read with PMF Sequences' own parseTable. */
+export function resultSeries(xvg: string): { label: string; points: [number, number][] }[] {
+  const t = parseTable(xvg), x = t.cols[0] || [];
+  return t.cols.slice(1).map((y, j) => ({
+    label: t.head.legends[j] || 'column ' + (j + 2),
+    points: x.flatMap((v, i) => (Number.isFinite(v) && Number.isFinite(y[i]) ? [[v, y[i]] as [number, number]] : [])),
+  }));
+}
+
+export interface Peak { r: number; g: number; rule: 'first shell' | 'maximum' }
+
+/**
+ * The first peak (T27): the highest point of the first stretch where g(r) > 1, with dips below 1 narrower
+ * than `bridge` nm bridged (sparse data leaves single empty bins inside a shell); if g(r) never exceeds 1,
+ * the global maximum; null for a curve that is zero everywhere.
+ */
+export function firstPeak(points: [number, number][], bridge = 0.01): Peak | null {
+  const start = points.findIndex(p => p[1] > 1);
+  if (start < 0) {
+    const top = points.reduce<[number, number] | null>((a, p) => (!a || p[1] > a[1] ? p : a), null);
+    return top && top[1] > 0 ? { r: top[0], g: top[1], rule: 'maximum' } : null;
+  }
+  let best = points[start], last = points[start][0];
+  for (const p of points.slice(start + 1)) {
+    if (p[0] - last > bridge + 1e-9) break;
+    if (p[1] > 1) { last = p[0]; if (p[1] > best[1]) best = p; }
+  }
+  return { r: best[0], g: best[1], rule: 'first shell' };
 }

@@ -112,6 +112,9 @@ describe('runs over HTTP', () => {
     let rec = await s.call('/api/jobs/' + started.json.id + '/record');
     for (let i = 0; i < 100 && rec.status !== 200; i++) { await new Promise(r => setTimeout(r, 100)); rec = await s.call('/api/jobs/' + started.json.id + '/record'); }
     expect(rec.json).toMatchObject({ format: 'gmx-cypher run', status: 'done', job: started.json.id });
+    const res = await fetch(s.base + '/api/jobs/' + started.json.id + '/output?kind=cn', { headers: s.headers });
+    expect(await res.text()).toContain('@ s1 legend "sodium"');
+    expect((await s.call('/api/jobs/' + started.json.id + '/output?kind=log')).json).toEqual({ error: 'no output log: xvg or cn' });
     expect((await s.call('/api/runs', { ...req, options: { bin: '0' } })).json).toEqual({ error: '-bin must be above 0' });
     await s.close();
   });

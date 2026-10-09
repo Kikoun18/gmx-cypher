@@ -10,7 +10,7 @@ import { commandText } from '../lib/command'
 import { asTerminal } from '../lib/progress'
 import { cn } from '../lib/utils'
 import { Code } from './Code'
-import { RunFiles } from './Result'
+import { RunResult } from './Result'
 import type { RunRecord } from '../lib/record'
 
 /** Destructive actions arm on the first click and act on the second, within 2.6 s. */
@@ -52,7 +52,7 @@ function JobDetail({ job, log, onRunAgain }: { job: Job; log: string | undefined
       )}
       {(running || job.progress.frame != null) && <p className="m-0 text-control" aria-live="polite">{job.status === 'failed' || job.status === 'cancelled' ? 'stopped at ' : ''}{progressText(job)}{took && ' · ' + took}</p>}
       {job.status === 'interrupted' && <p className="m-0 text-caption text-muted-foreground">{job.error}</p>}
-      <RunFiles job={job} onRunAgain={onRunAgain} />
+      <RunResult job={job} onRunAgain={onRunAgain} />
       <Section label="Command" />
       <Code label="command" text={commandText(job)} />
       <Section label="Log"><span className="text-caption text-muted-foreground">{job.status === 'running' ? 'live · stdout and stderr' : 'stdout and stderr'}</span></Section>
