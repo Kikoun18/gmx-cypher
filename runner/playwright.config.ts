@@ -4,6 +4,8 @@ import { defineConfig } from '@playwright/test'
 export default defineConfig({
   testDir: 'e2e',
   timeout: 90_000,
+  // The 3D view is drawn in software here (SwiftShader): on a loaded machine a step can take longer than 5 s.
+  expect: { timeout: 15_000 },
   reporter: 'list',
   use: {
     viewport: { width: 1280, height: 860 },

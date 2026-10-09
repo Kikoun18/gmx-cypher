@@ -115,6 +115,7 @@ function RdfChart({ job, record }: { job: Job; record: RunRecord }) {
 export function RunResult({ job, onRunAgain, vault }: { job: Job; onRunAgain: (r: RunRecord) => void; vault: string | null }) {
   const r = useRecord(job)
   const [sending, setSending] = React.useState(false)
+  const sendButton = React.useRef<HTMLButtonElement>(null)
   if (job.kind !== 'rdf' || !job.ended) return null
   if (!r) return <p className="m-0 text-caption text-muted-foreground" aria-live="polite">reading the run record…</p>
   if (r.error) return <p className="m-0 text-caption text-muted-foreground">no run record: {r.error}</p>
@@ -143,11 +144,11 @@ export function RunResult({ job, onRunAgain, vault }: { job: Job; onRunAgain: (r
         ))}
       </tbody></table>
       <div className="flex flex-wrap items-center gap-3">
-        {job.status === 'done' && vault && <Button onClick={() => setSending(true)}>send to vault…</Button>}
+        {job.status === 'done' && vault && <Button ref={sendButton} onClick={() => setSending(true)}>send to vault…</Button>}
         <Button variant="outline" onClick={() => onRunAgain(rec)}>run again</Button>
         <span className="text-caption text-muted-foreground">{job.status === 'done' && !vault ? 'set a PMF Sequences vault in settings to send this result · ' : ''}run again opens this recipe in rdf; the new run gets new names</span>
       </div>
-      {vault && <SendDialog job={job} open={sending} onOpenChange={setSending} />}
+      {vault && <SendDialog job={job} open={sending} onOpenChange={setSending} returnFocus={sendButton} />}
     </div>
   )
 }

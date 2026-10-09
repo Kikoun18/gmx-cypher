@@ -140,7 +140,8 @@ export function BatchView({ state, draft, jobs, onOpenJob }: { state: AppState; 
       </div>
       <div className="flex items-center gap-3">
         <Button variant="outline" disabled={!root || !template || busy} onClick={preview}>{busy && !items ? 'looking…' : 'preview'}</Button>
-        {items && <Button size="lg" disabled={!chosen.size || busy} onClick={run}>{busy ? 'starting…' : 'run ' + chosen.size + ' of ' + items.length}</Button>}
+        {items && state.gmx.ok && <Button size="lg" disabled={!chosen.size || busy} onClick={run}>{busy ? 'starting…' : 'run ' + chosen.size + ' of ' + items.length}</Button>}
+        {items && !state.gmx.ok && <span className="text-control text-destructive">✗ no working gmx: set it in settings to run these</span>}
         <span className="text-caption text-muted-foreground" aria-live="polite">{items ? items.length + ' trajectories match · nothing runs until you press run' : 'nothing runs until you have seen the preview'}</span>
       </div>
       {error && <Alert variant="destructive"><X /><AlertTitle>no batch</AlertTitle><AlertDescription><p className="whitespace-pre-line">{error}</p></AlertDescription></Alert>}

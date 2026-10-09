@@ -6,7 +6,7 @@ import { Field, FieldHint, Label } from '../ui/label'
 import { Section } from '../ui/separator'
 import { postJson, type AppState } from '../api'
 
-export function Settings({ state, open, onOpenChange, onState }: { state: AppState; open: boolean; onOpenChange: (o: boolean) => void; onState: (s: AppState) => void }) {
+export function Settings({ state, open, onOpenChange, onState, returnFocus }: { state: AppState; open: boolean; onOpenChange: (o: boolean) => void; onState: (s: AppState) => void; returnFocus?: React.RefObject<HTMLElement | null> }) {
   const [gmx, setGmx] = React.useState(state.config.gmx || '')
   const [busy, setBusy] = React.useState(false)
   const [folder, setFolder] = React.useState('')
@@ -28,7 +28,7 @@ export function Settings({ state, open, onOpenChange, onState }: { state: AppSta
   }
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent onCloseAutoFocus={e => { if (returnFocus?.current) { e.preventDefault(); returnFocus.current.focus() } }}>
         <DialogHeader>
           <DialogHeading>
             <DialogTitle>Settings</DialogTitle>

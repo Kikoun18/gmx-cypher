@@ -69,6 +69,8 @@ export function App() {
   const jobs = useJobs()
   const [draft, setDraft] = useDraft()
   const [selectedJob, setSelectedJob] = React.useState<string | null>(null)
+  // Closing settings returns the focus to its button, wherever the dialog was opened from.
+  const settingsButton = React.useRef<HTMLButtonElement>(null)
   const running = jobs.jobs.filter(j => j.status === 'running').length
   React.useEffect(() => { getJson<AppState>('/api/state').then(setState, e => setError(String(e.message || e))) }, [])
 
@@ -79,7 +81,7 @@ export function App() {
         <span aria-live="polite">{state && <GmxStatus gmx={state.gmx} />}</span>
         <span className="flex-1" />
         {state && <VaultStatus path={state.config.vault} />}
-        {state && <Button variant="ghost" size="sm" onClick={() => setSettings(true)}><SettingsIcon /> settings</Button>}
+        {state && <Button ref={settingsButton} variant="ghost" size="sm" onClick={() => setSettings(true)}><SettingsIcon /> settings</Button>}
         <ToggleGroup type="single" size="sm" value={pref} onValueChange={v => v && setPref(v as ThemePref)} aria-label="theme">
           <ToggleGroupItem value="light" aria-label="light theme"><Sun /></ToggleGroupItem>
           <ToggleGroupItem value="dark" aria-label="dark theme"><Moon /></ToggleGroupItem>
@@ -112,7 +114,7 @@ export function App() {
       </main>
       </Tabs>
       <Toaster />
-      {state && <Settings state={state} open={settings} onOpenChange={setSettings} onState={setState} />}
+      {state && <Settings state={state} open={settings} onOpenChange={setSettings} onState={setState} returnFocus={settingsButton} />}
     </div>
   )
 }

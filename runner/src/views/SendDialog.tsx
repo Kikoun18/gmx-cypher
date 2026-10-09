@@ -22,7 +22,7 @@ const FROM: Record<Source, string> = { path: 'from the folder pattern', header: 
 const FIELD_KEY: Record<keyof Fields, string> = { name: 'name', col: 'col', group: 'group', run: 'run', time: 'time' }
 
 /** The send dialog (R6b): where the result belongs, its file name by the project's pattern, and PMF Sequences' own landing preview. */
-export function SendDialog({ job, open, onOpenChange }: { job: Job; open: boolean; onOpenChange: (o: boolean) => void }) {
+export function SendDialog({ job, open, onOpenChange, returnFocus }: { job: Job; open: boolean; onOpenChange: (o: boolean) => void; returnFocus?: React.RefObject<HTMLElement | null> }) {
   const [vault, setVault] = React.useState<VaultInfo | null>(null)
   const [project, setProject] = React.useState<string | null>(null)
   const [fields, setFields] = React.useState<Fields | null>(null)
@@ -59,7 +59,7 @@ export function SendDialog({ job, open, onOpenChange }: { job: Job; open: boolea
 
   return (
     <Dialog open={open} onOpenChange={close}>
-      <DialogContent className="max-w-[720px]">
+      <DialogContent className="max-w-[720px]" onCloseAutoFocus={e => { if (returnFocus?.current) { e.preventDefault(); returnFocus.current.focus() } }}>
         <DialogHeader>
           <DialogHeading>
             <DialogTitle>{l?.row ? l.row + ' × ' + l.col.label : 'send to the vault'}</DialogTitle>
