@@ -45,10 +45,17 @@ export function namesIn(dir: string, roots: string[]): string[] {
   try { return readdirSync(inside(dir, roots)); } catch { return []; }
 }
 
+/** A new folder <home>/<kind>/<time>-<random>; it fails rather than reuse one. */
+export function newFolder(home: string, kind: string): string {
+  const dir = join(home, kind, new Date().toISOString().replace(/\D/g, '').slice(0, 14) + '-' + randomBytes(4).toString('hex'));
+  mkdirSync(dirname(dir), { recursive: true });
+  mkdirSync(dir);
+  return dir;
+}
+
 /** Streams an upload to <home>/uploads/<new id>/<safe name>, created exclusively: never overwrites, never held in memory. */
 export async function saveUpload(body: Readable, home: string, name: string): Promise<{ path: string; size: number; sha256: string }> {
-  const dir = join(home, 'uploads', new Date().toISOString().replace(/\D/g, '').slice(0, 14) + '-' + randomBytes(4).toString('hex'));
-  mkdirSync(dir, { recursive: true });
+  const dir = newFolder(home, 'uploads');
   const path = join(dir, safeFileName(name));
   const hash = createHash('sha256');
   let size = 0;

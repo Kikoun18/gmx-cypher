@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { frameEstimate, parseCheckAtoms, parseDump, parseVersion } from '../src/lib/gmxText';
+import { frameEstimate, parseCheckAtoms, parseDump, parseSizes, parseVersion } from '../src/lib/gmxText';
 
 const fixture = (p: string) => readFileSync(new URL('./fixtures/' + p, import.meta.url), 'utf8');
 
@@ -29,5 +29,12 @@ describe('gmx dump -s and gmx check -f', () => {
   it("reads the trajectory's atom count from gmx check", () => {
     expect(parseCheckAtoms(fixture('gmx-2025.4/check.stderr'))).toBe(3242);
     expect(parseCheckAtoms('Reading frame')).toBeNull();
+  });
+});
+
+describe('gmx select -os', () => {
+  it('reads each selection\'s size from the last row', () => {
+    expect(parseSizes(fixture('gmx-2025.4/sizes.xvg'))).toEqual([6, 800, 12]);
+    expect(parseSizes('# nothing\n@ legend on\n')).toBeNull();
   });
 });

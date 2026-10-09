@@ -13,3 +13,10 @@ export function judgeInputs(c: Counts, index?: { groups: number; maxAtom: number
   }
   return problems;
 }
+
+/** Before a run (T21): each group's size as gmx select counts it must be the one gmx-cypher wrote. */
+export function judgeSizes(groups: { name: string; count: number }[], sizes: number[] | null): string[] {
+  if (!sizes) return ['gmx select reported no sizes'];
+  if (sizes.length !== groups.length) return ['gmx select reported ' + sizes.length + ' groups, gmx-cypher wrote ' + groups.length];
+  return groups.flatMap((g, i) => (sizes[i] === g.count ? [] : [g.name + ': gmx counts ' + sizes[i] + ' atoms, gmx-cypher ' + g.count]));
+}

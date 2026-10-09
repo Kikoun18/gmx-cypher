@@ -118,7 +118,7 @@ function Checks({ check, busy }: ReturnType<typeof useInputCheck>) {
       {check.ok ? (
         <p className="m-0 text-control text-mint-strong">✓ the inputs agree{check.estimate ? ' · ≈' + check.estimate.frames + ' frames, ' + check.estimate.start + '–' + check.estimate.end + ' ps (from the run input)' : ''}</p>
       ) : (
-        <Alert variant="destructive"><X /><AlertTitle>✗ these inputs can't run together</AlertTitle><AlertDescription>{check.problems.map(p => <p key={p}>{p}</p>)}</AlertDescription></Alert>
+        <Alert variant="destructive"><X /><AlertTitle>these inputs can't run together</AlertTitle><AlertDescription>{check.problems.map(p => <p key={p}>{p}</p>)}</AlertDescription></Alert>
       )}
     </div>
   )

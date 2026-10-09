@@ -35,3 +35,9 @@ export function parseCheckAtoms(text: string): number | null {
   const m = /^# Atoms\s+(\d+)/m.exec(text);
   return m ? Number(m[1]) : null;
 }
+
+/** Each selection's size from `gmx select -os` (the last row, after its time), or null without one. */
+export function parseSizes(xvg: string): number[] | null {
+  const rows = xvg.split('\n').filter(l => l.trim() && !'#@'.includes(l.trim()[0]));
+  return rows.length ? rows[rows.length - 1].trim().split(/\s+/).slice(1).map(Number) : null;
+}

@@ -93,9 +93,27 @@ async function rdf() {
   process.stderr.write(log.join('') + quote);
 }
 
+/** gmx select -os: each 'group N' counted from the index; an atom beyond the run input fails as 2025.4 does. */
+function select() {
+  const ndx = one('-n'), text = ndx && existsSync(ndx) ? readFileSync(ndx, 'utf8') : '';
+  const groups = text.split(/^(?=\s*\[)/m).filter(b => b.trim()).map(b => { const [head, ...rest] = b.split('\n'); return { name: /\[\s*(\S+)/.exec(head)[1], atoms: rest.join(' ').trim().split(/\s+/).filter(Boolean).map(Number) }; });
+  const natoms = natomsOf(one('-s')), picked = values('-select').map(s => { const m = /^group (\d+)$/.exec(s); return m ? groups[+m[1]] : null; });
+  picked.forEach((g, i) => { if (!g) fail("Cannot match '" + values('-select')[i] + "', because no such index group can be found."); });
+  const beyond = picked.find(g => g.atoms.some(a => a > natoms));
+  if (beyond) {
+    const real = read('select-beyond.stderr');
+    process.stderr.write(banner('select') + real.slice(real.indexOf('Reading file')).replace("Group 'big'", "Group '" + beyond.name + "'").replace('is\n  3242)', 'is\n  ' + natoms + ')'));
+    process.exit(1);
+  }
+  const head = read('sizes.xvg').split('\n').filter(l => '#@'.includes(l[0]) && !/^@ s\d+ legend/.test(l)).map(l => (l.startsWith('#   gmx select') ? '#   ' + commandLine() : l));
+  writeFileSync(one('-os') || 'size.xvg', [...head, ...picked.map((g, i) => '@ s' + i + ' legend "' + g.name + '"'), '      0.000' + picked.map(g => g.atoms.length.toFixed(3).padStart(9)).join(''), ''].join('\n'));
+  process.stderr.write(banner('select') + quote);
+}
+
 if (argv[0] === '--version') process.stdout.write(read('version.txt'));
 else if (tool === 'rdf' && argv[1] === '-h') process.stdout.write(read('rdf-h.txt'));
 else if (tool === 'rdf') await rdf();
 else if (tool === 'dump') { process.stderr.write(banner('dump')); process.stdout.write(read('dump-head.txt').replace(/natoms = 3242/g, 'natoms = ' + natomsOf(one('-s')))); }
+else if (tool === 'select') select();
 else if (tool === 'check') { process.stdout.write('Checking file ' + one('-f') + '\n'); process.stderr.write(read('check.stderr').replace('# Atoms  3242', '# Atoms  ' + natomsOf(one('-f')))); }
 else { process.stderr.write('fake gmx: unsupported: ' + argv.join(' ') + '\n'); process.exit(1); }

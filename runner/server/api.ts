@@ -5,7 +5,9 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { basename, dirname, join } from 'node:path';
 import { TOKENS } from '../../app/src/lib/seq';
 import { suggestInputs } from '../src/lib/inputs';
-import { checkInputs } from './check';
+import { fromRanges } from '../src/lib/atoms';
+import { nameProblem } from '../src/lib/groups';
+import { checkInputs, checkSizes } from './check';
 import { inside, listFolder, namesIn, saveUpload } from './files';
 import { detectGmx, type GmxState } from './gmx';
 import { HttpError, readJson, type Api } from './http';
@@ -68,6 +70,18 @@ export function makeApi(ctx: Ctx): Api {
       return 'handled';
     }
     if (is(req, 'POST', url, '/api/check')) return { body: await checkInputs((await readJson<{ inputs: Record<string, string> }>(req)).inputs || {}, ctx.gmx, roots()) };
+    if (is(req, 'POST', url, '/api/sizes')) {
+      const b = await readJson<{ runInput: string; groups: { name: string; atoms: string }[] }>(req);
+      const runInput = inside(b.runInput || '', roots()), names = (b.groups || []).map(g => String(g.name));
+      const groups = (b.groups || []).map((g, i) => {
+        const bad = nameProblem(names[i], names.filter((_, j) => j !== i));
+        if (bad) throw new HttpError(400, names[i] + ': ' + bad);
+        try { return { name: names[i], atoms: fromRanges(String(g.atoms)) }; } catch (e) { throw new HttpError(400, names[i] + ': ' + (e as Error).message); }
+      });
+      if (!groups.length || groups.some(g => !g.atoms.length)) throw new HttpError(400, 'every group needs atoms');
+      if (!ctx.gmx.ok) throw new HttpError(409, 'no working gmx');
+      return { body: await checkSizes(ctx.gmx, runInput, groups, ctx.home) };
+    }
     if (is(req, 'POST', url, '/api/upload')) return { body: await saveUpload(req, ctx.home, url.searchParams.get('name') || 'upload') };
     const job = /^\/api\/jobs\/([\w-]+)(\/cancel)?$/.exec(url.pathname);
     if (job) {

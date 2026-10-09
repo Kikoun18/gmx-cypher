@@ -14,3 +14,15 @@ export function parseNdx(text: string): NdxGroup[] {
   }
   return groups;
 }
+
+/**
+ * An index as GROMACS writes it (T19): `[ name ]`, then each number in width 4 after a single space, a new
+ * line every 15. Names it would read differently, and empty groups, are refused rather than written.
+ */
+export function writeNdx(groups: { name: string; atoms: number[] }[]): string {
+  return groups.map(g => {
+    if (/\s/.test(g.name)) throw new Error('group name "' + g.name + '": GROMACS would read only its first word');
+    if (!g.atoms.length) throw new Error('group ' + g.name + ' is empty');
+    return '[ ' + g.name + ' ]' + g.atoms.map((n, k) => (k % 15 ? ' ' : '\n') + String(n).padStart(4)).join('') + '\n';
+  }).join('');
+}

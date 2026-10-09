@@ -17,9 +17,9 @@ describe('progress from gmx stderr', () => {
     expect(parseProgress(fixture('gmx-2025.4/check.stderr').split('\n').slice(0, 8).join('\n'))).toEqual({});
   });
 
-  it("gives gmx's own error message, without the frame of the block", () => {
-    expect(gmxError(fixture('gmx-2025.4/rdf-badgroup.stderr'))).toBe("Inconsistency in user input:\nInvalid index group reference(s)\n  Cannot match 'group 7', because no such index group can be found.");
-    expect(gmxError(fixture('gmx-2025.4/select-beyond.stderr'))).toContain('(largest allowed atom index is\n  3242).');
+  it("gives gmx's own error message, without the frame of the block, its wrapped lines joined", () => {
+    expect(gmxError(fixture('gmx-2025.4/rdf-badgroup.stderr'))).toBe("Inconsistency in user input:\nInvalid index group reference(s)\nCannot match 'group 7', because no such index group can be found.");
+    expect(gmxError(fixture('gmx-2025.4/select-beyond.stderr'))).toBe("Inconsistency in user input:\nInvalid index group references encountered\nGroup 'big' cannot be used in selections, because it contains negative atom indices and/or references atoms not present (largest allowed atom index is 3242).");
     expect(gmxError(run)).toBeNull();
   });
 });

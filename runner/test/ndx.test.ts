@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { parseNdx } from '../src/lib/ndx';
+import { parseNdx, writeNdx } from '../src/lib/ndx';
 
 const fixture = (p: string) => readFileSync(new URL('./fixtures/' + p, import.meta.url), 'utf8');
 
@@ -19,5 +19,21 @@ describe('reading an index', () => {
       { name: 'NA', label: 'NA', atoms: [32] },
       { name: 'empty', label: 'empty', atoms: [] },
     ]);
+  });
+});
+
+describe('writing an index, as GROMACS writes it', () => {
+  it('writes the index of your system back byte for byte: width 4, single spaces, 15 per line', () => {
+    const text = fixture('nvt/index.ndx');
+    expect(writeNdx(parseNdx(text))).toBe(text);
+  });
+
+  it('keeps the order and duplicate names, and numbers past 9999 widen the field', () => {
+    expect(writeNdx([{ name: 'b', atoms: [9999, 10000, 3] }, { name: 'a', atoms: [7] }, { name: 'b', atoms: [1] }])).toBe('[ b ]\n9999 10000    3\n[ a ]\n   7\n[ b ]\n   1\n');
+  });
+
+  it('refuses what GROMACS would read differently: a name with a space, an empty group', () => {
+    expect(() => writeNdx([{ name: 'water O', atoms: [1] }])).toThrow('group name "water O": GROMACS would read only its first word');
+    expect(() => writeNdx([{ name: 'none', atoms: [] }])).toThrow('group none is empty');
   });
 });

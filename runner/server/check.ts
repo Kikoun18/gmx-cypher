@@ -1,15 +1,17 @@
 // The checks before anything runs (R2b, T13): files exist inside the allowed folders, and the atom counts
 // of structure, run input and trajectory agree, as gmx itself reads them. Nothing reads more than a header
-// or a first frame: gmx dump and gmx check are stopped once they have printed the count.
+// or a first frame: gmx dump and gmx check are stopped once they have printed the count. Then each group's
+// size as gmx select counts it (T21).
 
-import { readFileSync, statSync } from 'node:fs';
-import { dirname } from 'node:path';
+import { readFileSync, statSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { countAtoms, structFormat } from '../../app/src/lib/structFile';
-import { judgeInputs, type Counts } from '../src/lib/checks';
-import { frameEstimate, parseCheckAtoms, parseDump } from '../src/lib/gmxText';
+import { judgeInputs, judgeSizes, type Counts } from '../src/lib/checks';
+import { frameEstimate, parseCheckAtoms, parseDump, parseSizes } from '../src/lib/gmxText';
 import type { Slot } from '../src/lib/inputs';
-import { parseNdx } from '../src/lib/ndx';
-import { inside } from './files';
+import { parseNdx, writeNdx } from '../src/lib/ndx';
+import { gmxError } from '../src/lib/progress';
+import { inside, newFolder } from './files';
 import { capture, type GmxState } from './gmx';
 
 export interface InputCheck {
@@ -50,4 +52,20 @@ export async function checkInputs(inputs: Partial<Record<Slot, string>>, gmx: Gm
   }
   problems.push(...judgeInputs(counts, index));
   return { ok: !problems.length, problems, files, counts, ...(index ? { index } : {}), estimate: frameEstimate(d, files.trajectory!.path) };
+}
+
+export interface SizeCheck { ok: boolean; problems: string[]; sizes: number[] | null; dir: string }
+
+/**
+ * The groups written as an index into a new <home>/checks/<id>/ and counted by gmx select against the run
+ * input: `-select 'group 0' 'group 1' …` (T17), so names can't be matched by prefix.
+ */
+export async function checkSizes(gmx: GmxState, runInput: string, groups: { name: string; atoms: number[] }[], home: string): Promise<SizeCheck> {
+  const dir = newFolder(home, 'checks');
+  writeFileSync(join(dir, 'groups.ndx'), writeNdx(groups), { flag: 'wx' });
+  const r = await capture(gmx.path!, ['select', '-s', runInput, '-n', 'groups.ndx', '-select', ...groups.map((_, i) => 'group ' + i), '-os', 'sizes.xvg'], { cwd: dir });
+  if (r.code !== 0) return { ok: false, problems: [gmxError(r.stderr) || 'gmx select failed (exit ' + r.code + ')'], sizes: null, dir };
+  const sizes = parseSizes(readFileSync(join(dir, 'sizes.xvg'), 'utf8'));
+  const problems = judgeSizes(groups.map(g => ({ name: g.name, count: g.atoms.length })), sizes);
+  return { ok: !problems.length, problems, sizes, dir };
 }

@@ -34,7 +34,7 @@ function JobDetail({ job, log }: { job: Job; log: string | undefined }) {
       </div>
       {(job.status === 'running' || job.progress.frame != null) && <p className="m-0 text-control" aria-live="polite">{progressText(job)}</p>}
       {job.status === 'failed' && job.error && (
-        <Alert variant="destructive"><X /><AlertTitle>✗ gmx stopped with an error</AlertTitle><AlertDescription><p className="whitespace-pre-wrap">{job.error}</p></AlertDescription></Alert>
+        <Alert variant="destructive"><X /><AlertTitle>gmx stopped with an error</AlertTitle><AlertDescription><p className="whitespace-pre-wrap">{job.error}</p></AlertDescription></Alert>
       )}
       {job.status === 'interrupted' && <p className="m-0 text-caption text-muted-foreground">{job.error}</p>}
       <Section label="Command" />

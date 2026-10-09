@@ -7,9 +7,11 @@ import { FieldHint } from '../ui/label'
 import { Kbd } from '../ui/kbd'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
 import { Section } from '../ui/separator'
+import { postJson } from '../api'
 import type { Draft } from '../draft'
 import { atomTable, fromRanges, toRanges, type Atom } from '../lib/atoms'
 import { clickStep, groupAtoms, nameProblem, ruleText, shared, type Group, type Rule, type Step } from '../lib/groups'
+import { parseNdx, type NdxGroup } from '../lib/ndx'
 import { TONES, toneSolid, toneText, type Tone } from '../lib/tones'
 import { cn } from '../lib/utils'
 import { structFormat } from '../../../app/src/lib/structFile'
@@ -33,15 +35,30 @@ function useStructure(path: string | undefined) {
   return s && s.path === path ? s : null
 }
 
-type Kind = Rule['kind']
-const KINDS: { kind: Exclude<Kind, 'atoms'>; label: string }[] = [
+/** The index file's groups, read once per path (an unreadable one is reported by the input checks). */
+function useIndex(path: string | undefined) {
+  const [s, setS] = React.useState<{ path: string; groups: NdxGroup[] } | null>(null)
+  React.useEffect(() => {
+    if (!path) return
+    let alive = true
+    fetch('/api/file?path=' + encodeURIComponent(path)).then(r => (r.ok ? r.text() : '')).then(t => alive && setS({ path, groups: parseNdx(t) }), () => {})
+    return () => { alive = false }
+  }, [path])
+  return path && s?.path === path ? s.groups : []
+}
+
+type Kind = Exclude<Rule['kind'], 'atoms'> | 'index'
+const KINDS: { kind: Kind; label: string }[] = [
   { kind: 'resname', label: 'residue name' }, { kind: 'resnr', label: 'residue numbers' },
-  { kind: 'name', label: 'atom name' }, { kind: 'element', label: 'element' },
+  { kind: 'name', label: 'atom name' }, { kind: 'element', label: 'element' }, { kind: 'index', label: 'index group' },
 ]
 
-/** A rule from what the structure contains: the names offered are the file's own. */
-function RuleForm({ atoms, onStep }: { atoms: Atom[]; onStep: (s: Step) => void }) {
-  const [kind, setKind] = React.useState<Exclude<Kind, 'atoms'>>('resname')
+/**
+ * A rule from what the structure contains: the names offered are the file's own. An index group is taken
+ * as its atoms (the step notes which group), so the group never depends on the index file again (T51).
+ */
+function RuleForm({ atoms, index, onStep }: { atoms: Atom[]; index: { file: string; groups: NdxGroup[] }; onStep: (s: Step) => void }) {
+  const [kind, setKind] = React.useState<Kind>('resname')
   const [value, setValue] = React.useState('')
   const [within, setWithin] = React.useState('')
   const options = React.useMemo(() => {
@@ -49,34 +66,44 @@ function RuleForm({ atoms, onStep }: { atoms: Atom[]; onStep: (s: Step) => void 
     return [...new Set(vals)].filter(Boolean).sort()
   }, [atoms, kind])
   const id = React.useId()
+  const picked = kind === 'index' ? index.groups[Number(value)] : undefined
   const rule = (): Rule | null => {
     const v = value.trim()
+    if (kind === 'index') return picked?.atoms.length ? { kind: 'atoms', atoms: toRanges(picked.atoms) } : null
     if (kind === 'resnr') { const m = /^(\d+)\s*(?:[-–]\s*(\d+))?$/.exec(v); return m ? { kind, from: +m[1], to: +(m[2] ?? m[1]) } : null }
     if (!v) return null
     return kind === 'name' ? { kind, value: v, ...(within.trim() ? { resn: within.trim() } : {}) } : { kind, value: v }
   }
   const r = rule()
-  const go = (op: Step['op']) => { if (r) { onStep({ op, rule: r }); setValue(''); setWithin('') } }
+  const note = picked && 'index group ' + picked.label + ' (#' + value + ' in ' + index.file + ')'
+  const go = (op: Step['op']) => { if (r) { onStep({ op, rule: r, ...(note ? { note } : {}) }); setValue(''); setWithin('') } }
   return (
     <div className="flex flex-wrap items-center gap-2 rounded-lg border border-dashed border-input p-2">
       <Select value={kind} onValueChange={k => { setKind(k as typeof kind); setValue('') }}>
         <SelectTrigger size="sm" className="w-40" aria-label="rule"><SelectValue /></SelectTrigger>
-        <SelectContent>{KINDS.map(k => <SelectItem key={k.kind} value={k.kind}>{k.label}</SelectItem>)}</SelectContent>
+        <SelectContent>{KINDS.filter(k => k.kind !== 'index' || index.groups.length).map(k => <SelectItem key={k.kind} value={k.kind}>{k.label}</SelectItem>)}</SelectContent>
       </Select>
-      <Input size="sm" className="w-28" value={value} onChange={e => setValue(e.target.value)} list={id} placeholder={kind === 'resnr' ? '1-6' : 'value'} aria-label="value"
-        onKeyDown={e => e.key === 'Enter' && go('add')} />
+      {kind === 'index' ? (
+        <Select value={value} onValueChange={setValue}>
+          <SelectTrigger size="sm" className="w-44" aria-label="index group"><SelectValue placeholder="group" /></SelectTrigger>
+          <SelectContent>{index.groups.map((g, i) => <SelectItem key={i} value={String(i)}>{i} · {g.label} · {g.atoms.length}</SelectItem>)}</SelectContent>
+        </Select>
+      ) : (
+        <Input size="sm" className="w-28" value={value} onChange={e => setValue(e.target.value)} list={id} placeholder={kind === 'resnr' ? '1-6' : 'value'} aria-label="value"
+          onKeyDown={e => e.key === 'Enter' && go('add')} />
+      )}
       <datalist id={id}>{options.map(o => <option key={o} value={o} />)}</datalist>
       {kind === 'name' && <Input size="sm" className="w-24" value={within} onChange={e => setWithin(e.target.value)} list={id + 'r'} placeholder="in every…" aria-label="in every residue named" />}
       <datalist id={id + 'r'}>{[...new Set(atoms.map(a => a.resn))].sort().map(o => <option key={o} value={o} />)}</datalist>
       <Button variant="outline" size="sm" disabled={!r} onClick={() => go('add')}>+ add</Button>
       <Button variant="ghost" size="sm" disabled={!r} onClick={() => go('remove')}>− remove</Button>
-      {r && <span className="text-caption text-muted-foreground">{ruleText(r)}</span>}
+      {r && <span className="text-caption text-muted-foreground">{picked ? picked.label + ' · ' + picked.atoms.length + ' atoms' : ruleText(r)}</span>}
     </div>
   )
 }
 
-function GroupCard({ group, atoms, nrs, others, current, onCurrent, onChange, onRemove }: {
-  group: Group; atoms: Atom[]; nrs: number[]; others: string[]; current: boolean
+function GroupCard({ group, atoms, index, nrs, others, current, onCurrent, onChange, onRemove }: {
+  group: Group; atoms: Atom[]; index: { file: string; groups: NdxGroup[] }; nrs: number[]; others: string[]; current: boolean
   onCurrent: () => void; onChange: (g: Group) => void; onRemove?: () => void
 }) {
   const [rule, setRule] = React.useState(false)
@@ -125,13 +152,15 @@ function GroupCard({ group, atoms, nrs, others, current, onCurrent, onChange, on
         onChange={e => setTyped(e.target.value)} onBlur={commitTyped} onKeyDown={e => { if (e.key === 'Enter') commitTyped(); if (e.key === 'Escape') setTyped(null) }} />
       {typedError && <FieldHint error>✗ {typedError}</FieldHint>}
       {beyond.length > 0 && <FieldHint error>✗ atoms {toRanges(beyond)} are beyond the structure's {atoms.length}</FieldHint>}
-      {rule ? <RuleForm atoms={atoms} onStep={s => { steps([...group.steps, s]); setRule(false) }} /> : <Button variant="ghost" size="sm" className="self-start" onClick={() => setRule(true)}>+ rule</Button>}
+      {rule ? <RuleForm atoms={atoms} index={index} onStep={s => { steps([...group.steps, s]); setRule(false) }} /> : <Button variant="ghost" size="sm" className="self-start" onClick={() => setRule(true)}>+ rule</Button>}
     </section>
   )
 }
 
 export function Groups({ draft, setDraft }: { draft: Draft; setDraft: React.Dispatch<React.SetStateAction<Draft>> }) {
   const structure = useStructure(draft.inputs.structure?.path)
+  const indexGroups = useIndex(draft.inputs.index?.path)
+  const index = React.useMemo(() => ({ file: draft.inputs.index?.path.split('/').pop() || '', groups: indexGroups }), [draft.inputs.index, indexGroups])
   const [current, setCurrent] = React.useState(0)
   const atoms = structure && !('error' in structure) ? structure.atoms : null
   const sets = React.useMemo(() => (atoms ? draft.groups.map(g => groupAtoms(atoms, g.steps)) : []), [atoms, draft.groups])
@@ -165,11 +194,11 @@ export function Groups({ draft, setDraft }: { draft: Draft; setDraft: React.Disp
       </div>
       <div className="flex flex-col gap-3">
         <Section label="Reference" />
-        <GroupCard group={ref} atoms={structure.atoms} nrs={sets[0]} others={names(0)} current={current === 0} onCurrent={() => setCurrent(0)} onChange={g => setGroup(0, g)} />
+        <GroupCard group={ref} atoms={structure.atoms} index={index} nrs={sets[0]} others={names(0)} current={current === 0} onCurrent={() => setCurrent(0)} onChange={g => setGroup(0, g)} />
         <Section label={'Selections ' + String(draft.groups.length - 1).padStart(2, '0')}><Button variant="dashed" size="sm" shape="pill" onClick={addSelection}><Plus /> group</Button></Section>
         {draft.groups.slice(1).map((g, k) => {
           const i = k + 1
-          return <GroupCard key={i} group={g} atoms={structure.atoms} nrs={sets[i]} others={names(i)} current={current === i} onCurrent={() => setCurrent(i)} onChange={x => setGroup(i, x)}
+          return <GroupCard key={i} group={g} atoms={structure.atoms} index={index} nrs={sets[i]} others={names(i)} current={current === i} onCurrent={() => setCurrent(i)} onChange={x => setGroup(i, x)}
             onRemove={draft.groups.length > 2 ? () => { setDraft(d => ({ ...d, groups: d.groups.filter((_, j) => j !== i) })); setCurrent(0) } : undefined} />
         })}
         {draft.groups.slice(1).map((g, k) => {
@@ -187,7 +216,36 @@ export function Groups({ draft, setDraft }: { draft: Draft; setDraft: React.Disp
             </Alert>
           )
         })}
+        <SizeCheck draft={draft} sets={sets} />
       </div>
+    </div>
+  )
+}
+
+interface Sizes { ok: boolean; problems: string[]; sizes: number[] | null }
+
+/** The groups counted by gmx select against the run input (T21); a result shows only while the groups are unchanged. */
+function SizeCheck({ draft, sets }: { draft: Draft; sets: number[][] }) {
+  const runInput = draft.inputs.runInput?.path
+  const body = { runInput, groups: draft.groups.map((g, i) => ({ name: g.name, atoms: toRanges(sets[i] || []) })) }
+  const key = JSON.stringify(body)
+  const [result, setResult] = React.useState<{ key: string; sizes?: Sizes; error?: string } | null>(null)
+  const [busy, setBusy] = React.useState(false)
+  const run = async () => {
+    setBusy(true)
+    try { setResult({ key, sizes: await postJson<Sizes>('/api/sizes', body) }) } catch (e) { setResult({ key, error: (e as Error).message }) } finally { setBusy(false) }
+  }
+  const r = result?.key === key ? result : null
+  return (
+    <div className="flex flex-col gap-2" aria-live="polite">
+      <div className="flex items-center gap-3">
+        <Button variant="outline" size="sm" disabled={!runInput || busy || body.groups.some(g => !g.atoms)} onClick={run}>{busy ? 'counting…' : 'check sizes with gmx'}</Button>
+        <span className="text-caption text-muted-foreground">{runInput ? 'gmx select on ' + runInput.split('/').pop() : 'needs a run input'}</span>
+      </div>
+      {r?.sizes?.ok && <p className="m-0 text-control text-mint-strong">✓ gmx counts the same: {draft.groups.map((g, i) => g.name + ' ' + r.sizes!.sizes![i]).join(' · ')}</p>}
+      {r && !r.sizes?.ok && (
+        <Alert variant="destructive"><X /><AlertTitle>these groups can't run</AlertTitle><AlertDescription>{(r.sizes?.problems || [r.error]).map(p => <p key={p} className="whitespace-pre-line">{p}</p>)}</AlertDescription></Alert>
+      )}
     </div>
   )
 }

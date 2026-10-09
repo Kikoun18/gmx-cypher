@@ -17,14 +17,22 @@ export function parseProgress(stderr: string): Progress {
 
 const RULE = '-------------------------------------------------------';
 
-/** gmx's own message from its error block, without Program / Source file / Function and the website pointer. */
+/**
+ * gmx's own message from its error block, without Program / Source file / Function and the website pointer.
+ * GROMACS wraps the indented message at 78 columns; its lines are joined back into one.
+ */
 export function gmxError(stderr: string): string | null {
   const a = stderr.indexOf(RULE);
   if (a < 0) return null;
   const b = stderr.indexOf(RULE, a + RULE.length);
   const body = stderr.slice(a + RULE.length, b < 0 ? undefined : b).split('\n').filter(l => !/^(Program|Source file|Function):/.test(l));
   const end = body.findIndex(l => l.startsWith('For more information'));
-  return body.slice(0, end < 0 ? undefined : end).join('\n').trim() || null;
+  const lines: string[] = [];
+  for (const l of body.slice(0, end < 0 ? undefined : end)) {
+    if (/^ {2}\S/.test(l) && /^ {2}\S/.test(lines.at(-1) ?? '')) lines[lines.length - 1] += ' ' + l.trim();
+    else lines.push(l);
+  }
+  return lines.map(l => l.trim()).join('\n').trim() || null;
 }
 
 /** Each line as a terminal leaves it: what follows the last \r (the frame counter overwrites itself). */
