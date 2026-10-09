@@ -1,0 +1,45 @@
+# This file was created Fri Oct  9 23:30:03 2026
+# Created by:
+#                     :-) GROMACS - gmx distance, 2025.4 (-:
+# 
+# Executable:   /opt/gromacs-2025.4/bin/gmx
+# Data prefix:  /opt/gromacs-2025.4
+# Working dir:  /home/user/sim/na2so4/nvt
+# Command line:
+#   gmx distance -f nvt.xtc -s nvt.tpr -n groups.ndx -select 'group 0 merge group 1' 'group 0 merge group 2' -oav pairs/distance_nvt.xvg -oall pairs/distance_nvt_all.xvg -oh pairs/distance_nvt_hist.xvg -len 0.5 -binw 0.05
+# gmx distance is part of G R O M A C S:
+#
+# Glycine aRginine prOline Methionine Alanine Cystine Serine
+#
+@    title "Distance histogram"
+@    xaxis  label "Distance (nm)"
+@    yaxis  label "Probability"
+@TYPE xy
+@ view 0.15, 0.15, 0.75, 0.85
+@ legend on
+@ legend box on
+@ legend loctype view
+@ legend 0.78, 0.8
+@ legend length 2
+@ s0 legend "group 0 merge group 1"
+@ s1 legend "group 0 merge group 2"
+      0.025    0.000    0.000
+      0.075    0.000    0.000
+      0.125    0.000    0.000
+      0.175    0.000    0.000
+      0.225    0.000    0.000
+      0.275    0.000    0.000
+      0.325    1.429    0.000
+      0.375    0.159    0.000
+      0.425    0.000    0.000
+      0.475    0.000    0.000
+      0.525    0.317    0.000
+      0.575    0.317    0.000
+      0.625    0.000    0.000
+      0.675    0.159    0.000
+      0.725    0.000    0.000
+      0.775    0.159    0.000
+      0.825    0.476    0.000
+      0.875    0.317    0.159
+      0.925    0.000    0.794
+      0.975   16.667   19.048

@@ -6,7 +6,8 @@ import type { HelpOption } from './gmxText';
 import { groupAtoms, type Group } from './groups';
 import type { Slot } from './inputs';
 import type { Progress } from './progress';
-import { commandOf } from './commands';
+import { commandOf, formHelp, type CommandOption } from './commands';
+import type { DistanceStat } from './distance';
 import type { EnergyStats } from './energy';
 import { FORM, isDefault, type Options } from './rdf';
 
@@ -41,6 +42,8 @@ export interface RunRecord {
   statistics?: EnergyStats | null;
   /** gmx wham's windows (version 3, R6): each window's run input and pull file, hashed, in the order of the lists. */
   windows?: { tpr: FileInfo; pull: FileInfo }[];
+  /** gmx distance's averages per selection, as it printed them (version 3, R7). */
+  distances?: DistanceStat[];
   /** Every option of the form this gmx has, with its value and whether that is the installed default. */
   options: { flag: string; value: string | boolean | null; default: string | boolean | null; isDefault: boolean }[];
   outputs: Output[];
@@ -74,13 +77,15 @@ export interface RecordParts {
   statistics?: EnergyStats | null;
   windows?: { tpr: FileInfo; pull: FileInfo }[];
   pull?: 'pullx' | 'pullf';
+  distances?: DistanceStat[];
 }
 
 export function buildRecord(p: RecordParts): RunRecord {
-  const by = new Map(p.help.map(o => [o.flag, o.flag === 'cn' ? { ...o, type: 'bool', default: false } : o]));
+  // The form's options as gmx describes them: RDF's -cn as a switch, gmx-cypher's own choices (R7) as enums.
+  const by = new Map(formHelp((p.form ?? FORM) as CommandOption[], p.help).map(o => [o.flag, o]));
   return {
     format: 'gmx-cypher run', version: 3, analysis: p.analysis, ...(p.stdin != null ? { stdin: p.stdin } : {}), ...(p.statistics !== undefined ? { statistics: p.statistics } : {}),
-    ...(p.windows ? { windows: p.windows } : {}),
+    ...(p.windows ? { windows: p.windows } : {}), ...(p.distances ? { distances: p.distances } : {}),
     runner: { name: 'gmx-cypher', version: p.runner }, gmx: p.gmx, job: p.job.id, command: p.command, env: p.env,
     started: p.job.started ?? null, ended: p.job.ended ?? null, status: p.job.status, exit: p.job.exit ?? null,
     frames: p.frames !== undefined ? p.frames : p.job.progress.analysed ? { analysed: p.job.progress.analysed.frames, lastTime: p.job.progress.analysed.lastTime } : null, log: p.job.log, inputs: p.inputs,

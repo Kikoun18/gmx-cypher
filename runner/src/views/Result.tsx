@@ -243,6 +243,40 @@ function WhamChart({ job, record }: { job: Job; record: RunRecord }) {
   )
 }
 
+/**
+ * gmx distance's result (R7): the average distance from the reference to each selection over time, in the groups'
+ * hues; a tile per selection with what gmx printed (average ± standard deviation over all samples); the histogram.
+ */
+function DistanceChart({ job, record }: { job: Job; record: RunRecord }) {
+  const xvg = useOutput(job.id, 'xvg'), hist = useNamed(job.id, record.outputs.map(o => o.path.split('/').pop()!).find(n => n.endsWith('_hist.xvg')) ?? null)
+  if (xvg == null || hist == null) return <p className="m-0 text-caption text-muted-foreground" aria-live="polite">reading the distances…</p>
+  const sels = record.groups.slice(1), ref = record.groups[0]
+  const measure = String(record.options.find(o => o.flag === 'measure')?.value ?? 'com')
+  const named = (text: string, xLabel: string, yLabel: string) => {
+    const series: ChartSeries[] = resultSeries(text).map((c, i) => ({ label: sels[i]?.name ?? c.label, points: c.points, tone: sels[i]?.tone }))
+    return <LineChart series={series} xLabel={xLabel} yLabel={yLabel} height={240} legend zeroLine={false} />
+  }
+  return (
+    <div className="flex flex-col gap-3">
+      {named(xvg, 'time (ps)', measure === 'pairs' ? 'average over pairs (nm)' : 'distance (nm)')}
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3">
+        {(record.distances ?? []).map((d, i) => (
+          <Stat key={i} label={(sels[i]?.name ?? d.selection) + ' · average'} value={d.average.toFixed(3) + ' nm'} hint={'± ' + d.sd.toFixed(3) + ' nm (standard deviation) · ' + d.samples + ' samples · ' + d.selection} />
+        ))}
+      </div>
+      <p className="m-0 text-caption text-muted-foreground">
+        {measure === 'pairs' ? 'atom k of ' + ref.name + ' with atom k of each selection' : 'between the centres of ' + (measure === 'com' ? 'mass' : 'geometry') + ' of ' + ref.name + ' and of each selection'}
+        {sels.length > 1 ? ' · PMF Sequences takes the first curve of a distance file' : ''}
+      </p>
+      {hist && <>
+        <Section label="Histogram" />
+        {named(hist, 'distance (nm)', 'probability')}
+        <p className="m-0 text-caption text-muted-foreground">not sent to the vault: PMF Sequences would read it as an umbrella histogram</p>
+      </>}
+    </div>
+  )
+}
+
 /** What a run wrote, its result, its groups as gmx counted them, and "run again" (sections 10.5, 11.4). */
 export function RunResult({ job, onRunAgain, vault }: { job: Job; onRunAgain: (r: RunRecord) => void; vault: string | null }) {
   const r = useRecord(job)
@@ -257,7 +291,7 @@ export function RunResult({ job, onRunAgain, vault }: { job: Job; onRunAgain: (r
       {rec.problems.length > 0 && (
         <Alert variant="warning"><TriangleAlert /><AlertTitle>gmx-cypher's promise was broken</AlertTitle><AlertDescription>{rec.problems.map(p => <p key={p}>{p}</p>)}</AlertDescription></Alert>
       )}
-      {job.status === 'done' && (job.kind === 'energy' ? <EnergyChart job={job} record={rec} /> : job.kind === 'awh' ? <AwhChart job={job} record={rec} /> : job.kind === 'wham' ? <WhamChart job={job} record={rec} /> : <RdfChart job={job} record={rec} />)}
+      {job.status === 'done' && (job.kind === 'energy' ? <EnergyChart job={job} record={rec} /> : job.kind === 'awh' ? <AwhChart job={job} record={rec} /> : job.kind === 'wham' ? <WhamChart job={job} record={rec} /> : job.kind === 'distance' ? <DistanceChart job={job} record={rec} /> : <RdfChart job={job} record={rec} />)}
       {rec.groups.length > 0 && <Section label="Groups" />}
       {rec.groups.length > 0 && <table className="text-control"><tbody>
         {rec.groups.map(g => (

@@ -15,7 +15,7 @@ export type RdfIo = { trajectory: string; runInput: string; index: string; outpu
  * changes in one line. -cn is a switch here: gmx-cypher names the file. -selrpos is offered because gmx has
  * it, but with index groups it changes nothing (checked with 2025.4: identical data), and the line says so.
  */
-export const FORM: { flag: string; group: string; label: string; unit?: string; what: string }[] = [
+export const FORM: { flag: string; group: string; label: string; unit?: string; what: string; switch?: string }[] = [
   { flag: 'b', group: 'frames', label: 'first', unit: 'ps', what: 'frames before this time are skipped' },
   { flag: 'e', group: 'frames', label: 'last', unit: 'ps', what: '0 = to the end of the trajectory' },
   { flag: 'dt', group: 'frames', label: 'every', unit: 'ps', what: 'one frame per this many ps; 0 = every frame' },
@@ -30,7 +30,7 @@ export const FORM: { flag: string; group: string; label: string; unit?: string; 
   { flag: 'rmpbc', group: 'periodic boundaries · surface', label: 'make molecules whole', what: 'from the run input, in every frame' },
   { flag: 'surf', group: 'periodic boundaries · surface', label: 'surface', what: 'r from the nearest reference atom of each molecule or residue; not normalised' },
   { flag: 'selrpos', group: 'periodic boundaries · surface', label: 'selection reference positions', what: 'used inside selection expressions; with index groups, as here, it changes nothing' },
-  { flag: 'cn', group: 'output', label: 'cumulative number too', what: 'a second file: the average number of atoms within r' },
+  { flag: 'cn', group: 'output', label: 'cumulative number too', what: 'a second file: the average number of atoms within r', switch: 'cn' },
 ];
 
 /** Set by gmx-cypher whatever the form says: PMF Sequences reads ps and the xmgrace @ lines (T22). */

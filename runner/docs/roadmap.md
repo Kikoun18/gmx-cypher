@@ -98,7 +98,7 @@ Spec: [`batch-2.md`](batch-2.md). Phase 0 report: [`batch-2-phase0.md`](batch-2-
 - [x] R6 `gmx wham`: window lists, histogram overlap check, bootstrap errors (T115–T118; tested on a small real umbrella set made here, until yours comes)
 
 ### Phase 4: Commands with groups (R7–R9)
-- [ ] R7 `gmx distance`: pairs or centres of mass; average, all and histogram outputs
+- [x] R7 `gmx distance`: pairs or centres of mass; average, all and histogram outputs (T119–T121)
 - [ ] R8 `gmx hbond`: the 2023+ tool and the legacy tool, whichever is installed
 - [ ] R9 The commands I chose in Phase 0, one item each
 

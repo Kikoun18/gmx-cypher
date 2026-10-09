@@ -164,6 +164,23 @@ function wham() {
   process.stderr.write(w('wham-run.stderr') + log.join(''));
 }
 
+/**
+ * gmx distance (R7): the real 2025.4 outputs of test/fixtures/distance for two selections, by centres of mass (com/)
+ * or atom pairs (pairs/), after the index groups are found as gmx finds them. Anything else is refused.
+ */
+function distance() {
+  const sels = values('-select'), pairs = sels.length > 0 && sels.every(x => /^group 0 merge group \d+$/.test(x));
+  if (sels.length !== 2 || (!pairs && !sels.every(x => /^com of group 0 plus com of group \d+$/.test(x)))) { process.stderr.write('fake gmx distance: only two selections by com or pairs are in the fixtures, not ' + sels.join(' | ') + '\n'); process.exit(1); }
+  if (one('-oxyz')) { process.stderr.write('fake gmx distance: -oxyz is not in the fixtures\n'); process.exit(1); }
+  const names = groupNames(one('-n'));
+  for (const x of sels) for (const m of x.matchAll(/group (\d+)/g)) if (!names[+m[1]]) fail("Cannot match 'group " + m[1] + "', because no such index group can be found.");
+  const dir = new URL('./fixtures/distance/' + (pairs ? 'pairs' : 'com') + '/', import.meta.url), w = n => readFileSync(new URL(n, dir), 'utf8');
+  const log = [], put = (flag, name) => { const o = one(flag); if (o) { backUp(o, log); writeFileSync(o, w(name)); } };
+  put('-oav', 'distance_nvt.xvg'); put('-oall', 'distance_nvt_all.xvg'); put('-oh', 'distance_nvt_hist.xvg');
+  process.stdout.write(w('run.stdout'));
+  process.stderr.write(w('run.stderr') + log.join(''));
+}
+
 if (argv[0] === '--version') process.stdout.write(read('version.txt'));
 else if (tool === 'rdf' && argv[1] === '-h') process.stdout.write(read('rdf-h.txt'));
 else if (tool === 'energy' && argv[1] === '-h') process.stdout.write(read('energy-h.txt'));
@@ -171,6 +188,8 @@ else if (tool === 'awh' && argv[1] === '-h') process.stdout.write(read('awh-h.tx
 else if (tool === 'awh') awh();
 else if (tool === 'wham' && argv[1] === '-h') process.stdout.write(read('wham-h.txt'));
 else if (tool === 'wham') wham();
+else if (tool === 'distance' && argv[1] === '-h') process.stdout.write(read('distance-h.txt'));
+else if (tool === 'distance') distance();
 else if (tool === 'energy') energy();
 else if (tool === 'rdf') await rdf();
 // gmx dump: the real head of the test system's dump, or of an umbrella window's (300 K, 663 atoms) for those (R6).

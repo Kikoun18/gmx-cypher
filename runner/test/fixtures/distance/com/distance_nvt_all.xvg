@@ -1,0 +1,38 @@
+# This file was created Fri Oct  9 23:30:03 2026
+# Created by:
+#                     :-) GROMACS - gmx distance, 2025.4 (-:
+# 
+# Executable:   /opt/gromacs-2025.4/bin/gmx
+# Data prefix:  /opt/gromacs-2025.4
+# Working dir:  /home/user/sim/na2so4/nvt
+# Command line:
+#   gmx distance -f nvt.xtc -s nvt.tpr -n groups.ndx -select 'com of group 0 plus com of group 1' 'com of group 0 plus com of group 2' -oav com/distance_nvt.xvg -oall com/distance_nvt_all.xvg -oh com/distance_nvt_hist.xvg -len 0.5 -binw 0.05
+# gmx distance is part of G R O M A C S:
+#
+# Glycine aRginine prOline Methionine Alanine Cystine Serine
+#
+@    title "Distance"
+@    xaxis  label "Time (ps)"
+@    yaxis  label "Distance (nm)"
+@TYPE xy
+      0.000    1.444    2.068
+      1.000    1.607    1.737
+      2.000    1.316    1.628
+      3.000    0.865    1.212
+      4.000    0.985    1.651
+      5.000    0.602    1.511
+      6.000    0.328    1.544
+      7.000    0.517    1.504
+      8.000    0.349    1.309
+      9.000    0.850    1.356
+     10.000    0.911    1.365
+     11.000    0.391    1.568
+     12.000    0.515    1.545
+     13.000    0.525    1.610
+     14.000    0.528    1.616
+     15.000    0.552    1.696
+     16.000    0.461    1.674
+     17.000    0.480    1.222
+     18.000    0.516    1.102
+     19.000    0.882    0.782
+     20.000    0.892    1.145

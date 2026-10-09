@@ -33,6 +33,10 @@ Nothing here is invented. Each file is what GROMACS wrote or printed.
   -nBootstrap 10 -bs-seed 1` wrote and printed (`profile.xvg`, `histo.xvg`, `bsres.xvg`, `bsprof.xvg`). `dump-head.txt`
   is the first 250 lines of `gmx dump -s win00/umbrella.tpr`. The scratch folder is written as `/home/user/sim/wham-water`.
   `gmx-2025.4/wham-h.txt` and `gmx-2023.3/wham-h.txt` go with it.
+- `distance/` — `gmx distance` (2025.4) on `nvt/` with `groups.ndx` (sulfur 5–30:5, sodium 31–36, water_O 43–63:4):
+  `com/` from `-select 'com of group 0 plus com of group 1' 'com of group 0 plus com of group 2'`, `pairs/` from
+  `-select 'group 0 merge group 1' 'group 0 merge group 2'`, each with `-oav`, `-oall` and `-oh` (`-len 0.5 -binw 0.05`)
+  and what gmx printed. `gmx-2025.4/distance-h.txt` and `gmx-2023.3/distance-h.txt` go with them (R7).
 - `nvt/rerun.edr` — the energy file of `gmx mdrun -rerun nvt.xtc` on your test system (GROMACS 2025.4): 6 terms, 21 frames, 0–20 ps (R4).
 - `gmx-2023.3/` — GROMACS 2023.3 (Ubuntu): `version.txt`, `rdf-h.txt`; `energy-h.txt`, and `energy-menu.txt` and
   `energy-stats.txt` from the same two runs of `gmx energy` on `nvt/rerun.edr` (the menu is on stderr, the statistics on stdout).

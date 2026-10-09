@@ -1,0 +1,8 @@
+group 0 merge group 1:
+  Number of samples:  126
+  Average distance:   1.64240  nm
+  Standard deviation: 0.66729  nm
+group 0 merge group 2:
+  Number of samples:  126
+  Average distance:   2.00448  nm
+  Standard deviation: 0.44211  nm

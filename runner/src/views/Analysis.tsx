@@ -6,7 +6,7 @@ import { Field, FieldHint, Label } from '../ui/label'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '../ui/select'
 import { Awh } from './Awh'
 import { Energy } from './Energy'
-import { Rdf } from './Rdf'
+import { GroupCommand } from './GroupCommand'
 import { Wham } from './Wham'
 
 /** The analysis tab (R3b, T99): the command picker, grouped by what each command needs, then that command's own view. */
@@ -29,7 +29,7 @@ export function Analysis({ gmx, draft, setDraft, onStarted }: { gmx: AppState['g
         </Select>
         <FieldHint>the commands gmx-cypher runs, grouped by what each needs</FieldHint>
       </Field>
-      {command.tool === 'rdf' && <Rdf gmx={gmx} draft={draft} setDraft={setDraft} onStarted={onStarted} />}
+      {command.groups && <GroupCommand key={command.tool} command={command} gmx={gmx} draft={draft} setDraft={setDraft} onStarted={onStarted} />}
       {command.tool === 'energy' && <Energy gmx={gmx} draft={draft} setDraft={setDraft} onStarted={onStarted} />}
       {command.tool === 'awh' && <Awh gmx={gmx} draft={draft} setDraft={setDraft} onStarted={onStarted} />}
       {command.tool === 'wham' && <Wham gmx={gmx} draft={draft} setDraft={setDraft} onStarted={onStarted} />}

@@ -1,0 +1,37 @@
+                     :-) GROMACS - gmx distance, 2025.4 (-:
+
+Executable:   /opt/gromacs-2025.4/bin/gmx
+Data prefix:  /opt/gromacs-2025.4
+Working dir:  /home/user/sim/na2so4/nvt
+Command line:
+  gmx distance -f nvt.xtc -s nvt.tpr -n groups.ndx -select 'group 0 merge group 1' 'group 0 merge group 2' -oav pairs/distance_nvt.xvg -oall pairs/distance_nvt_all.xvg -oh pairs/distance_nvt_hist.xvg -len 0.5 -binw 0.05
+
+Reading file nvt.tpr, VERSION 2025.1-Homebrew (single precision)
+Reading file nvt.tpr, VERSION 2025.1-Homebrew (single precision)
+
+Reading frame       0 time    0.000   
+Reading frame       1 time    1.000   
+Reading frame       2 time    2.000   
+Reading frame       3 time    3.000   
+Reading frame       4 time    4.000   
+Reading frame       5 time    5.000   
+Reading frame       6 time    6.000   
+Reading frame       7 time    7.000   
+Reading frame       8 time    8.000   
+Reading frame       9 time    9.000   
+Reading frame      10 time   10.000   
+Reading frame      11 time   11.000   
+Reading frame      12 time   12.000   
+Reading frame      13 time   13.000   
+Reading frame      14 time   14.000   
+Reading frame      15 time   15.000   
+Reading frame      16 time   16.000   
+Reading frame      17 time   17.000   
+Reading frame      18 time   18.000   
+Reading frame      19 time   19.000   
+Reading frame      20 time   20.000   
+Last frame         20 time   20.000   
+Analyzed 21 frames, last time 20.000
+
+GROMACS reminds you: "Well, I am a dilettante. It's only in England that dilettantism is considered a bad thing. In other countries it's called interdisciplinary research." (Brian Eno)
+

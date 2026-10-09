@@ -8,7 +8,8 @@ import { basename, dirname, join } from 'node:path';
 import { atomTable, type Atom } from '../src/lib/atoms';
 import { allNames, COMMANDS, commandOf, type InputSlot, type OutputNames, type RunIo } from '../src/lib/commands';
 import { awhFrames, awhNames, framesWritten, type AwhFrame } from '../src/lib/awh';
-import { commonFolder, listFile, WHAM_SUFFIXES, whamOutputNames } from '../src/lib/wham';
+import { commonFolder, listFile, whamOutputNames } from '../src/lib/wham';
+import { parseDistanceStats } from '../src/lib/distance';
 import { energyProblems, parseEnergyStats } from '../src/lib/energy';
 import { groupAtoms, nameProblem, type Group } from '../src/lib/groups';
 import type { Slot } from '../src/lib/inputs';
@@ -104,7 +105,7 @@ export async function planRun(ctx: Ctx, req: RunRequest, roots: string[]): Promi
   }
   // gmx awh writes a file per frame (R5): the frames come from a scan of the file, and each one's name must be free too.
   const frames: AwhFrame[] | null = cmd.tool === 'awh' ? (await awhScan(ctx.gmx, first!, paths.runInput!)).frames : null;
-  const extra = frames ? frames.map(f => f.suffix) : cmd.tool === 'wham' ? WHAM_SUFFIXES : [];
+  const extra = frames ? frames.map(f => f.suffix) : cmd.suffixes ?? [];
   stem = freeStem(stem, existsSync(outDir) ? readdirSync(outDir) : [], extra);
   const help = await toolHelp(ctx.gmx, cmd.tool), { cwd, io } = cmd.io(paths, outDir, stem);
   let options: Options = req.options || {};
@@ -125,7 +126,7 @@ export async function planRun(ctx: Ctx, req: RunRequest, roots: string[]): Promi
     if (cmd.tool === 'energy') problems.push(...energyProblems(req.terms ?? [], await energyMenu(ctx.gmx, first!)));
     stdin = cmd.stdin(req.terms ?? []);
   }
-  let names = cmd.outputNames(stem);
+  let names = cmd.outputNames(stem, options);
   if (frames) {
     const written = framesWritten(frames, req.options || {}), files = awhNames(stem, written);
     if (!frames.length) problems.push('this energy file has no AWH data');
@@ -194,6 +195,9 @@ export async function startRun(ctx: Ctx, req: RunRequest, roots: string[]): Prom
     const picked = groupsAtoms(req, roots);
     atoms = picked.atoms;
     groups = req.groups.map((g, i) => ({ name: g.name, atoms: picked.sets[i] }));
+    // What the command would get wrong with these groups (gmx distance's pairs of unequal sizes, R7): refused here.
+    const wrong = cmd.groupProblems?.(plan.options, picked.sets.map(s => s.length), req.groups.map(g => g.name)) ?? [];
+    if (wrong.length) throw new HttpError(409, wrong.join('\n'));
     const runInput = inside(req.inputs.runInput!, roots);
     // The groups' atom numbers come from the structure: it must be the run input's system, or every group
     // would be other atoms that gmx select still counts the same (review finding 1).
@@ -253,6 +257,7 @@ export async function startRun(ctx: Ctx, req: RunRequest, roots: string[]): Prom
         outDir: req.outDir ?? null, job: j, outputs, problems, stdin: plan.stdin, terms: req.terms,
         ...(plan.windows ? { windows: await Promise.all(plan.windows.map(async w => ({ tpr: await fileInfo(w.tpr, true), pull: await fileInfo(w.pull, true) }))), pull: req.pull ?? 'pullx' } : {}),
         ...(plan.tool === 'energy' ? { statistics: parseEnergyStats(j.log) } : {}),
+        ...(plan.tool === 'distance' ? { distances: parseDistanceStats(j.log) } : {}),
         // gmx awh's frames are its files: how many it wrote, and the time of the last (the one for the vault).
         ...(plan.tool === 'awh' ? { frames: awhRecordFrames(plan.stem, outputs.map(o => o.path.split('/').pop()!)) } : {}),
       });
