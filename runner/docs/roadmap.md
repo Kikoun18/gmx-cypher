@@ -35,7 +35,7 @@ Order as approved in [`phase0.md`](phase0.md) §10: R5 before R4b, and R4d after
 - [x] R5 Output names, folders, run record, nothing overwritten
 - [x] R4b Run, progress, frames read, cancel, log
 - [x] R4c Result chart (Morpheus LineChart) and summary
-- [ ] R4d Playwright smoke test: start, pick, run with the fake `gmx`, see the chart
+- [x] R4d Playwright smoke test: start, pick, run with the fake `gmx`, see the chart
 
 ### Phase 4: Handoff to PMF Sequences (R6)
 - [ ] R6a Read-only vault reader (projects, columns, rows, runs, patterns)
