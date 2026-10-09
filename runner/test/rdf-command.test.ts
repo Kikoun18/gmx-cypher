@@ -66,9 +66,10 @@ describe('paths as gmx gets them: relative to the trajectory folder (T29)', () =
     ['/a/b/c', '/x/y.tpr', '../../../x/y.tpr'],
   ])('from %s: %s → %s', (from, to, want) => expect(relPath(from, to)).toBe(want));
 
-  it('plans the run in the trajectory folder, outputs in rdf/', () => {
-    expect(rdfIo({ trajectory: '/sim/nvt/nvt.xtc', runInput: '/sim/nvt.tpr' }, 'rdf_nvt')).toEqual({
+  it('plans the run in the trajectory folder, outputs in rdf/ or another folder', () => {
+    expect(rdfIo({ trajectory: '/sim/nvt/nvt.xtc', runInput: '/sim/nvt.tpr' }, '/sim/nvt/rdf', 'rdf_nvt')).toEqual({
       cwd: '/sim/nvt', io: { trajectory: 'nvt.xtc', runInput: '../nvt.tpr', index: 'rdf/rdf_nvt.ndx', output: 'rdf/rdf_nvt.xvg', cn: 'rdf/rdf_nvt_cn.xvg' },
     });
+    expect(rdfIo({ trajectory: '/sim/nvt/nvt.xtc', runInput: '/sim/nvt/nvt.tpr' }, '/out', 'rdf_nvt (2)').io).toMatchObject({ output: '../../out/rdf_nvt (2).xvg', index: '../../out/rdf_nvt (2).ndx' });
   });
 });

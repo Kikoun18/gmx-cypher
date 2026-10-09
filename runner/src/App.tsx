@@ -9,6 +9,7 @@ import { getJson, type AppState } from './api'
 import { readThemePref, saveThemePref, themeOf, type ThemePref } from './lib/theme'
 import { useJobs } from './jobs'
 import { useDraft } from './draft'
+import { recipeFromRecord } from './lib/record'
 import { Groups } from './views/Groups'
 import { Inputs } from './views/Inputs'
 import { Rdf } from './views/Rdf'
@@ -90,7 +91,7 @@ export function App() {
         <TabsContent value="inputs">{state && <Inputs state={state} draft={draft} setDraft={setDraft} onSettings={() => setSettings(true)} onNext={() => setTab('groups')} />}</TabsContent>
         <TabsContent value="groups"><Groups draft={draft} setDraft={setDraft} /></TabsContent>
         <TabsContent value="rdf">{state && <Rdf gmx={state.gmx} draft={draft} setDraft={setDraft} />}</TabsContent>
-        <TabsContent value="jobs"><JobsView {...jobs} selected={selectedJob} onSelect={setSelectedJob} /></TabsContent>
+        <TabsContent value="jobs"><JobsView {...jobs} selected={selectedJob} onSelect={setSelectedJob} onRunAgain={r => { setDraft(d => ({ ...d, ...recipeFromRecord(r) })); setTab('rdf') }} /></TabsContent>
       </main>
       </Tabs>
       <Toaster />

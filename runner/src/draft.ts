@@ -12,6 +12,9 @@ export interface Draft {
   groups: Group[]
   /** gmx rdf options set so far, by flag without its dash (R4a). */
   options: Record<string, string | boolean>
+  /** The output name template and another output folder than <trajectory folder>/rdf, if any (R5). */
+  template?: string
+  outDir?: string | null
 }
 
 const KEY = 'gmx-cypher-draft'

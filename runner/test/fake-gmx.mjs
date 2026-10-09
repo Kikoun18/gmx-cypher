@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // A fake gmx for tests (T9). Everything it prints or writes is real GROMACS 2025.4 text from
 // test/fixtures/gmx-2025.4, with the header's command, working directory and group names taken from its
-// own arguments. FAKE_GMX_FRAMES (11), FAKE_GMX_SLOW (ms per frame) and FAKE_GMX_FAIL change its run.
+// own arguments. FAKE_GMX_FRAMES (11), FAKE_GMX_SLOW (ms per frame) and FAKE_GMX_FAIL change its run;
+// FAKE_GMX_TOUCH=<tool>=<path> makes a file appear at that path while that tool runs (no-overwrite tests).
 
 import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
@@ -72,6 +73,9 @@ function natomsOf(file) {
 }
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+const [touchTool, touchPath] = (process.env.FAKE_GMX_TOUCH || '').split('=');
+if (touchTool === tool && touchPath) writeFileSync(touchPath, 'appeared while gmx ' + tool + ' ran\n');
 
 async function rdf() {
   const names = groupNames(one('-n')), pick = ref => { const m = /^group (\d+)$/.exec(ref); return m && names[+m[1]] ? names[+m[1]] : null; };

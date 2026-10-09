@@ -2,6 +2,7 @@
 // runs it. Only what differs from the installed defaults is passed (T23); groups go by number (T17).
 
 import type { HelpOption } from './gmxText';
+import { outputNames } from './names';
 
 export type Options = Record<string, string | boolean>;
 export interface Recipe { options: Options; selections: number }
@@ -87,8 +88,8 @@ export function relPath(from: string, to: string): string {
   return [...a.slice(i).map(() => '..'), ...b.slice(i)].join('/');
 }
 
-/** gmx runs in the trajectory folder; outputs go to rdf/ there under one stem (T29, T30). */
-export function rdfIo(inputs: { trajectory: string; runInput: string }, stem: string): { cwd: string; io: RdfIo } {
-  const cwd = inputs.trajectory.slice(0, inputs.trajectory.lastIndexOf('/')) || '/', out = 'rdf/' + stem;
-  return { cwd, io: { trajectory: relPath(cwd, inputs.trajectory), runInput: relPath(cwd, inputs.runInput), index: out + '.ndx', output: out + '.xvg', cn: out + '_cn.xvg' } };
+/** gmx runs in the trajectory folder (T29); the outputs are the stem's files in `outDir`, all as paths relative to it. */
+export function rdfIo(inputs: { trajectory: string; runInput: string }, outDir: string, stem: string): { cwd: string; io: RdfIo } {
+  const cwd = inputs.trajectory.slice(0, inputs.trajectory.lastIndexOf('/')) || '/', n = outputNames(stem), out = (f: string) => relPath(cwd, outDir + '/' + f);
+  return { cwd, io: { trajectory: relPath(cwd, inputs.trajectory), runInput: relPath(cwd, inputs.runInput), index: out(n.ndx), output: out(n.xvg), cn: out(n.cn) } };
 }

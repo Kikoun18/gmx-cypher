@@ -1,7 +1,7 @@
 // Files by path, only inside the allowed folders (T10), and uploads written once (T11).
 
 import { createHash, randomBytes } from 'node:crypto';
-import { createWriteStream, mkdirSync, readdirSync, realpathSync, statSync } from 'node:fs';
+import { createReadStream, createWriteStream, mkdirSync, readdirSync, realpathSync, statSync } from 'node:fs';
 import { dirname, join, sep } from 'node:path';
 import type { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
@@ -62,4 +62,11 @@ export async function saveUpload(body: Readable, home: string, name: string): Pr
   body.on('data', (c: Buffer) => { size += c.length; hash.update(c); });
   await pipeline(body, createWriteStream(path, { flags: 'wx' }));
   return { path, size, sha256: hash.digest('hex') };
+}
+
+/** A file's SHA-256, streamed: a trajectory of many GB is never held in memory. */
+export async function sha256File(path: string): Promise<string> {
+  const hash = createHash('sha256');
+  for await (const chunk of createReadStream(path)) hash.update(chunk as Buffer);
+  return hash.digest('hex');
 }

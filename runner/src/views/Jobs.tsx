@@ -10,6 +10,8 @@ import { commandText } from '../lib/command'
 import { asTerminal } from '../lib/progress'
 import { cn } from '../lib/utils'
 import { Code } from './Code'
+import { RunFiles } from './Result'
+import type { RunRecord } from '../lib/record'
 
 /** Destructive actions arm on the first click and act on the second, within 2.6 s. */
 function useArmed(): [boolean, () => boolean] {
@@ -18,7 +20,7 @@ function useArmed(): [boolean, () => boolean] {
   return [armed, () => { if (armed) { setArmed(false); return true } setArmed(true); return false }]
 }
 
-function JobDetail({ job, log }: { job: Job; log: string | undefined }) {
+function JobDetail({ job, log, onRunAgain }: { job: Job; log: string | undefined; onRunAgain: (r: RunRecord) => void }) {
   const [armed, press] = useArmed()
   const logRef = React.useRef<HTMLDivElement>(null)
   React.useEffect(() => { const el = logRef.current?.querySelector('pre'); if (el) el.scrollTop = el.scrollHeight }, [log])
@@ -37,6 +39,7 @@ function JobDetail({ job, log }: { job: Job; log: string | undefined }) {
         <Alert variant="destructive"><X /><AlertTitle>gmx stopped with an error</AlertTitle><AlertDescription><p className="whitespace-pre-wrap">{job.error}</p></AlertDescription></Alert>
       )}
       {job.status === 'interrupted' && <p className="m-0 text-caption text-muted-foreground">{job.error}</p>}
+      <RunFiles job={job} onRunAgain={onRunAgain} />
       <Section label="Command" />
       <Code label="command" text={commandText(job)} />
       <Section label="Log"><span className="text-caption text-muted-foreground">{job.status === 'running' ? 'live · stdout and stderr' : 'stdout and stderr'}</span></Section>
@@ -46,7 +49,7 @@ function JobDetail({ job, log }: { job: Job; log: string | undefined }) {
   )
 }
 
-export function JobsView({ jobs, logs, loadLog, selected, onSelect }: ReturnType<typeof useJobs> & { selected: string | null; onSelect: (id: string) => void }) {
+export function JobsView({ jobs, logs, loadLog, selected, onSelect, onRunAgain }: ReturnType<typeof useJobs> & { selected: string | null; onSelect: (id: string) => void; onRunAgain: (r: RunRecord) => void }) {
   const job = jobs.find(j => j.id === selected) || jobs[0]
   React.useEffect(() => { if (job && !(job.id in logs)) loadLog(job.id) }, [job, logs, loadLog])
   if (!jobs.length) return <p className="m-0 text-control text-muted-foreground">no jobs yet</p>
@@ -62,7 +65,7 @@ export function JobsView({ jobs, logs, loadLog, selected, onSelect }: ReturnType
           </button>
         ))}
       </nav>
-      {job && <JobDetail key={job.id} job={job} log={logs[job.id]} />}
+      {job && <JobDetail key={job.id} job={job} log={logs[job.id]} onRunAgain={onRunAgain} />}
     </div>
   )
 }

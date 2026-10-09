@@ -1,6 +1,6 @@
 // The API: thin routes that call the pure functions in src/lib and the side effects in server/.
 
-import { createReadStream, realpathSync, statSync } from 'node:fs';
+import { createReadStream, existsSync, readFileSync, realpathSync, statSync } from 'node:fs';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { basename, dirname, join } from 'node:path';
 import { TOKENS } from '../../app/src/lib/seq';
@@ -12,6 +12,7 @@ import { inside, listFolder, namesIn, saveUpload } from './files';
 import { detectGmx, rdfHelp, type GmxState } from './gmx';
 import { HttpError, readJson, type Api } from './http';
 import type { Job, Jobs } from './jobs';
+import { planRun, startRun } from './runs';
 import { saveConfig, type Config } from './state';
 
 export interface Ctx { home: string; version: string; config: Config; gmx: GmxState; jobs: Jobs }
@@ -86,13 +87,20 @@ export function makeApi(ctx: Ctx): Api {
       if (!ctx.gmx.ok) throw new HttpError(409, 'no working gmx');
       return { body: await checkSizes(ctx.gmx, runInput, groups, ctx.home) };
     }
+    if (is(req, 'POST', url, '/api/plan')) return { body: await planRun(ctx, await readJson(req), roots()) };
+    if (is(req, 'POST', url, '/api/runs')) return { body: summary((await startRun(ctx, await readJson(req), roots())).job) };
     if (is(req, 'POST', url, '/api/upload')) return { body: await saveUpload(req, ctx.home, url.searchParams.get('name') || 'upload') };
-    const job = /^\/api\/jobs\/([\w-]+)(\/cancel)?$/.exec(url.pathname);
+    const job = /^\/api\/jobs\/([\w-]+)(\/cancel|\/record)?$/.exec(url.pathname);
     if (job) {
       const j = ctx.jobs.get(job[1]);
       if (!j) throw new HttpError(404, 'no job ' + job[1]);
       if (req.method === 'GET' && !job[2]) return { body: j };
-      if (req.method === 'POST' && job[2]) { ctx.jobs.cancel(j.id); return { body: summary(j) }; }
+      if (req.method === 'POST' && job[2] === '/cancel') { ctx.jobs.cancel(j.id); return { body: summary(j) }; }
+      if (req.method === 'GET' && job[2] === '/record') {
+        const path = j.meta?.record as string | undefined;
+        if (!path || !existsSync(path)) throw new HttpError(404, j.ended ? 'this run has no record' : 'the record is written when the run ends');
+        return { body: JSON.parse(readFileSync(path, 'utf8')) };
+      }
     }
     if (is(req, 'POST', url, '/api/config')) {
       const patch = await readJson<Partial<Config>>(req);
