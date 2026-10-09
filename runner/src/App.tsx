@@ -10,13 +10,14 @@ import { readThemePref, saveThemePref, themeOf, type ThemePref } from './lib/the
 import { useJobs } from './jobs'
 import { useDraft } from './draft'
 import { recipeFromRecord } from './lib/record'
+import { BatchView } from './views/Batch'
 import { Groups } from './views/Groups'
 import { Inputs } from './views/Inputs'
 import { Rdf } from './views/Rdf'
 import { JobsView } from './views/Jobs'
 import { Settings } from './views/Settings'
 
-const TABS = ['inputs', 'groups', 'rdf', 'jobs'] as const
+const TABS = ['inputs', 'groups', 'rdf', 'jobs', 'batch'] as const
 type Tab = (typeof TABS)[number]
 
 /** The open tab lives in the address (#jobs), so a reload keeps it. */
@@ -91,6 +92,7 @@ export function App() {
           <TabsTrigger value="groups">groups</TabsTrigger>
           <TabsTrigger value="rdf">rdf</TabsTrigger>
           <TabsTrigger value="jobs">jobs {jobs.jobs.length > 0 && <TabsCount>{running ? running + ' running' : String(jobs.jobs.length).padStart(2, '0')}</TabsCount>}</TabsTrigger>
+          <TabsTrigger value="batch">batch</TabsTrigger>
         </TabsList>
       <main className="flex flex-col gap-4 p-5">
         {error && <Alert variant="destructive"><X /><AlertTitle>can't reach the gmx-cypher server</AlertTitle><AlertDescription><p>{error}</p></AlertDescription></Alert>}
@@ -106,6 +108,7 @@ export function App() {
         <TabsContent value="groups"><Groups draft={draft} setDraft={setDraft} /></TabsContent>
         <TabsContent value="rdf">{state && <Rdf gmx={state.gmx} draft={draft} setDraft={setDraft} onStarted={id => { setSelectedJob(id); setTab('jobs') }} />}</TabsContent>
         <TabsContent value="jobs"><JobsView {...jobs} selected={selectedJob} onSelect={setSelectedJob} vault={state?.config.vault ?? null} onRunAgain={r => { setDraft(d => ({ ...d, ...recipeFromRecord(r) })); setTab('rdf') }} /></TabsContent>
+        <TabsContent value="batch">{state && <BatchView state={state} draft={draft} jobs={jobs.jobs} onOpenJob={id => { setSelectedJob(id); setTab('jobs') }} />}</TabsContent>
       </main>
       </Tabs>
       <Toaster />

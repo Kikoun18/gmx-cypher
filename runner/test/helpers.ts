@@ -1,5 +1,5 @@
 import { spawn, type ChildProcess } from 'node:child_process';
-import { mkdtempSync } from 'node:fs';
+import { copyFileSync, cpSync, mkdirSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -46,4 +46,16 @@ export async function apiServer(patch: Partial<import('../server/api').Ctx> = {}
     return { status: res.status, json: (await res.json()) as T };
   };
   return { ctx, base, headers, call, close: () => new Promise<void>(r => server.close(() => r())) };
+}
+
+/** A copy of app/test/fixtures/cluster/ with the test system's files as each run's trajectory, run input and structure. */
+export function clusterCopy() {
+  const root = tmp('cluster');
+  cpSync(APP + 'test/fixtures/cluster', root, { recursive: true });
+  for (const [col, run] of [['ha', '1'], ['ha', '2'], ['pg', '1']]) {
+    const d = join(root, 'hmr+fast+6', col, 'WRWYCR/9.multiwalker', run);
+    mkdirSync(d, { recursive: true });
+    for (const [from, to] of [['nvt.xtc', '07_md.xtc'], ['nvt.tpr', '07_md.tpr'], ['nvt.gro', '07_md.gro']]) copyFileSync(RUNNER + 'test/fixtures/nvt/' + from, join(d, to));
+  }
+  return root;
 }

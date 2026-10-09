@@ -12,7 +12,10 @@ import { inside, listFolder, namesIn, saveUpload } from './files';
 import { detectGmx, rdfHelp, type GmxState } from './gmx';
 import { HttpError, readJson, type Api } from './http';
 import type { Job, Jobs } from './jobs';
+import { Batches, findTrajectories, sendAll } from './batch';
 import { listRecipes, readRecipe, saveRecipe } from './recipes';
+import { recipeFileProblems, type Recipe } from '../src/lib/recipe';
+import { cpus } from 'node:os';
 import { planRun, startRun } from './runs';
 import { sendToInbox } from './send';
 import { landingFor, listProjects, openVault, projectSummary, readProject } from './vault';
@@ -25,15 +28,17 @@ export interface Ctx { home: string; version: string; config: Config; gmx: GmxSt
 /** A job without its log, for lists and events (the log comes with GET /api/jobs/:id). */
 const summary = ({ log: _log, ...j }: Job) => j;
 
-/** Server-Sent Events: every job change and every piece of output, to every open page. */
-function events(jobs: Jobs, res: ServerResponse) {
+/** Server-Sent Events: every job and batch change and every piece of output, to every open page. */
+function events(jobs: Jobs, batches: Batches, res: ServerResponse) {
   res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-store', connection: 'keep-alive' });
   const send = (name: string, data: unknown) => res.write('event: ' + name + '\ndata: ' + JSON.stringify(data) + '\n\n');
   const onJob = (j: Job) => send('job', summary(j)), onOut = (id: string, s: string) => send('out', { id, s });
+  const onBatch = (b: unknown) => send('batch', b);
   jobs.on('job', onJob);
   jobs.on('out', onOut);
+  batches.on('batch', onBatch);
   const ping = setInterval(() => res.write(': ping\n\n'), 25_000);
-  res.on('close', () => { clearInterval(ping); jobs.off('job', onJob); jobs.off('out', onOut); });
+  res.on('close', () => { clearInterval(ping); jobs.off('job', onJob); jobs.off('out', onOut); batches.off('batch', onBatch); });
   send('hello', {});
 }
 
@@ -54,9 +59,11 @@ export function makeApi(ctx: Ctx): Api {
   const state = () => ({ name: 'gmx-cypher', version: ctx.version, tokens: TOKENS, gmx: ctx.gmx, config: ctx.config });
   // Uploaded inputs are used like picked ones, so the uploads folder counts as allowed.
   const roots = () => [...ctx.config.allow, join(ctx.home, 'uploads')];
+  const batches = new Batches(ctx, roots);
+  const checked = (r: unknown) => { const p = recipeFileProblems(r); if (p.length) throw new HttpError(400, p.join('; ')); return r as Recipe; };
   return async (req, url, res) => {
     if (is(req, 'GET', url, '/api/state')) return { body: state() };
-    if (is(req, 'GET', url, '/api/events')) { events(ctx.jobs, res); return 'handled'; }
+    if (is(req, 'GET', url, '/api/events')) { events(ctx.jobs, batches, res); return 'handled'; }
     if (is(req, 'GET', url, '/api/jobs')) return { body: ctx.jobs.list().map(summary) };
     if (is(req, 'GET', url, '/api/help/rdf')) {
       if (!ctx.gmx.ok) throw new HttpError(409, 'no working gmx');
@@ -127,6 +134,26 @@ export function makeApi(ctx: Ctx): Api {
       if (!project) throw new HttpError(404, 'no project ' + b.project + ' in the vault');
       // Only g(r): the cumulative-number file is titled "Cumulative Number RDF", which PMF Sequences would read as another RDF (T35).
       return { body: sendToInbox(v, project, join(String(j.meta!.outDir), (j.meta!.names as { xvg: string }).xvg), String(b.name ?? ''), ctx.config.pmfUrl) };
+    }
+    if (is(req, 'POST', url, '/api/batch/preview')) {
+      const b = await readJson<{ root: string; template: string; recipe: unknown }>(req);
+      return { body: { items: findTrajectories(b.root, String(b.template || ''), checked(b.recipe), roots()) } };
+    }
+    if (is(req, 'GET', url, '/api/batches')) return { body: batches.list() };
+    if (is(req, 'POST', url, '/api/batches')) {
+      // The matches are found again: only paths the preview showed, and that still match, run.
+      const b = await readJson<{ root: string; template: string; recipe: unknown; rels: string[]; concurrency?: number }>(req), recipe = checked(b.recipe), rels = new Set(b.rels || []);
+      const items = findTrajectories(b.root, String(b.template || ''), recipe, roots()).filter(i => rels.has(i.rel));
+      if (!items.length) throw new HttpError(400, 'none of the chosen trajectories matches');
+      return { body: batches.start(recipe, b.root, b.template, items, Math.min(cpus().length, b.concurrency || ctx.config.concurrency)) };
+    }
+    const batch = /^\/api\/batches\/([\w-]+)\/(cancel|send)$/.exec(url.pathname);
+    if (batch && req.method === 'POST') {
+      const b = batches.get(batch[1]);
+      if (!b) throw new HttpError(404, 'no batch ' + batch[1]);
+      if (batch[2] === 'cancel') { batches.cancel(b.id); return { body: b }; }
+      if (!ctx.config.vault) throw new HttpError(409, 'no vault set');
+      return { body: await sendAll(ctx, b, (await readJson<{ project: string }>(req)).project) };
     }
     if (is(req, 'GET', url, '/api/recipes')) return { body: listRecipes(ctx.home) };
     if (is(req, 'POST', url, '/api/recipes')) return { body: saveRecipe(ctx.home, await readJson(req)) };
