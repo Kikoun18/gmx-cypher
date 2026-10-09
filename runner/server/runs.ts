@@ -5,13 +5,14 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, statSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import { atomTable, type Atom } from '../src/lib/atoms';
+import { COMMANDS, commandOf } from '../src/lib/commands';
 import { groupAtoms, nameProblem, type Group } from '../src/lib/groups';
 import type { Slot } from '../src/lib/inputs';
 import { DEFAULT_TEMPLATE, freeStem, outputNames, renderStem } from '../src/lib/names';
 import { writeNdx } from '../src/lib/ndx';
 import { structureMismatch } from '../src/lib/checks';
 import { frameEstimate } from '../src/lib/gmxText';
-import { rdfArgs, rdfIo, recipeProblems, runEstimate, type Options, type RdfIo } from '../src/lib/rdf';
+import { rdfIo, runEstimate, type Options, type RdfIo } from '../src/lib/rdf';
 import { buildRecord, type FileInfo, type Output, type RunRecord } from '../src/lib/record';
 import { structFormat } from '../../app/src/lib/structFile';
 import type { Ctx } from './api';
@@ -22,13 +23,15 @@ import { HttpError } from './http';
 import type { Job } from './jobs';
 
 export interface RunRequest {
+  /** The command's tool name (T98); RDF when it is left out. */
+  tool?: string;
   inputs: Partial<Record<Slot, string>>; groups: Group[]; options: Options; template?: string; outDir?: string | null;
   /** Values for the name template's PMF Sequences tokens: a batch's path fields (review finding 4). */
   names?: Record<string, string>;
   /** A batch run whose names were taken meanwhile takes the next free stem instead of stopping (review finding 5). */
   retryNames?: boolean;
 }
-export interface Plan { cwd: string; outDir: string; stem: string; names: ReturnType<typeof outputNames>; io: RdfIo; file: string; argv: string[]; env: Record<string, string>; problems: string[] }
+export interface Plan { tool: string; cwd: string; outDir: string; stem: string; names: ReturnType<typeof outputNames>; io: RdfIo; file: string; argv: string[]; env: Record<string, string>; problems: string[] }
 
 /** What a job sets in gmx's environment: GROMACS backs up an existing output unless GMX_MAXBACKUP is 0 or -1 (then 2025.4 overwrites; checked), which cluster shells often set (review finding 6). */
 const JOB_ENV = { GMX_MAXBACKUP: '99' };
@@ -38,6 +41,8 @@ const nameKey = (s: string) => s.normalize('NFC').toLowerCase();
 /** Where and under which names a run would write now, and the exact argv (T25, T29, T30). */
 export async function planRun(ctx: Ctx, req: RunRequest, roots: string[]): Promise<Plan> {
   if (!ctx.gmx.ok) throw new HttpError(409, 'no working gmx');
+  const cmd = commandOf(req.tool ?? 'rdf');
+  if (!cmd) throw new HttpError(400, 'no command ' + req.tool + ': gmx-cypher runs ' + COMMANDS.map(c => c.tool).join(', '));
   if (!req.inputs?.trajectory || !req.inputs.runInput) throw new HttpError(400, 'a trajectory and a run input are needed');
   const trajectory = inside(req.inputs.trajectory, roots), runInput = inside(req.inputs.runInput, roots);
   // Uploaded inputs have no folder of their own: their outputs go to the state folder's workspace.
@@ -47,7 +52,7 @@ export async function planRun(ctx: Ctx, req: RunRequest, roots: string[]): Promi
   const vault = ctx.config.vault && existsSync(ctx.config.vault) ? realpathSync(ctx.config.vault) : null;
   if (vault && within(outDir, vault)) throw new HttpError(400, outDir + ' is inside the PMF Sequences vault; results go there only by send to vault');
   let stem: string;
-  try { stem = renderStem(req.template || DEFAULT_TEMPLATE, { ...req.names, analysis: 'rdf', trajectory: basename(trajectory).replace(/\.[^.]+$/, '') }); }
+  try { stem = renderStem(req.template || DEFAULT_TEMPLATE, { ...req.names, analysis: cmd.tool, trajectory: basename(trajectory).replace(/\.[^.]+$/, '') }); }
   catch (e) {
     const m = (e as Error).message;
     throw new HttpError(400, !req.names && m.endsWith('has no value here') ? m + ": in a single run only {analysis} and {trajectory} do; a batch's path template gives the others" : m);
@@ -55,9 +60,9 @@ export async function planRun(ctx: Ctx, req: RunRequest, roots: string[]): Promi
   stem = freeStem(stem, existsSync(outDir) ? readdirSync(outDir) : []);
   const help = await rdfHelp(ctx.gmx), { cwd, io } = rdfIo({ trajectory, runInput }, outDir, stem);
   let argv: string[];
-  try { argv = rdfArgs({ options: req.options || {}, selections: (req.groups?.length || 1) - 1 }, io, help); }
+  try { argv = cmd.argv({ options: req.options || {}, selections: (req.groups?.length || 1) - 1 }, io, help); }
   catch (e) { throw new HttpError(400, (e as Error).message); }
-  return { cwd, outDir, stem, names: outputNames(stem), io, file: ctx.gmx.path!, argv, env: JOB_ENV, problems: recipeProblems(req.options || {}, help) };
+  return { tool: cmd.tool, cwd, outDir, stem, names: cmd.outputNames(stem), io, file: ctx.gmx.path!, argv, env: JOB_ENV, problems: cmd.problems(req.options || {}, help) };
 }
 
 /** The groups' atoms from the structure file, as the GUI computed them; names and emptiness refused here too. */
@@ -140,7 +145,7 @@ export async function startRun(ctx: Ctx, req: RunRequest, roots: string[]): Prom
       const problems = readdirSync(plan.outDir).filter(n => { const m = /^#(.+)\.\d+#$/.exec(n); return m && ours.has(nameKey(m[1])); })
         .map(n => 'gmx backed up a file that appeared during the run: ' + n);
       const r = buildRecord({
-        runner: ctx.version, gmx: { path: ctx.gmx.path!, version: ctx.gmx.version! }, env, command: { cwd: plan.cwd, file: plan.file, args: plan.argv },
+        analysis: plan.tool, runner: ctx.version, gmx: { path: ctx.gmx.path!, version: ctx.gmx.version! }, env, command: { cwd: plan.cwd, file: plan.file, args: plan.argv },
         inputs, groups: req.groups, atoms, sizes: sizes.sizes, options: req.options || {}, help: await rdfHelp(ctx.gmx), template: req.template || DEFAULT_TEMPLATE,
         outDir: req.outDir ?? null, job: j, outputs, problems,
       });

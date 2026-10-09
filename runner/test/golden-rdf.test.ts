@@ -98,7 +98,7 @@ describe('gmx rdf as gmx-cypher gives it (golden)', () => {
 
 describe('the index file as gmx-cypher writes it (golden)', () => {
   it('the three groups of nvt.gro, as the index holds them', () => {
-    const indexed = groups.map((g, i) => ({ name: g.name, atoms: groupAtoms(nvt, g.steps) }));
+    const indexed = groups.map(g => ({ name: g.name, atoms: groupAtoms(nvt, g.steps) }));
     expect(writeNdx(indexed)).toMatchInlineSnapshot(`
       "[ sulfur ]
          5   10   15   20   25   30

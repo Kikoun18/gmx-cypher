@@ -85,11 +85,11 @@ describe('recipe and record versions with lists', () => {
   it('a version 2 recipe with a list loads; a version 3 one is refused in words', () => {
     const v2 = { ...read('recipe-v1.json'), version: 2, groups: [read('recipe-v1.json').groups[0], { role: 'selection', name: 'oxygens', tone: 'sky', steps: [{ op: 'add', rule: { kind: 'names', values: ['O1', 'O2'], resn: 'SO4' } }] }] };
     expect(recipeFileProblems(v2)).toEqual([]);
-    expect(recipeFileProblems({ ...v2, version: 3 })).toEqual(['recipe version 3: this gmx-cypher reads versions 1 and 2']);
+    expect(recipeFileProblems({ ...v2, version: 4 })).toEqual(['recipe version 4: this gmx-cypher reads versions 1 to 3']);
   });
 
   it('the frozen v1 record still loads (versions 1 and 2 are read)', () => {
     expect(recordProblems(read('run-v1.run.json'))).toEqual([]);
-    expect(recordProblems({ ...read('run-v1.run.json'), version: 3 })).toEqual(['run record version 3: this gmx-cypher reads versions 1 and 2']);
+    expect(recordProblems({ ...read('run-v1.run.json'), version: 4 })).toEqual(['run record version 4: this gmx-cypher reads versions 1 to 3']);
   });
 });

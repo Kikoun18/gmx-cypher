@@ -1,3 +1,4 @@
+import { commandOf } from './commands';
 // Recipes (R7a, T37): the saved form of a run, without its inputs: options, groups as steps (rules where
 // possible, hand-picked atoms as ranges), the name template and output folder. One recipe serves other
 // trajectories of the same system, and is checked against each system before it runs there.
@@ -9,9 +10,10 @@ import { safeFileName } from '../../../app/src/lib/storage/path';
 
 export interface Recipe {
   format: 'gmx-cypher recipe';
-  version: 1 | 2;
+  version: 1 | 2 | 3;
   name: string;
-  analysis: 'rdf';
+  /** The command (its tool name); a version 1 or 2 recipe is RDF. */
+  analysis: string;
   saved: string;
   options: Options;
   /** The reference first, then the selections. */
@@ -24,7 +26,7 @@ export interface Recipe {
 interface DraftLike { groups: Group[]; options: Options; template?: string; outDir?: string | null }
 
 export function recipeFromDraft(d: DraftLike, name: string, saved = new Date().toISOString()): Recipe {
-  return { format: 'gmx-cypher recipe', version: 2, name, analysis: 'rdf', saved, options: d.options, groups: d.groups, template: d.template ?? '{analysis}_{trajectory}', outDir: d.outDir ?? null };
+  return { format: 'gmx-cypher recipe', version: 3, name, analysis: 'rdf', saved, options: d.options, groups: d.groups, template: d.template ?? '{analysis}_{trajectory}', outDir: d.outDir ?? null };
 }
 
 /** The draft with the recipe's groups, options, template and folder; its inputs are kept. */
@@ -38,9 +40,11 @@ const KINDS = new Set(['resname', 'resnr', 'name', 'names', 'element', 'atoms'])
 export function recipeFileProblems(x: unknown): string[] {
   const r = x as Partial<Recipe> | null;
   if (!r || typeof r !== 'object' || r.format !== 'gmx-cypher recipe') return ['not a gmx-cypher recipe'];
-  if (r.version !== 1 && r.version !== 2) return ['recipe version ' + r.version + ': this gmx-cypher reads versions 1 and 2'];
+  if (r.version !== 1 && r.version !== 2 && r.version !== 3) return ['recipe version ' + r.version + ': this gmx-cypher reads versions 1 to 3'];
   const p: string[] = [];
   if (typeof r.name !== 'string' || !r.name.trim()) p.push('a recipe needs a name');
+  const analysis = r.analysis ?? 'rdf';
+  if (!commandOf(String(analysis))) p.push('analysis ' + analysis + ' is not a command gmx-cypher knows');
   if (!r.options || typeof r.options !== 'object') p.push('options are missing');
   if (!Array.isArray(r.groups) || r.groups.length < 2) return [...p, 'a reference and at least one selection are needed'];
   r.groups.forEach(g => (Array.isArray(g?.steps) ? g.steps : [null]).forEach((s, i) => {

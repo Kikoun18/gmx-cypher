@@ -18,7 +18,7 @@ const draft = { inputs: { trajectory: { path: '/sim/nvt/nvt.xtc', why: 'picked' 
 describe('recipes (T37)', () => {
   it('round trip: the draft as a recipe, as JSON, and back; the inputs stay the draft\'s own', () => {
     const r = recipeFromDraft(draft, 'ion pairs', '2026-10-09T01:00:00.000Z');
-    expect(r).toEqual({ format: 'gmx-cypher recipe', version: 2, name: 'ion pairs', analysis: 'rdf', saved: '2026-10-09T01:00:00.000Z', options: { rmax: '1.5', cn: true }, groups, template: '{analysis}_{trajectory}', outDir: null });
+    expect(r).toEqual({ format: 'gmx-cypher recipe', version: 3, name: 'ion pairs', analysis: 'rdf', saved: '2026-10-09T01:00:00.000Z', options: { rmax: '1.5', cn: true }, groups, template: '{analysis}_{trajectory}', outDir: null });
     const back = JSON.parse(JSON.stringify(r));
     expect(recipeFileProblems(back)).toEqual([]);
     const other = { inputs: { trajectory: { path: '/sim/other.xtc', why: 'picked' } }, groups: [], options: {} };
@@ -27,7 +27,7 @@ describe('recipes (T37)', () => {
 
   it('names what makes a file unusable as a recipe', () => {
     expect(recipeFileProblems({ format: 'something' })).toEqual(['not a gmx-cypher recipe']);
-    expect(recipeFileProblems({ ...recipeFromDraft(draft, 'x'), version: 3 })).toEqual(['recipe version 3: this gmx-cypher reads versions 1 and 2']);
+    expect(recipeFileProblems({ ...recipeFromDraft(draft, 'x'), version: 4 })).toEqual(['recipe version 4: this gmx-cypher reads versions 1 to 3']);
     expect(recipeFileProblems({ ...recipeFromDraft(draft, 'x'), groups: [groups[0]] })).toEqual(['a reference and at least one selection are needed']);
     expect(recipeFileProblems({ ...recipeFromDraft(draft, 'x'), groups: [groups[0], { ...groups[1], steps: [{ op: 'add', rule: { kind: 'nope' } }] }] })).toEqual(['water_O: step 1 is not a rule gmx-cypher knows']);
   });

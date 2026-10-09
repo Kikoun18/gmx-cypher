@@ -14,7 +14,9 @@ type Status = 'running' | 'done' | 'failed' | 'cancelled' | 'interrupted';
 
 export interface RunRecord {
   format: 'gmx-cypher run';
-  version: 1 | 2;
+  version: 1 | 2 | 3;
+  /** The command (version 3): its tool name. Versions 1 and 2 are RDF. */
+  analysis?: string;
   runner: { name: 'gmx-cypher'; version: string };
   gmx: { path: string; version: string };
   job: string;
@@ -38,6 +40,7 @@ export interface RunRecord {
 }
 
 export interface RecordParts {
+  analysis: string;
   runner: string;
   gmx: { path: string; version: string };
   env: Record<string, string>;
@@ -58,7 +61,7 @@ export interface RecordParts {
 export function buildRecord(p: RecordParts): RunRecord {
   const by = new Map(p.help.map(o => [o.flag, o.flag === 'cn' ? { ...o, type: 'bool', default: false } : o]));
   return {
-    format: 'gmx-cypher run', version: 2,
+    format: 'gmx-cypher run', version: 3, analysis: p.analysis,
     runner: { name: 'gmx-cypher', version: p.runner }, gmx: p.gmx, job: p.job.id, command: p.command, env: p.env,
     started: p.job.started ?? null, ended: p.job.ended ?? null, status: p.job.status, exit: p.job.exit ?? null,
     frames: p.job.progress.analysed ? { analysed: p.job.progress.analysed.frames, lastTime: p.job.progress.analysed.lastTime } : null, log: p.job.log, inputs: p.inputs,
@@ -78,8 +81,9 @@ export function buildRecord(p: RecordParts): RunRecord {
 export function recordProblems(x: unknown): string[] {
   const r = x as Partial<RunRecord> | null;
   if (!r || typeof r !== 'object' || r.format !== 'gmx-cypher run') return ['not a gmx-cypher run record'];
-  if (r.version !== 1 && r.version !== 2) return ['run record version ' + r.version + ': this gmx-cypher reads versions 1 and 2'];
+  if (r.version !== 1 && r.version !== 2 && r.version !== 3) return ['run record version ' + r.version + ': this gmx-cypher reads versions 1 to 3'];
   const p: string[] = [], need = (ok: boolean, what: string) => { if (!ok) p.push(what + ' is missing'); };
+  if (r.version === 3 && typeof r.analysis !== 'string') p.push('analysis is missing: a version 3 record names its command');
   need(typeof r.command?.cwd === 'string' && typeof r.command.file === 'string', 'command');
   need(Array.isArray(r.command?.args), 'command.args');
   need(!!r.inputs && typeof r.inputs.trajectory?.path === 'string' && typeof r.inputs.runInput?.path === 'string', 'inputs');
