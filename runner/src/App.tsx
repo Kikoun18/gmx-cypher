@@ -11,10 +11,11 @@ import { useJobs } from './jobs'
 import { useDraft } from './draft'
 import { Groups } from './views/Groups'
 import { Inputs } from './views/Inputs'
+import { Rdf } from './views/Rdf'
 import { JobsView } from './views/Jobs'
 import { Settings } from './views/Settings'
 
-const TABS = ['inputs', 'groups', 'jobs'] as const
+const TABS = ['inputs', 'groups', 'rdf', 'jobs'] as const
 type Tab = (typeof TABS)[number]
 
 /** The open tab lives in the address (#jobs), so a reload keeps it. */
@@ -73,20 +74,22 @@ export function App() {
         <TabsList className="px-3">
           <TabsTrigger value="inputs">inputs</TabsTrigger>
           <TabsTrigger value="groups">groups</TabsTrigger>
+          <TabsTrigger value="rdf">rdf</TabsTrigger>
           <TabsTrigger value="jobs">jobs {jobs.jobs.length > 0 && <TabsCount>{running ? running + ' running' : String(jobs.jobs.length).padStart(2, '0')}</TabsCount>}</TabsTrigger>
         </TabsList>
       <main className="flex flex-col gap-4 p-5">
-        {error && <Alert variant="destructive"><X /><AlertTitle>✗ can't reach the gmx-cypher server</AlertTitle><AlertDescription><p>{error}</p></AlertDescription></Alert>}
+        {error && <Alert variant="destructive"><X /><AlertTitle>can't reach the gmx-cypher server</AlertTitle><AlertDescription><p>{error}</p></AlertDescription></Alert>}
         {state && !state.gmx.ok && (
           <Alert variant="destructive">
             <X />
-            <AlertTitle>✗ no working gmx: nothing can run</AlertTitle>
+            <AlertTitle>no working gmx: nothing can run</AlertTitle>
             <AlertDescription><p>{state.gmx.error}</p></AlertDescription>
             <AlertActions><Button variant="outline" size="sm" onClick={() => setSettings(true)}>set gmx</Button></AlertActions>
           </Alert>
         )}
         <TabsContent value="inputs">{state && <Inputs state={state} draft={draft} setDraft={setDraft} onSettings={() => setSettings(true)} onNext={() => setTab('groups')} />}</TabsContent>
         <TabsContent value="groups"><Groups draft={draft} setDraft={setDraft} /></TabsContent>
+        <TabsContent value="rdf">{state && <Rdf gmx={state.gmx} draft={draft} setDraft={setDraft} />}</TabsContent>
         <TabsContent value="jobs"><JobsView {...jobs} selected={selectedJob} onSelect={setSelectedJob} /></TabsContent>
       </main>
       </Tabs>

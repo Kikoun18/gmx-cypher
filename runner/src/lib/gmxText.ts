@@ -41,3 +41,35 @@ export function parseSizes(xvg: string): number[] | null {
   const rows = xvg.split('\n').filter(l => l.trim() && !'#@'.includes(l.trim()[0]));
   return rows.length ? rows[rows.length - 1].trim().split(/\s+/).slice(1).map(Number) : null;
 }
+
+export interface HelpOption {
+  flag: string;
+  section: 'input' | 'output' | 'other';
+  /** `file` for [<.ext>] and <file>, `bool` for -[no]flag, else gmx's own word: time, real, int, enum, selection… */
+  type: string;
+  default: string | boolean | null;
+  optional?: boolean;
+  values?: string[];
+  help: string;
+}
+
+const SECTIONS: Record<string, HelpOption['section']> = { 'Options to specify input files:': 'input', 'Options to specify output files:': 'output', 'Other options:': 'other' };
+
+/** The OPTIONS part of `gmx <tool> -h`: each option with its type, default, enum values and help text (T22). */
+export function parseHelp(text: string): HelpOption[] {
+  const out: HelpOption[] = [];
+  let section: HelpOption['section'] | null = null;
+  for (const line of text.split('\n')) {
+    if (SECTIONS[line.trim()]) { section = SECTIONS[line.trim()]; continue; }
+    const m = section && /^ -(\[no\])?([\w-]+)\s*(\[<[^>]*>\]|<\w+>)?\s*(?:\(([^)]*)\))?\s*(\(Opt\.\))?\s*$/.exec(line);
+    if (m) {
+      const [, no, flag, kind, def, opt] = m, file = !!kind?.startsWith('[');
+      out.push({ flag, section: section!, type: no ? 'bool' : file || kind === '<file>' ? 'file' : kind!.slice(1, -1), default: no ? def === 'yes' : def ?? null, ...(file ? { optional: !!opt } : {}), help: '' });
+    } else if (out.length && /^ {11}\S/.test(line)) {
+      const o = out[out.length - 1];
+      o.help = (o.help + ' ' + line.trim()).trim();
+    }
+  }
+  for (const o of out) if (o.type === 'enum') o.values = o.help.slice(o.help.lastIndexOf(':') + 1).split(',').map(v => v.trim());
+  return out;
+}

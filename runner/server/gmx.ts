@@ -4,7 +4,7 @@
 import { spawn } from 'node:child_process';
 import { accessSync, constants, statSync } from 'node:fs';
 import { delimiter, isAbsolute, join, resolve } from 'node:path';
-import { parseVersion } from '../src/lib/gmxText';
+import { parseHelp, parseVersion, type HelpOption } from '../src/lib/gmxText';
 
 export interface GmxState { ok: boolean; name: string; path?: string; version?: string; versionText?: string; error?: string }
 
@@ -60,4 +60,21 @@ export async function detectGmx(configured: string | null, PATH = process.env.PA
     first ??= g;
   }
   return first || { ok: false, name: 'gmx', error: 'neither gmx_mpi nor gmx is on PATH; set its path in settings, or start gmx-cypher after module add' };
+}
+
+const helps = new Map<string, Promise<HelpOption[]>>();
+
+/** `gmx rdf -h` of this gmx, read once per binary and version (T22); a failed read is tried again next time. */
+export function rdfHelp(g: GmxState): Promise<HelpOption[]> {
+  const key = g.path + '\0' + g.version;
+  if (!helps.has(key)) {
+    const read = capture(g.path!, ['rdf', '-h'], { timeoutMs: 30_000 }).then(r => {
+      const options = parseHelp(r.stdout);
+      if (!options.length) throw new Error(g.path + ' rdf -h listed no options' + (r.code ? ' (exit ' + r.code + ')' : ''));
+      return options;
+    });
+    helps.set(key, read);
+    read.catch(() => helps.delete(key));
+  }
+  return helps.get(key)!;
 }

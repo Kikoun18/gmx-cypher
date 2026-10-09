@@ -9,7 +9,7 @@ import { fromRanges } from '../src/lib/atoms';
 import { nameProblem } from '../src/lib/groups';
 import { checkInputs, checkSizes } from './check';
 import { inside, listFolder, namesIn, saveUpload } from './files';
-import { detectGmx, type GmxState } from './gmx';
+import { detectGmx, rdfHelp, type GmxState } from './gmx';
 import { HttpError, readJson, type Api } from './http';
 import type { Job, Jobs } from './jobs';
 import { saveConfig, type Config } from './state';
@@ -52,6 +52,10 @@ export function makeApi(ctx: Ctx): Api {
     if (is(req, 'GET', url, '/api/state')) return { body: state() };
     if (is(req, 'GET', url, '/api/events')) { events(ctx.jobs, res); return 'handled'; }
     if (is(req, 'GET', url, '/api/jobs')) return { body: ctx.jobs.list().map(summary) };
+    if (is(req, 'GET', url, '/api/help/rdf')) {
+      if (!ctx.gmx.ok) throw new HttpError(409, 'no working gmx');
+      return { body: { gmx: ctx.gmx.path, version: ctx.gmx.version, options: await rdfHelp(ctx.gmx) } };
+    }
     if (is(req, 'GET', url, '/api/ls')) {
       const path = url.searchParams.get('path');
       return { body: path ? listFolder(path, roots()) : { roots: roots() } };
