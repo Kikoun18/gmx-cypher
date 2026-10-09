@@ -34,10 +34,14 @@ export function localHost(host: string | undefined): boolean {
   return !!m && LOCAL.has(m[1].toLowerCase());
 }
 
-/** No Origin (same-origin GET, curl) or a local http origin. */
-export function localOrigin(origin: string | undefined): boolean {
+/**
+ * No Origin (a same-origin GET, curl), or exactly this address: the browser's Host. A page on another
+ * local port is refused, because cookies are not bound to a port (review finding 3). Through an SSH tunnel
+ * the browser's own address is both the Host and the Origin, so it still works.
+ */
+export function localOrigin(origin: string | undefined, host: string | undefined): boolean {
   if (origin === undefined) return true;
-  try { const u = new URL(origin); return u.protocol === 'http:' && LOCAL.has(u.hostname); } catch { return false; }
+  try { const u = new URL(origin); return u.protocol === 'http:' && LOCAL.has(u.hostname) && u.host === (host || '').toLowerCase(); } catch { return false; }
 }
 
 const same = (a: string, b: string) => a.length === b.length && timingSafeEqual(Buffer.from(a), Buffer.from(b));
@@ -47,7 +51,7 @@ export type Gate = { kind: 'ok' } | { kind: 'enter'; location: string } | { kind
 
 export function gate(req: IncomingMessage, url: URL, token: string): Gate {
   if (!localHost(req.headers.host)) return { kind: 'refuse', status: 403, reason: 'foreign host' };
-  if (!localOrigin(req.headers.origin)) return { kind: 'refuse', status: 403, reason: 'foreign origin' };
+  if (!localOrigin(req.headers.origin, req.headers.host)) return { kind: 'refuse', status: 403, reason: 'foreign origin' };
   const fromUrl = url.searchParams.get('token');
   if (fromUrl != null && same(fromUrl, token)) {
     url.searchParams.delete('token');
@@ -61,7 +65,9 @@ export function sendJson(res: ServerResponse, status: number, body: unknown) {
   res.end(JSON.stringify(body));
 }
 
+/** A JSON body; declared as JSON, so a form or a text/plain post from another page can't pass as one. */
 export async function readJson<T>(req: IncomingMessage, limit = 16 << 20): Promise<T> {
+  if (!/^application\/json\b/i.test(req.headers['content-type'] || '')) throw new HttpError(415, 'the body must be JSON (content-type: application/json)');
   let size = 0;
   const parts: Buffer[] = [];
   for await (const c of req) {
@@ -70,6 +76,14 @@ export async function readJson<T>(req: IncomingMessage, limit = 16 << 20): Promi
     parts.push(c as Buffer);
   }
   try { return JSON.parse(Buffer.concat(parts).toString('utf8') || 'null') as T; } catch { throw new HttpError(400, 'not JSON'); }
+}
+
+/** A file as the answer: refused unless it is a file; a read error ends the answer, never the server. */
+export function sendFile(res: ServerResponse, path: string, headers: Record<string, string>) {
+  if (!statSync(path, { throwIfNoEntry: false })?.isFile()) throw new HttpError(400, path + ' is not a file');
+  const stream = createReadStream(path);
+  stream.once('error', e => { if (res.headersSent) res.destroy(e); else sendJson(res, 500, { error: path + ': ' + e.message }); });
+  stream.once('open', () => { res.writeHead(200, headers); stream.pipe(res); });
 }
 
 const MIME: Record<string, string> = {
@@ -86,8 +100,7 @@ function serveStatic(dist: string, pathname: string, res: ServerResponse) {
   // A path without an extension is a page of the GUI (single page); a missing file is a 404.
   const target = stat?.isFile() ? file : inside && !extname(rel) ? resolve(dist, 'index.html') : null;
   if (!target) { res.writeHead(404, { 'content-type': 'text/plain' }).end('not found'); return; }
-  res.writeHead(200, { 'content-type': MIME[extname(target)] || 'application/octet-stream', 'cache-control': target.endsWith('.html') ? 'no-store' : 'no-cache' });
-  createReadStream(target).pipe(res);
+  sendFile(res, target, { 'content-type': MIME[extname(target)] || 'application/octet-stream', 'cache-control': target.endsWith('.html') ? 'no-store' : 'no-cache' });
 }
 
 const REFUSED = '<!doctype html><meta charset="utf-8"><title>gmx-cypher</title><body style="font-family:monospace;padding:2em">'

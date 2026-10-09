@@ -22,3 +22,9 @@ describe('the shown command', () => {
       .toBe("cd /sim/na2so4/nvt\n/opt/gmx/bin/gmx_mpi rdf -ref 'group 0' -o rdf/x.xvg");
   });
 });
+
+describe('the environment a job sets, shown before the program', () => {
+  it('as NAME=value words, so a paste runs the same', () => {
+    expect(commandText({ cwd: '/sim', file: 'gmx', args: ['rdf'], env: { GMX_MAXBACKUP: '99' } })).toBe('cd /sim\nGMX_MAXBACKUP=99 gmx rdf');
+  });
+});

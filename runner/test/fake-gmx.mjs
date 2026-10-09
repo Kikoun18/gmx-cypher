@@ -38,9 +38,9 @@ function fail(message) {
   process.exit(1);
 }
 
-/** Like GROMACS: an existing output is renamed to #name.N#, never overwritten silently. */
+/** Like GROMACS: an existing output is renamed to #name.N#; with GMX_MAXBACKUP 0 or -1, 2025.4 overwrites it instead (checked). */
 function backUp(file, log) {
-  if (!existsSync(file)) return;
+  if (!existsSync(file) || ['0', '-1'].includes(process.env.GMX_MAXBACKUP)) return;
   let n = 1, to;
   while (existsSync((to = join(dirname(file), '#' + basename(file) + '.' + n + '#')))) n++;
   renameSync(file, to);

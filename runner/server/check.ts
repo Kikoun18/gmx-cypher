@@ -7,7 +7,7 @@ import { readFileSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { countAtoms, structFormat } from '../../app/src/lib/structFile';
 import { judgeInputs, judgeSizes, type Counts } from '../src/lib/checks';
-import { frameEstimate, parseCheckAtoms, parseDump, parseSizes } from '../src/lib/gmxText';
+import { frameEstimate, parseCheckAtoms, parseDump, parseSizes, type Dump } from '../src/lib/gmxText';
 import type { Slot } from '../src/lib/inputs';
 import { parseNdx, writeNdx } from '../src/lib/ndx';
 import { gmxError } from '../src/lib/progress';
@@ -21,6 +21,11 @@ export interface InputCheck {
   counts: Counts;
   index?: { groups: number; maxAtom: number };
   estimate?: { frames: number; start: number; end: number } | null;
+}
+
+/** The run input's parameters and atom count as gmx reads them (`gmx dump -s`, stopped at `natoms`). */
+export async function dumpRunInput(gmx: GmxState, runInput: string, cwd: string): Promise<Dump> {
+  return parseDump((await capture(gmx.path!, ['dump', '-s', runInput], { cwd, until: /^\s*natoms\s*=\s*\d+/m })).stdout);
 }
 
 const NEEDED: [Slot, string][] = [['runInput', 'no run input'], ['structure', 'no structure']];
@@ -38,11 +43,10 @@ export async function checkInputs(inputs: Partial<Record<Slot, string>>, gmx: Gm
   const cwd = dirname(files.trajectory!.path);
   const text = readFileSync(files.structure!.path, 'utf8'), format = structFormat(files.structure!.path, text);
   counts.structure = (format && countAtoms(format, text)) || null;
-  const [dump, check] = await Promise.all([
-    capture(gmx.path, ['dump', '-s', files.runInput!.path], { cwd, until: /^\s*natoms\s*=\s*\d+/m }),
+  const [d, check] = await Promise.all([
+    dumpRunInput(gmx, files.runInput!.path, cwd),
     capture(gmx.path, ['check', '-f', files.trajectory!.path], { cwd, until: /^# Atoms\s+\d+/m }),
   ]);
-  const d = parseDump(dump.stdout);
   counts.runInput = d.natoms ?? null;
   counts.trajectory = parseCheckAtoms(check.stdout + check.stderr);
   let index: InputCheck['index'];

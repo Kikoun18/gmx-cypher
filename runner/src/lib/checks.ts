@@ -14,6 +14,12 @@ export function judgeInputs(c: Counts, index?: { groups: number; maxAtom: number
   return problems;
 }
 
+/** Before a run (review finding 1): groups are numbered from the structure, so it must be the run input's system. */
+export function structureMismatch(structure: number, runInput: number | null | undefined): string | null {
+  if (runInput == null) return 'the run input: gmx did not report an atom count';
+  return structure === runInput ? null : 'the structure has ' + structure + ' atoms, the run input ' + runInput + ': its groups would be other atoms';
+}
+
 /** Before a run (T21): each group's size as gmx select counts it must be the one gmx-cypher wrote. */
 export function judgeSizes(groups: { name: string; count: number }[], sizes: number[] | null): string[] {
   if (!sizes) return ['gmx select reported no sizes'];

@@ -37,7 +37,7 @@ function useHelp(gmx: GmxState) {
   return h?.key === key ? h : null
 }
 
-interface Plan { cwd: string; outDir: string; stem: string; names: { xvg: string; cn: string; ndx: string; record: string }; io: RdfIo; file: string; argv: string[]; problems: string[] }
+interface Plan { cwd: string; outDir: string; stem: string; names: { xvg: string; cn: string; ndx: string; record: string }; io: RdfIo; file: string; argv: string[]; env: Record<string, string>; problems: string[] }
 
 /** Where and under which free names the run would write now, as the server sees the folder (T30); asked again 250 ms after a change. */
 /** The run as the server takes it (POST /api/plan and /api/runs): input paths, groups as steps, options, names. */
@@ -191,7 +191,7 @@ export function Rdf({ gmx, draft, setDraft, onStarted }: { gmx: GmxState; draft:
         <Section label="Command" />
         {!trajectory || !runInput ? <p className="m-0 text-control text-muted-foreground">pick a trajectory and a run input in inputs</p>
           : planned?.error ? <FieldHint error>✗ {planned.error}</FieldHint>
-          : plan ? <Code label="command" text={commandText({ cwd: plan.cwd, file: plan.file, args: plan.argv })} />
+          : plan ? <Code label="command" text={commandText({ cwd: plan.cwd, file: plan.file, args: plan.argv, env: plan.env })} />
           : <p className="m-0 text-control text-muted-foreground" aria-live="polite">choosing names…</p>}
         <FieldHint>exactly what will run, without a shell · options read from this {gmx.name} {gmx.version} (gmx rdf -h)</FieldHint>
         {problems.length > 0 && (

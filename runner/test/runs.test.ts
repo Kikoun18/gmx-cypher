@@ -54,6 +54,18 @@ describe('a run writes four new files under one stem' + (REAL ? ' (a real gmx)' 
     await s.close();
   });
 
+  it('refuses a structure of another size than the run input: the groups would be other atoms (review finding 1)', async () => {
+    const { dir, s, req, roots } = await setup();
+    // Your nvt.gro without its 30 SO4 atoms: 3212 atoms, so "residue name Na" would be atoms 1-12, sulfate in nvt.tpr.
+    const lines = readFileSync(join(dir, 'nvt.gro'), 'utf8').split('\n'), atoms = lines.slice(2, 2 + 3242).filter(l => l.slice(5, 10).trim() !== 'SO4');
+    writeFileSync(join(dir, 'other.gro'), [lines[0], String(atoms.length).padStart(5), ...atoms, lines[2 + 3242], ''].join('\n'));
+    const groupsNa = [groups[0], { ...groups[2] }].map((g, i) => (i === 0 ? { ...g, steps: [{ op: 'add' as const, rule: { kind: 'resname' as const, value: 'Na' } }], name: 'sodium' } : { ...g, name: 'water', steps: [{ op: 'add' as const, rule: { kind: 'name' as const, value: 'OW1' } }] }));
+    await expect(startRun(s.ctx, { ...req, inputs: { ...req.inputs, structure: join(dir, 'other.gro') }, groups: groupsNa }, roots)).rejects.toThrow('the structure has 3212 atoms, the run input 3242');
+    expect(s.ctx.jobs.list()).toEqual([]);
+    expect(existsSync(join(dir, 'rdf'))).toBe(false);
+    await s.close();
+  });
+
   it('refuses before starting: options gmx would refuse, a group without atoms, a name gmx would cut', async () => {
     const { s, req, roots } = await setup();
     await expect(startRun(s.ctx, { ...req, options: { excl: true, seltype: 'mol_com' } }, roots)).rejects.toThrow('-excl needs atom positions');
@@ -84,6 +96,18 @@ describe.skipIf(REAL)('nothing is overwritten, even when files appear meanwhile 
     await s.close();
   });
 
+  it('a GMX_MAXBACKUP=-1 inherited from a cluster shell is not passed on: gmx still backs up (review finding 6)', async () => {
+    const { dir, s, req, roots } = await setup();
+    process.env.GMX_MAXBACKUP = '-1';
+    try {
+      process.env.FAKE_GMX_TOUCH = 'rdf=' + join(dir, 'rdf/rdf_nvt.xvg');
+      const r = await (await startRun(s.ctx, req, roots)).record;
+      expect(r.problems).toEqual(['gmx backed up a file that appeared during the run: #rdf_nvt.xvg.1#']);
+      expect(r.env.GMX_MAXBACKUP).toBe('99');
+    } finally { delete process.env.GMX_MAXBACKUP; }
+    await s.close();
+  });
+
   it('uploaded inputs write to the workspace in the state folder', async () => {
     const { s } = await setup();
     const up = join(s.ctx.home, 'uploads', 'u1');
@@ -106,12 +130,15 @@ describe('runs over HTTP', () => {
     expect(plan.json).toMatchObject({ cwd: dir, outDir: join(dir, 'rdf'), stem: 'rdf_nvt', problems: [] });
     expect(plan.json.argv).toContain('rdf/rdf_nvt_cn.xvg');
     // Asked while typing a template: a refusal is an answer (200), so the browser logs no failed request.
-    expect(await s.call('/api/plan', { ...req, template: '{run}' })).toEqual({ status: 200, json: { error: '{run} has no value here' } });
+    expect(await s.call('/api/plan', { ...req, template: '{run}' })).toEqual({ status: 200, json: { error: "{run} has no value here: in a single run only {analysis} and {trajectory} do; a batch's path template gives the others" } });
     const started = await s.call('/api/runs', req);
     expect(started.json).toMatchObject({ kind: 'rdf', status: 'running', meta: { stem: 'rdf_nvt' } });
     expect(started.json).not.toHaveProperty('log');
-    let rec = await s.call('/api/jobs/' + started.json.id + '/record');
-    for (let i = 0; i < 100 && rec.status !== 200; i++) { await new Promise(r => setTimeout(r, 100)); rec = await s.call('/api/jobs/' + started.json.id + '/record'); }
+    // Asked the moment the job ends, as the page does: the record is still being written, and the answer waits for it (no 404).
+    const ended = new Promise<void>(r => s.ctx.jobs.on('job', (j: { id: string; ended?: string }) => { if (j.id === started.json.id && j.ended) r(); }));
+    await ended;
+    const rec = await s.call('/api/jobs/' + started.json.id + '/record');
+    expect(rec.status).toBe(200);
     expect(rec.json).toMatchObject({ format: 'gmx-cypher run', status: 'done', job: started.json.id });
     const res = await fetch(s.base + '/api/jobs/' + started.json.id + '/output?kind=cn', { headers: s.headers });
     expect(await res.text()).toContain('@ s1 legend "sodium"');

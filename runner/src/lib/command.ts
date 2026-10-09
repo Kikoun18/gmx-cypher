@@ -5,6 +5,8 @@ const PLAIN = /^[A-Za-z0-9_\-+.,/:@]+$/;
 
 export const shellQuote = (arg: string) => (PLAIN.test(arg) ? arg : "'" + arg.replace(/'/g, "'\\''") + "'");
 
-export interface Command { cwd: string; file: string; args: string[] }
+/** `env`: variables the job sets on top of gmx-cypher's own environment (GMX_MAXBACKUP). */
+export interface Command { cwd: string; file: string; args: string[]; env?: Record<string, string> }
 
-export const commandText = (c: Command) => 'cd ' + shellQuote(c.cwd) + '\n' + [c.file, ...c.args].map(shellQuote).join(' ');
+export const commandText = (c: Command) => 'cd ' + shellQuote(c.cwd) + '\n'
+  + [...Object.entries(c.env || {}).map(([k, v]) => k + '=' + shellQuote(v)), ...[c.file, ...c.args].map(shellQuote)].join(' ');

@@ -80,3 +80,21 @@ describe('reading a structure or an index for the GUI', () => {
     await s.close();
   });
 });
+
+describe('requests the server refuses without breaking', () => {
+  it('a body that is not declared JSON (a form or text/plain post from another page)', async () => {
+    const s = await apiServer();
+    const r = await fetch(s.base + '/api/config', { method: 'POST', headers: { ...s.headers, 'content-type': 'text/plain' }, body: JSON.stringify({ allow: [] }) });
+    expect([r.status, await r.json()]).toEqual([415, { error: 'the body must be JSON (content-type: application/json)' }]);
+    await s.close();
+  });
+
+  it('a picked .gro that is a folder: refused, and the server keeps running', async () => {
+    const { root } = sim(), s = await apiServer();
+    mkdirSync(join(root, 'dir.gro'));
+    await s.call('/api/config', { allow: [root] });
+    expect(await s.call('/api/file?path=' + encodeURIComponent(join(root, 'dir.gro')))).toEqual({ status: 400, json: { error: join(root, 'dir.gro') + ' is not a file' } });
+    expect((await s.call('/api/state')).status).toBe(200);
+    await s.close();
+  });
+});

@@ -18,3 +18,9 @@ export function vaultFields(m: BatchMatch): Fields {
   const f = m.fields;
   return { name: f.name || f.seq || '', col: f.col || '', group: f.group || '', run: m.run ?? 0, time: f.time || '' };
 }
+
+/** A match's fields as values for the output-name template's tokens (`{method}` is PMF Sequences' group). */
+export function nameValues(m: BatchMatch): Record<string, string> {
+  const f = m.fields, v: Record<string, string | undefined> = { method: f.group, column: f.col, name: f.name, seq: f.seq, time: f.time, temp: f.temp, run: m.run ? String(m.run) : undefined };
+  return Object.fromEntries(Object.entries(v).filter(([, x]) => x)) as Record<string, string>;
+}

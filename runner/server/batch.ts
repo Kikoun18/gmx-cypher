@@ -7,11 +7,14 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { basename, dirname, join, relative } from 'node:path';
 import { structFormat } from '../../app/src/lib/structFile';
 import { atomTable } from '../src/lib/atoms';
-import { matchTrajectory, vaultFields, type BatchMatch } from '../src/lib/batch';
+import { matchTrajectory, nameValues, vaultFields, type BatchMatch } from '../src/lib/batch';
+import { renderStem } from '../src/lib/names';
 import { inputRole, suggestInputs } from '../src/lib/inputs';
 import { applyRecipe, type Recipe } from '../src/lib/recipe';
+import { structureMismatch } from '../src/lib/checks';
 import type { RunRecord } from '../src/lib/record';
 import type { Ctx } from './api';
+import { dumpRunInput } from './check';
 import { inside, namesIn } from './files';
 import { HttpError } from './http';
 import type { Job } from './jobs';
@@ -20,7 +23,7 @@ import { sendToInbox } from './send';
 import { landingFor, listProjects, openVault } from './vault';
 
 export interface BatchItem extends BatchMatch {
-  rel: string; trajectory: string; runInput: string | null; structure: string | null; counts: number[] | null;
+  rel: string; trajectory: string; runInput: string | null; structure: string | null; atoms: number | null; counts: number[] | null;
 }
 
 const MAX_FILES = 20_000;
@@ -42,14 +45,28 @@ export function findTrajectories(rootPath: string, template: string, recipe: Rec
     const dir = dirname(abs), s = suggestInputs(basename(abs), namesIn(dir, roots), namesIn(dirname(dir), roots));
     const runInput = s.runInput ? join(dir, s.runInput.name) : null, structure = s.structure ? join(dir, s.structure.name) : null;
     const problems = [...m.problems, ...(!runInput ? ['no run input (.tpr) next to it'] : []), ...(!structure ? ['no structure (.gro or .pdb) next to it'] : [])];
-    let counts: number[] | null = null;
+    try { renderStem(recipe.template, { ...nameValues(m), analysis: 'rdf', trajectory: basename(abs).replace(/\.[^.]+$/, '') }); } catch (e) { problems.push('file name: ' + (e as Error).message); }
+    let counts: number[] | null = null, atoms: number | null = null;
     if (structure) {
       const text = readFileSync(structure, 'utf8'), format = structFormat(structure, text);
-      if (format) { const a = applyRecipe(recipe, atomTable(text, format)); counts = a.counts; problems.push(...a.problems); }
+      if (format) { const table = atomTable(text, format), a = applyRecipe(recipe, table); atoms = table.length; counts = a.counts; problems.push(...a.problems); }
       else problems.push(basename(structure) + ' is not a .gro or .pdb');
     }
-    return [{ ...m, rel, trajectory: abs, runInput, structure, counts, problems }];
+    return [{ ...m, rel, trajectory: abs, runInput, structure, atoms, counts, problems }];
   }).sort((a, b) => a.rel.localeCompare(b.rel));
+}
+
+/** Each match's structure against its run input as gmx reads it, a few at a time (review finding 1). Without a working gmx, the run itself checks. */
+export async function checkRunInputs(ctx: Ctx, items: BatchItem[]): Promise<BatchItem[]> {
+  if (!ctx.gmx.ok) return items;
+  const todo = items.filter(i => i.runInput && i.atoms != null);
+  for (let k = 0; k < todo.length; k += 4) {
+    await Promise.all(todo.slice(k, k + 4).map(async i => {
+      try { const p = structureMismatch(i.atoms!, (await dumpRunInput(ctx.gmx, i.runInput!, dirname(i.runInput!))).natoms); if (p) i.problems.push(p); }
+      catch (e) { i.problems.push('the run input: ' + (e as Error).message); }
+    }));
+  }
+  return items;
 }
 
 export type ItemStatus = 'queued' | 'starting' | 'started' | 'refused' | 'cancelled';
@@ -101,7 +118,7 @@ export class Batches extends EventEmitter {
       const item = b.items.find(i => i.status === 'queued');
       if (!item) break;
       item.status = 'starting';
-      const req = { inputs: { trajectory: item.trajectory, runInput: item.runInput ?? '', structure: item.structure ?? undefined }, groups: r.groups, options: r.options, template: r.template, outDir: r.outDir };
+      const req = { inputs: { trajectory: item.trajectory, runInput: item.runInput ?? '', structure: item.structure ?? undefined }, groups: r.groups, options: r.options, template: r.template, outDir: r.outDir, names: nameValues(item), retryNames: true };
       startRun(this.ctx, req, this.roots()).then(({ job }) => {
         Object.assign(item, { status: 'started', job: job.id });
         if (b.cancelled) this.ctx.jobs.cancel(job.id);

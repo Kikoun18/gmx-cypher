@@ -5,7 +5,7 @@ import { getJson } from './api'
 import type { Progress } from './lib/progress'
 
 export interface Job {
-  id: string; kind: string; title: string; file: string; args: string[]; cwd: string
+  id: string; kind: string; title: string; file: string; args: string[]; cwd: string; env?: Record<string, string>
   status: 'running' | 'done' | 'failed' | 'cancelled' | 'interrupted'
   created: string; started?: string; ended?: string; pid?: number
   exit?: { code: number | null; signal: string | null }; progress: Progress; error?: string; log?: string

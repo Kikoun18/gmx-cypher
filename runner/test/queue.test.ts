@@ -21,8 +21,9 @@ async function setup(slow: number) {
   return { root, s, roots, items, batches: new Batches(s.ctx, () => roots) };
 }
 
-/** Fake gmx processes still alive (not zombies the container's init leaves unreaped). */
-const alive = () => execFileSync('ps', ['-A', '-o', 'stat=,args=']).toString().split('\n').filter(l => l.includes('fake-gmx.mjs rdf') && !l.trim().startsWith('Z'));
+/** Live (not zombie) processes in these process groups: other test files run fake gmx at the same time. */
+const alive = (pgids: number[]) => execFileSync('ps', ['-A', '-o', 'pgid=,stat='], { encoding: 'utf8' }).split('\n')
+  .filter(l => { const [g, stat] = l.trim().split(/\s+/); return pgids.includes(Number(g)) && !!stat && !stat.startsWith('Z'); });
 
 describe('the batch queue (T39)', () => {
   it('runs at most `concurrency` jobs at a time, and each match becomes its own run with its own record', async () => {
@@ -56,7 +57,7 @@ describe('the batch queue (T39)', () => {
     const done = await batches.done(b.id);
     expect(done.items.map(i => i.status)).toEqual(['started', 'started', 'cancelled']);
     expect(done.items.slice(0, 2).map(i => s.ctx.jobs.get(i.job!)!.status)).toEqual(['cancelled', 'cancelled']);
-    expect(alive()).toEqual([]);
+    expect(alive(done.items.slice(0, 2).map(i => s.ctx.jobs.get(i.job!)!.pid!))).toEqual([]);
     await s.close();
   });
 });

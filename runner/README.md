@@ -73,7 +73,8 @@ ssh -L 8765:127.0.0.1:8765 workstation      # then open the same address here
 4. **rdf.** Every option of your `gmx rdf -h`, its default, and what it changes. Changed options show
    *changed · default …* (click it to reset). Options gmx would refuse are named before you run. The
    command on the right is exactly what will run, in the trajectory's folder.
-5. **run.** gmx-cypher confirms each group's size with `gmx select`, writes the index, and starts gmx.
+5. **run.** gmx-cypher checks that the structure has the run input's atom count (the groups are numbered
+   from it), confirms each group's size with `gmx select`, writes the index, and starts gmx.
    *jobs* shows the frames read against the estimate, the live log, and *cancel* (click twice). A run
    keeps going if you close the page.
 6. **result.** g(r) per selection in its group's hue (click a name: shown → dimmed → hidden), the first
@@ -91,9 +92,11 @@ another trajectory of the same system, export or import them as JSON.
 
 **Batches** (batch tab): one recipe over every trajectory a path template finds under a root, for
 example `hmr+fast+6/{column}/{seq}/9.multiwalker/{run}/07_md.xtc`. *preview* lists every match, its
-fields, the inputs beside it, each group's atom count there, and any problem; nothing runs until you press
-*run*. The queue runs a few at a time (2 by default), each as an ordinary run with its own record;
-*cancel all* stops them; *send all to vault* sends each by the same rule as a single send.
+fields, the inputs beside it, each group's atom count there, and any problem (no run input, a structure
+whose atom count isn't the run input's, a file-name token the path doesn't give); nothing runs until you
+press *run*. The queue runs a few at a time (2 by default), each as an ordinary run with its own record;
+runs that share an output folder each take the next free name. *cancel all* stops them; *send all to
+vault* sends each by the same rule as a single send.
 
 ## Where files go
 
@@ -111,14 +114,16 @@ fields, the inputs beside it, each group's atom count there, and any problem; no
 The stem comes from the file-name template (`{analysis}_{trajectory}` by default, so `rdf_nvt`). It is
 made safe with PMF Sequences' `safeFileName` and free for all four files with its `uniqueName`: if
 `rdf_nvt.xvg` (or any of the four, in any case) exists, the run is `rdf_nvt (2)`. The names are checked
-again just before gmx starts; GROMACS never needs to back a file up.
+again just before gmx starts, and the stem is claimed by creating its `.ndx`. gmx runs with
+`GMX_MAXBACKUP=99` (shown in the command), so a file that appears under one of its names during the run
+is backed up by GROMACS and named in the record, even where your shell sets `GMX_MAXBACKUP=-1`.
 
 ## The run record
 
 `<stem>.run.json`, written when the run ends, is everything needed to know and repeat the run
 (`format: "gmx-cypher run"`, `version: 1`):
 
-- `runner`, `gmx` (path and version), `env` (the `GMX…` environment variables);
+- `runner`, `gmx` (path and version), `env` (the `GMX…` environment variables gmx ran with);
 - `command`: working directory, program and arguments, exactly as run (no shell);
 - `started`, `ended`, `status`, `exit`, `frames` (analysed, last time), `log` (stdout and stderr);
 - `inputs`: each file's path, size and modification time, and SHA-256 (trajectories only when
@@ -133,8 +138,9 @@ again just before gmx starts; GROMACS never needs to back a file up.
 
 ## Templates and tokens
 
-- **Output names** (rdf → *file name*): `{analysis}` (`rdf`), `{trajectory}` (its name without the
-  extension), and PMF Sequences' fields `{method}` `{column}` `{name}` `{seq}` `{time}` `{run}` `{temp}`.
+- **Output names** (rdf → *file name*): `{analysis}` (`rdf`) and `{trajectory}` (its name without the
+  extension). In a batch, also PMF Sequences' fields as its path template reads them: `{method}`
+  `{column}` `{name}` `{seq}` `{time}` `{run}` `{temp}` (the preview names a token the path doesn't give).
 - **Sending** fills the *project's own* file pattern with the fields (`{*}` becomes `rdf`), so PMF
   Sequences reads the name back. RDF files are kept apart from PMF files by folder, not by name.
 - **Batch path templates** use PMF Sequences' folder-pattern rules, by its own `parsePath`: tokens never
@@ -152,8 +158,9 @@ gmx-cypher can:
 It cannot, by design:
 - overwrite or delete any of your files (new names are created exclusively; the vault reader's every
   write throws);
-- be reached from another computer (it listens on 127.0.0.1 only, and checks the token, the Host and
-  the Origin of every request);
+- be reached from another computer, or used by another page in your browser (it listens on 127.0.0.1
+  only; every request needs the token and a local Host; a request from a page must come from this very
+  address, so not from another port of 127.0.0.1 either; and every POST must be JSON);
 - run anything but `gmx`, or reach the network beyond serving its own page.
 
 *cancel* stops the whole process group of a run (SIGTERM, then SIGKILL after 5 s); stopping gmx-cypher

@@ -1,6 +1,6 @@
 // The API: thin routes that call the pure functions in src/lib and the side effects in server/.
 
-import { createReadStream, existsSync, readFileSync, realpathSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, realpathSync, statSync } from 'node:fs';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { basename, dirname, join } from 'node:path';
 import { TOKENS } from '../../app/src/lib/seq';
@@ -10,13 +10,13 @@ import { nameProblem } from '../src/lib/groups';
 import { checkInputs, checkSizes } from './check';
 import { inside, listFolder, namesIn, saveUpload } from './files';
 import { detectGmx, rdfHelp, type GmxState } from './gmx';
-import { HttpError, readJson, type Api } from './http';
+import { HttpError, readJson, sendFile, type Api } from './http';
 import type { Job, Jobs } from './jobs';
-import { Batches, findTrajectories, sendAll } from './batch';
+import { Batches, checkRunInputs, findTrajectories, sendAll } from './batch';
 import { listRecipes, readRecipe, saveRecipe } from './recipes';
 import { recipeFileProblems, type Recipe } from '../src/lib/recipe';
 import { cpus } from 'node:os';
-import { planRun, startRun } from './runs';
+import { planRun, recordWritten, startRun } from './runs';
 import { sendToInbox } from './send';
 import { landingFor, listProjects, openVault, projectSummary, readProject } from './vault';
 import type { Fields } from '../src/lib/landing';
@@ -82,8 +82,7 @@ export function makeApi(ctx: Ctx): Api {
       // Structures and indexes only: the GUI draws and reads them. Trajectories stay on the server.
       const path = inside(url.searchParams.get('path') || '', roots());
       if (!/\.(gro|pdb|ndx)$/i.test(path)) throw new HttpError(400, 'only .gro, .pdb and .ndx files are sent to the browser');
-      res.writeHead(200, { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' });
-      createReadStream(path).pipe(res);
+      sendFile(res, path, { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' });
       return 'handled';
     }
     if (is(req, 'POST', url, '/api/check')) return { body: await checkInputs((await readJson<{ inputs: Record<string, string> }>(req)).inputs || {}, ctx.gmx, roots()) };
@@ -137,7 +136,7 @@ export function makeApi(ctx: Ctx): Api {
     }
     if (is(req, 'POST', url, '/api/batch/preview')) {
       const b = await readJson<{ root: string; template: string; recipe: unknown }>(req);
-      return { body: { items: findTrajectories(b.root, String(b.template || ''), checked(b.recipe), roots()) } };
+      return { body: { items: await checkRunInputs(ctx, findTrajectories(b.root, String(b.template || ''), checked(b.recipe), roots())) } };
     }
     if (is(req, 'GET', url, '/api/batches')) return { body: batches.list() };
     if (is(req, 'POST', url, '/api/batches')) {
@@ -174,6 +173,7 @@ export function makeApi(ctx: Ctx): Api {
       if (req.method === 'POST' && job[2] === '/cancel') { ctx.jobs.cancel(j.id); return { body: summary(j) }; }
       if (req.method === 'GET' && job[2] === '/record') {
         const path = j.meta?.record as string | undefined;
+        if (j.ended) await recordWritten(j.id);
         if (!path || !existsSync(path)) throw new HttpError(404, j.ended ? 'this run has no record' : 'the record is written when the run ends');
         return { body: JSON.parse(readFileSync(path, 'utf8')) };
       }
@@ -183,8 +183,7 @@ export function makeApi(ctx: Ctx): Api {
         if (kind !== 'xvg' && kind !== 'cn') throw new HttpError(400, 'no output ' + kind + ': xvg or cn');
         const path = names && join(String(j.meta!.outDir), names[kind]);
         if (!path || !existsSync(path)) throw new HttpError(404, 'this run wrote no ' + kind + ' file');
-        res.writeHead(200, { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' });
-        createReadStream(path).pipe(res);
+        sendFile(res, path, { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' });
         return 'handled';
       }
     }

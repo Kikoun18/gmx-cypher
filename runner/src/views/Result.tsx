@@ -21,10 +21,8 @@ function useRecord(job: Job) {
   React.useEffect(() => {
     if (job.kind !== 'rdf' || !job.ended) return
     let alive = true
-    // The record is written just after the job's end event: ask again shortly if it isn't there yet.
-    const read = (left: number) => getJson<RunRecord>('/api/jobs/' + job.id + '/record').then(record => alive && setR({ id: job.id, record }),
-      e => { if (!alive) return; if (left) setTimeout(() => read(left - 1), 300); else setR({ id: job.id, error: (e as Error).message }) })
-    read(10)
+    // The record is written just after the job's end event; the server's answer waits for it.
+    getJson<RunRecord>('/api/jobs/' + job.id + '/record').then(record => alive && setR({ id: job.id, record }), e => alive && setR({ id: job.id, error: (e as Error).message }))
     return () => { alive = false }
   }, [job.id, job.kind, job.ended])
   return r?.id === job.id ? r : null

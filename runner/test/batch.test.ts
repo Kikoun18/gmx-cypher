@@ -84,3 +84,55 @@ describe('batches over HTTP', () => {
     await s.close();
   });
 });
+
+describe('batch names and folders (review findings 4 and 5)', () => {
+  const named = (template: string, outDir: string | null = null) => ({ ...recipe, template, outDir });
+
+  it("PMF Sequences' tokens in the output name take the path template's fields; a token the path doesn't give is a problem in the preview", () => {
+    const root = clusterCopy();
+    expect(findTrajectories(root, TEMPLATE, named('{analysis}_{column}_{seq}_{run}'), [root]).map(i => i.problems)).toEqual([[], [], []]);
+    expect(findTrajectories(root, TEMPLATE, named('{analysis}_{time}'), [root])[0].problems).toEqual(['file name: {time} has no value here']);
+  });
+
+  it('a batch names its runs from its fields, and runs sharing one output folder each take a free name', async () => {
+    const { mkdirSync } = await import('node:fs');
+    const { join } = await import('node:path');
+    const { apiServer } = await import('./helpers');
+    const { Batches } = await import('../server/batch');
+    const root = clusterCopy(), out = join(root, 'out'), s = await apiServer(), roots = [root];
+    mkdirSync(out);
+    const batches = new Batches(s.ctx, () => roots);
+    const byFields = await batches.done(batches.start(named('{analysis}_{column}_{seq}_{run}'), root, TEMPLATE, findTrajectories(root, TEMPLATE, named('{analysis}_{column}_{seq}_{run}'), roots), 2).id);
+    expect(byFields.items.map(i => s.ctx.jobs.get(i.job!)!.meta!.stem)).toEqual(['rdf_ha_WRWYCR_1', 'rdf_ha_WRWYCR_2', 'rdf_pg_WRWYCR_1']);
+    const shared = named('{analysis}_{trajectory}', out);
+    const done = await batches.done(batches.start(shared, root, TEMPLATE, findTrajectories(root, TEMPLATE, shared, roots), 2).id);
+    expect(done.items.map(i => i.status)).toEqual(['started', 'started', 'started']);
+    expect(done.items.map(i => s.ctx.jobs.get(i.job!)!.meta!.stem).sort()).toEqual(['rdf_07_md', 'rdf_07_md (2)', 'rdf_07_md (3)']);
+    await s.close();
+  });
+
+  it("a single run says where such a token's value comes from", async () => {
+    const { join } = await import('node:path');
+    const { apiServer } = await import('./helpers');
+    const root = clusterCopy(), s = await apiServer(), d = join(root, 'hmr+fast+6/ha/WRWYCR/9.multiwalker/1');
+    await s.call('/api/config', { allow: [root] });
+    const r = await s.call('/api/plan', { inputs: { trajectory: join(d, '07_md.xtc'), runInput: join(d, '07_md.tpr') }, groups: recipe.groups, options: {}, template: '{analysis}_{column}' });
+    expect(r.json).toEqual({ error: "{column} has no value here: in a single run only {analysis} and {trajectory} do; a batch's path template gives the others" });
+    await s.close();
+  });
+});
+
+describe('a batch checks each structure against its run input (review finding 1)', () => {
+  it('the preview names a structure of another size, and its match is not chosen', async () => {
+    const { readFileSync, writeFileSync } = await import('node:fs');
+    const { apiServer } = await import('./helpers');
+    const root = clusterCopy(), gro = join(root, 'hmr+fast+6/ha/WRWYCR/9.multiwalker/2/07_md.gro'), s = await apiServer();
+    // nvt.gro without its last 10 waters: 3212 atoms against the run input's 3242, and the recipe's groups still found.
+    const lines = readFileSync(gro, 'utf8').split('\n'), atoms = lines.slice(2, 2 + 3212);
+    writeFileSync(gro, [lines[0], String(atoms.length).padStart(5), ...atoms, lines[2 + 3242], ''].join('\n'));
+    await s.call('/api/config', { allow: [root] });
+    const preview = await s.call('/api/batch/preview', { root, template: TEMPLATE, recipe });
+    expect(preview.json.items.map((i: { problems: string[] }) => i.problems)).toEqual([[], ['the structure has 3212 atoms, the run input 3242: its groups would be other atoms'], []]);
+    await s.close();
+  });
+});

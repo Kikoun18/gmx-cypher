@@ -81,7 +81,14 @@ describe('the server', () => {
   it('refuses a foreign or null Origin', async () => {
     expect((await get('/api/ping', { ...cookie, origin: 'http://evil.example' }, 'POST')).status).toBe(403);
     expect((await get('/api/ping', { ...cookie, origin: 'null' }, 'POST')).status).toBe(403);
-    expect((await get('/api/ping', { ...cookie, origin: 'http://localhost:' + port })).status).toBe(200);
+    expect((await get('/api/ping', { ...cookie, origin: 'http://127.0.0.1:' + port })).status).toBe(200);
+  });
+
+  it("refuses a page on another local port: the cookie isn't port-bound, so the Origin must be this address", async () => {
+    expect((await get('/api/ping', { ...cookie, origin: 'http://127.0.0.1:9999' }, 'POST')).status).toBe(403);
+    expect((await get('/api/ping', { ...cookie, origin: 'http://localhost:' + port })).status).toBe(403);
+    // Through an SSH tunnel the browser's address is both the Host and the Origin.
+    expect((await get('/api/ping', { ...cookie, host: 'localhost:9000', origin: 'http://localhost:9000' }, 'POST')).status).toBe(200);
   });
 
   it('serves nothing outside the GUI folder', async () => {
