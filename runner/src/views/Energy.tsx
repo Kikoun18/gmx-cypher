@@ -38,7 +38,8 @@ export function Energy({ gmx, draft, setDraft, onStarted }: { gmx: GmxState; dra
   const [starting, setStarting] = React.useState(false)
   const [refused, setRefused] = React.useState<{ key: string; message: string } | null>(null)
   const terms = draft.terms ?? [], options = draft.options
-  const body = edr ? { tool: 'energy', inputs: { edr }, groups: [], options, terms } : null
+  const tpr = draft.inputs.runInput?.path
+  const body = edr ? { tool: 'energy', inputs: { edr, ...(tpr ? { runInput: tpr } : {}) }, groups: [], options, terms } : null
   const planned = usePlan(body), plan = planned?.plan
   const key = JSON.stringify(body)
 

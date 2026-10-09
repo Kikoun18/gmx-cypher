@@ -84,6 +84,20 @@ describe('the statistics table (R4): parsed from the stdout gmx energy prints', 
     expect(s?.rows[1]).toEqual({ name: 'Potential', average: -45566.9, errEst: 450, rmsd: 1136.61, drift: -2935.35, unit: 'kJ/mol' });
   });
 
+  it('a short span (-b 18, 3 frames) with -sum: gmx prints -- where it has no error estimate or RMSD (real 2025.4)', () => {
+    const s = parseEnergyStats(fixture('gmx-2025.4/energy-stats-short.txt'));
+    expect(s?.frames).toBe(3);
+    expect(s?.rows).toEqual([
+      { name: 'Bond', average: 210.22, errEst: null, rmsd: 21.7977, drift: -7.08301, unit: 'kJ/mol' },
+      { name: 'Potential', average: -46318.4, errEst: null, rmsd: 95.2962, drift: 158.656, unit: 'kJ/mol' },
+      { name: 'Total', average: -46108.2, errEst: null, rmsd: null, drift: 151.574, unit: 'kJ/mol' },
+    ]);
+    // No estimate, no flag: the drift is not compared with an error that isn't there (review finding 2).
+    expect(s?.rows.map(driftLarger)).toEqual([false, false, false]);
+    // As the record stores it: JSON has no NaN, and a missing estimate must stay missing.
+    expect(JSON.parse(JSON.stringify(s)).rows.map(driftLarger)).toEqual([false, false, false]);
+  });
+
   it('no statistics block gives null, so nothing is shown as a result', () => {
     expect(parseEnergyStats(fixture('gmx-2025.4/energy-menu.txt'))).toBeNull();
   });
@@ -99,6 +113,7 @@ describe('the drift flag (R4): a drift larger than its error estimate, in either
     ['inside the error', { drift: 5, errEst: 10 }, false],
     ['negative and larger', { drift: -12, errEst: 10 }, true],
     ['exactly the error', { drift: 10, errEst: 10 }, false],
+    ['no error estimate', { drift: 10, errEst: null }, false],
   ])('%s', (_, r, flagged) => {
     expect(driftLarger(r)).toBe(flagged);
   });

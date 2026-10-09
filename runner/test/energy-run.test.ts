@@ -33,6 +33,13 @@ describe('the energy command (R4): its argument list and its refusals', () => {
     expect(energyCommand.argv({ options: { driftcorr: false, fluct_props: false }, selections: 0 }, io, help)).toEqual(['energy', '-f', 'rerun.edr', '-o', 'energy/rerun.xvg']);
   });
 
+  it('the run input is optional: given, it goes in as -s', () => {
+    const { io: withTpr } = energyCommand.io({ edr: '/sim/nvt/rerun.edr', runInput: '/sim/nvt/nvt.tpr' }, '/sim/nvt/energy', 'rerun');
+    expect(withTpr).toEqual({ edr: 'rerun.edr', tpr: 'nvt.tpr', output: 'energy/rerun.xvg' });
+    expect(energyCommand.argv({ options: {}, selections: 0 }, withTpr, help)).toEqual(['energy', '-f', 'rerun.edr', '-s', 'nvt.tpr', '-o', 'energy/rerun.xvg']);
+    expect(energyCommand).toMatchObject({ inputs: ['edr', 'runInput'], required: ['edr'] });
+  });
+
   it('an option the form does not offer, or this gmx does not have, is refused', () => {
     expect(() => energyCommand.argv({ options: { dt: '2' }, selections: 0 }, io, help)).toThrow('-dt is not an option gmx-cypher sets for energy');
     expect(() => energyCommand.argv({ options: { b: '2' }, selections: 0 }, io, help.filter(o => o.flag !== 'b'))).toThrow('this gmx energy has no -b');
@@ -53,7 +60,7 @@ describe('the energy command (R4): its argument list and its refusals', () => {
 
   it('is found by its tool name and needs an energy file, no groups', () => {
     expect(commandOf('energy')).toBe(energyCommand);
-    expect(energyCommand).toMatchObject({ tool: 'energy', inputs: ['edr'], required: ['edr'], groups: false, section: 'an energy file' });
+    expect(energyCommand).toMatchObject({ tool: 'energy', inputs: ['edr', 'runInput'], required: ['edr'], groups: false, section: 'an energy file' });
   });
 });
 
@@ -112,6 +119,15 @@ describe('a run of gmx energy (R4): planned, checked against the file, and recor
     expect(r.options.map(o => o.flag)).toEqual(['b', 'e', 'sum', 'fluct_props', 'driftcorr']);
     expect(recordProblems(JSON.parse(readFileSync(join(dir, 'energy/energy_rerun.run.json'), 'utf8')))).toEqual([]);
     expect(readdirSync(join(dir, 'energy')).sort()).toEqual(['energy_rerun.run.json', 'energy_rerun.xvg']);
+    await s.close();
+  });
+
+  it('a record left empty (the run was interrupted after its stem was claimed) reads as no record, not as an error', async () => {
+    const { dir, s, req, roots } = await setup();
+    const { job, record } = await startRun(s.ctx, req, roots);
+    await record;
+    writeFileSync(join(dir, 'energy/energy_rerun.run.json'), '');
+    expect(await s.call('/api/jobs/' + job.id + '/record')).toEqual({ status: 404, json: { error: 'this run has no record: it stopped before gmx-cypher wrote it' } });
     await s.close();
   });
 

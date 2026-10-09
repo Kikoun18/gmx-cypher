@@ -1,9 +1,10 @@
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { batchSummary, matchTrajectory, sentSummary, vaultFields } from '../src/lib/batch';
 import { recipeFromDraft } from '../src/lib/recipe';
 import { findTrajectories } from '../server/batch';
-import { clusterCopy, tmp } from './helpers';
+import { apiServer, clusterCopy, tmp } from './helpers';
 
 const TEMPLATE = 'hmr+fast+6/{column}/{seq}/9.multiwalker/{run}/07_md.xtc';
 
@@ -135,6 +136,26 @@ describe('send all, item by item (review finding 10)', () => {
 
 describe('batch names and folders (review findings 4 and 5)', () => {
   const named = (template: string, outDir: string | null = null) => ({ ...recipe, template, outDir });
+
+  it('the frozen v1 recipe still runs as a batch, as gmx rdf (section 1.5)', async () => {
+    const v1 = JSON.parse(readFileSync(new URL('./fixtures/formats/recipe-v1.json', import.meta.url), 'utf8'));
+    const root = clusterCopy(), s = await apiServer(), roots = [root];
+    const { Batches } = await import('../server/batch');
+    const batches = new Batches(s.ctx, () => roots);
+    const b = await batches.done(batches.start(v1, root, TEMPLATE, findTrajectories(root, TEMPLATE, v1, roots).slice(0, 1), 1).id);
+    const job = s.ctx.jobs.get(b.items[0].job!)!;
+    expect(b.items[0].status).toBe('started');
+    expect([job.kind, job.args[0], job.args.slice(-5)]).toEqual(['rdf', 'rdf', ['-ref', 'group 0', '-sel', 'group 1', 'group 2']]);
+    await s.close();
+  });
+
+  it('a recipe of a command without groups is refused for a batch, in words (review finding 1)', async () => {
+    const root = clusterCopy(), s = await apiServer();
+    await s.call('/api/config', { allow: [root] });
+    const energy = { ...recipe, name: 'energy terms', analysis: 'energy', groups: [], options: { b: '2' } };
+    expect(await s.call('/api/batch/preview', { root, template: TEMPLATE, recipe: energy })).toEqual({ status: 400, json: { error: 'batches run recipes of commands with groups (rdf); energy terms is a gmx energy recipe' } });
+    await s.close();
+  });
 
   it("PMF Sequences' tokens in the output name take the path template's fields; a token the path doesn't give is a problem in the preview", () => {
     const root = clusterCopy();

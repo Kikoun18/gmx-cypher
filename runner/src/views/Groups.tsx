@@ -5,6 +5,7 @@ import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 import { FieldHint } from '../ui/label'
 import { Kbd } from '../ui/kbd'
+import { altName, browserPlatform } from '../lib/platform'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
 import { Section } from '../ui/separator'
 import { postJson } from '../api'
@@ -49,11 +50,13 @@ function NameMenu({ atoms, resn, value, onChange }: { atoms: Atom[]; resn: strin
   )
 }
 
-function RuleForm({ atoms, index, onStep }: { atoms: Atom[]; index: { file: string; groups: NdxGroup[] }; onStep: (s: Step, keep?: boolean) => void }) {
-  const [kind, setKind] = React.useState<Kind>('resname')
+function RuleForm({ atoms, index, onStep, start }: { atoms: Atom[]; index: { file: string; groups: NdxGroup[] }; onStep: (s: Step, keep?: boolean) => void; start?: { within: string } }) {
+  // A form opened by Shift+Enter in the group before starts as an atom-name rule in the same residue name, focused.
+  const [kind, setKind] = React.useState<Kind>(start ? 'name' : 'resname')
   const [value, setValue] = React.useState('')
-  const [within, setWithin] = React.useState('')
+  const [within, setWithin] = React.useState(start?.within ?? '')
   const valueRef = React.useRef<HTMLInputElement>(null)
+  React.useEffect(() => { if (start) valueRef.current?.focus() }, []) // eslint-disable-line react-hooks/exhaustive-deps -- once, when opened
   const options = React.useMemo(() => {
     const vals = kind === 'resname' ? atoms.map(a => a.resn) : kind === 'element' ? atoms.map(a => a.elem || '') : []
     return [...new Set(vals)].filter(Boolean).sort()
@@ -71,7 +74,7 @@ function RuleForm({ atoms, index, onStep }: { atoms: Atom[]; index: { file: stri
   }
   const r = rule()
   const note = picked && 'index group ' + picked.label + ' (#' + value + ' in ' + index.file + ')'
-  // Shift+Enter in the name field keeps the form open with the same residue name, for the next name (R1b).
+  // Shift+Enter in the name field adds the rule, then the next group starts with the same residue name (R1b, T105).
   const go = (op: Step['op'], keep = false) => {
     if (!r) return
     onStep({ op, rule: r, ...(note ? { note } : {}) }, keep)
@@ -104,7 +107,7 @@ function RuleForm({ atoms, index, onStep }: { atoms: Atom[]; index: { file: stri
         <Button variant="ghost" size="sm" disabled={!r} onClick={() => go('remove')}>− remove</Button>
       </div>
       {kind === 'name' && <NameMenu atoms={atoms} resn={within.trim()} value={value} onChange={setValue} />}
-      {kind === 'name' && <p className="m-0 text-caption text-muted-foreground"><Kbd>Enter</Kbd> adds the rule and closes it · <Kbd>Shift</Kbd>+<Kbd>Enter</Kbd> adds it and keeps the residue name for the next</p>}
+      {kind === 'name' && <p className="m-0 text-caption text-muted-foreground"><Kbd>Enter</Kbd> adds the rule and closes it · <Kbd>Shift</Kbd>+<Kbd>Enter</Kbd> adds it and starts a new selection group with the same residue name</p>}
       {value.trim() && names?.problems.map(p => <FieldHint key={p} error>✗ {p}</FieldHint>)}
       {unknown.length > 0 && <FieldHint error>✗ 0 atoms: {unknown.join(', ')}{within.trim() ? ' in ' + within.trim() : ' in this structure'}</FieldHint>}
       {r && <span className="text-caption text-muted-foreground">{picked ? picked.label + ' · ' + picked.atoms.length + ' atoms' : ruleText(r) + ' · ' + groupAtoms(atoms, [{ op: 'add', rule: r }]).length + ' atoms'}</span>}
@@ -112,11 +115,15 @@ function RuleForm({ atoms, index, onStep }: { atoms: Atom[]; index: { file: stri
   )
 }
 
-function GroupCard({ group, atoms, index, nrs, others, current, onCurrent, onChange, onRemove }: {
+function GroupCard({ group, atoms, index, nrs, others, current, onCurrent, onChange, onRemove, onNext, opened }: {
   group: Group; atoms: Atom[]; index: { file: string; groups: NdxGroup[] }; nrs: number[]; others: string[]; current: boolean
   onCurrent: () => void; onChange: (g: Group) => void; onRemove?: () => void
+  /** Shift+Enter: a new selection group after this one, its rule form open in this residue name. */
+  onNext?: (resn: string) => void
+  /** This card was made by Shift+Enter: its rule form opens at once, in this residue name. */
+  opened?: string
 }) {
-  const [rule, setRule] = React.useState(false)
+  const [rule, setRule] = React.useState(opened !== undefined)
   const [typed, setTyped] = React.useState<string | null>(null)
   const [armed, setArmed] = React.useState(false)
   React.useEffect(() => { if (!armed) return; const t = setTimeout(() => setArmed(false), 2600); return () => clearTimeout(t) }, [armed])
@@ -162,7 +169,11 @@ function GroupCard({ group, atoms, index, nrs, others, current, onCurrent, onCha
         onChange={e => setTyped(e.target.value)} onBlur={commitTyped} onKeyDown={e => { if (e.key === 'Enter') commitTyped(); if (e.key === 'Escape') setTyped(null) }} />
       {typedError && <FieldHint error>✗ {typedError}</FieldHint>}
       {beyond.length > 0 && <FieldHint error>✗ atoms {toRanges(beyond)} are beyond the structure's {atoms.length}</FieldHint>}
-      {rule ? <RuleForm atoms={atoms} index={index} onStep={(s, keep) => { steps([...group.steps, s]); setRule(!!keep) }} /> : <Button variant="ghost" size="sm" className="self-start" onClick={() => setRule(true)}>+ rule</Button>}
+      {rule ? <RuleForm atoms={atoms} index={index} start={opened !== undefined ? { within: opened } : undefined} onStep={(s, keep) => {
+        steps([...group.steps, s])
+        setRule(!!keep && !onNext)
+        if (keep && onNext) onNext(s.rule.kind === 'names' ? s.rule.resn ?? '' : '')
+      }} /> : <Button variant="ghost" size="sm" className="self-start" onClick={() => setRule(true)}>+ rule</Button>}
     </section>
   )
 }
@@ -172,6 +183,8 @@ export function Groups({ draft, setDraft }: { draft: Draft; setDraft: React.Disp
   const indexGroups = useIndex(draft.inputs.index?.path)
   const index = React.useMemo(() => ({ file: draft.inputs.index?.path.split('/').pop() || '', groups: indexGroups }), [draft.inputs.index, indexGroups])
   const [current, setCurrent] = React.useState(0)
+  // The card Shift+Enter made, and the residue name its rule form opens in (T105).
+  const [opened, setOpened] = React.useState<{ i: number; resn: string } | null>(null)
   // Each card keeps its own key, so removing one doesn't pass its state to the next (review finding 7).
   const [cardKeys, setCardKeys] = React.useState(() => initialKeys(draft.groups.length))
   const keys = fitKeys(cardKeys, draft.groups.length)
@@ -196,6 +209,8 @@ export function Groups({ draft, setDraft }: { draft: Draft; setDraft: React.Disp
   if ('error' in structure) return <p className="m-0 text-control text-destructive">✗ {structure.error}</p>
   const ref = draft.groups[0], names = (i: number) => draft.groups.filter((_, j) => j !== i).map(g => g.name)
   const addSelection = () => setDraft(d => ({ ...d, groups: [...d.groups, { role: 'selection', name: 'selection' + d.groups.length, tone: TONES[d.groups.length % TONES.length], steps: [] }] }))
+  // Each name its own curve: the next rule goes into a new selection group, which clicks then fill too.
+  const nextGroup = (resn: string) => { const i = draft.groups.length; addSelection(); setCurrent(i); setOpened({ i, resn }) }
   return (
     <div className="grid grid-cols-[minmax(0,1fr)_420px] gap-5">
       <div className="flex min-w-0 flex-col gap-3">
@@ -203,17 +218,18 @@ export function Groups({ draft, setDraft }: { draft: Draft; setDraft: React.Disp
         <p className="m-0 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-caption text-muted-foreground">
           <span className="whitespace-nowrap">click an atom: in or out of <b className={toneText[draft.groups[current]?.tone || 'coral']}>{draft.groups[current]?.name}</b></span>
           <span className="whitespace-nowrap"><Kbd>shift</Kbd> click: its residue</span>
-          <span className="whitespace-nowrap"><Kbd>alt</Kbd> click: its atom name in every residue of that name</span>
+          <span className="whitespace-nowrap"><Kbd>{altName(browserPlatform())}</Kbd> click: its atom name in every residue of that name</span>
         </p>
       </div>
       <div className="flex flex-col gap-3">
         <Section label="Reference" />
-        <GroupCard group={ref} atoms={structure.atoms} index={index} nrs={sets[0]} others={names(0)} current={current === 0} onCurrent={() => setCurrent(0)} onChange={g => setGroup(0, g)} />
-        <Section label={'Selections ' + String(draft.groups.length - 1).padStart(2, '0')}><Button variant="dashed" size="sm" shape="pill" onClick={addSelection}><Plus /> group</Button></Section>
+        <GroupCard group={ref} atoms={structure.atoms} index={index} nrs={sets[0]} others={names(0)} current={current === 0} onCurrent={() => setCurrent(0)} onChange={g => setGroup(0, g)} onNext={nextGroup} />
+        <Section label={'Selections ' + String(draft.groups.length - 1).padStart(2, '0')}><Button variant="dashed" size="sm" shape="pill" onClick={() => { setOpened(null); addSelection() }}><Plus /> group</Button></Section>
         {draft.groups.slice(1).map((g, k) => {
           const i = k + 1
           return <GroupCard key={keys.keys[i]} group={g} atoms={structure.atoms} index={index} nrs={sets[i]} others={names(i)} current={current === i} onCurrent={() => setCurrent(i)} onChange={x => setGroup(i, x)}
-            onRemove={draft.groups.length > 2 ? () => { setDraft(d => ({ ...d, groups: d.groups.filter((_, j) => j !== i) })); setCardKeys(c => removeKey(c, i)); setCurrent(0) } : undefined} />
+            onNext={nextGroup} opened={opened?.i === i ? opened.resn : undefined}
+            onRemove={draft.groups.length > 2 ? () => { setDraft(d => ({ ...d, groups: d.groups.filter((_, j) => j !== i) })); setCardKeys(c => removeKey(c, i)); setCurrent(0); setOpened(null) } : undefined} />
         })}
         {draft.groups.slice(1).map((g, k) => {
           const both = shared(sets[0], sets[k + 1])

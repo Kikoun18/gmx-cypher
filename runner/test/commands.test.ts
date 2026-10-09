@@ -1,12 +1,14 @@
 // One definition per GROMACS command (R3a, T98): RDF moved in unchanged; records and recipes name their command (v3, T97).
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { COMMANDS, commandOf, energyCommand, rdfCommand, sectionsOf } from '../src/lib/commands';
+import { COMMANDS, commandOf, energyCommand, rdfCommand, sectionsOf, withCommand } from '../src/lib/commands';
 import { parseHelp } from '../src/lib/gmxText';
 import { FORM, rdfArgs, rdfIo, recipeProblems } from '../src/lib/rdf';
 import { outputNames } from '../src/lib/names';
 import { recipeFileProblems, recipeFromDraft } from '../src/lib/recipe';
 import { recordProblems } from '../src/lib/record';
+import { detectAna, getAnalyses, parseTable } from '../../app/src/lib/seq';
+import { parseGmxHeader } from '../../app/src/lib/gmxHeader';
 
 const read = (name: string) => JSON.parse(readFileSync(new URL('./fixtures/formats/' + name, import.meta.url), 'utf8'));
 
@@ -62,5 +64,44 @@ describe('the picker groups the commands by what they need (R3b)', () => {
       { section: 'trajectory and groups', commands: [rdfCommand] },
       { section: 'an energy file', commands: [energyCommand] },
     ]);
+  });
+});
+
+describe('each command keeps its own options (review finding 1)', () => {
+  const draft = { analysis: undefined as string | undefined, options: { bin: '0.01', cn: true } as Record<string, string | boolean>, inputs: {} };
+
+  it('picking energy puts RDF\'s options aside and starts energy with none', () => {
+    const e = withCommand(draft, 'energy');
+    expect(e).toMatchObject({ analysis: 'energy', options: {}, optionsBy: { rdf: { bin: '0.01', cn: true } }, inputs: {} });
+  });
+
+  it('coming back gives each its own again', () => {
+    const e = { ...withCommand(draft, 'energy'), options: { sum: true, b: '2' } };
+    const r = withCommand(e, 'rdf');
+    expect(r).toMatchObject({ analysis: 'rdf', options: { bin: '0.01', cn: true }, optionsBy: { energy: { sum: true, b: '2' } } });
+    expect(withCommand(r, 'energy').options).toEqual({ sum: true, b: '2' });
+  });
+
+  it('picking the command that is picked changes nothing', () => {
+    expect(withCommand(draft, 'rdf')).toBe(draft);
+  });
+});
+
+describe('every output has a PMF Sequences type decision (R3a, section 3)', () => {
+  it.each(COMMANDS.map(c => [c.tool, c] as const))('%s: each file has a type, or none with the reason; one goes to the vault by default', (_, c) => {
+    expect(c.outputs.length).toBeGreaterThan(0);
+    for (const o of c.outputs) expect(o.type !== null || !!o.why).toBe(true);
+    expect(c.outputs.filter(o => o.vault)).toHaveLength(1);
+    expect(c.outputs.find(o => o.vault)!.file).toBe('xvg');
+  });
+
+  // The decision checked against PMF Sequences itself, on real 2025.4 output under the default name gmx-cypher gives it.
+  it.each([
+    ['rdf', 'xvg', 'gmx-2025.4/rdf_nvt.xvg', 'rdf_nvt.xvg'],
+    ['energy', 'xvg', 'gmx-2025.4/energy-potential.xvg', 'energy_rerun.xvg'],
+  ])('%s %s: PMF Sequences agrees on %s', (tool, file, fixture, name) => {
+    const text = readFileSync(new URL('./fixtures/' + fixture, import.meta.url), 'utf8');
+    const want = commandOf(tool)!.outputs.find(o => o.file === file)!.type;
+    expect(detectAna(getAnalyses(null), name, parseTable(text).head, parseGmxHeader(text)?.tool ?? null).k).toBe(want);
   });
 });

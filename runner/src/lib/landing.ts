@@ -45,12 +45,12 @@ export function landing(store: Store, fileName: string, text: string): Landing {
   };
 }
 
-/** The project's file-name pattern filled with the fields (T34); a token without a value is listed, `{*}` becomes `rdf`. */
+/** The project's file-name pattern filled with the fields (T34); a token without a value is listed, `{*}` becomes the analysis. */
 export function nameFromPattern(pattern: string, f: Fields & { ana: string }): { name: string; missing: string[] } {
   const value: Record<string, string> = { ana: f.ana, group: f.group, col: f.col, name: f.name, seq: f.name, time: f.time, run: f.run ? String(f.run) : '', temp: '' };
   const missing: string[] = [];
   const text = pattern.replace(/\{([^}]*)\}/g, (token, inner: string) => {
-    if (inner.trim() === '*') return 'rdf';
+    if (inner.trim() === '*') return f.ana;
     const [field] = patternFields(token);
     const v = field ? value[field] : '';
     if (!v) missing.push(token);

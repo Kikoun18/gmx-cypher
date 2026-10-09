@@ -114,7 +114,7 @@ function RdfChart({ job, record }: { job: Job; record: RunRecord }) {
   )
 }
 
-const fmt = (x: number) => (Number.isFinite(x) ? x.toLocaleString('en', { maximumSignificantDigits: 5 }) : '—')
+const fmt = (x: number | null) => (x != null && Number.isFinite(x) ? x.toLocaleString('en', { maximumSignificantDigits: 5 }) : '—')
 
 const TONES_FOR_TERMS: Tone[] = ['coral', 'sky', 'mint', 'butter', 'lilac', 'aqua', 'rose', 'stone']
 
@@ -141,7 +141,7 @@ function EnergyChart({ job, record }: { job: Job; record: RunRecord }) {
       </div>
       <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3">
         {rows.map(r => (
-          <Stat key={r.name} label={r.name + ' · average'} value={fmt(r.average) + ' ' + r.unit} hint={'± ' + fmt(r.errEst) + ' Err.Est. · RMSD ' + fmt(r.rmsd) + ' · drift ' + fmt(r.drift) + (driftLarger(r) ? ' · larger than its error' : '')} />
+          <Stat key={r.name} label={r.name + ' · average'} value={fmt(r.average) + ' ' + r.unit} hint={(r.errEst == null ? 'no error estimate (too few frames)' : '± ' + fmt(r.errEst) + ' Err.Est.') + ' · RMSD ' + fmt(r.rmsd) + ' · drift ' + fmt(r.drift) + (driftLarger(r) ? ' · larger than its error' : '')} />
         ))}
         {stats && <Stat label="frames" value={String(stats.frames)} hint={stats.t0 + '–' + stats.t1 + ' ps · ' + stats.steps + ' steps'} />}
       </div>

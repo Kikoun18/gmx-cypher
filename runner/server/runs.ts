@@ -55,6 +55,9 @@ export async function planRun(ctx: Ctx, req: RunRequest, roots: string[]): Promi
     if (!req.inputs?.[slot]) throw new HttpError(400, cmd.required.map(s => LABELS[s]).join(' and ') + (cmd.required.length > 1 ? ' are' : ' is') + ' needed');
     paths[slot] = inside(req.inputs[slot]!, roots);
   }
+  // A command without groups may take an optional input (gmx energy's run input): checked like the rest when given.
+  // (RDF's structure and index are read for the groups, in startRun; its plan doesn't need them.)
+  if (!cmd.groups) for (const slot of cmd.inputs) if (!paths[slot] && req.inputs?.[slot]) paths[slot] = inside(req.inputs[slot]!, roots);
   // The first required input names the run: its folder holds the outputs, and its name stands in for {trajectory}.
   const first = paths[cmd.required[0]]!;
   // Uploaded inputs have no folder of their own: their outputs go to the state folder's workspace.

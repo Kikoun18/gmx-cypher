@@ -51,6 +51,18 @@ describe('a .pdb CRYST1 line', () => {
     expect(box.vectors).toBeNull();
     expect(box.problems).toEqual(['no CRYST1 line in this file: no box to draw']);
   });
+
+  // Never a guessed box (section 9.5): a line cut short is no box, said in words (review finding 9).
+  it.each([
+    ['lengths only', 'CRYST1   35.000   35.000   35.000'],
+    ['one angle missing', 'CRYST1   35.000   35.000   35.000  90.00  90.00'],
+    ['an angle that is no cell', 'CRYST1   35.000   35.000   35.000   0.00  90.00  90.00 P 1           1'],
+    ['angles that close no cell', 'CRYST1   35.000   35.000   35.000 170.00 170.00 170.00 P 1           1'],
+  ])('%s: no box, and the reason', (_, line) => {
+    const box = parseBox(line + '\n', 'pdb');
+    expect(box.vectors).toBeNull();
+    expect(box.problems).toEqual(['the CRYST1 line has no usable cell (a, b, c in Å and three angles in degrees)']);
+  });
 });
 
 describe('the cell and what it holds', () => {

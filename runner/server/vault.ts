@@ -126,7 +126,8 @@ export async function landingFor(v: VaultView, pid: string, xvg: { name: string;
   const read = await readProject(v, pid), { pattern, pathPattern } = projectSummary(read).settings;
   const first = landing(read.store, xvg.name, xvg.text);
   const fields: Fields = req.fields ?? { name: first.row, col: first.col.label, group: first.group, run: first.run, time: xvg.lastTime == null ? '' : String(Math.round(xvg.lastTime)) };
-  const made = nameFromPattern(pattern, { ...fields, ana: 'rdf' }), name = req.name?.trim() || made.name;
+  // {analysis} is what PMF Sequences reads the file as (rdf, energy, pmf…), so the name agrees with the file (review finding 3).
+  const made = nameFromPattern(pattern, { ...fields, ana: first.type.k || 'rdf' }), name = req.name?.trim() || made.name;
   const preview = landing(read.store, name, xvg.text);
   return {
     project: { id: read.state.project.id, name: read.state.project.name, dir: read.state.project.dir }, pattern, pathPattern,

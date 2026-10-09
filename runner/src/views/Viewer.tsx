@@ -1,6 +1,7 @@
 import * as React from 'react'
 import type { GLViewer } from '3dmol'
 import { Checkbox } from '../ui/checkbox'
+import { Kbd } from '../ui/kbd'
 import { ToggleGroup, ToggleGroupItem } from '../ui/toggle-group'
 import { defaultView, structStyle, toPdb, type Look } from '../../../app/src/lib/structFile'
 import { drawnNumbers, type Atom } from '../lib/atoms'
@@ -116,7 +117,7 @@ export function Viewer({ text, format, atoms, colour, onPick, describe }: {
         </ToggleGroup>
         <label className="flex items-center gap-2 text-control"><Checkbox checked={hydrogens} onCheckedChange={c => setHydrogens(c === true)} /> hydrogens</label>
         <label className="flex items-center gap-2 text-control"><Checkbox checked={solvent} onCheckedChange={c => setSolvent(c === true)} /> water & ions</label>
-        <label className="flex items-center gap-2 text-control"><Checkbox checked={showCell && !!cell.vectors} disabled={!cell.vectors} onCheckedChange={c => setShowCell(c === true)} /> box</label>
+        <label className="flex items-center gap-2 text-control"><Checkbox checked={showCell && !!cell.vectors} disabled={!cell.vectors} onCheckedChange={c => setShowCell(c === true)} /> box <Kbd>B</Kbd></label>
       </div>
       <p className="m-0 text-caption text-muted-foreground">
         {info.atoms} of {atoms.length} atoms drawn{virtual ? ' · ' + virtual + ' virtual sites not drawn' : ''}{unknown.length ? ' · ' + unknown.length + ' not drawn, element unknown (' + unknown.slice(0, 3).join(', ') + ')' : ''}
@@ -126,7 +127,9 @@ export function Viewer({ text, format, atoms, colour, onPick, describe }: {
         {cell.vectors && dims ? <>box of the structure file · a {dims.a.toFixed(2)} · b {dims.b.toFixed(2)} · c {dims.c.toFixed(2)} nm · α {degrees(dims.alpha)}° β {degrees(dims.beta)}° γ {degrees(dims.gamma)}° · V {dims.volume.toFixed(3)} nm³{outside && outside.count ? ' · ' + outside.count + ' of ' + outside.total + ' atoms lie outside it, as recorded' : ''}</> : 'no box: ' + cell.problems.join(' ')}
       </p>
       {cell.vectors && <p className="m-0 text-caption text-muted-foreground">a molecule that crosses an edge looks broken: that is periodicity, not an error</p>}
-      <div className="relative h-[460px] overflow-hidden rounded-xl border border-border bg-card">
+      {/* B toggles the box while the 3D view has focus (a click in it gives it focus), as section 9.2 asks: a control and a key. */}
+      <div className="relative h-[460px] overflow-hidden rounded-xl border border-border bg-card focus-visible:outline-2 focus-visible:outline-ring" tabIndex={0} role="group" aria-label="3D view · B shows or hides the box"
+        onKeyDown={e => { if (e.key.toLowerCase() === 'b' && !e.ctrlKey && !e.metaKey && !e.altKey && cell.vectors) { e.preventDefault(); setShowCell(v => !v) } }}>
         <div ref={box} className="absolute inset-0" role="img" aria-label="3D structure: atoms can also be picked by rule or as a list" />
         {h && (
           <div className="pointer-events-none absolute left-3 top-3 rounded-lg border border-border bg-popover px-3 py-2 text-caption shadow-menu" aria-live="polite">

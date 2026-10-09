@@ -36,13 +36,15 @@ export function energyStdin(numbers: number[]): string {
   return numbers.join(' ') + '\n0\n';
 }
 
-export interface EnergyRow { name: string; average: number; errEst: number; rmsd: number; drift: number; unit: string }
+/** A term's row; gmx prints `--` for an error estimate, RMSD or drift it has no data for (3 frames, or a -sum Total): null here. */
+export interface EnergyRow { name: string; average: number; errEst: number | null; rmsd: number | null; drift: number | null; unit: string }
 export interface EnergyStats { steps: number; t0: number; t1: number; dataSets: number; frames: number; rows: EnergyRow[] }
 
 const HEAD = /Statistics over (\d+) steps \[\s*(-?[\d.]+) through\s+(-?[\d.]+) ps \], (\d+) data sets/;
 const FRAMES = /All statistics are over (\d+) points/;
-const NUM = '(-?[\\d.eE+-]+|nan)';
+const NUM = '(-?(?:\\d+\\.?\\d*|\\.\\d+)(?:[eE][+-]?\\d+)?|nan|--)';
 const ROW = new RegExp('^(\\S.*?)\\s{2,}' + NUM + '\\s+' + NUM + '\\s+' + NUM + '\\s+' + NUM + '\\s+\\(([^)]*)\\)\\s*$');
+const value = (t: string) => (t === '--' ? null : Number(t));
 
 /** The block gmx energy prints after the run: its span, its frames and each term's average, error estimate, RMSD and drift. */
 export function parseEnergyStats(text: string): EnergyStats | null {
@@ -52,7 +54,7 @@ export function parseEnergyStats(text: string): EnergyStats | null {
   const rows: EnergyRow[] = [];
   for (const line of text.slice(head.index + head[0].length).split('\n')) {
     const m = ROW.exec(line.trim());
-    if (m) rows.push({ name: m[1], average: Number(m[2]), errEst: Number(m[3]), rmsd: Number(m[4]), drift: Number(m[5]), unit: m[6] });
+    if (m) rows.push({ name: m[1], average: Number(m[2]), errEst: value(m[3]), rmsd: value(m[4]), drift: value(m[5]), unit: m[6] });
   }
   return {
     steps: Number(head[1]), t0: Number(head[2]), t1: Number(head[3]), dataSets: Number(head[4]),
@@ -60,8 +62,12 @@ export function parseEnergyStats(text: string): EnergyStats | null {
   };
 }
 
-/** A drift larger than the term's error estimate, either way: the average is not steady to within its error (R4). */
-export const driftLarger = (r: Pick<EnergyRow, 'drift' | 'errEst'>) => Math.abs(r.drift) > r.errEst;
+/**
+ * A drift larger than the term's error estimate, either way: the average is not steady to within its error (R4).
+ * Without an estimate (gmx's `--`, null in the record) there is nothing to compare with, so no flag.
+ */
+export const driftLarger = (r: Pick<EnergyRow, 'drift' | 'errEst'>) =>
+  r.errEst != null && r.drift != null && Number.isFinite(r.errEst) && Number.isFinite(r.drift) && Math.abs(r.drift) > r.errEst;
 
 /** The options gmx-cypher offers for gmx energy: the curated few first, as the picker shows them (R4). */
 export const ENERGY_FORM: { flag: string; group: string; label: string; unit?: string; what: string }[] = [
@@ -88,13 +94,13 @@ export function energyOptionProblems(options: Options, help: HelpOption[]): stri
 }
 
 /** gmx energy's argument list: the file, its output, then only the options that differ from the installed defaults (T23). */
-export function energyArgv(r: { options: Options }, io: { edr: string; output: string }, help: HelpOption[]): string[] {
+export function energyArgv(r: { options: Options }, io: { edr: string; tpr?: string; output: string }, help: HelpOption[]): string[] {
   const has = new Set(help.map(o => o.flag));
   for (const k of Object.keys(r.options)) {
     if (!FORM_FLAGS.has(k)) throw new Error('-' + k + ' is not an option gmx-cypher sets for energy');
     if (!has.has(k)) throw new Error('this gmx energy has no -' + k);
   }
-  const args = ['energy', '-f', io.edr, '-o', io.output];
+  const args = ['energy', '-f', io.edr, ...(io.tpr ? ['-s', io.tpr] : []), '-o', io.output];
   for (const o of help) {
     if (!FORM_FLAGS.has(o.flag)) continue;
     const v = r.options[o.flag];

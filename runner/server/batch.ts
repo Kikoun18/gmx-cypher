@@ -136,7 +136,7 @@ export class Batches extends EventEmitter {
       const item = b.items.find(i => i.status === 'queued');
       if (!item) break;
       item.status = 'starting';
-      const req = { inputs: { trajectory: item.trajectory, runInput: item.runInput ?? '', structure: item.structure ?? undefined }, groups: r.groups, options: r.options, template: r.template, outDir: r.outDir, names: nameValues(item), retryNames: true };
+      const req = { tool: r.analysis ?? 'rdf', inputs: { trajectory: item.trajectory, runInput: item.runInput ?? '', structure: item.structure ?? undefined }, groups: r.groups, options: r.options, template: r.template, outDir: r.outDir, names: nameValues(item), retryNames: true };
       startRun(this.ctx, req, this.roots()).then(({ job }) => {
         Object.assign(item, { status: 'started', job: job.id });
         if (b.cancelled) this.ctx.jobs.cancel(job.id);

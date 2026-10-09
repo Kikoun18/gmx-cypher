@@ -1,0 +1,8 @@
+Statistics over 2001 steps [ 18.0000 through 20.0000 ps ], 2 data sets
+All statistics are over 3 points (frames)
+
+Energy                      Average   Err.Est.       RMSD  Tot-Drift
+-------------------------------------------------------------------------------
+Bond                         210.22         --    21.7977   -7.08301  (kJ/mol)
+Potential                  -46318.4         --    95.2962    158.656  (kJ/mol)
+Total                      -46108.2         --         --    151.574  (kJ/mol)

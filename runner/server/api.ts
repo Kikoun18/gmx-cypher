@@ -63,6 +63,11 @@ export function makeApi(ctx: Ctx): Api {
   const roots = () => [...ctx.config.allow, join(ctx.home, 'uploads')];
   const batches = new Batches(ctx, roots);
   const checked = (r: unknown) => { const p = recipeFileProblems(r); if (p.length) throw new HttpError(400, p.join('; ')); return r as Recipe; };
+  // A batch runs a recipe over trajectories: only a command with groups has that shape (energy and AWH batches are not built yet).
+  const batchable = (r: Recipe) => {
+    if (commandOf(r.analysis ?? 'rdf')?.groups === false) throw new HttpError(400, 'batches run recipes of commands with groups (rdf); ' + r.name + ' is a gmx ' + r.analysis + ' recipe');
+    return r;
+  };
   return async (req, url, res) => {
     if (is(req, 'GET', url, '/api/state')) return { body: state() };
     if (is(req, 'GET', url, '/api/events')) { events(ctx.jobs, batches, res); return 'handled'; }
@@ -146,13 +151,13 @@ export function makeApi(ctx: Ctx): Api {
     }
     if (is(req, 'POST', url, '/api/batch/preview')) {
       const b = await readJson<{ root: string; template: string; recipe: unknown }>(req);
-      const unread: string[] = [], items = await checkRunInputs(ctx, findTrajectories(b.root, String(b.template || ''), checked(b.recipe), roots(), unread));
+      const unread: string[] = [], items = await checkRunInputs(ctx, findTrajectories(b.root, String(b.template || ''), batchable(checked(b.recipe)), roots(), unread));
       return { body: { items, unread } };
     }
     if (is(req, 'GET', url, '/api/batches')) return { body: batches.list() };
     if (is(req, 'POST', url, '/api/batches')) {
       // The matches are found again: only paths the preview showed, and that still match, run.
-      const b = await readJson<{ root: string; template: string; recipe: unknown; rels: string[]; concurrency?: number }>(req), recipe = checked(b.recipe), rels = new Set(b.rels || []);
+      const b = await readJson<{ root: string; template: string; recipe: unknown; rels: string[]; concurrency?: number }>(req), recipe = batchable(checked(b.recipe)), rels = new Set(b.rels || []);
       const items = findTrajectories(b.root, String(b.template || ''), recipe, roots()).filter(i => rels.has(i.rel));
       if (!items.length) throw new HttpError(400, 'none of the chosen trajectories matches');
       return { body: batches.start(recipe, b.root, b.template, items, Math.min(cpus().length, b.concurrency || ctx.config.concurrency)) };
@@ -191,7 +196,10 @@ export function makeApi(ctx: Ctx): Api {
         const path = j.meta?.record as string | undefined;
         if (j.ended) await recordWritten(j.id);
         if (!path || !existsSync(path)) throw new HttpError(404, j.ended ? 'this run has no record' : 'the record is written when the run ends');
-        return { body: JSON.parse(readFileSync(path, 'utf8')) };
+        // A run without groups claims its stem with an empty record (T103): one left empty never got its record (review finding 8).
+        const text = readFileSync(path, 'utf8');
+        if (!text.trim()) throw new HttpError(404, j.ended ? 'this run has no record: it stopped before gmx-cypher wrote it' : 'the record is written when the run ends');
+        return { body: JSON.parse(text) };
       }
       if (req.method === 'GET' && job[2] === '/output') {
         // A run's own .xvg files only, by kind: the chart reads them.

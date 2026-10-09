@@ -4,6 +4,8 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { recipeFileProblems, recipeFromDraft } from '../src/lib/recipe';
 import { recipeFromRecord, recordProblems, type RunRecord } from '../src/lib/record';
+import { rdfCommand } from '../src/lib/commands';
+import { parseHelp } from '../src/lib/gmxText';
 
 const FIX = new URL('./fixtures/formats/', import.meta.url);
 const read = (name: string) => JSON.parse(readFileSync(new URL(name, FIX), 'utf8'));
@@ -27,6 +29,16 @@ describe('the frozen v1 files', () => {
   it('a recipe written now is version 3 with the frozen shape (its groups and options are the frozen ones)', () => {
     const recipe = read('recipe-v1.json');
     expect(recipeFromDraft({ groups: recipe.groups, options: recipe.options }, 'ion pairs v1', recipe.saved)).toEqual({ ...recipe, version: 3 });
+  });
+
+  it('run again from the v1 record gives the argv it recorded (section 10, tests)', () => {
+    const run = read('run-v1.run.json') as RunRecord, again = recipeFromRecord(run);
+    const help = parseHelp(readFileSync(new URL('../gmx-2025.4/rdf-h.txt', FIX), 'utf8'));
+    const trajectory = again.inputs.trajectory!.path, outDir = trajectory.slice(0, trajectory.lastIndexOf('/')) + '/rdf';
+    const { cwd, io } = rdfCommand.io({ trajectory, runInput: again.inputs.runInput!.path }, again.outDir ?? outDir, 'rdf_nvt');
+    expect(again.analysis).toBe('rdf');
+    expect(cwd).toBe(run.command.cwd);
+    expect(rdfCommand.argv({ options: again.options, selections: again.groups!.length - 1 }, io, help)).toEqual(run.command.args);
   });
 
   it('a newer version is refused in words, not read', () => {

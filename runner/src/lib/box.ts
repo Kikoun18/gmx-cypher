@@ -17,13 +17,17 @@ export function parseBox(text: string, format: 'gro' | 'pdb'): Box {
   if (format === 'pdb') {
     const line = text.split(/\r?\n/).find(l => l.startsWith('CRYST1'));
     if (!line) return none('no CRYST1 line in this file: no box to draw');
-    const num = (from: number, to: number) => Number(line.slice(from, to));
+    // A blank field is no number (Number('') would be 0): a line cut short has no cell, it is not a flat one.
+    const num = (from: number, to: number) => { const t = line.slice(from, to).trim(); return t ? Number(t) : NaN; };
     const [a, b, c] = [num(6, 15), num(15, 24), num(24, 33)].map(x => x / 10);
     const [al, be, ga] = [num(33, 40), num(40, 47), num(47, 54)].map(x => (x * Math.PI) / 180);
-    if (![a, b, c, al, be, ga].every(Number.isFinite) || a <= 0 || b <= 0 || c <= 0) return none('the CRYST1 line has no box size');
+    const bad = none('the CRYST1 line has no usable cell (a, b, c in Å and three angles in degrees)');
+    if (![a, b, c, al, be, ga].every(Number.isFinite) || a <= 0 || b <= 0 || c <= 0 || [al, be, ga].some(x => x <= 0 || x >= Math.PI)) return bad;
     const cosA = Math.cos(al), cosB = Math.cos(be), cosG = Math.cos(ga), sinG = Math.sin(ga);
-    const cx = c * cosB, cy = (c * (cosA - cosB * cosG)) / sinG;
-    const vectors: Vectors = [[a, 0, 0], [b * cosG, b * sinG, 0], [cx, cy, Math.sqrt(Math.max(0, c * c - cx * cx - cy * cy))]];
+    const cx = c * cosB, cy = (c * (cosA - cosB * cosG)) / sinG, cz2 = c * c - cx * cx - cy * cy;
+    // Angles that close no cell leave the third vector no height.
+    if (!(cz2 > 1e-12)) return bad;
+    const vectors: Vectors = [[a, 0, 0], [b * cosG, b * sinG, 0], [cx, cy, Math.sqrt(cz2)]];
     return { vectors: vectors.map(v => v.map(clean)) as Vectors, problems: [] };
   }
   const lines = text.split(/\r?\n/).filter(l => l.trim() !== '');

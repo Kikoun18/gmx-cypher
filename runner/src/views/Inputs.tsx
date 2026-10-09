@@ -128,10 +128,11 @@ function Checks({ check, busy }: ReturnType<typeof useInputCheck>) {
 }
 
 export function Inputs({ state, draft, setDraft, onSettings, onNext }: { state: AppState; draft: Draft; setDraft: React.Dispatch<React.SetStateAction<Draft>>; onSettings: () => void; onNext?: () => void }) {
-  const checked = useInputCheck(draft.inputs)
   // The slots the analysis asks for: an energy file alone for gmx energy; the four for the rest (section 7).
   const command = commandOf(draft.analysis ?? 'rdf') ?? COMMANDS[0]
-  const slots = SLOTS.filter(s => command.inputs.includes(s.slot))
+  const slots = command.inputs.map(slot => SLOTS.find(s => s.slot === slot)!)
+  // Only the slots shown are checked: a file another command uses can't hold this one up (review finding 7).
+  const checked = useInputCheck(command.groups ? Object.fromEntries(Object.entries(draft.inputs).filter(([k]) => command.inputs.includes(k as Slot))) : {})
   const energy = useTerms(command.tool === 'energy' ? draft.inputs.edr?.path : undefined)
   const ready = command.tool === 'energy' ? !!energy?.terms : !!checked.check?.ok
   const roots = state.config.allow
@@ -140,14 +141,18 @@ export function Inputs({ state, draft, setDraft, onSettings, onNext }: { state: 
   const fileRef = React.useRef<HTMLInputElement>(null)
   const used = new Set(Object.values(draft.inputs).map(p => p!.path))
 
-  const set = (slot: Slot, p: Picked) => setDraft(d => ({ ...d, inputs: { ...d.inputs, [slot]: p } }))
+  // Another energy file is another menu: its terms are picked again, never carried over by number (review finding 4).
+  const set = (slot: Slot, p: Picked) => setDraft(d => ({ ...d, inputs: { ...d.inputs, [slot]: p }, ...(slot === 'edr' && d.inputs.edr?.path !== p.path ? { terms: [] } : {}) }))
+  // A trajectory's suggestions replace the slots they fill; the others (an energy file) stay.
+  const others = (inputs: Draft['inputs']) => Object.fromEntries(Object.entries(inputs).filter(([k]) => !['trajectory', 'runInput', 'structure', 'index'].includes(k))) as Draft['inputs']
   const assign = async (p: string, role: Role | 'output' | null) => {
     const slot = picking || (role && role !== 'output' ? SLOT_OF[role] : undefined)
     const ok = slot && SLOTS.find(s => s.slot === slot)!.accepts.includes(role as Role)
     if (!slot || !ok) { toast.error('✗ ' + p.split('/').pop() + ' is not a ' + (picking ? SLOTS.find(s => s.slot === picking)!.label : 'GROMACS input')); return }
+    if (!command.inputs.includes(slot)) { toast.error('✗ ' + p.split('/').pop() + ' is a ' + role + ': gmx ' + command.tool + ' takes ' + slots.map(s => s.label).join(' and ')); return }
     setPicking(null)
     if (slot !== 'trajectory') { set(slot, { path: p, why: 'picked' }); return }
-    try { setDraft(d => ({ ...d, inputs: {} })); const s = await getJson<Draft['inputs']>('/api/suggest?trajectory=' + encodeURIComponent(p)); setDraft(d => ({ ...d, inputs: s })) }
+    try { setDraft(d => ({ ...d, inputs: others(d.inputs) })); const s = await getJson<Draft['inputs']>('/api/suggest?trajectory=' + encodeURIComponent(p)); setDraft(d => ({ ...d, inputs: { ...others(d.inputs), ...s } })) }
     catch (e) { toast.error('✗ ' + (e as Error).message) }
   }
   const upload = async (files: File[]) => {
@@ -181,7 +186,9 @@ export function Inputs({ state, draft, setDraft, onSettings, onNext }: { state: 
       </div>
       <div className="flex flex-col gap-4">
         <Section label="This run" />
-        {slots.map(({ slot, label, optional }) => {
+        {slots.map(({ slot, label, optional: always }) => {
+          // Optional: the index for RDF; for a command without groups, any input it can run without (energy's run input).
+          const optional = always || (!command.groups && !command.required.includes(slot))
           const p = draft.inputs[slot]
           return (
             <div key={slot} className="flex items-start gap-3">

@@ -10,10 +10,12 @@ export interface Draft {
   inputs: Partial<Record<Slot, Picked>>
   /** The reference first, then the selections. */
   groups: Group[]
-  /** gmx rdf options set so far, by flag without its dash (R4a). */
+  /** The picked command's options set so far, by flag without its dash (R4a; per command since R4). */
   options: Record<string, string | boolean>
   /** The command the analysis tab runs (its tool name); RDF when it is left out (R3b). */
   analysis?: string
+  /** The options of the commands not picked now, by tool, kept for when one is picked again (review finding 1). */
+  optionsBy?: Record<string, Record<string, string | boolean>>
   /** The output name template and another output folder than <trajectory folder>/rdf, if any (R5). */
   template?: string
   outDir?: string | null

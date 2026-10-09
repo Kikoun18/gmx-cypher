@@ -32,6 +32,11 @@ export interface CommandDef {
   options: CommandOption[];
   /** The file names of one run, from its stem. */
   outputNames(stem: string): OutputNames;
+  /**
+   * Each file a run writes: the PMF Sequences type it lands as (section 3), or null with the reason it has none,
+   * and whether "send to vault" sends it. Checked against PMF Sequences' own detectAna on real output (tests).
+   */
+  outputs: { file: 'xvg' | 'cn'; type: string | null; vault: boolean; why?: string }[];
   /** The paths gmx is given and the directory it runs in, for the outputs in `outDir`. */
   io(paths: Partial<Record<InputSlot, string>>, outDir: string, stem: string): { cwd: string; io: RunIo };
   /** What gmx would refuse, in words, before anything runs. */
@@ -51,6 +56,10 @@ export const rdfCommand: CommandDef = {
   groups: true,
   options: FORM,
   outputNames,
+  outputs: [
+    { file: 'xvg', type: 'rdf', vault: true },
+    { file: 'cn', type: null, vault: false, why: 'PMF Sequences reads its title "Cumulative Number RDF" as another RDF (T35)' },
+  ],
   io: (p, outDir, stem) => rdfIo({ trajectory: p.trajectory ?? '', runInput: p.runInput ?? '' }, outDir, stem),
   problems: recipeProblems,
   argv: (r, io, help) => rdfArgs(r, io as RdfIo, help),
@@ -61,22 +70,39 @@ export const energyCommand: CommandDef = {
   tool: 'energy',
   title: 'terms over time, with their statistics',
   section: 'an energy file',
-  inputs: ['edr'],
+  // The run input is optional (section 11): given, it goes in as -s.
+  inputs: ['edr', 'runInput'],
   required: ['edr'],
   groups: false,
   options: ENERGY_FORM,
   outputNames: stem => ({ xvg: stem + '.xvg', record: stem + '.run.json' }),
+  // Typed Energy by its name only: its title "GROMACS Energies" misses PMF Sequences' keyword (T103).
+  outputs: [{ file: 'xvg', type: 'energy', vault: true, why: 'typed from its file name, which must contain "energy"' }],
   io: (p, outDir, stem) => {
     const edr = p.edr ?? '', cwd = edr.slice(0, edr.lastIndexOf('/')) || '/';
-    return { cwd, io: { edr: relPath(cwd, edr), output: relPath(cwd, outDir + '/' + stem + '.xvg') } };
+    return { cwd, io: { edr: relPath(cwd, edr), ...(p.runInput ? { tpr: relPath(cwd, p.runInput) } : {}), output: relPath(cwd, outDir + '/' + stem + '.xvg') } };
   },
   problems: energyOptionProblems,
-  argv: (r, io, help) => energyArgv(r, io as { edr: string; output: string }, help),
+  argv: (r, io, help) => energyArgv(r, io as { edr: string; tpr?: string; output: string }, help),
   stdin: energyStdin,
 };
 
 export const COMMANDS: CommandDef[] = [rdfCommand, energyCommand];
 export const commandOf = (tool: string) => COMMANDS.find(c => c.tool === tool);
+
+/** What a draft holds of commands: the picked one, its options, and the options of the others, kept aside. */
+export interface CommandDraft { analysis?: string; options: Options; optionsBy?: Record<string, Options> }
+
+/**
+ * The draft with another command picked: the options of the one left are kept aside, and the new one's come back.
+ * Options never cross commands: RDF's -bin is no option of gmx energy, and energy's -sum none of gmx rdf (review finding 1).
+ */
+export function withCommand<D extends CommandDraft>(d: D, tool: string): D {
+  const from = d.analysis ?? 'rdf';
+  if (from === tool) return d;
+  const { [tool]: options = {}, ...others } = { ...d.optionsBy, [from]: d.options };
+  return { ...d, analysis: tool, options, optionsBy: others };
+}
 
 /** The commands grouped by what they need, in the picker's order; a section without commands is left out. */
 export const sectionsOf = (commands: CommandDef[] = COMMANDS) =>

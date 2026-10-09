@@ -1,4 +1,4 @@
-import { commandOf } from './commands';
+import { commandOf, withCommand } from './commands';
 // Recipes (R7a, T37): the saved form of a run, without its inputs: options, groups as steps (rules where
 // possible, hand-picked atoms as ranges), the name template and output folder. One recipe serves other
 // trajectories of the same system, and is checked against each system before it runs there.
@@ -29,9 +29,9 @@ export function recipeFromDraft(d: DraftLike, name: string, saved = new Date().t
   return { format: 'gmx-cypher recipe', version: 3, name, analysis: d.analysis ?? 'rdf', saved, options: d.options, groups: d.groups, template: d.template ?? '{analysis}_{trajectory}', outDir: d.outDir ?? null };
 }
 
-/** The draft with the recipe's groups, options, template and folder; its inputs are kept. */
+/** The draft with the recipe's command, groups, options, template and folder; its inputs are kept. */
 export function draftFromRecipe<D extends DraftLike & { inputs: unknown }>(r: Recipe, d: D) {
-  return { ...d, groups: r.groups, options: r.options, template: r.template, outDir: r.outDir };
+  return { ...withCommand(d, r.analysis ?? 'rdf'), groups: r.groups, options: r.options, template: r.template, outDir: r.outDir };
 }
 
 const KINDS = new Set(['resname', 'resnr', 'name', 'names', 'element', 'atoms']);
@@ -46,6 +46,8 @@ export function recipeFileProblems(x: unknown): string[] {
   const analysis = r.analysis ?? 'rdf';
   if (!commandOf(String(analysis))) p.push('analysis ' + analysis + ' is not a command gmx-cypher knows');
   if (!r.options || typeof r.options !== 'object') p.push('options are missing');
+  // A command without groups (R4) has none to check; the others need a reference and at least one selection.
+  if (commandOf(String(analysis))?.groups === false) return p;
   if (!Array.isArray(r.groups) || r.groups.length < 2) return [...p, 'a reference and at least one selection are needed'];
   r.groups.forEach(g => (Array.isArray(g?.steps) ? g.steps : [null]).forEach((s, i) => {
     if (!s || !KINDS.has(s.rule?.kind)) p.push((g?.name || '?') + ': step ' + (i + 1) + ' is not a rule gmx-cypher knows');
