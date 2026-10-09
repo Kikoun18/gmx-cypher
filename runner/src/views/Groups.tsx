@@ -11,14 +11,14 @@ import { postJson } from '../api'
 import type { Draft } from '../draft'
 import { useIndex, useStructure } from '../structure'
 import { fromRanges, toRanges, type Atom } from '../lib/atoms'
-import { clickStep, groupAtoms, nameProblem, ruleText, shared, type Group, type Rule, type Step } from '../lib/groups'
+import { atomNameCounts, clickStep, groupAtoms, nameProblem, parseNames, ruleText, shared, toggleName, type Group, type Rule, type Step } from '../lib/groups'
 import { fitKeys, initialKeys, removeKey } from '../lib/keys'
 import type { NdxGroup } from '../lib/ndx'
 import { TONES, toneSolid, toneText, type Tone } from '../lib/tones'
 import { cn } from '../lib/utils'
 import { Viewer, type PickHow } from './Viewer'
 
-type Kind = Exclude<Rule['kind'], 'atoms'> | 'index'
+type Kind = 'resname' | 'resnr' | 'name' | 'element' | 'index'
 const KINDS: { kind: Kind; label: string }[] = [
   { kind: 'resname', label: 'residue name' }, { kind: 'resnr', label: 'residue numbers' },
   { kind: 'name', label: 'atom name' }, { kind: 'element', label: 'element' }, { kind: 'index', label: 'index group' },
@@ -28,47 +28,86 @@ const KINDS: { kind: Kind; label: string }[] = [
  * A rule from what the structure contains: the names offered are the file's own. An index group is taken
  * as its atoms (the step notes which group), so the group never depends on the index file again (T51).
  */
-function RuleForm({ atoms, index, onStep }: { atoms: Atom[]; index: { file: string; groups: NdxGroup[] }; onStep: (s: Step) => void }) {
+/** The names of one residue name (or of every residue), with counts: tick to write them into the field (R1a, T92). */
+function NameMenu({ atoms, resn, value, onChange }: { atoms: Atom[]; resn: string; value: string; onChange: (text: string) => void }) {
+  const names = React.useMemo(() => atomNameCounts(atoms, resn || undefined), [atoms, resn])
+  const chosen = parseNames(value).values
+  return (
+    <div role="listbox" aria-multiselectable="true" aria-label={resn ? 'atom names in ' + resn : 'atom names in every residue'}
+      className="flex max-h-40 flex-wrap gap-1.5 overflow-y-auto rounded-md border border-border bg-popover p-2">
+      {names.length === 0 && <span className="text-caption text-muted-foreground">no atom has this residue name</span>}
+      {names.map(({ name, count }) => {
+        const on = chosen.includes(name)
+        return (
+          <button key={name} type="button" role="option" aria-selected={on} onClick={() => onChange(toggleName(value, name))}
+            className={cn('inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-control', on ? 'bg-primary font-bold text-primary-foreground' : 'bg-secondary text-foreground')}>
+            {name}<span className={cn('text-caption', on ? 'text-primary-foreground' : 'text-muted-foreground')}>{count}</span>
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+function RuleForm({ atoms, index, onStep }: { atoms: Atom[]; index: { file: string; groups: NdxGroup[] }; onStep: (s: Step, keep?: boolean) => void }) {
   const [kind, setKind] = React.useState<Kind>('resname')
   const [value, setValue] = React.useState('')
   const [within, setWithin] = React.useState('')
+  const valueRef = React.useRef<HTMLInputElement>(null)
   const options = React.useMemo(() => {
-    const vals = kind === 'resname' ? atoms.map(a => a.resn) : kind === 'name' ? atoms.map(a => a.name) : kind === 'element' ? atoms.map(a => a.elem || '') : []
+    const vals = kind === 'resname' ? atoms.map(a => a.resn) : kind === 'element' ? atoms.map(a => a.elem || '') : []
     return [...new Set(vals)].filter(Boolean).sort()
   }, [atoms, kind])
   const id = React.useId()
   const picked = kind === 'index' ? index.groups[Number(value)] : undefined
+  const names = kind === 'name' ? parseNames(value) : null
   const rule = (): Rule | null => {
     const v = value.trim()
     if (kind === 'index') return picked?.atoms.length ? { kind: 'atoms', atoms: toRanges(picked.atoms) } : null
     if (kind === 'resnr') { const m = /^(\d+)\s*(?:[-–]\s*(\d+))?$/.exec(v); return m ? { kind, from: +m[1], to: +(m[2] ?? m[1]) } : null }
+    if (kind === 'name') return names && !names.problems.length ? { kind: 'names', values: names.values, ...(within.trim() ? { resn: within.trim() } : {}) } : null
     if (!v) return null
-    return kind === 'name' ? { kind, value: v, ...(within.trim() ? { resn: within.trim() } : {}) } : { kind, value: v }
+    return { kind, value: v }
   }
   const r = rule()
   const note = picked && 'index group ' + picked.label + ' (#' + value + ' in ' + index.file + ')'
-  const go = (op: Step['op']) => { if (r) { onStep({ op, rule: r, ...(note ? { note } : {}) }); setValue(''); setWithin('') } }
+  // Shift+Enter in the name field keeps the form open with the same residue name, for the next name (R1b).
+  const go = (op: Step['op'], keep = false) => {
+    if (!r) return
+    onStep({ op, rule: r, ...(note ? { note } : {}) }, keep)
+    setValue('')
+    if (!keep) setWithin('')
+    valueRef.current?.focus()
+  }
+  const unknown = names ? names.values.filter(v => !atoms.some(a => a.name === v && (!within.trim() || a.resn === within.trim()))) : []
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-lg border border-dashed border-input p-2">
-      <Select value={kind} onValueChange={k => { setKind(k as typeof kind); setValue('') }}>
-        <SelectTrigger size="sm" className="w-40" aria-label="rule"><SelectValue /></SelectTrigger>
-        <SelectContent>{KINDS.filter(k => k.kind !== 'index' || index.groups.length).map(k => <SelectItem key={k.kind} value={k.kind}>{k.label}</SelectItem>)}</SelectContent>
-      </Select>
-      {kind === 'index' ? (
-        <Select value={value} onValueChange={setValue}>
-          <SelectTrigger size="sm" className="w-44" aria-label="index group"><SelectValue placeholder="group" /></SelectTrigger>
-          <SelectContent>{index.groups.map((g, i) => <SelectItem key={i} value={String(i)}>{i} · {g.label} · {g.atoms.length}</SelectItem>)}</SelectContent>
+    <div className="flex flex-col gap-2 rounded-lg border border-dashed border-input p-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <Select value={kind} onValueChange={k => { setKind(k as Kind); setValue('') }}>
+          <SelectTrigger size="sm" className="w-40" aria-label="rule"><SelectValue /></SelectTrigger>
+          <SelectContent>{KINDS.filter(k => k.kind !== 'index' || index.groups.length).map(k => <SelectItem key={k.kind} value={k.kind}>{k.label}</SelectItem>)}</SelectContent>
         </Select>
-      ) : (
-        <Input size="sm" className="w-28" value={value} onChange={e => setValue(e.target.value)} list={id} placeholder={kind === 'resnr' ? '1-6' : 'value'} aria-label="value"
-          onKeyDown={e => e.key === 'Enter' && go('add')} />
-      )}
-      <datalist id={id}>{options.map(o => <option key={o} value={o} />)}</datalist>
-      {kind === 'name' && <Input size="sm" className="w-24" value={within} onChange={e => setWithin(e.target.value)} list={id + 'r'} placeholder="in every…" aria-label="in every residue named" />}
-      <datalist id={id + 'r'}>{[...new Set(atoms.map(a => a.resn))].sort().map(o => <option key={o} value={o} />)}</datalist>
-      <Button variant="outline" size="sm" disabled={!r} onClick={() => go('add')}>+ add</Button>
-      <Button variant="ghost" size="sm" disabled={!r} onClick={() => go('remove')}>− remove</Button>
-      {r && <span className="text-caption text-muted-foreground">{picked ? picked.label + ' · ' + picked.atoms.length + ' atoms' : ruleText(r)}</span>}
+        {kind === 'index' ? (
+          <Select value={value} onValueChange={setValue}>
+            <SelectTrigger size="sm" className="w-44" aria-label="index group"><SelectValue placeholder="group" /></SelectTrigger>
+            <SelectContent>{index.groups.map((g, i) => <SelectItem key={i} value={String(i)}>{i} · {g.label} · {g.atoms.length}</SelectItem>)}</SelectContent>
+          </Select>
+        ) : (
+          <Input ref={valueRef} size="sm" className={kind === 'name' ? 'w-64' : 'w-28'} value={value} onChange={e => setValue(e.target.value)} list={kind === 'name' ? undefined : id}
+            placeholder={kind === 'resnr' ? '1-6' : kind === 'name' ? 'O1, O2 O3 and O4' : 'value'} aria-label={kind === 'name' ? 'atom names' : 'value'}
+            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); go('add', e.shiftKey && kind === 'name') } }} />
+        )}
+        <datalist id={id}>{options.map(o => <option key={o} value={o} />)}</datalist>
+        {kind === 'name' && <Input size="sm" className="w-24" value={within} onChange={e => setWithin(e.target.value)} list={id + 'r'} placeholder="in every…" aria-label="in every residue named" />}
+        <datalist id={id + 'r'}>{[...new Set(atoms.map(a => a.resn))].sort().map(o => <option key={o} value={o} />)}</datalist>
+        <Button variant="outline" size="sm" disabled={!r} onClick={() => go('add')}>+ add</Button>
+        <Button variant="ghost" size="sm" disabled={!r} onClick={() => go('remove')}>− remove</Button>
+      </div>
+      {kind === 'name' && <NameMenu atoms={atoms} resn={within.trim()} value={value} onChange={setValue} />}
+      {kind === 'name' && <p className="m-0 text-caption text-muted-foreground"><Kbd>Enter</Kbd> adds the rule and closes it · <Kbd>Shift</Kbd>+<Kbd>Enter</Kbd> adds it and keeps the residue name for the next</p>}
+      {value.trim() && names?.problems.map(p => <FieldHint key={p} error>✗ {p}</FieldHint>)}
+      {unknown.length > 0 && <FieldHint error>✗ 0 atoms: {unknown.join(', ')}{within.trim() ? ' in ' + within.trim() : ' in this structure'}</FieldHint>}
+      {r && <span className="text-caption text-muted-foreground">{picked ? picked.label + ' · ' + picked.atoms.length + ' atoms' : ruleText(r) + ' · ' + groupAtoms(atoms, [{ op: 'add', rule: r }]).length + ' atoms'}</span>}
     </div>
   )
 }
@@ -123,7 +162,7 @@ function GroupCard({ group, atoms, index, nrs, others, current, onCurrent, onCha
         onChange={e => setTyped(e.target.value)} onBlur={commitTyped} onKeyDown={e => { if (e.key === 'Enter') commitTyped(); if (e.key === 'Escape') setTyped(null) }} />
       {typedError && <FieldHint error>✗ {typedError}</FieldHint>}
       {beyond.length > 0 && <FieldHint error>✗ atoms {toRanges(beyond)} are beyond the structure's {atoms.length}</FieldHint>}
-      {rule ? <RuleForm atoms={atoms} index={index} onStep={s => { steps([...group.steps, s]); setRule(false) }} /> : <Button variant="ghost" size="sm" className="self-start" onClick={() => setRule(true)}>+ rule</Button>}
+      {rule ? <RuleForm atoms={atoms} index={index} onStep={(s, keep) => { steps([...group.steps, s]); setRule(!!keep) }} /> : <Button variant="ghost" size="sm" className="self-start" onClick={() => setRule(true)}>+ rule</Button>}
     </section>
   )
 }

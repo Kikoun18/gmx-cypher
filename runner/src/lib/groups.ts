@@ -9,17 +9,61 @@ export type Rule =
   | { kind: 'resname'; value: string }
   | { kind: 'resnr'; from: number; to: number }
   | { kind: 'name'; value: string; resn?: string }
+  | { kind: 'names'; values: string[]; resn?: string }
   | { kind: 'element'; value: string }
   | { kind: 'atoms'; atoms: string };
 
 export interface Step { op: 'add' | 'remove'; rule: Rule; note?: string }
 export interface Group { role: 'reference' | 'selection'; name: string; tone: Tone; steps: Step[] }
 
+/** A name as the field writes it: quoted when it holds a comma, a space or a quote, or is `and` (which would read as a joiner). */
+const quoteName = (name: string) => (/[\s,"]/.test(name) || name.toLowerCase() === 'and' ? '"' + name + '"' : name);
+
+/** `O1, O2 or O3` in words; a single name as itself. */
+const listText = (values: string[]) => {
+  const names = values.map(quoteName);
+  return names.length < 2 ? names.join('') : names.slice(0, -1).join(', ') + ' or ' + names[names.length - 1];
+};
+
+/**
+ * What the field says, as names (R1a, T92): commas, spaces and `and` separate; a quoted name is taken as it is
+ * (so an atom really named AND is `"AND"`). Duplicates go; matching stays exact and case-sensitive.
+ */
+export function parseNames(text: string): { values: string[]; problems: string[] } {
+  const values: string[] = [], problems: string[] = [];
+  for (const token of text.match(/"[^"]*"|[^\s,]+/g) ?? []) {
+    if (token.startsWith('"')) {
+      if (token.length < 2 || !token.endsWith('"')) problems.push('a closing quote is missing');
+      else if (token.length > 2) values.push(token.slice(1, -1));
+    } else if (token.toLowerCase() !== 'and') values.push(token);
+  }
+  const unique = [...new Set(values)];
+  if (!unique.length && !problems.length) problems.push('a name is needed');
+  return { values: unique, problems: [...new Set(problems)] };
+}
+
+/** The list as the field writes it: `O1, O2, O3`. */
+export const formatNames = (values: string[]) => values.map(quoteName).join(', ');
+
+/** A tick in the menu: the name added to the list, or taken out of it. */
+export const toggleName = (text: string, name: string) => {
+  const { values } = parseNames(text);
+  return formatNames(values.includes(name) ? values.filter(v => v !== name) : [...values, name]);
+};
+
+/** The names in one residue name (or in every residue), with how many atoms each has, sorted. */
+export function atomNameCounts(atoms: Atom[], resn?: string): { name: string; count: number }[] {
+  const counts = new Map<string, number>();
+  for (const a of atoms) if (!resn || a.resn === resn) counts.set(a.name, (counts.get(a.name) ?? 0) + 1);
+  return [...counts].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)).map(([name, count]) => ({ name, count }));
+}
+
 export function ruleText(r: Rule): string {
   switch (r.kind) {
     case 'resname': return 'residue name ' + r.value;
     case 'resnr': return r.from === r.to ? 'residue number ' + r.from : 'residue numbers ' + r.from + '–' + r.to;
     case 'name': return 'atom name ' + r.value + (r.resn ? ' in every ' + r.resn : '');
+    case 'names': return 'atom name ' + listText(r.values) + (r.resn ? ' in every ' + r.resn : '');
     case 'element': return 'element ' + r.value;
     case 'atoms': return 'atoms ' + r.atoms;
   }
@@ -31,6 +75,7 @@ function matches(a: Atom, r: Rule): boolean {
     case 'resname': return a.resn === r.value;
     case 'resnr': return a.resi >= r.from && a.resi <= r.to;
     case 'name': return a.name === r.value && (!r.resn || a.resn === r.resn);
+    case 'names': return r.values.includes(a.name) && (!r.resn || a.resn === r.resn);
     case 'element': return a.elem === r.value;
     case 'atoms': return false;
   }

@@ -9,7 +9,7 @@ import { safeFileName } from '../../../app/src/lib/storage/path';
 
 export interface Recipe {
   format: 'gmx-cypher recipe';
-  version: 1;
+  version: 1 | 2;
   name: string;
   analysis: 'rdf';
   saved: string;
@@ -24,7 +24,7 @@ export interface Recipe {
 interface DraftLike { groups: Group[]; options: Options; template?: string; outDir?: string | null }
 
 export function recipeFromDraft(d: DraftLike, name: string, saved = new Date().toISOString()): Recipe {
-  return { format: 'gmx-cypher recipe', version: 1, name, analysis: 'rdf', saved, options: d.options, groups: d.groups, template: d.template ?? '{analysis}_{trajectory}', outDir: d.outDir ?? null };
+  return { format: 'gmx-cypher recipe', version: 2, name, analysis: 'rdf', saved, options: d.options, groups: d.groups, template: d.template ?? '{analysis}_{trajectory}', outDir: d.outDir ?? null };
 }
 
 /** The draft with the recipe's groups, options, template and folder; its inputs are kept. */
@@ -32,13 +32,13 @@ export function draftFromRecipe<D extends DraftLike & { inputs: unknown }>(r: Re
   return { ...d, groups: r.groups, options: r.options, template: r.template, outDir: r.outDir };
 }
 
-const KINDS = new Set(['resname', 'resnr', 'name', 'element', 'atoms']);
+const KINDS = new Set(['resname', 'resnr', 'name', 'names', 'element', 'atoms']);
 
 /** What makes a parsed file unusable as a v1 recipe, in words; [] when it is one. */
 export function recipeFileProblems(x: unknown): string[] {
   const r = x as Partial<Recipe> | null;
   if (!r || typeof r !== 'object' || r.format !== 'gmx-cypher recipe') return ['not a gmx-cypher recipe'];
-  if (r.version !== 1) return ['recipe version ' + r.version + ': this gmx-cypher reads version 1'];
+  if (r.version !== 1 && r.version !== 2) return ['recipe version ' + r.version + ': this gmx-cypher reads versions 1 and 2'];
   const p: string[] = [];
   if (typeof r.name !== 'string' || !r.name.trim()) p.push('a recipe needs a name');
   if (!r.options || typeof r.options !== 'object') p.push('options are missing');

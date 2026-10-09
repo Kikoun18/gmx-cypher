@@ -24,12 +24,12 @@ describe('the frozen v1 files', () => {
     expect(recipeFromRecord(run).options).toEqual(recipe.options);
   });
 
-  it('a v1 recipe written from the draft has the frozen shape', () => {
+  it('a recipe written now is version 2 with the frozen shape (its groups and options are the frozen ones)', () => {
     const recipe = read('recipe-v1.json');
-    expect(recipeFromDraft({ groups: recipe.groups, options: recipe.options }, 'ion pairs v1', recipe.saved)).toEqual(recipe);
+    expect(recipeFromDraft({ groups: recipe.groups, options: recipe.options }, 'ion pairs v1', recipe.saved)).toEqual({ ...recipe, version: 2 });
   });
 
   it('a newer version is refused in words, not read', () => {
-    expect(recipeFileProblems({ ...read('recipe-v1.json'), version: 3 })).toEqual(['recipe version 3: this gmx-cypher reads version 1']);
+    expect(recipeFileProblems({ ...read('recipe-v1.json'), version: 3 })).toEqual(['recipe version 3: this gmx-cypher reads versions 1 and 2']);
   });
 });

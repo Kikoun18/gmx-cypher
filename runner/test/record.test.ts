@@ -30,7 +30,7 @@ describe('the run record (T31)', () => {
   const r = buildRecord(parts);
 
   it('holds versions, the command, the inputs, the groups as steps and atom ranges, every option and the outputs', () => {
-    expect(r).toMatchObject({ format: 'gmx-cypher run', version: 1, runner: { name: 'gmx-cypher', version: '0.1.0' }, gmx: { version: '2025.4' }, job: 'jabc', status: 'done', frames: { analysed: 21, lastTime: 20 } });
+    expect(r).toMatchObject({ format: 'gmx-cypher run', version: 2, runner: { name: 'gmx-cypher', version: '0.1.0' }, gmx: { version: '2025.4' }, job: 'jabc', status: 'done', frames: { analysed: 21, lastTime: 20 } });
     expect(r.command.args.slice(0, 3)).toEqual(['rdf', '-f', 'nvt.xtc']);
     expect(r.groups).toEqual([
       { index: 0, role: 'reference', name: 'sulfur', tone: 'coral', steps: groups[0].steps, atoms: '5-30:5', count: 6, gmxCount: 6 },
@@ -49,7 +49,7 @@ describe('the run record (T31)', () => {
 
   it('names what is wrong with a file that is not a v1 record', () => {
     expect(recordProblems({})).toEqual(['not a gmx-cypher run record']);
-    expect(recordProblems({ ...r, version: 2 })).toEqual(['run record version 2: this gmx-cypher reads version 1']);
+    expect(recordProblems({ ...r, version: 3 })).toEqual(['run record version 3: this gmx-cypher reads versions 1 and 2']);
     expect(recordProblems({ ...r, command: { cwd: '/x', file: 'gmx' }, groups: [{ name: 'a' }, r.groups[1]] })).toEqual(['command.args is missing', 'groups[0].steps is missing']);
     expect(recordProblems({ ...r, groups: [r.groups[0]] })).toEqual(['groups: a reference and at least one selection are needed']);
   });
