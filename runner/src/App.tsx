@@ -40,6 +40,19 @@ function useTheme() {
   return [pref, (p: ThemePref) => { saveThemePref(p); setPref(p) }] as const
 }
 
+/** The vault in the header: its folder name, or why it can't be read. */
+function VaultStatus({ path }: { path: string | null }) {
+  const [v, setV] = React.useState<{ path: string; error?: string } | null>(null)
+  React.useEffect(() => {
+    if (!path) return
+    let alive = true
+    getJson<{ path: string; error?: string }>('/api/vault').then(x => alive && setV(x), e => alive && setV({ path, error: (e as Error).message }))
+    return () => { alive = false }
+  }, [path])
+  if (!path || !v) return null
+  return v.error ? <span className="text-caption text-destructive" title={v.error}>✗ vault</span> : <span className="text-caption text-muted-foreground">vault · {v.path.split('/').pop()}</span>
+}
+
 function GmxStatus({ gmx }: { gmx: AppState['gmx'] }) {
   return gmx.ok
     ? <span className="text-caption text-muted-foreground">{gmx.name} {gmx.version} · <span className="text-mint-strong">✓ ready</span></span>
@@ -64,6 +77,7 @@ export function App() {
         <h1 className="m-0 text-heading font-bold">gmx-cypher</h1>
         <span aria-live="polite">{state && <GmxStatus gmx={state.gmx} />}</span>
         <span className="flex-1" />
+        {state && <VaultStatus path={state.config.vault} />}
         {state && <Button variant="ghost" size="sm" onClick={() => setSettings(true)}><SettingsIcon /> settings</Button>}
         <ToggleGroup type="single" size="sm" value={pref} onValueChange={v => v && setPref(v as ThemePref)} aria-label="theme">
           <ToggleGroupItem value="light" aria-label="light theme"><Sun /></ToggleGroupItem>

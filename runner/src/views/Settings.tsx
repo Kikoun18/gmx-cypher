@@ -11,6 +11,11 @@ export function Settings({ state, open, onOpenChange, onState }: { state: AppSta
   const [busy, setBusy] = React.useState(false)
   const [folder, setFolder] = React.useState('')
   const [folderError, setFolderError] = React.useState('')
+  const [vault, setVault] = React.useState(state.config.vault || '')
+  const [vaultError, setVaultError] = React.useState('')
+  const chooseVault = async (path: string | null) => {
+    try { onState(await postJson<AppState>('/api/config', { vault: path })); setVaultError(''); if (!path) setVault('') } catch (e) { setVaultError((e as Error).message) }
+  }
   const setAllow = async (allow: string[]) => {
     try { onState(await postJson<AppState>('/api/config', { allow })); setFolder(''); setFolderError('') } catch (e) { setFolderError((e as Error).message) }
   }
@@ -53,6 +58,17 @@ export function Settings({ state, open, onOpenChange, onState }: { state: AppSta
               <Button variant="outline" onClick={() => setAllow([...state.config.allow, folder.trim()])} disabled={!folder.trim()}>add</Button>
             </div>
             {folderError && <FieldHint error>✗ {folderError}</FieldHint>}
+          </Field>
+          <Section label="PMF Sequences vault" />
+          <Field>
+            <Label htmlFor="vault">vault folder</Label>
+            <div className="flex gap-2">
+              <Input id="vault" size="sm" value={vault} placeholder="/home/you/pmf-vault" onChange={e => setVault(e.target.value)} onKeyDown={e => e.key === 'Enter' && vault.trim() && chooseVault(vault.trim())} />
+              <Button variant="outline" onClick={() => chooseVault(vault.trim())} disabled={!vault.trim() || vault.trim() === state.config.vault}>use</Button>
+              {state.config.vault && <Button variant="ghost" onClick={() => chooseVault(null)}>forget</Button>}
+            </div>
+            {vaultError ? <FieldHint error>✗ {vaultError}</FieldHint> : state.config.vault && <FieldHint>✓ {state.config.vault}</FieldHint>}
+            <FieldHint>Read only: projects, rows and patterns, for where a result lands. A result you send goes into the project's _inbox folder; nothing else in the vault is ever written.</FieldHint>
           </Field>
         </DialogBody>
         <DialogFooter><Button variant="ghost" onClick={() => onOpenChange(false)}>close</Button></DialogFooter>
