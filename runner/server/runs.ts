@@ -6,7 +6,8 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, statSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import { atomTable, type Atom } from '../src/lib/atoms';
-import { COMMANDS, commandOf, type InputSlot, type OutputNames, type RunIo } from '../src/lib/commands';
+import { allNames, COMMANDS, commandOf, type InputSlot, type OutputNames, type RunIo } from '../src/lib/commands';
+import { awhFrames, awhNames, framesWritten, type AwhFrame } from '../src/lib/awh';
 import { energyProblems, parseEnergyStats } from '../src/lib/energy';
 import { groupAtoms, nameProblem, type Group } from '../src/lib/groups';
 import type { Slot } from '../src/lib/inputs';
@@ -18,6 +19,7 @@ import { runEstimate, type Options } from '../src/lib/rdf';
 import { buildRecord, type FileInfo, type Output, type RunRecord } from '../src/lib/record';
 import { structFormat } from '../../app/src/lib/structFile';
 import type { Ctx } from './api';
+import { awhScan } from './awh';
 import { checkSizes, dumpRunInput } from './check';
 import { energyMenu } from './energy';
 import { inside, sha256File, within } from './files';
@@ -72,7 +74,9 @@ export async function planRun(ctx: Ctx, req: RunRequest, roots: string[]): Promi
     const m = (e as Error).message;
     throw new HttpError(400, !req.names && m.endsWith('has no value here') ? m + ": in a single run only {analysis} and {trajectory} do; a batch's path template gives the others" : m);
   }
-  stem = freeStem(stem, existsSync(outDir) ? readdirSync(outDir) : []);
+  // gmx awh writes a file per frame (R5): the frames come from a scan of the file, and each one's name must be free too.
+  const frames: AwhFrame[] | null = cmd.tool === 'awh' ? (await awhScan(ctx.gmx, first, paths.runInput!)).frames : null;
+  stem = freeStem(stem, existsSync(outDir) ? readdirSync(outDir) : [], frames?.map(f => f.suffix));
   const help = await toolHelp(ctx.gmx, cmd.tool), { cwd, io } = cmd.io(paths, outDir, stem);
   let argv: string[];
   try { argv = cmd.argv({ options: req.options || {}, selections: (req.groups?.length || 1) - 1 }, io, help); }
@@ -84,7 +88,16 @@ export async function planRun(ctx: Ctx, req: RunRequest, roots: string[]): Promi
     if (cmd.tool === 'energy') problems.push(...energyProblems(req.terms ?? [], await energyMenu(ctx.gmx, first)));
     stdin = cmd.stdin(req.terms ?? []);
   }
-  return { tool: cmd.tool, cwd, outDir, stem, names: cmd.outputNames(stem), io, file: ctx.gmx.path!, argv, env: JOB_ENV, problems, stdin };
+  let names = cmd.outputNames(stem);
+  if (frames) {
+    const written = framesWritten(frames, req.options || {}), files = awhNames(stem, written);
+    if (!frames.length) problems.push('this energy file has no AWH data');
+    // gmx awh writes nothing and still exits 0 when -b is past the last frame (2025.4, checked).
+    else if (!written.length) problems.push('no AWH frame in this range: the file has frames from ' + frames[0].time + ' to ' + frames[frames.length - 1].time + ' ps');
+    // The last frame is the run's file for the vault (the usual choice for PMF Sequences); the earlier ones come with it.
+    if (files.length) names = { xvg: files[files.length - 1], record: names.record, more: files.slice(0, -1) };
+  }
+  return { tool: cmd.tool, cwd, outDir, stem, names, io, file: ctx.gmx.path!, argv, env: JOB_ENV, problems, stdin };
 }
 
 /** The groups' atoms from the structure file, as the GUI computed them; names and emptiness refused here too. */
@@ -107,6 +120,12 @@ function groupsAtoms(req: RunRequest, roots: string[]): { atoms: Atom[]; sets: n
 async function fileInfo(path: string, hash: boolean): Promise<FileInfo> {
   const st = statSync(path);
   return { path, size: st.size, mtime: st.mtime.toISOString(), ...(hash ? { sha256: await sha256File(path) } : {}) };
+}
+
+/** The frames an AWH run wrote, as a record states them: their count, and the last one's time. */
+function awhRecordFrames(stem: string, names: string[]) {
+  const f = awhFrames(stem, names);
+  return f.length ? { analysed: f.length, lastTime: f[f.length - 1].time } : null;
 }
 
 /** Records being written: a job's end event comes just before its record (outputs hashed), and a request asked then waits for it. */
@@ -142,7 +161,7 @@ export async function startRun(ctx: Ctx, req: RunRequest, roots: string[]): Prom
   // exclusively (T30). A file that appeared meanwhile stops a single run, whose command was shown; a batch run plans a new free stem.
   for (let attempt = 0; ; attempt++) {
     if (!existsSync(plan.outDir)) mkdirSync(plan.outDir, { recursive: plan.outDir.startsWith(ctx.home + '/') });
-    const mine = new Set(Object.values(plan.names).map(nameKey)), claim = cmd.groups ? plan.names.ndx! : plan.names.record;
+    const mine = new Set(allNames(plan.names).map(nameKey)), claim = cmd.groups ? plan.names.ndx! : plan.names.record;
     let appeared = readdirSync(plan.outDir).filter(n => mine.has(nameKey(n)));
     if (!appeared.length) {
       try { writeFileSync(join(plan.outDir, claim), cmd.groups ? writeNdx(groups) : '', { flag: 'wx' }); break; }
@@ -151,7 +170,7 @@ export async function startRun(ctx: Ctx, req: RunRequest, roots: string[]): Prom
     if (!req.retryNames || attempt >= 5) throw new HttpError(409, appeared.join(', ') + ' appeared in ' + plan.outDir + ' while checking; nothing was started. Start again for a new name.');
     plan = await planRun(ctx, req, roots);
   }
-  const ours = new Set(Object.values(plan.names).map(nameKey));
+  const ours = new Set(allNames(plan.names).map(nameKey));
   const recordPath = join(plan.outDir, plan.names.record);
 
   const inputs: RunRecord['inputs'] = {};
@@ -168,7 +187,8 @@ export async function startRun(ctx: Ctx, req: RunRequest, roots: string[]): Prom
   const record = new Promise<RunRecord>((done, fail) => {
     const finish = async (j: Job) => {
       const outputs: Output[] = [];
-      for (const [kind, name] of [['xvg', plan.names.xvg], ['cn', plan.names.cn], ['ndx', plan.names.ndx]] as const) {
+      const files: [Output['kind'], string | undefined][] = [...(plan.names.more ?? []).map(n => ['xvg', n] as [Output['kind'], string]), ['xvg', plan.names.xvg], ['cn', plan.names.cn], ['ndx', plan.names.ndx]];
+      for (const [kind, name] of files) {
         if (!name) continue;
         const p = join(plan.outDir, name);
         if (existsSync(p)) outputs.push({ kind, path: p, size: statSync(p).size, sha256: await sha256File(p) });
@@ -181,6 +201,8 @@ export async function startRun(ctx: Ctx, req: RunRequest, roots: string[]): Prom
         inputs, groups: req.groups ?? [], atoms, sizes, options: req.options || {}, help: await toolHelp(ctx.gmx, plan.tool), form: cmd.options, template: req.template || DEFAULT_TEMPLATE,
         outDir: req.outDir ?? null, job: j, outputs, problems, stdin: plan.stdin, terms: req.terms,
         ...(plan.tool === 'energy' ? { statistics: parseEnergyStats(j.log) } : {}),
+        // gmx awh's frames are its files: how many it wrote, and the time of the last (the one for the vault).
+        ...(plan.tool === 'awh' ? { frames: awhRecordFrames(plan.stem, outputs.map(o => o.path.split('/').pop()!)) } : {}),
       });
       // The record of a command with groups is new under its stem; one without was claimed as an empty file above.
       writeFileSync(recordPath, JSON.stringify(r, null, 2) + '\n', { flag: cmd.groups ? 'wx' : 'w' });

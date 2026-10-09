@@ -4,6 +4,7 @@ import type { Draft } from '../draft'
 import { COMMANDS, commandOf, sectionsOf, withCommand } from '../lib/commands'
 import { Field, FieldHint, Label } from '../ui/label'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '../ui/select'
+import { Awh } from './Awh'
 import { Energy } from './Energy'
 import { Rdf } from './Rdf'
 
@@ -29,6 +30,7 @@ export function Analysis({ gmx, draft, setDraft, onStarted }: { gmx: AppState['g
       </Field>
       {command.tool === 'rdf' && <Rdf gmx={gmx} draft={draft} setDraft={setDraft} onStarted={onStarted} />}
       {command.tool === 'energy' && <Energy gmx={gmx} draft={draft} setDraft={setDraft} onStarted={onStarted} />}
+      {command.tool === 'awh' && <Awh gmx={gmx} draft={draft} setDraft={setDraft} onStarted={onStarted} />}
     </div>
   )
 }

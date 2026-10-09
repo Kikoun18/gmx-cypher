@@ -1,0 +1,44 @@
+                       :-) GROMACS - gmx awh, 2025.4 (-:
+
+Executable:   /opt/gromacs-2025.4/bin/gmx
+Data prefix:  /opt/gromacs-2025.4
+Working dir:  /home/user/sim/awh-water
+Command line:
+  gmx awh -f awh.edr -s topol.tpr -o awh/awh.xvg
+
+Opened awh.edr as single precision energy file
+Reading file topol.tpr, VERSION 2025.4 (single precision)
+
+Reading energy frame      0 time    0.000         
+Reading energy frame      1 time    0.200         
+Reading energy frame      2 time    0.400         
+Reading energy frame      3 time    0.600         
+Reading energy frame      4 time    0.800         
+Reading energy frame      5 time    1.000         
+Reading energy frame      6 time    1.200         
+Reading energy frame      7 time    1.400         
+Reading energy frame      8 time    1.600         
+Reading energy frame      9 time    1.800         
+Reading energy frame     10 time    2.000         
+Reading energy frame     11 time    2.200         
+Reading energy frame     12 time    2.400         
+Reading energy frame     13 time    2.600         
+Reading energy frame     14 time    2.800         
+Reading energy frame     15 time    3.000         
+Reading energy frame     16 time    3.200         
+Reading energy frame     17 time    3.400         
+Reading energy frame     18 time    3.600         
+Reading energy frame     19 time    3.800         
+Reading energy frame     20 time    4.000         
+Reading energy frame     30 time    6.000         
+Reading energy frame     40 time    8.000         
+Reading energy frame     50 time   10.000         
+Reading energy frame     60 time   12.000         
+Reading energy frame     70 time   14.000         
+Reading energy frame     80 time   16.000         
+Reading energy frame     90 time   18.000         
+Reading energy frame    100 time   20.000         
+Last energy frame read 100 time   20.000         
+
+GROMACS reminds you: "Give someone a program, you frustrate them for a day; teach them how to program, you frustrate them for a lifetime." (David Leinweber)
+

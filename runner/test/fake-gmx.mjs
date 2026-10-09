@@ -4,7 +4,7 @@
 // own arguments. FAKE_GMX_FRAMES (11), FAKE_GMX_SLOW (ms per frame) and FAKE_GMX_FAIL change its run;
 // FAKE_GMX_TOUCH=<tool>=<path> makes a file appear at that path while that tool runs (no-overwrite tests).
 
-import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 
 const FIX = new URL('./fixtures/gmx-2025.4/', import.meta.url);
@@ -130,9 +130,29 @@ function energy() {
   process.stdout.write(stats.slice(stats.indexOf('Statistics over')));
 }
 
+/**
+ * gmx awh (R5): the real files of the AWH run in test/fixtures/awh/out (frames every 2 ps, 0–20 ps), chosen with
+ * -b, -e and -skip as 2025.4 chooses them, under the -o stem. -more is not in the fixtures: the files are PMF only.
+ */
+function awh() {
+  const dir = new URL('./fixtures/awh/out/', import.meta.url);
+  const all = readdirSync(dir).flatMap(n => { const m = /^awh_t(\d+(?:\.\d+)?)\.xvg$/.exec(n); return m ? [Number(m[1])] : []; }).sort((a, b) => a - b);
+  const b = Number(one('-b') || 0), e = Number(one('-e') || 0), skip = Math.max(1, Number(one('-skip') || 0));
+  const times = all.filter(t => t >= b && (e <= 0 || t <= e)).filter((_, i) => i % skip === 0);
+  const stem = (one('-o') || 'awh.xvg').replace(/\.xvg$/, ''), log = [];
+  for (const t of times) {
+    const f = stem + '_t' + t + '.xvg';
+    backUp(f, log);
+    writeFileSync(f, readFileSync(new URL('awh_t' + t + '.xvg', dir), 'utf8'));
+  }
+  process.stderr.write(read('awh-run.stderr') + log.join(''));
+}
+
 if (argv[0] === '--version') process.stdout.write(read('version.txt'));
 else if (tool === 'rdf' && argv[1] === '-h') process.stdout.write(read('rdf-h.txt'));
 else if (tool === 'energy' && argv[1] === '-h') process.stdout.write(read('energy-h.txt'));
+else if (tool === 'awh' && argv[1] === '-h') process.stdout.write(read('awh-h.txt'));
+else if (tool === 'awh') awh();
 else if (tool === 'energy') energy();
 else if (tool === 'rdf') await rdf();
 else if (tool === 'dump') { process.stderr.write(banner('dump')); process.stdout.write(read('dump-head.txt').replace(/natoms = 3242/g, 'natoms = ' + natomsOf(one('-s')))); }

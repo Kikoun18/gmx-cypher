@@ -64,6 +64,8 @@ export interface RecordParts {
   problems: string[];
   /** The command's options, in the order its form shows them; RDF's when left out. */
   form?: { flag: string }[];
+  /** The frames a run wrote, when they are not gmx's progress (gmx awh's files, R5). */
+  frames?: RunRecord['frames'];
   stdin?: string;
   terms?: number[];
   statistics?: EnergyStats | null;
@@ -75,7 +77,7 @@ export function buildRecord(p: RecordParts): RunRecord {
     format: 'gmx-cypher run', version: 3, analysis: p.analysis, ...(p.stdin != null ? { stdin: p.stdin } : {}), ...(p.statistics !== undefined ? { statistics: p.statistics } : {}),
     runner: { name: 'gmx-cypher', version: p.runner }, gmx: p.gmx, job: p.job.id, command: p.command, env: p.env,
     started: p.job.started ?? null, ended: p.job.ended ?? null, status: p.job.status, exit: p.job.exit ?? null,
-    frames: p.job.progress.analysed ? { analysed: p.job.progress.analysed.frames, lastTime: p.job.progress.analysed.lastTime } : null, log: p.job.log, inputs: p.inputs,
+    frames: p.frames !== undefined ? p.frames : p.job.progress.analysed ? { analysed: p.job.progress.analysed.frames, lastTime: p.job.progress.analysed.lastTime } : null, log: p.job.log, inputs: p.inputs,
     groups: p.groups.map((g, index) => {
       const nrs = groupAtoms(p.atoms, g.steps);
       return { index, role: g.role, name: g.name, tone: g.tone, steps: g.steps, atoms: toRanges(nrs), count: nrs.length, gmxCount: p.sizes?.[index] ?? null };

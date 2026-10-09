@@ -25,9 +25,13 @@ const SUFFIXES = ['.xvg', '_cn.xvg', '.ndx', '.run.json'];
 
 export const outputNames = (stem: string) => ({ xvg: stem + '.xvg', cn: stem + '_cn.xvg', ndx: stem + '.ndx', record: stem + '.run.json' });
 
-/** The first of stem, `stem (2)`, `stem (3)`… whose four files are all free in a folder holding `taken` (as uniqueName: case-insensitive). */
-export function freeStem(stem: string, taken: string[]): string {
-  // Every taken name that one of a stem's four files could be, seen as that stem's .xvg; uniqueName skips those.
-  const asXvg = taken.flatMap(t => SUFFIXES.filter(s => t.toLowerCase().endsWith(s)).map(s => t.slice(0, -s.length) + '.xvg'));
+/**
+ * The first of stem, `stem (2)`, `stem (3)`… whose files are all free in a folder holding `taken` (as uniqueName:
+ * case-insensitive): the four of the first spec, and `extra` suffixes a command adds (gmx awh's `_t20.xvg`, R5).
+ */
+export function freeStem(stem: string, taken: string[], extra: string[] = []): string {
+  // Every taken name that one of a stem's files could be, seen as that stem's .xvg; uniqueName skips those.
+  const suffixes = [...SUFFIXES, ...extra.map(s => s.toLowerCase())];
+  const asXvg = taken.flatMap(t => suffixes.filter(s => t.toLowerCase().endsWith(s)).map(s => t.slice(0, -s.length) + '.xvg'));
   return uniqueName(stem + '.xvg', asXvg).slice(0, -'.xvg'.length);
 }

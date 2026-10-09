@@ -13,21 +13,7 @@ import { ENERGY_FORM, type EnergyTerm } from '../lib/energy'
 import { cn } from '../lib/utils'
 import { Code } from './Code'
 import { useTerms } from '../terms'
-
-interface EnergyPlan { cwd: string; file: string; argv: string[]; env: Record<string, string>; stdin?: string; problems: string[]; outDir: string; stem: string }
-
-/** The run as the server plans it (POST /api/plan), so the command shown is the one that runs. */
-function usePlan(body: object | null) {
-  const key = JSON.stringify(body)
-  const [p, setP] = React.useState<{ key: string; plan?: EnergyPlan; error?: string } | null>(null)
-  React.useEffect(() => {
-    if (!body) return
-    let alive = true
-    const t = setTimeout(() => postJson<EnergyPlan & { error?: string }>('/api/plan', body).then(plan => alive && setP(plan.error ? { key, error: plan.error } : { key, plan }), e => alive && setP({ key, error: (e as Error).message })), 250)
-    return () => { alive = false; clearTimeout(t) }
-  }, [key]) // eslint-disable-line react-hooks/exhaustive-deps -- body is what key says
-  return p?.key === key ? p : null
-}
+import { usePlan } from '../plan'
 
 /** The energy command's own view (R4): its terms picked by number, its first and last time, and what will run. */
 export function Energy({ gmx, draft, setDraft, onStarted }: { gmx: GmxState; draft: Draft; setDraft: React.Dispatch<React.SetStateAction<Draft>>; onStarted: (id: string) => void }) {

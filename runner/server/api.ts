@@ -1,6 +1,6 @@
 // The API: thin routes that call the pure functions in src/lib and the side effects in server/.
 
-import { COMMANDS, commandOf } from '../src/lib/commands';
+import { COMMANDS, commandOf, type OutputNames } from '../src/lib/commands';
 import { existsSync, readFileSync, realpathSync, statSync } from 'node:fs';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { basename, dirname, join } from 'node:path';
@@ -9,6 +9,7 @@ import { inputRole, suggestInputs } from '../src/lib/inputs';
 import { fromRanges } from '../src/lib/atoms';
 import { nameProblem } from '../src/lib/groups';
 import { checkInputs, checkSizes } from './check';
+import { awhScan } from './awh';
 import { energyMenu } from './energy';
 import { inside, listFolder, namesIn, saveUpload } from './files';
 import { detectGmx, toolHelp, type GmxState } from './gmx';
@@ -83,6 +84,14 @@ export function makeApi(ctx: Ctx): Api {
       if (!/\.edr$/i.test(path)) throw new HttpError(400, path + ' is not an .edr file');
       if (!ctx.gmx.ok) throw new HttpError(409, 'no working gmx');
       return { body: { terms: await energyMenu(ctx.gmx, path) } };
+    }
+    if (is(req, 'GET', url, '/api/awh/frames')) {
+      // The AWH frames of an energy file with its run input (R5), so the page can say how many files each choice writes.
+      const edr = inside(url.searchParams.get('edr') || '', roots()), tpr = inside(url.searchParams.get('tpr') || '', roots());
+      if (!/\.edr$/i.test(edr)) throw new HttpError(400, edr + ' is not an .edr file');
+      if (!/\.tpr$/i.test(tpr)) throw new HttpError(400, tpr + ' is not a .tpr file');
+      if (!ctx.gmx.ok) throw new HttpError(409, 'no working gmx');
+      return { body: await awhScan(ctx.gmx, edr, tpr) };
     }
     if (is(req, 'GET', url, '/api/ls')) {
       const path = url.searchParams.get('path');
@@ -202,10 +211,11 @@ export function makeApi(ctx: Ctx): Api {
         return { body: JSON.parse(text) };
       }
       if (req.method === 'GET' && job[2] === '/output') {
-        // A run's own .xvg files only, by kind: the chart reads them.
-        const kind = url.searchParams.get('kind') || '', names = j.meta?.names as Record<string, string> | undefined;
-        if (kind !== 'xvg' && kind !== 'cn') throw new HttpError(400, 'no output ' + kind + ': xvg or cn');
-        const path = names && join(String(j.meta!.outDir), names[kind]);
+        // A run's own .xvg files only, by kind, or one of gmx awh's frames by its name (R5): the chart reads them.
+        const kind = url.searchParams.get('kind') || '', file = url.searchParams.get('name'), names = j.meta?.names as OutputNames | undefined;
+        if (file != null && !names?.more?.includes(file) && file !== names?.xvg) throw new HttpError(404, 'this run wrote no file ' + file);
+        if (file == null && kind !== 'xvg' && kind !== 'cn') throw new HttpError(400, 'no output ' + kind + ': xvg or cn');
+        const name = file ?? names?.[kind as 'xvg' | 'cn'], path = name && join(String(j.meta!.outDir), name);
         if (!path || !existsSync(path)) throw new HttpError(404, 'this run wrote no ' + kind + ' file');
         sendFile(res, path, { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' });
         return 'handled';

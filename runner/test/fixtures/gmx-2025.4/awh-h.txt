@@ -1,0 +1,48 @@
+SYNOPSIS
+
+gmx awh [-f [<.edr>]] [-s [<.tpr>]] [-o [<.xvg>]] [-fric [<.xvg>]]
+        [-b <time>] [-e <time>] [-[no]w] [-xvg <enum>] [-skip <int>]
+        [-[no]more] [-[no]kt]
+
+DESCRIPTION
+
+gmx awh extracts AWH data from an energy file. One or two files are written
+per AWH bias per time frame. The bias index, if more than one, is appended to
+the file, as well as the time of the frame. By default only the PMF is
+printed. With -more the bias, target and coordinate distributions are also
+printed, as well as the metric sqrt(det(friction_tensor)) normalized such that
+the average is 1. Option -fric prints all components of the friction tensor to
+an additional set of files.
+
+OPTIONS
+
+Options to specify input files:
+
+ -f      [<.edr>]           (ener.edr)
+           Energy file
+ -s      [<.tpr>]           (topol.tpr)
+           Portable xdr run input file
+
+Options to specify output files:
+
+ -o      [<.xvg>]           (awh.xvg)
+           xvgr/xmgr file
+ -fric   [<.xvg>]           (friction.xvg)   (Opt.)
+           xvgr/xmgr file
+
+Other options:
+
+ -b      <time>             (0)
+           Time of first frame to read from trajectory (default unit ps)
+ -e      <time>             (0)
+           Time of last frame to read from trajectory (default unit ps)
+ -[no]w                     (no)
+           View output .xvg, .xpm, .eps and .pdb files
+ -xvg    <enum>             (xmgrace)
+           xvg plot formatting: xmgrace, xmgr, none
+ -skip   <int>              (0)
+           Skip number of frames between data points
+ -[no]more                  (no)
+           Print more output
+ -[no]kt                    (no)
+           Print free energy output in units of kT instead of kJ/mol

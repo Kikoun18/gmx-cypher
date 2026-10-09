@@ -1,7 +1,7 @@
 // One definition per GROMACS command (R3a, T98): RDF moved in unchanged; records and recipes name their command (v3, T97).
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { COMMANDS, commandOf, energyCommand, rdfCommand, sectionsOf, withCommand } from '../src/lib/commands';
+import { awhCommand, COMMANDS, commandOf, energyCommand, rdfCommand, sectionsOf, withCommand } from '../src/lib/commands';
 import { parseHelp } from '../src/lib/gmxText';
 import { FORM, rdfArgs, rdfIo, recipeProblems } from '../src/lib/rdf';
 import { outputNames } from '../src/lib/names';
@@ -13,11 +13,11 @@ import { parseGmxHeader } from '../../app/src/lib/gmxHeader';
 const read = (name: string) => JSON.parse(readFileSync(new URL('./fixtures/formats/' + name, import.meta.url), 'utf8'));
 
 describe('one definition per command (R3a)', () => {
-  it('each command is found by its tool name: rdf, and energy (R4)', () => {
-    expect(COMMANDS.map(c => c.tool)).toEqual(['rdf', 'energy']);
+  it('each command is found by its tool name: rdf, energy (R4) and awh (R5)', () => {
+    expect(COMMANDS.map(c => c.tool)).toEqual(['rdf', 'energy', 'awh']);
     expect(commandOf('rdf')).toBe(rdfCommand);
     expect(commandOf('energy')).toBe(energyCommand);
-    expect(commandOf('awh')).toBeUndefined();
+    expect(commandOf('wham')).toBeUndefined();
   });
 
   it('rdf says what it takes: four inputs, and a reference with selections', () => {
@@ -62,7 +62,7 @@ describe('the picker groups the commands by what they need (R3b)', () => {
   it('only the sections with commands are shown: rdf under its section, energy under its own', () => {
     expect(sectionsOf()).toEqual([
       { section: 'trajectory and groups', commands: [rdfCommand] },
-      { section: 'an energy file', commands: [energyCommand] },
+      { section: 'an energy file', commands: [energyCommand, awhCommand] },
     ]);
   });
 });
@@ -82,6 +82,14 @@ describe('each command keeps its own options (review finding 1)', () => {
     expect(withCommand(r, 'energy').options).toEqual({ sum: true, b: '2' });
   });
 
+  it('the name template goes with its command too: an AWH stem never names an RDF run', () => {
+    const a = { ...withCommand({ ...draft, template: '{analysis}_{trajectory}' }, 'awh'), template: 'hmrfast6_ha_WRWYCR' };
+    const r = withCommand(a, 'rdf');
+    expect(r.template).toBe('{analysis}_{trajectory}');
+    expect(withCommand(r, 'awh').template).toBe('hmrfast6_ha_WRWYCR');
+    expect(withCommand(withCommand({ ...draft, template: undefined }, 'energy'), 'rdf').template).toBeUndefined();
+  });
+
   it('picking the command that is picked changes nothing', () => {
     expect(withCommand(draft, 'rdf')).toBe(draft);
   });
@@ -99,6 +107,7 @@ describe('every output has a PMF Sequences type decision (R3a, section 3)', () =
   it.each([
     ['rdf', 'xvg', 'gmx-2025.4/rdf_nvt.xvg', 'rdf_nvt.xvg'],
     ['energy', 'xvg', 'gmx-2025.4/energy-potential.xvg', 'energy_rerun.xvg'],
+    ['awh', 'xvg', 'awh/out/awh_t20.xvg', 'awh_awh_t20.xvg'],
   ])('%s %s: PMF Sequences agrees on %s', (tool, file, fixture, name) => {
     const text = readFileSync(new URL('./fixtures/' + fixture, import.meta.url), 'utf8');
     const want = commandOf(tool)!.outputs.find(o => o.file === file)!.type;

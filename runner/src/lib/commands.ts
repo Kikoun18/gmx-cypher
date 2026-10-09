@@ -1,6 +1,7 @@
 // The GROMACS commands gmx-cypher runs (R3a, T98): one definition each. A definition says what the command takes,
 // which options it offers, what its files are called and how its argument list is built. Code is written only where
-// a command really differs. RDF is the first; energy (R4) is the second, and the rest come as their own definitions.
+// a command really differs. RDF is the first; energy (R4) and awh (R5) follow, and the rest come as their own definitions.
+import { AWH_FORM, awhArgv, awhOptionProblems } from './awh';
 import type { HelpOption } from './gmxText';
 import { ENERGY_FORM, energyArgv, energyOptionProblems, energyStdin } from './energy';
 import { outputNames } from './names';
@@ -10,7 +11,11 @@ export type InputSlot = 'trajectory' | 'runInput' | 'structure' | 'index' | 'edr
 /** A command's gmx paths by name, relative to its working directory (T29). */
 export type RunIo = Record<string, string>;
 export interface CommandOption { flag: string; group: string; label: string; unit?: string; what: string }
-export interface OutputNames { xvg: string; record: string; cn?: string; ndx?: string }
+/** A run's files: `xvg` is the one sent to the vault; `more` are further .xvg files (gmx awh's earlier frames, R5). */
+export interface OutputNames { xvg: string; record: string; cn?: string; ndx?: string; more?: string[] }
+
+/** Every file name of a run, for the checks that nothing of the stem exists yet. */
+export const allNames = (n: OutputNames) => [n.xvg, n.record, n.cn, n.ndx, ...(n.more ?? [])].filter((x): x is string => !!x);
 
 /** What a command needs, as the picker groups them (R3b). */
 export type Section = 'trajectory and groups' | 'an energy file' | 'window lists';
@@ -87,21 +92,46 @@ export const energyCommand: CommandDef = {
   stdin: energyStdin,
 };
 
-export const COMMANDS: CommandDef[] = [rdfCommand, energyCommand];
+/**
+ * gmx awh (R5): the PMF of each stored frame, from the energy file and its run input. Its files are `<stem>_t<time>.xvg`;
+ * which frames are written follows from a scan of the file (server/awh.ts), so the planner names them, not this definition.
+ */
+export const awhCommand: CommandDef = {
+  tool: 'awh',
+  title: 'AWH free-energy profiles (PMF), by time',
+  section: 'an energy file',
+  inputs: ['edr', 'runInput'],
+  required: ['edr', 'runInput'],
+  groups: false,
+  options: AWH_FORM,
+  outputNames: stem => ({ xvg: stem + '.xvg', record: stem + '.run.json' }),
+  // Typed PMF from its header (tool gmx awh, title AWH), whatever its name; the last frame goes to the vault.
+  outputs: [{ file: 'xvg', type: 'pmf', vault: true }],
+  io: (p, outDir, stem) => {
+    const edr = p.edr ?? '', cwd = edr.slice(0, edr.lastIndexOf('/')) || '/';
+    return { cwd, io: { edr: relPath(cwd, edr), tpr: relPath(cwd, p.runInput ?? ''), output: relPath(cwd, outDir + '/' + stem + '.xvg') } };
+  },
+  problems: awhOptionProblems,
+  argv: (r, io, help) => awhArgv(r, io as { edr: string; tpr: string; output: string }, help),
+};
+
+export const COMMANDS: CommandDef[] = [rdfCommand, energyCommand, awhCommand];
 export const commandOf = (tool: string) => COMMANDS.find(c => c.tool === tool);
 
-/** What a draft holds of commands: the picked one, its options, and the options of the others, kept aside. */
-export interface CommandDraft { analysis?: string; options: Options; optionsBy?: Record<string, Options> }
+/** What a draft holds of commands: the picked one, its options and name template, and the others', kept aside. */
+export interface CommandDraft { analysis?: string; options: Options; optionsBy?: Record<string, Options>; template?: string; templateBy?: Record<string, string | undefined> }
 
 /**
- * The draft with another command picked: the options of the one left are kept aside, and the new one's come back.
- * Options never cross commands: RDF's -bin is no option of gmx energy, and energy's -sum none of gmx rdf (review finding 1).
+ * The draft with another command picked: the options and template of the one left are kept aside, and the new one's
+ * come back. They never cross commands: RDF's -bin is no option of gmx energy, energy's -sum none of gmx rdf (review
+ * finding 1), and an AWH stem typed for PMF Sequences (`hmrfast6_ha_WRWYCR`) must not name an RDF run.
  */
 export function withCommand<D extends CommandDraft>(d: D, tool: string): D {
   const from = d.analysis ?? 'rdf';
   if (from === tool) return d;
   const { [tool]: options = {}, ...others } = { ...d.optionsBy, [from]: d.options };
-  return { ...d, analysis: tool, options, optionsBy: others };
+  const { [tool]: template, ...templates } = { ...d.templateBy, [from]: d.template };
+  return { ...d, analysis: tool, options, optionsBy: others, template, templateBy: templates };
 }
 
 /** The commands grouped by what they need, in the picker's order; a section without commands is left out. */

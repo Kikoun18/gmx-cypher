@@ -20,6 +20,12 @@ Nothing here is invented. Each file is what GROMACS wrote or printed.
   - `energy-menu.txt`: `gmx energy -f rerun.edr -o e.xvg` with an empty stdin: the term menu, then "No energy terms selected" (R4);
   - `energy-stats.txt`, `energy-potential.xvg`: the same with the terms `1 6` and `0` on stdin: its output and the file it wrote.
   - `energy-stats-short.txt`: the statistics block of `gmx energy -b 18 -sum` with the same terms: 3 frames, where gmx prints `--` for what it can't estimate.
+- `awh/` — a small real AWH run made here with GROMACS 2025.4 for R5 (your AWH run is still to come): 221 SPC waters
+  (`gmx solvate -cs spc216.gro -box 2 2 2`, OPLS-AA), one distance coordinate between two water oxygens with AWH
+  over 0.30–0.80 nm, 20 ps, AWH data every 2 ps. `awh.edr` and `topol.tpr` are its files; `out/` holds the 11 files
+  `gmx awh -f awh.edr -s topol.tpr -o awh/awh.xvg` wrote (`awh_t0.xvg` … `awh_t20.xvg`). The scratch folder is
+  written as `/home/user/sim/awh-water`. `gmx-2025.4/awh-h.txt`, `gmx-2023.3/awh-h.txt` and `gmx-2025.4/awh-run.stderr`
+  go with it.
 - `nvt/rerun.edr` — the energy file of `gmx mdrun -rerun nvt.xtc` on your test system (GROMACS 2025.4): 6 terms, 21 frames, 0–20 ps (R4).
 - `gmx-2023.3/` — GROMACS 2023.3 (Ubuntu): `version.txt`, `rdf-h.txt`; `energy-h.txt`, and `energy-menu.txt` and
   `energy-stats.txt` from the same two runs of `gmx energy` on `nvt/rerun.edr` (the menu is on stderr, the statistics on stdout).

@@ -12,7 +12,7 @@ import { getJson, postJson, type AppState } from '../api'
 import type { Draft, Picked } from '../draft'
 import { COMMANDS, commandOf } from '../lib/commands'
 import { inputRole, type Role, type Slot } from '../lib/inputs'
-import { useTerms } from '../terms'
+import { useAwhScan, useTerms } from '../terms'
 import { cn } from '../lib/utils'
 import { fmtBytes } from '../../../app/src/lib/structFile'
 
@@ -134,7 +134,9 @@ export function Inputs({ state, draft, setDraft, onSettings, onNext }: { state: 
   // Only the slots shown are checked: a file another command uses can't hold this one up (review finding 7).
   const checked = useInputCheck(command.groups ? Object.fromEntries(Object.entries(draft.inputs).filter(([k]) => command.inputs.includes(k as Slot))) : {})
   const energy = useTerms(command.tool === 'energy' ? draft.inputs.edr?.path : undefined)
-  const ready = command.tool === 'energy' ? !!energy?.terms : !!checked.check?.ok
+  const awh = useAwhScan(command.tool === 'awh' ? draft.inputs.edr?.path : undefined, command.tool === 'awh' ? draft.inputs.runInput?.path : undefined)
+  const frames = awh?.scan?.frames
+  const ready = command.tool === 'energy' ? !!energy?.terms : command.tool === 'awh' ? !!frames?.length : !!checked.check?.ok
   const roots = state.config.allow
   const [path, setPath] = React.useState<string | null>(() => { const t = draft.inputs.trajectory?.path; return t ? t.slice(0, t.lastIndexOf('/')) : roots[0] || null })
   const [picking, setPicking] = React.useState<Slot | null>(null)
@@ -206,6 +208,10 @@ export function Inputs({ state, draft, setDraft, onSettings, onNext }: { state: 
         <Section label="Checks" />
         {command.tool === 'energy'
           ? <p className="m-0 text-control" aria-live="polite">{draft.inputs.edr ? energy?.terms ? '✓ ' + energy.terms.length + ' terms · read by gmx energy' : energy?.error ? '✗ ' + energy.error : 'reading the terms…' : 'pick an energy file'}</p>
+          : command.tool === 'awh'
+          ? <p className="m-0 text-control" aria-live="polite">{!draft.inputs.edr || !draft.inputs.runInput ? 'pick the energy file and its run input'
+            : awh?.error ? '✗ ' + awh.error : !frames ? 'reading the AWH frames…' : !frames.length ? '✗ no AWH data in this energy file'
+            : '✓ ' + frames.length + ' AWH frames, ' + frames[0].time + '–' + frames[frames.length - 1].time + ' ps · read by gmx awh'}</p>
           : <Checks {...checked} />}
         {onNext && <Button size="lg" className="self-start" disabled={!ready || !state.gmx.ok} onClick={onNext}>use these inputs</Button>}
       </div>

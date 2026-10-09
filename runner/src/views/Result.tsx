@@ -7,9 +7,11 @@ import { DASH, LineChart, type ChartSeries } from '../ui/line-chart'
 import { Section } from '../ui/separator'
 import { getJson } from '../api'
 import { estimateOf, type Job } from '../jobs'
+import { awhTargetError } from '../lib/awh'
 import { COMMANDS } from '../lib/commands'
 import { driftLarger, type EnergyRow } from '../lib/energy'
 import { firstPeak, resultSeries } from '../lib/rdf'
+import { parseTable } from '../../../app/src/lib/seq'
 import type { RunRecord } from '../lib/record'
 import { toneText, toneVar, type Tone } from '../lib/tones'
 import { cn } from '../lib/utils'
@@ -151,6 +153,41 @@ function EnergyChart({ job, record }: { job: Job; record: RunRecord }) {
   )
 }
 
+/** At most `n` of a run's frames for one chart, evenly spaced, the last always among them. */
+function spread<T>(items: T[], n: number): T[] {
+  if (items.length <= n) return items
+  return [...new Set(Array.from({ length: n }, (_, i) => Math.round((i * (items.length - 1)) / (n - 1))))].map(i => items[i])
+}
+
+/**
+ * gmx awh's result (R5): the PMF of each frame written, on one chart, oldest to newest. Eight tones, then the same
+ * tones dashed; at most 12 curves (evenly spaced, the last always in), so a long run stays readable.
+ */
+function AwhChart({ job, record }: { job: Job; record: RunRecord }) {
+  const names = React.useMemo(() => record.outputs.filter(o => o.kind === 'xvg').map(o => o.path.split('/').pop()!), [record])
+  const shown = React.useMemo(() => spread(names, 12), [names])
+  const [texts, setTexts] = React.useState<Record<string, string>>({})
+  React.useEffect(() => {
+    let alive = true
+    for (const n of shown) fetch('/api/jobs/' + job.id + '/output?name=' + encodeURIComponent(n)).then(r => (r.ok ? r.text() : '')).then(t => alive && setTexts(x => ({ ...x, [n]: t })), () => {})
+    return () => { alive = false }
+  }, [job.id, shown])
+  if (shown.some(n => texts[n] == null)) return <p className="m-0 text-caption text-muted-foreground" aria-live="polite">reading {shown.length} PMF file{shown.length > 1 ? 's' : ''}…</p>
+  const time = (n: string) => /_t(-?\d+(?:\.\d+)?)\.xvg$/.exec(n)?.[1] ?? '?'
+  const series: ChartSeries[] = shown.map((n, i) => ({ label: 't = ' + time(n) + ' ps', points: resultSeries(texts[n])[0]?.points ?? [], tone: TONES_FOR_TERMS[i % 8], dash: Math.floor(i / 8) }))
+  const last = texts[shown[shown.length - 1]], target = awhTargetError(last), xLabel = parseTable(last).head.xLabel || 'coordinate'
+  return (
+    <div className="flex flex-col gap-3">
+      <LineChart series={series} xLabel={xLabel} yLabel="PMF (kJ/mol)" height={300} legend={series.length > 1} />
+      {names.length > shown.length && <p className="m-0 text-caption text-muted-foreground">{shown.length} of {names.length} frames drawn, evenly spaced; every file is in the folder</p>}
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3">
+        <Stat label="frames written" value={String(names.length)} hint={'t = ' + time(names[0]) + (names.length > 1 ? ' … ' + time(names[names.length - 1]) : '') + ' ps · one PMF file each'} />
+        {target && <Stat label="target error · last frame" value={target.kJ + ' kJ/mol'} hint={target.kT + ' kT · from the AWH metadata of ' + names[names.length - 1]} />}
+      </div>
+    </div>
+  )
+}
+
 /** What a run wrote, its result, its groups as gmx counted them, and "run again" (sections 10.5, 11.4). */
 export function RunResult({ job, onRunAgain, vault }: { job: Job; onRunAgain: (r: RunRecord) => void; vault: string | null }) {
   const r = useRecord(job)
@@ -165,7 +202,7 @@ export function RunResult({ job, onRunAgain, vault }: { job: Job; onRunAgain: (r
       {rec.problems.length > 0 && (
         <Alert variant="warning"><TriangleAlert /><AlertTitle>gmx-cypher's promise was broken</AlertTitle><AlertDescription>{rec.problems.map(p => <p key={p}>{p}</p>)}</AlertDescription></Alert>
       )}
-      {job.status === 'done' && (job.kind === 'energy' ? <EnergyChart job={job} record={rec} /> : <RdfChart job={job} record={rec} />)}
+      {job.status === 'done' && (job.kind === 'energy' ? <EnergyChart job={job} record={rec} /> : job.kind === 'awh' ? <AwhChart job={job} record={rec} /> : <RdfChart job={job} record={rec} />)}
       {rec.groups.length > 0 && <Section label="Groups" />}
       {rec.groups.length > 0 && <table className="text-control"><tbody>
         {rec.groups.map(g => (

@@ -94,7 +94,7 @@ Spec: [`batch-2.md`](batch-2.md). Phase 0 report: [`batch-2-phase0.md`](batch-2-
 
 ### Phase 3: Commands without atom groups (R4–R6)
 - [x] R4 `gmx energy`: terms, statistics with errors, equilibration cut (T101–T104; saved recipes and batches for energy not yet)
-- [ ] R5 `gmx awh`: time frames, PMF Sequences names, kJ/mol
+- [x] R5 `gmx awh`: time frames, PMF Sequences names, kJ/mol (T111–T114; tested on a small real AWH run made here, until yours comes)
 - [ ] R6 `gmx wham`: window lists, histogram overlap check, bootstrap errors
 
 ### Phase 4: Commands with groups (R7–R9)

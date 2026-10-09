@@ -43,4 +43,11 @@ describe('one free stem for all four files (T30)', () => {
     [['rdf_nvt.xvg', 'rdf_nvt (2).run.json'], 'rdf_nvt (3)'],
     [['#rdf_nvt.xvg.1#', 'rdf_nvt.log', 'rdf_nvt2.xvg'], 'rdf_nvt'],
   ])('%j taken → %s', (taken, want) => expect(freeStem('rdf_nvt', taken)).toBe(want));
+
+  // gmx awh writes <stem>_t<time>.xvg per frame (R5): those names are a stem's files too, given as extra suffixes.
+  it.each<[string[], string]>([
+    [['awh_run_t20.xvg'], 'awh_run (2)'],
+    [['AWH_RUN_T0.XVG', 'awh_run (2)_t8.xvg'], 'awh_run (3)'],
+    [['awh_run_t2.xvg', 'awh_run.log'], 'awh_run'],
+  ])('with the frames of an AWH run: %j taken → %s', (taken, want) => expect(freeStem('awh_run', taken, ['_t0.xvg', '_t8.xvg', '_t20.xvg'])).toBe(want));
 });

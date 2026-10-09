@@ -16,6 +16,8 @@ export interface Draft {
   analysis?: string
   /** The options of the commands not picked now, by tool, kept for when one is picked again (review finding 1). */
   optionsBy?: Record<string, Record<string, string | boolean>>
+  /** The name templates of the commands not picked now, by tool (R5). */
+  templateBy?: Record<string, string | undefined>
   /** The output name template and another output folder than <trajectory folder>/rdf, if any (R5). */
   template?: string
   outDir?: string | null
