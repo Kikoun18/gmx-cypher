@@ -53,9 +53,9 @@ Order as approved in [`phase0.md`](phase0.md) §10: R5 before R4b, and R4d after
 - [x] Final report `runner/docs/report.md`
 
 ### Backlog (not in this task)
-- Next analyses, each as a small addition: `gmx mindist`, contact numbers, H-bonds (real outputs are in `app/test/fixtures/gmx/`), RMSD, Rg.
-- Submitting jobs to the cluster queue (PBS on MetaCentrum).
-- Trajectory preparation (`trjconv -pbc mol`, centring). Not needed for RDF: `gmx rdf -rmpbc` makes molecules whole (phase0 §6).
+- Moved to Batch 2 (R7–R9): the analyses `gmx mindist`, H-bonds, RMSD and Rg. Their real outputs are in `app/test/fixtures/gmx/`.
+- Moved to Batch 2 (backlog): submitting jobs to the cluster queue (PBS on MetaCentrum).
+- Moved to Batch 2 (R9 candidate): trajectory preparation (`trjconv -pbc mol`, centring). Not needed for RDF: `gmx rdf -rmpbc` makes molecules whole (phase0 §6).
 - Trajectories that store only some atoms (`compressed-x-grps`): `-fgroup` and a matching atom-count check.
 - Selection expressions as an expert way to define a group (dynamic selections such as "water within 0.5 nm").
 - Anything PMF Sequences would need to change to make the handoff even easier. Note it here for a later PMF Sequences batch; don't change `app/`:
@@ -64,3 +64,59 @@ Order as approved in [`phase0.md`](phase0.md) §10: R5 before R4b, and R4d after
   - in the folder-pattern tester, warn when a pattern also matches unrelated paths (it read the fixture's cluster path as row `tLys+O127`, column `solutions`);
   - recognise the `gmx rdf -cn` file (`Cumulative Number RDF`) as its own analysis instead of another RDF.
 - Morpheus: code and log colours, if wanted (Q15).
+
+## Batch 2
+
+Spec: [`batch-2.md`](batch-2.md). Phase 0 report: [`batch-2-phase0.md`](batch-2-phase0.md). Branch `cypher-batch-2` from `eeb8292` (local; not pushed).
+
+**Why this order:**
+- the picking and the box are small and land on the existing RDF screen;
+- the command definitions come next, with RDF moved in unchanged, so every new command is a small addition;
+- commands without atom groups (energy, AWH, WHAM) come before those with groups (distance, H-bonds), because they test the definitions without the 3D view;
+- the cluster view is independent, needs cluster access and changes Cypher's safety guarantees, so it comes last, when my real samples are in.
+
+### Phase 0: Plan
+- [x] Baseline commit; Cypher and `app/` results recorded (`batch-2-phase0.md` §1)
+- [x] Cypher's current state described; GROMACS 2025.4 checked for the new commands; real outputs typed with PMF Sequences' `detectAna`
+- [x] Phase 0 report for R1–R10, with mockups (`img/batch-2/mock-*.png`); R9 shortlist and batches proposed
+- [ ] Questions answered (cluster, samples, product decisions, branch and footer); decisions recorded; order confirmed
+
+### Phase 1: Picking and the box (R1, R2)
+- [ ] R1-0 Frozen v1 recipe and run-record files (section 1.5)
+- [ ] R1a Atom-name lists: `,`, spaces and `and` → one set, said in words; recipe v2
+- [ ] R1b Shift+Enter: keep this rule, start the next one with the same residue name and no atom names
+- [ ] R1c The same-name click, as decided (section 8)
+- [ ] R2 PBC box: read, draw, toggle and dimensions, for `.gro` and `.pdb`, rectangular and triclinic
+
+### Phase 2: Command definitions (R3)
+- [ ] R3a The definition format; RDF moved in, with the same command, record and outputs (golden tests); run record v2
+- [ ] R3b Command picker; the inputs and groups steps only as each command needs them; options from `gmx <tool> -h`; stdin for jobs
+
+### Phase 3: Commands without atom groups (R4–R6)
+- [ ] R4 `gmx energy`: terms, statistics with errors, equilibration cut
+- [ ] R5 `gmx awh`: time frames, PMF Sequences names, kJ/mol
+- [ ] R6 `gmx wham`: window lists, histogram overlap check, bootstrap errors
+
+### Phase 4: Commands with groups (R7–R9)
+- [ ] R7 `gmx distance`: pairs or centres of mass; average, all and histogram outputs
+- [ ] R8 `gmx hbond`: the 2023+ tool and the legacy tool, whichever is installed
+- [ ] R9 The commands I chose in Phase 0, one item each
+
+### Phase 5: Cluster jobs (R10)
+- [ ] R10a Fixed-list runner (local or SSH), with timeouts
+- [ ] R10b Parsers: `qq jobs --yaml` and `gmx-eta -a`; merged by job ID
+- [ ] R10c Cluster view: states, ETA, finish time, walltime warning, refresh
+- [ ] R10d Kill (if agreed), and "analyse this job" (if agreed)
+
+### Phase 6: Finish
+- [ ] `runner/README.md` updated
+- [ ] Manual QA in Chrome with real `gmx`, `qq` and `gmx-eta`; results recorded (passed, failed or not run)
+- [ ] Fresh-context review of the whole branch against section 20 of the spec; findings fixed or recorded
+- [ ] Final report `runner/docs/batch-2-report.md`
+
+### Backlog (Batch 2: add to it, don't do it)
+- Job submission (`qq submit`), and running Cypher's analyses as cluster jobs. (Moved here from the backlog above.)
+- Morpheus: a Table and a Combobox component, and an error band for `LineChart` (built locally in this batch). Morpheus's `DropdownMenu` checkbox items are a non-searchable multi-select option.
+- PMF Sequences (read-only in this batch): `GROMACS Energies` is not matched by its `energy` keyword, so an energy file is typed only from its file name; distance and H-bond distribution histograms (titles with "Histogram") are typed as Histogram, with an umbrella axis. The backlog for a later PMF Sequences batch.
+- Trajectory preparation (`trjconv`) is an R9 candidate; it stays out unless chosen.
+
