@@ -1,0 +1,57 @@
+{
+  "format": "gmx-cypher recipe",
+  "version": 1,
+  "name": "ion pairs v1",
+  "analysis": "rdf",
+  "saved": "2026-10-09T00:00:00.000Z",
+  "options": {
+    "cn": true
+  },
+  "groups": [
+    {
+      "role": "reference",
+      "name": "sulfur",
+      "tone": "coral",
+      "steps": [
+        {
+          "op": "add",
+          "rule": {
+            "kind": "name",
+            "value": "S1"
+          }
+        }
+      ]
+    },
+    {
+      "role": "selection",
+      "name": "water_O",
+      "tone": "sky",
+      "steps": [
+        {
+          "op": "add",
+          "rule": {
+            "kind": "name",
+            "value": "OW1",
+            "resn": "SOL"
+          }
+        }
+      ]
+    },
+    {
+      "role": "selection",
+      "name": "sodium",
+      "tone": "mint",
+      "steps": [
+        {
+          "op": "add",
+          "rule": {
+            "kind": "resname",
+            "value": "Na"
+          }
+        }
+      ]
+    }
+  ],
+  "template": "{analysis}_{trajectory}",
+  "outDir": null
+}

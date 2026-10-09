@@ -1,0 +1,247 @@
+{
+  "format": "gmx-cypher run",
+  "version": 1,
+  "runner": {
+    "name": "gmx-cypher",
+    "version": "0"
+  },
+  "gmx": {
+    "path": "/tmp/claude-0/-home-user-gmx-cypher/8563e48c-2df7-5b3f-9433-f89db4bb2dc7/scratchpad/gmx2025/bin/gmx",
+    "version": "2025.4"
+  },
+  "job": "jmv1io6ea50lp",
+  "command": {
+    "cwd": "/tmp/gmxc-freeze-WbS723",
+    "file": "/tmp/claude-0/-home-user-gmx-cypher/8563e48c-2df7-5b3f-9433-f89db4bb2dc7/scratchpad/gmx2025/bin/gmx",
+    "args": [
+      "rdf",
+      "-f",
+      "nvt.xtc",
+      "-s",
+      "nvt.tpr",
+      "-n",
+      "rdf/rdf_nvt.ndx",
+      "-o",
+      "rdf/rdf_nvt.xvg",
+      "-cn",
+      "rdf/rdf_nvt_cn.xvg",
+      "-ref",
+      "group 0",
+      "-sel",
+      "group 1",
+      "group 2"
+    ]
+  },
+  "env": {
+    "GMX": "/tmp/claude-0/-home-user-gmx-cypher/8563e48c-2df7-5b3f-9433-f89db4bb2dc7/scratchpad/gmx2025/bin/gmx",
+    "GMX_MAXBACKUP": "99"
+  },
+  "started": "2026-10-09T22:08:09.833Z",
+  "ended": "2026-10-09T22:08:09.850Z",
+  "status": "done",
+  "exit": {
+    "code": 0,
+    "signal": null
+  },
+  "frames": {
+    "analysed": 21,
+    "lastTime": 20
+  },
+  "log": "                       :-) GROMACS - gmx rdf, 2025.4 (-:\n\nExecutable:   /tmp/claude-0/-home-user-gmx-cypher/8563e48c-2df7-5b3f-9433-f89db4bb2dc7/scratchpad/gmx2025/bin/gmx\nData prefix:  /tmp/claude-0/-home-user-gmx-cypher/8563e48c-2df7-5b3f-9433-f89db4bb2dc7/scratchpad/gmx2025\nWorking dir:  /tmp/gmxc-freeze-WbS723\nCommand line:\n  gmx rdf -f nvt.xtc -s nvt.tpr -n rdf/rdf_nvt.ndx -o rdf/rdf_nvt.xvg -cn rdf/rdf_nvt_cn.xvg -ref 'group 0' -sel 'group 1' 'group 2'\n\nReading file nvt.tpr, VERSION 2025.1-Homebrew (single precision)\nReading file nvt.tpr, VERSION 2025.1-Homebrew (single precision)\n\rReading frame       0 time    0.000   \rReading frame       1 time    1.000   \rReading frame       2 time    2.000   \rReading frame       3 time    3.000   \rReading frame       4 time    4.000   \rReading frame       5 time    5.000   \rReading frame       6 time    6.000   \rReading frame       7 time    7.000   \rReading frame       8 time    8.000   \rReading frame       9 time    9.000   \rReading frame      10 time   10.000   \rReading frame      11 time   11.000   \rReading frame      12 time   12.000   \rReading frame      13 time   13.000   \rReading frame      14 time   14.000   \rReading frame      15 time   15.000   \rReading frame      16 time   16.000   \rReading frame      17 time   17.000   \rReading frame      18 time   18.000   \rReading frame      19 time   19.000   \rReading frame      20 time   20.000   \rLast frame         20 time   20.000   \nAnalyzed 21 frames, last time 20.000\n\nGROMACS reminds you: \"I don't believe in astrology; I'm a Sagittarian and we're skeptical.\" (Arthur C. Clarke)\n\n",
+  "inputs": {
+    "trajectory": {
+      "path": "/tmp/gmxc-freeze-WbS723/nvt.xtc",
+      "size": 228704,
+      "mtime": "2026-10-09T22:08:09.410Z"
+    },
+    "runInput": {
+      "path": "/tmp/gmxc-freeze-WbS723/nvt.tpr",
+      "size": 86516,
+      "mtime": "2026-10-09T22:08:09.403Z",
+      "sha256": "a9f07ef7c39efe5918e7bc8105f24ec65d99afd9c464219fb1585be84b01b194"
+    },
+    "structure": {
+      "path": "/tmp/gmxc-freeze-WbS723/nvt.gro",
+      "size": 223752,
+      "mtime": "2026-10-09T22:08:09.406Z",
+      "sha256": "a308de4e0934e99c94dd63e4a85b258b7e6aae9a1da9dbaad971c2bc3a730a41"
+    }
+  },
+  "groups": [
+    {
+      "index": 0,
+      "role": "reference",
+      "name": "sulfur",
+      "tone": "coral",
+      "steps": [
+        {
+          "op": "add",
+          "rule": {
+            "kind": "name",
+            "value": "S1"
+          }
+        }
+      ],
+      "atoms": "5-30:5",
+      "count": 6,
+      "gmxCount": 6
+    },
+    {
+      "index": 1,
+      "role": "selection",
+      "name": "water_O",
+      "tone": "sky",
+      "steps": [
+        {
+          "op": "add",
+          "rule": {
+            "kind": "name",
+            "value": "OW1",
+            "resn": "SOL"
+          }
+        }
+      ],
+      "atoms": "43-3239:4",
+      "count": 800,
+      "gmxCount": 800
+    },
+    {
+      "index": 2,
+      "role": "selection",
+      "name": "sodium",
+      "tone": "mint",
+      "steps": [
+        {
+          "op": "add",
+          "rule": {
+            "kind": "resname",
+            "value": "Na"
+          }
+        }
+      ],
+      "atoms": "31-42",
+      "count": 12,
+      "gmxCount": 12
+    }
+  ],
+  "options": [
+    {
+      "flag": "b",
+      "value": "0",
+      "default": "0",
+      "isDefault": true
+    },
+    {
+      "flag": "e",
+      "value": "0",
+      "default": "0",
+      "isDefault": true
+    },
+    {
+      "flag": "dt",
+      "value": "0",
+      "default": "0",
+      "isDefault": true
+    },
+    {
+      "flag": "bin",
+      "value": "0.002",
+      "default": "0.002",
+      "isDefault": true
+    },
+    {
+      "flag": "rmax",
+      "value": "0",
+      "default": "0",
+      "isDefault": true
+    },
+    {
+      "flag": "norm",
+      "value": "rdf",
+      "default": "rdf",
+      "isDefault": true
+    },
+    {
+      "flag": "seltype",
+      "value": "atom",
+      "default": "atom",
+      "isDefault": true
+    },
+    {
+      "flag": "cut",
+      "value": "0",
+      "default": "0",
+      "isDefault": true
+    },
+    {
+      "flag": "excl",
+      "value": false,
+      "default": false,
+      "isDefault": true
+    },
+    {
+      "flag": "xy",
+      "value": false,
+      "default": false,
+      "isDefault": true
+    },
+    {
+      "flag": "pbc",
+      "value": true,
+      "default": true,
+      "isDefault": true
+    },
+    {
+      "flag": "rmpbc",
+      "value": true,
+      "default": true,
+      "isDefault": true
+    },
+    {
+      "flag": "surf",
+      "value": "no",
+      "default": "no",
+      "isDefault": true
+    },
+    {
+      "flag": "selrpos",
+      "value": "atom",
+      "default": "atom",
+      "isDefault": true
+    },
+    {
+      "flag": "cn",
+      "value": true,
+      "default": false,
+      "isDefault": false
+    }
+  ],
+  "outputs": [
+    {
+      "kind": "xvg",
+      "path": "/tmp/gmxc-freeze-WbS723/rdf/rdf_nvt.xvg",
+      "size": 32100,
+      "sha256": "861b2f012c0923465b88a3d217860403d3dd995d499b274d258ad974ace305e6"
+    },
+    {
+      "kind": "cn",
+      "path": "/tmp/gmxc-freeze-WbS723/rdf/rdf_nvt_cn.xvg",
+      "size": 26908,
+      "sha256": "3b48d65473f764f62e8c110d332ae9acd03ffa7eea93ff7b901788b595cee4b1"
+    },
+    {
+      "kind": "ndx",
+      "path": "/tmp/gmxc-freeze-WbS723/rdf/rdf_nvt.ndx",
+      "size": 4124,
+      "sha256": "59c64f9222eb3836c34591f4d02fe99b07de28653629a4b4f3fe3d1404819488"
+    }
+  ],
+  "recipe": {
+    "options": {
+      "cn": true
+    },
+    "template": "{analysis}_{trajectory}",
+    "outDir": null
+  },
+  "problems": []
+}
