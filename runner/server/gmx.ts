@@ -1,7 +1,8 @@
 // The configured gmx (T4): found on PATH or by path, checked with --version, recorded as an absolute path.
 // Every gmx call goes through capture(): an argument array, never a shell.
 
-import { spawn } from 'node:child_process';
+import { spawn, type ChildProcessByStdio } from 'node:child_process';
+import type { Readable, Writable } from 'node:stream';
 import { accessSync, constants, statSync } from 'node:fs';
 import { delimiter, isAbsolute, join, resolve } from 'node:path';
 import { parseHelp, parseVersion, type HelpOption } from '../src/lib/gmxText';
@@ -18,9 +19,10 @@ export function findOnPath(name: string, PATH = process.env.PATH || ''): string 
 export interface Captured { code: number | null; stdout: string; stderr: string }
 
 /** Runs a program without a shell and collects its output; `until` stops it once the output matches. */
-export function capture(file: string, args: string[], o: { cwd?: string; until?: RegExp; timeoutMs?: number } = {}): Promise<Captured> {
+export function capture(file: string, args: string[], o: { cwd?: string; until?: RegExp; timeoutMs?: number; stdin?: string } = {}): Promise<Captured> {
   return new Promise((done, fail) => {
-    const p = spawn(file, args, { cwd: o.cwd, shell: false, stdio: ['ignore', 'pipe', 'pipe'] });
+    const p = spawn(file, args, { cwd: o.cwd, shell: false, stdio: [o.stdin == null ? 'ignore' : 'pipe', 'pipe', 'pipe'] }) as ChildProcessByStdio<Writable | null, Readable, Readable>;
+    if (o.stdin != null) { p.stdin!.on('error', () => { /* the process ended before reading its answers */ }); p.stdin!.end(o.stdin); }
     let stdout = '', stderr = '', finished = false;
     const timer = setTimeout(() => p.kill('SIGKILL'), o.timeoutMs ?? 60_000);
     const check = () => { if (o.until && !finished && o.until.test(stdout + '\n' + stderr)) { finished = true; p.kill('SIGTERM'); } };
@@ -64,13 +66,13 @@ export async function detectGmx(configured: string | null, PATH = process.env.PA
 
 const helps = new Map<string, Promise<HelpOption[]>>();
 
-/** `gmx rdf -h` of this gmx, read once per binary and version (T22); a failed read is tried again next time. */
-export function rdfHelp(g: GmxState): Promise<HelpOption[]> {
-  const key = g.path + '\0' + g.version;
+/** `gmx <tool> -h` of this gmx, read once per binary, version and tool (T22); a failed read is tried again next time. */
+export function toolHelp(g: GmxState, tool: string): Promise<HelpOption[]> {
+  const key = g.path + '\0' + g.version + '\0' + tool;
   if (!helps.has(key)) {
-    const read = capture(g.path!, ['rdf', '-h'], { timeoutMs: 30_000 }).then(r => {
+    const read = capture(g.path!, [tool, '-h'], { timeoutMs: 30_000 }).then(r => {
       const options = parseHelp(r.stdout);
-      if (!options.length) throw new Error(g.path + ' rdf -h listed no options' + (r.code ? ' (exit ' + r.code + ')' : ''));
+      if (!options.length) throw new Error(g.path + ' ' + tool + ' -h listed no options' + (r.code ? ' (exit ' + r.code + ')' : ''));
       return options;
     });
     helps.set(key, read);
@@ -78,3 +80,6 @@ export function rdfHelp(g: GmxState): Promise<HelpOption[]> {
   }
   return helps.get(key)!;
 }
+
+/** `gmx rdf -h` (T22). */
+export const rdfHelp = (g: GmxState) => toolHelp(g, 'rdf');

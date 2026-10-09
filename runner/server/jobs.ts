@@ -8,7 +8,7 @@ import { appendFileSync, mkdirSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { gmxError, parseProgress, type Progress } from '../src/lib/progress';
 
-export interface JobSpec { kind: string; title: string; file: string; args: string[]; cwd: string; env?: Record<string, string>; meta?: Record<string, unknown> }
+export interface JobSpec { kind: string; title: string; file: string; args: string[]; cwd: string; env?: Record<string, string>; meta?: Record<string, unknown>; /** Answers the program reads from stdin (T99). */ stdin?: string }
 export type JobStatus = 'running' | 'done' | 'failed' | 'cancelled' | 'interrupted';
 export interface Job extends JobSpec {
   id: string;
@@ -95,7 +95,8 @@ export class Jobs extends EventEmitter {
     const j = fold(id, [created])!;
     this.jobs.set(id, j);
     // An argument array and no shell: names, selections and paths are data. detached: its own process group.
-    const p = spawn(spec.file, spec.args, { cwd: spec.cwd, env: { ...process.env, ...spec.env }, shell: false, detached: true, stdio: ['ignore', 'pipe', 'pipe'] });
+    const p = spawn(spec.file, spec.args, { cwd: spec.cwd, env: { ...process.env, ...spec.env }, shell: false, detached: true, stdio: [spec.stdin == null ? 'ignore' : 'pipe', 'pipe', 'pipe'] });
+    if (spec.stdin != null) { p.stdin!.on('error', () => { /* the program may end before it reads its answers */ }); p.stdin!.end(spec.stdin); }
     if (p.pid) {
       this.procs.set(id, p);
       const e: Event = { t: 'started', at: new Date().toISOString(), pid: p.pid };

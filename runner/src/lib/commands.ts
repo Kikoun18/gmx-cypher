@@ -8,11 +8,16 @@ import { outputNames } from './names';
 export type InputSlot = 'trajectory' | 'runInput' | 'structure' | 'index';
 export interface CommandOption { flag: string; group: string; label: string; unit?: string; what: string }
 
+/** What a command needs, as the picker groups them (R3b). */
+export type Section = 'trajectory and groups' | 'an energy file' | 'window lists';
+const SECTIONS: Section[] = ['trajectory and groups', 'an energy file', 'window lists'];
+
 export interface CommandDef {
   /** The gmx tool, as typed after `gmx`. */
   tool: string;
   /** One line for the picker. */
   title: string;
+  section: Section;
   /** The inputs the command asks for, in the order the inputs step shows them. */
   inputs: InputSlot[];
   /** Whether it takes atom groups (a reference and selections, picked in 3D). */
@@ -30,6 +35,7 @@ export interface CommandDef {
 export const rdfCommand: CommandDef = {
   tool: 'rdf',
   title: 'radial distribution, g(r) per selection',
+  section: 'trajectory and groups',
   inputs: ['trajectory', 'runInput', 'structure', 'index'],
   groups: true,
   options: FORM,
@@ -40,3 +46,7 @@ export const rdfCommand: CommandDef = {
 
 export const COMMANDS: CommandDef[] = [rdfCommand];
 export const commandOf = (tool: string) => COMMANDS.find(c => c.tool === tool);
+
+/** The commands grouped by what they need, in the picker's order; a section without commands is left out. */
+export const sectionsOf = (commands: CommandDef[] = COMMANDS) =>
+  SECTIONS.map(section => ({ section, commands: commands.filter(c => c.section === section) })).filter(s => s.commands.length > 0);

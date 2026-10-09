@@ -12,6 +12,8 @@ export interface Draft {
   groups: Group[]
   /** gmx rdf options set so far, by flag without its dash (R4a). */
   options: Record<string, string | boolean>
+  /** The command the analysis tab runs (its tool name); RDF when it is left out (R3b). */
+  analysis?: string
   /** The output name template and another output folder than <trajectory folder>/rdf, if any (R5). */
   template?: string
   outDir?: string | null

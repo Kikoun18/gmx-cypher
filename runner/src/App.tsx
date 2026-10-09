@@ -13,16 +13,18 @@ import { recipeFromRecord } from './lib/record'
 import { BatchView } from './views/Batch'
 import { Groups } from './views/Groups'
 import { Inputs } from './views/Inputs'
-import { Rdf } from './views/Rdf'
+import { Analysis } from './views/Analysis'
+import { commandOf } from './lib/commands'
 import { JobsView } from './views/Jobs'
 import { Settings } from './views/Settings'
 
-const TABS = ['inputs', 'groups', 'rdf', 'jobs', 'batch'] as const
+const TABS = ['inputs', 'groups', 'analysis', 'jobs', 'batch'] as const
 type Tab = (typeof TABS)[number]
 
 /** The open tab lives in the address (#jobs), so a reload keeps it. */
 function useTab(): [Tab, (t: Tab) => void] {
-  const read = (): Tab => (TABS as readonly string[]).includes(location.hash.slice(1)) ? (location.hash.slice(1) as Tab) : TABS[0]
+  // The analysis tab was the rdf tab until R3b: an old address still opens it.
+  const read = (): Tab => { const h = location.hash.slice(1) === 'rdf' ? 'analysis' : location.hash.slice(1); return (TABS as readonly string[]).includes(h) ? (h as Tab) : TABS[0] }
   const [tab, setTab] = React.useState<Tab>(read)
   React.useEffect(() => { const on = () => setTab(read()); window.addEventListener('hashchange', on); return () => window.removeEventListener('hashchange', on) }, [])
   return [tab, t => { history.replaceState(null, '', '#' + t); setTab(t) }]
@@ -68,6 +70,7 @@ export function App() {
   const [tab, setTab] = useTab()
   const jobs = useJobs()
   const [draft, setDraft] = useDraft()
+  const groupsStep = commandOf(draft.analysis ?? 'rdf')?.groups ?? true
   const [selectedJob, setSelectedJob] = React.useState<string | null>(null)
   // Closing settings returns the focus to its button, wherever the dialog was opened from.
   const settingsButton = React.useRef<HTMLButtonElement>(null)
@@ -91,8 +94,8 @@ export function App() {
       <Tabs value={tab} onValueChange={v => setTab(v as Tab)} className="flex-1 gap-0">
         <TabsList className="px-3">
           <TabsTrigger value="inputs">inputs</TabsTrigger>
-          <TabsTrigger value="groups">groups</TabsTrigger>
-          <TabsTrigger value="rdf">rdf</TabsTrigger>
+          {groupsStep && <TabsTrigger value="groups">groups</TabsTrigger>}
+          <TabsTrigger value="analysis">analysis</TabsTrigger>
           <TabsTrigger value="jobs">jobs {jobs.jobs.length > 0 && <TabsCount>{running ? running + ' running' : String(jobs.jobs.length).padStart(2, '0')}</TabsCount>}</TabsTrigger>
           <TabsTrigger value="batch">batch</TabsTrigger>
         </TabsList>
@@ -108,8 +111,8 @@ export function App() {
         )}
         <TabsContent value="inputs">{state && <Inputs state={state} draft={draft} setDraft={setDraft} onSettings={() => setSettings(true)} onNext={() => setTab('groups')} />}</TabsContent>
         <TabsContent value="groups"><Groups draft={draft} setDraft={setDraft} /></TabsContent>
-        <TabsContent value="rdf">{state && <Rdf gmx={state.gmx} draft={draft} setDraft={setDraft} onStarted={id => { setSelectedJob(id); setTab('jobs') }} />}</TabsContent>
-        <TabsContent value="jobs"><JobsView {...jobs} selected={selectedJob} onSelect={setSelectedJob} vault={state?.config.vault ?? null} onRunAgain={r => { setDraft(d => ({ ...d, ...recipeFromRecord(r) })); setTab('rdf') }} /></TabsContent>
+        <TabsContent value="analysis">{state && <Analysis gmx={state.gmx} draft={draft} setDraft={setDraft} onStarted={id => { setSelectedJob(id); setTab('jobs') }} />}</TabsContent>
+        <TabsContent value="jobs"><JobsView {...jobs} selected={selectedJob} onSelect={setSelectedJob} vault={state?.config.vault ?? null} onRunAgain={r => { setDraft(d => ({ ...d, ...recipeFromRecord(r) })); setTab('analysis') }} /></TabsContent>
         <TabsContent value="batch">{state && <BatchView state={state} draft={draft} jobs={jobs.jobs} onOpenJob={id => { setSelectedJob(id); setTab('jobs') }} />}</TabsContent>
       </main>
       </Tabs>

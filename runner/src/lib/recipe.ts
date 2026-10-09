@@ -23,10 +23,10 @@ export interface Recipe {
 }
 
 /** What a recipe carries of the draft (its inputs stay behind). */
-interface DraftLike { groups: Group[]; options: Options; template?: string; outDir?: string | null }
+interface DraftLike { groups: Group[]; options: Options; template?: string; outDir?: string | null; analysis?: string }
 
 export function recipeFromDraft(d: DraftLike, name: string, saved = new Date().toISOString()): Recipe {
-  return { format: 'gmx-cypher recipe', version: 3, name, analysis: 'rdf', saved, options: d.options, groups: d.groups, template: d.template ?? '{analysis}_{trajectory}', outDir: d.outDir ?? null };
+  return { format: 'gmx-cypher recipe', version: 3, name, analysis: d.analysis ?? 'rdf', saved, options: d.options, groups: d.groups, template: d.template ?? '{analysis}_{trajectory}', outDir: d.outDir ?? null };
 }
 
 /** The draft with the recipe's groups, options, template and folder; its inputs are kept. */

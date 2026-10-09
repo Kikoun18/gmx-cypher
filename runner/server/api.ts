@@ -1,5 +1,6 @@
 // The API: thin routes that call the pure functions in src/lib and the side effects in server/.
 
+import { commandOf } from '../src/lib/commands';
 import { existsSync, readFileSync, realpathSync, statSync } from 'node:fs';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { basename, dirname, join } from 'node:path';
@@ -9,7 +10,7 @@ import { fromRanges } from '../src/lib/atoms';
 import { nameProblem } from '../src/lib/groups';
 import { checkInputs, checkSizes } from './check';
 import { inside, listFolder, namesIn, saveUpload } from './files';
-import { detectGmx, rdfHelp, type GmxState } from './gmx';
+import { detectGmx, toolHelp, type GmxState } from './gmx';
 import { HttpError, readJson, sendFile, type Api } from './http';
 import type { Job, Jobs } from './jobs';
 import { Batches, checkRunInputs, findTrajectories, sendAll } from './batch';
@@ -65,9 +66,10 @@ export function makeApi(ctx: Ctx): Api {
     if (is(req, 'GET', url, '/api/state')) return { body: state() };
     if (is(req, 'GET', url, '/api/events')) { events(ctx.jobs, batches, res); return 'handled'; }
     if (is(req, 'GET', url, '/api/jobs')) return { body: ctx.jobs.list().map(summary) };
-    if (is(req, 'GET', url, '/api/help/rdf')) {
+    const help = /^\/api\/help\/([a-z-]+)$/.exec(url.pathname);
+    if (help && req.method === 'GET' && commandOf(help[1])) {
       if (!ctx.gmx.ok) throw new HttpError(409, 'no working gmx');
-      return { body: { gmx: ctx.gmx.path, version: ctx.gmx.version, options: await rdfHelp(ctx.gmx) } };
+      return { body: { gmx: ctx.gmx.path, version: ctx.gmx.version, options: await toolHelp(ctx.gmx, help[1]) } };
     }
     if (is(req, 'GET', url, '/api/ls')) {
       const path = url.searchParams.get('path');

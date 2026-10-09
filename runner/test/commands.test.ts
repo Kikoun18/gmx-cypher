@@ -1,7 +1,7 @@
 // One definition per GROMACS command (R3a, T98): RDF moved in unchanged; records and recipes name their command (v3, T97).
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { COMMANDS, commandOf, rdfCommand } from '../src/lib/commands';
+import { COMMANDS, commandOf, rdfCommand, sectionsOf } from '../src/lib/commands';
 import { parseHelp } from '../src/lib/gmxText';
 import { FORM, rdfArgs, rdfIo, recipeProblems } from '../src/lib/rdf';
 import { outputNames } from '../src/lib/names';
@@ -52,5 +52,11 @@ describe('records and recipes name their command (v3)', () => {
   it('a newer version is refused, saying which versions are read', () => {
     expect(recipeFileProblems({ ...read('recipe-v1.json'), version: 4 })).toEqual(['recipe version 4: this gmx-cypher reads versions 1 to 3']);
     expect(recordProblems({ ...read('run-v1.run.json'), version: 4 })).toEqual(['run record version 4: this gmx-cypher reads versions 1 to 3']);
+  });
+});
+
+describe('the picker groups the commands by what they need (R3b)', () => {
+  it('only the sections with commands are shown, rdf under its section', () => {
+    expect(sectionsOf()).toEqual([{ section: 'trajectory and groups', commands: [rdfCommand] }]);
   });
 });

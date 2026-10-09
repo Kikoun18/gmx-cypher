@@ -43,7 +43,7 @@ test('pick inputs, make groups, run, see the chart', async ({ page }) => {
     await card.getByRole('button', { name: '+ rule' }).click()
     await card.getByRole('combobox', { name: 'rule' }).click()
     await page.getByRole('option', { name: 'atom name' }).click()
-    await card.getByRole('combobox', { name: 'value' }).fill(value)
+    await card.getByRole('textbox', { name: 'atom names' }).fill(value)
     if (within) await card.getByRole('combobox', { name: 'in every residue named' }).fill(within)
     await card.getByRole('button', { name: '+ add' }).click()
   }
@@ -53,7 +53,7 @@ test('pick inputs, make groups, run, see the chart', async ({ page }) => {
   await expect(page.getByText('800 atoms')).toBeVisible()
 
   // RDF: the command is the planned one; run it.
-  await page.getByRole('tab', { name: 'rdf' }).click()
+  await page.getByRole('tab', { name: 'analysis' }).click()
   await expect(page.getByLabel('command', { exact: true })).toContainText("-o rdf/rdf_nvt.xvg -ref 'group 0' -sel 'group 1'")
   await page.getByRole('button', { name: 'run', exact: true }).click()
 
