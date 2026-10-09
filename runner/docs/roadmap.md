@@ -79,21 +79,21 @@ Spec: [`batch-2.md`](batch-2.md). Phase 0 report: [`batch-2-phase0.md`](batch-2-
 - [x] Baseline commit; Cypher and `app/` results recorded (`batch-2-phase0.md` §1)
 - [x] Cypher's current state described; GROMACS 2025.4 checked for the new commands; real outputs typed with PMF Sequences' `detectAna`
 - [x] Phase 0 report for R1–R10, with mockups (`img/batch-2/mock-*.png`); R9 shortlist and batches proposed
-- [ ] Questions answered (cluster, samples, product decisions, branch and footer); decisions recorded; order confirmed
+- [x] Questions answered: cluster (local `qq`/`gmx-eta`, watch only, 60 s), README wording, job colours; every other question by the report's recommendation (T90–T100)
 
 ### Phase 1: Picking and the box (R1, R2)
-- [ ] R1-0 Frozen v1 recipe and run-record files (section 1.5)
-- [ ] R1a Atom-name lists: `,`, spaces and `and` → one set, said in words; recipe v2
-- [ ] R1b Shift+Enter: keep this rule, start the next one with the same residue name and no atom names
-- [ ] R1c The same-name click, as decided (section 8)
-- [ ] R2 PBC box: read, draw, toggle and dimensions, for `.gro` and `.pdb`, rectangular and triclinic
+- [x] R1-0 Frozen v1 recipe and run-record files (section 1.5)
+- [x] R1a Atom-name lists: `,`, spaces and `and` → one set, said in words; recipe v2 (T92, T93)
+- [x] R1b Shift+Enter: keep this rule, start the next one with the same residue name and no atom names
+- [x] R1c The same-name click, as decided (section 8): kept as it is (T94)
+- [x] R2 PBC box: read, draw, toggle and dimensions, for `.gro` and `.pdb`, rectangular and triclinic (T95, T96)
 
 ### Phase 2: Command definitions (R3)
-- [ ] R3a The definition format; RDF moved in, with the same command, record and outputs (golden tests); run record v2
-- [ ] R3b Command picker; the inputs and groups steps only as each command needs them; options from `gmx <tool> -h`; stdin for jobs
+- [x] R3a The definition format; RDF moved in, with the same command, record and outputs (golden tests); run record v3 (T97, T98)
+- [x] R3b Command picker; the inputs and groups steps only as each command needs them; options from `gmx <tool> -h`; stdin for jobs (T99, T100)
 
 ### Phase 3: Commands without atom groups (R4–R6)
-- [ ] R4 `gmx energy`: terms, statistics with errors, equilibration cut
+- [x] R4 `gmx energy`: terms, statistics with errors, equilibration cut (T101–T104; saved recipes and batches for energy not yet)
 - [ ] R5 `gmx awh`: time frames, PMF Sequences names, kJ/mol
 - [ ] R6 `gmx wham`: window lists, histogram overlap check, bootstrap errors
 

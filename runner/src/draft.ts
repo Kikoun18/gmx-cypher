@@ -17,6 +17,8 @@ export interface Draft {
   /** The output name template and another output folder than <trajectory folder>/rdf, if any (R5). */
   template?: string
   outDir?: string | null
+  /** The energy terms picked, by number from the file's menu (R4). */
+  terms?: number[]
 }
 
 const KEY = 'gmx-cypher-draft'

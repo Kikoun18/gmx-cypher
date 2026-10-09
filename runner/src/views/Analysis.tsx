@@ -4,6 +4,7 @@ import type { Draft } from '../draft'
 import { COMMANDS, commandOf, sectionsOf } from '../lib/commands'
 import { Field, FieldHint, Label } from '../ui/label'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '../ui/select'
+import { Energy } from './Energy'
 import { Rdf } from './Rdf'
 
 /** The analysis tab (R3b, T99): the command picker, grouped by what each command needs, then that command's own view. */
@@ -27,6 +28,7 @@ export function Analysis({ gmx, draft, setDraft, onStarted }: { gmx: AppState['g
         <FieldHint>the commands gmx-cypher runs, grouped by what each needs</FieldHint>
       </Field>
       {command.tool === 'rdf' && <Rdf gmx={gmx} draft={draft} setDraft={setDraft} onStarted={onStarted} />}
+      {command.tool === 'energy' && <Energy gmx={gmx} draft={draft} setDraft={setDraft} onStarted={onStarted} />}
     </div>
   )
 }

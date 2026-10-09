@@ -1,5 +1,6 @@
 // What gmx prints on stderr while it reads a trajectory (T8), as in test/fixtures/gmx-2025.4/rdf-run.stderr:
-// "\rReading frame      12 time   12.000   " …, "\rLast frame …", "Analyzed 21 frames, last time 20.000".
+// "\rReading frame      12 time   12.000   " …, "\rLast frame …", "Analyzed 21 frames, last time 20.000";
+// and what gmx energy prints while it reads an energy file (R4), as in energy-stats.txt.
 
 export interface Progress { frame?: number; time?: number; analysed?: { frames: number; lastTime: number } }
 
@@ -7,11 +8,15 @@ export interface Progress { frame?: number; time?: number; analysed?: { frames: 
 export function parseProgress(stderr: string): Progress {
   const tail = stderr.slice(-8192), out: Progress = {};
   // A record counts once whitespace follows its time, so a line cut mid-number is never read.
-  const frames = [...tail.matchAll(/(?:Reading|Last) frame\s+(\d+)\s+time\s+(\S+)\s/g)];
+  // gmx energy (R4) prints "Reading energy frame N time T" and "Last energy frame read N time T".
+  const frames = [...tail.matchAll(/(?:Reading|Last)(?: energy)? frame(?: read)?\s+(\d+)\s+time\s+(\S+)\s/g)];
   const last = frames[frames.length - 1];
   if (last) { out.frame = Number(last[1]); out.time = Number(last[2]); }
   const done = /Analyzed (\d+) frames, last time (\S+)/.exec(tail);
   if (done) out.analysed = { frames: Number(done[1]), lastTime: Number(done[2]) };
+  // gmx energy's own summary: the frames its statistics are over, which -b and -e narrow.
+  const stats = /Statistics over \d+ steps \[\s*\S+ through\s+(\S+) ps \][^\n]*\nAll statistics are over (\d+) points/.exec(tail);
+  if (stats) out.analysed = { frames: Number(stats[2]), lastTime: Number(stats[1]) };
   return out;
 }
 

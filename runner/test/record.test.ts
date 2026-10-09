@@ -57,15 +57,15 @@ describe('the run record (T31)', () => {
   it('goes back into the form: the same inputs, groups, options, template and folder', () => {
     expect(recipeFromRecord(r)).toEqual({
       inputs: { trajectory: { path: inputs.trajectory, why: 'from rdf_nvt.run.json' }, runInput: { path: inputs.runInput, why: 'from rdf_nvt.run.json' }, structure: { path: inputs.structure, why: 'from rdf_nvt.run.json' } },
-      groups, options, template: '{analysis}_{trajectory}', outDir: '/sim/nvt/rdf',
+      groups, options, template: '{analysis}_{trajectory}', outDir: '/sim/nvt/rdf', analysis: 'rdf',
     });
   });
 
   it('run again: the same argv apart from the new names, and the same .ndx bytes', () => {
-    const again = recipeFromRecord(r), plan2 = rdfIo(inputs, again.outDir!, 'rdf_nvt (2)');
-    const argv = rdfArgs({ options: again.options, selections: again.groups.length - 1 }, plan2.io, help);
+    const again = recipeFromRecord(r), plan2 = rdfIo(inputs, again.outDir!, 'rdf_nvt (2)'), groupsAgain = again.groups!;
+    const argv = rdfArgs({ options: again.options, selections: groupsAgain.length - 1 }, plan2.io, help);
     expect(argv.map(a => a.replace('rdf_nvt (2)', 'rdf_nvt'))).toEqual(r.command.args);
     const first = writeNdx(r.groups.map(g => ({ name: g.name, atoms: fromRanges(g.atoms) })));
-    expect(writeNdx(again.groups.map(g => ({ name: g.name, atoms: groupAtoms(atoms, g.steps) })))).toBe(first);
+    expect(writeNdx(groupsAgain.map(g => ({ name: g.name, atoms: groupAtoms(atoms, g.steps) })))).toBe(first);
   });
 });

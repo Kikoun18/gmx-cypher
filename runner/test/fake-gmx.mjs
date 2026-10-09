@@ -114,8 +114,26 @@ function select() {
   process.stderr.write(banner('select') + quote);
 }
 
+/**
+ * gmx energy (R4): with no terms on stdin it prints the term menu to stderr and stops, as 2025.4 does. With terms
+ * it writes the real energy-potential.xvg (the terms 1 and 6 of rerun.edr, the only ones in the fixtures) and prints
+ * the statistics on stdout. Other terms are refused, so a test never sees invented numbers.
+ */
+function energy() {
+  const picked = readFileSync(0, 'utf8').split(/\s+/).filter(Boolean).map(Number).filter(n => n !== 0);
+  if (!picked.length || process.env.FAKE_GMX_FAIL) { process.stderr.write(read('energy-menu.txt')); process.exit(1); }
+  if (picked.length !== 2 || !picked.includes(1) || !picked.includes(6)) { process.stderr.write('fake gmx energy: only terms 1 and 6 are in the fixtures, not ' + picked.join(' ') + '\n'); process.exit(1); }
+  const o = one('-o') || 'energy.xvg';
+  backUp(o, []);
+  writeFileSync(o, read('energy-potential.xvg'));
+  const stats = read('energy-stats.txt');
+  process.stdout.write(stats.slice(stats.indexOf('Statistics over')));
+}
+
 if (argv[0] === '--version') process.stdout.write(read('version.txt'));
 else if (tool === 'rdf' && argv[1] === '-h') process.stdout.write(read('rdf-h.txt'));
+else if (tool === 'energy' && argv[1] === '-h') process.stdout.write(read('energy-h.txt'));
+else if (tool === 'energy') energy();
 else if (tool === 'rdf') await rdf();
 else if (tool === 'dump') { process.stderr.write(banner('dump')); process.stdout.write(read('dump-head.txt').replace(/natoms = 3242/g, 'natoms = ' + natomsOf(one('-s')))); }
 else if (tool === 'select') select();

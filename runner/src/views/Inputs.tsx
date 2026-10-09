@@ -10,7 +10,9 @@ import { X } from 'lucide-react'
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert'
 import { getJson, postJson, type AppState } from '../api'
 import type { Draft, Picked } from '../draft'
+import { COMMANDS, commandOf } from '../lib/commands'
 import { inputRole, type Role, type Slot } from '../lib/inputs'
+import { useTerms } from '../terms'
 import { cn } from '../lib/utils'
 import { fmtBytes } from '../../../app/src/lib/structFile'
 
@@ -22,8 +24,9 @@ const SLOTS: { slot: Slot; label: string; accepts: Role[]; optional?: boolean }[
   { slot: 'runInput', label: 'run input', accepts: ['run input'] },
   { slot: 'structure', label: 'structure', accepts: ['structure'] },
   { slot: 'index', label: 'index', accepts: ['index'], optional: true },
+  { slot: 'edr', label: 'energy file', accepts: ['energy file'] },
 ]
-const SLOT_OF: Partial<Record<Role, Slot>> = { trajectory: 'trajectory', 'run input': 'runInput', structure: 'structure', index: 'index' }
+const SLOT_OF: Partial<Record<Role, Slot>> = { trajectory: 'trajectory', 'run input': 'runInput', structure: 'structure', index: 'index', 'energy file': 'edr' }
 
 /** A folder as `root-name/rest`, relative to the allowed folder it is in. */
 const short = (dir: string, roots: string[]) => { const r = roots.find(x => dir === x || dir.startsWith(x + '/')); return r ? r.split('/').pop() + dir.slice(r.length) : dir }
@@ -126,6 +129,11 @@ function Checks({ check, busy }: ReturnType<typeof useInputCheck>) {
 
 export function Inputs({ state, draft, setDraft, onSettings, onNext }: { state: AppState; draft: Draft; setDraft: React.Dispatch<React.SetStateAction<Draft>>; onSettings: () => void; onNext?: () => void }) {
   const checked = useInputCheck(draft.inputs)
+  // The slots the analysis asks for: an energy file alone for gmx energy; the four for the rest (section 7).
+  const command = commandOf(draft.analysis ?? 'rdf') ?? COMMANDS[0]
+  const slots = SLOTS.filter(s => command.inputs.includes(s.slot))
+  const energy = useTerms(command.tool === 'energy' ? draft.inputs.edr?.path : undefined)
+  const ready = command.tool === 'energy' ? !!energy?.terms : !!checked.check?.ok
   const roots = state.config.allow
   const [path, setPath] = React.useState<string | null>(() => { const t = draft.inputs.trajectory?.path; return t ? t.slice(0, t.lastIndexOf('/')) : roots[0] || null })
   const [picking, setPicking] = React.useState<Slot | null>(null)
@@ -145,7 +153,7 @@ export function Inputs({ state, draft, setDraft, onSettings, onNext }: { state: 
   const upload = async (files: File[]) => {
     for (const f of files) {
       const role = inputRole(f.name)
-      if (!role || role === 'output') { toast.error('✗ ' + f.name + ' is not a GROMACS input (.xtc .trr .tng .tpr .gro .pdb .ndx); not uploaded'); continue }
+      if (!role || role === 'output') { toast.error('✗ ' + f.name + ' is not a GROMACS input (.xtc .trr .tng .tpr .gro .pdb .ndx .edr); not uploaded'); continue }
       try {
         const r = await fetch('/api/upload?name=' + encodeURIComponent(f.name), { method: 'POST', body: f })
         const body = await r.json()
@@ -173,7 +181,7 @@ export function Inputs({ state, draft, setDraft, onSettings, onNext }: { state: 
       </div>
       <div className="flex flex-col gap-4">
         <Section label="This run" />
-        {SLOTS.map(({ slot, label, optional }) => {
+        {slots.map(({ slot, label, optional }) => {
           const p = draft.inputs[slot]
           return (
             <div key={slot} className="flex items-start gap-3">
@@ -189,8 +197,10 @@ export function Inputs({ state, draft, setDraft, onSettings, onNext }: { state: 
           )
         })}
         <Section label="Checks" />
-        <Checks {...checked} />
-        {onNext && <Button size="lg" className="self-start" disabled={!checked.check?.ok || !state.gmx.ok} onClick={onNext}>use these inputs</Button>}
+        {command.tool === 'energy'
+          ? <p className="m-0 text-control" aria-live="polite">{draft.inputs.edr ? energy?.terms ? '✓ ' + energy.terms.length + ' terms · read by gmx energy' : energy?.error ? '✗ ' + energy.error : 'reading the terms…' : 'pick an energy file'}</p>
+          : <Checks {...checked} />}
+        {onNext && <Button size="lg" className="self-start" disabled={!ready || !state.gmx.ok} onClick={onNext}>use these inputs</Button>}
       </div>
     </div>
   )

@@ -37,8 +37,8 @@ describe('allowed folders', () => {
   it('lists GROMACS files with their role, folders first, dot-files and others only counted', () => {
     const { root } = tree();
     const l = listFolder(join(root, 'nvt'), [root]);
-    expect(l.entries.map(e => [e.name, e.role])).toEqual([['index.ndx', 'index'], ['nvt.gro', 'structure'], ['nvt.tpr', 'run input'], ['nvt.xtc', 'trajectory']]);
-    expect(l.hidden).toBe(2); // nvt.edr, .hidden.tpr; link.tpr leads out and is left out
+    expect(l.entries.map(e => [e.name, e.role])).toEqual([['index.ndx', 'index'], ['nvt.edr', 'energy file'], ['nvt.gro', 'structure'], ['nvt.tpr', 'run input'], ['nvt.xtc', 'trajectory']]);
+    expect(l.hidden).toBe(1); // .hidden.tpr; link.tpr leads out and is left out
     expect(l.parent).toBe(root);
     expect(listFolder(root, [root]).parent).toBeNull();
     expect(listFolder(root, [root]).entries.map(e => e.name)).toEqual(['nvt', 'alias.tpr']);

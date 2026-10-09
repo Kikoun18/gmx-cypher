@@ -1,6 +1,6 @@
 // The API: thin routes that call the pure functions in src/lib and the side effects in server/.
 
-import { commandOf } from '../src/lib/commands';
+import { COMMANDS, commandOf } from '../src/lib/commands';
 import { existsSync, readFileSync, realpathSync, statSync } from 'node:fs';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { basename, dirname, join } from 'node:path';
@@ -9,6 +9,7 @@ import { inputRole, suggestInputs } from '../src/lib/inputs';
 import { fromRanges } from '../src/lib/atoms';
 import { nameProblem } from '../src/lib/groups';
 import { checkInputs, checkSizes } from './check';
+import { energyMenu } from './energy';
 import { inside, listFolder, namesIn, saveUpload } from './files';
 import { detectGmx, toolHelp, type GmxState } from './gmx';
 import { HttpError, readJson, sendFile, type Api } from './http';
@@ -71,6 +72,13 @@ export function makeApi(ctx: Ctx): Api {
       if (!ctx.gmx.ok) throw new HttpError(409, 'no working gmx');
       return { body: { gmx: ctx.gmx.path, version: ctx.gmx.version, options: await toolHelp(ctx.gmx, help[1]) } };
     }
+    if (is(req, 'GET', url, '/api/energy/menu')) {
+      // The terms of an energy file, as gmx energy lists them (R4); only inside the allowed folders.
+      const path = inside(url.searchParams.get('path') || '', roots());
+      if (!/\.edr$/i.test(path)) throw new HttpError(400, path + ' is not an .edr file');
+      if (!ctx.gmx.ok) throw new HttpError(409, 'no working gmx');
+      return { body: { terms: await energyMenu(ctx.gmx, path) } };
+    }
     if (is(req, 'GET', url, '/api/ls')) {
       const path = url.searchParams.get('path');
       return { body: path ? listFolder(path, roots()) : { roots: roots() } };
@@ -117,7 +125,7 @@ export function makeApi(ctx: Ctx): Api {
     if (is(req, 'POST', url, '/api/landing')) {
       const b = await readJson<{ job: string; project: string; fields?: Fields; name?: string }>(req);
       const j = ctx.jobs.get(b.job);
-      if (!j || j.kind !== 'rdf') throw new HttpError(404, 'no rdf run ' + b.job);
+      if (!j || !COMMANDS.some(c => c.tool === j.kind)) throw new HttpError(404, 'no run ' + b.job);
       if (j.status !== 'done') throw new HttpError(409, 'only a finished run can be sent');
       if (!ctx.config.vault) throw new HttpError(409, 'no vault set');
       const names = j.meta!.names as { xvg: string }, rec = JSON.parse(readFileSync(String(j.meta!.record), 'utf8')) as RunRecord;
@@ -128,7 +136,7 @@ export function makeApi(ctx: Ctx): Api {
     if (is(req, 'POST', url, '/api/send')) {
       const b = await readJson<{ job: string; project: string; name: string }>(req);
       const j = ctx.jobs.get(b.job);
-      if (!j || j.kind !== 'rdf') throw new HttpError(404, 'no rdf run ' + b.job);
+      if (!j || !COMMANDS.some(c => c.tool === j.kind)) throw new HttpError(404, 'no run ' + b.job);
       if (j.status !== 'done') throw new HttpError(409, 'only a finished run can be sent');
       if (!ctx.config.vault) throw new HttpError(409, 'no vault set');
       const v = await openVault(ctx.config.vault), project = (await listProjects(v)).find(p => p.id === b.project);
@@ -170,7 +178,7 @@ export function makeApi(ctx: Ctx): Api {
     if (is(req, 'POST', url, '/api/upload')) {
       // GROMACS inputs only, as the page offers them (review finding 11).
       const name = url.searchParams.get('name') || 'upload', role = inputRole(name);
-      if (!role || role === 'output') throw new HttpError(400, name + ' is not a GROMACS input (.xtc .trr .tng .tpr .gro .pdb .ndx); not uploaded');
+      if (!role || role === 'output') throw new HttpError(400, name + ' is not a GROMACS input (.xtc .trr .tng .tpr .gro .pdb .ndx .edr); not uploaded');
       return { body: await saveUpload(req, ctx.home, name) };
     }
     const job = /^\/api\/jobs\/([\w-]+)(\/cancel|\/record|\/output)?$/.exec(url.pathname);

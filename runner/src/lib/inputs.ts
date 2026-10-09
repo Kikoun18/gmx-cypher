@@ -1,11 +1,11 @@
 // The four inputs of a run, and what picking a trajectory suggests for the others (T12).
 
-export type Role = 'trajectory' | 'run input' | 'structure' | 'index';
-export type Slot = 'trajectory' | 'runInput' | 'structure' | 'index';
+export type Role = 'trajectory' | 'run input' | 'structure' | 'index' | 'energy file';
+export type Slot = 'trajectory' | 'runInput' | 'structure' | 'index' | 'edr';
 
 const EXT: Record<string, Role | 'output'> = {
   '.xtc': 'trajectory', '.trr': 'trajectory', '.tng': 'trajectory', '.tpr': 'run input',
-  '.gro': 'structure', '.pdb': 'structure', '.ndx': 'index', '.xvg': 'output',
+  '.gro': 'structure', '.pdb': 'structure', '.ndx': 'index', '.edr': 'energy file', '.xvg': 'output',
 };
 
 const ext = (name: string) => { const i = name.lastIndexOf('.'); return i > 0 ? name.slice(i).toLowerCase() : ''; };

@@ -4,7 +4,7 @@ import { inputRole, suggestInputs } from '../src/lib/inputs';
 describe('what a file is', () => {
   it.each([
     ['07_md.xtc', 'trajectory'], ['run.trr', 'trajectory'], ['a.TNG', 'trajectory'], ['nvt.tpr', 'run input'],
-    ['nvt.gro', 'structure'], ['test.pdb', 'structure'], ['index.ndx', 'index'], ['rdf.xvg', 'output'], ['notes.pdf', null], ['nvt.edr', null],
+    ['nvt.gro', 'structure'], ['test.pdb', 'structure'], ['index.ndx', 'index'], ['rdf.xvg', 'output'], ['notes.pdf', null], ['nvt.edr', 'energy file'],
   ])('%s → %s', (name, role) => expect(inputRole(name)).toBe(role));
 });
 

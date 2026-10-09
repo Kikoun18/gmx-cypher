@@ -8,7 +8,7 @@ import { parseTable } from '../../../app/src/lib/seq';
 export type Options = Record<string, string | boolean>;
 export interface Recipe { options: Options; selections: number }
 /** Paths as gmx gets them, relative to its working directory (T29). */
-export interface RdfIo { trajectory: string; runInput: string; index: string; output: string; cn: string }
+export type RdfIo = { trajectory: string; runInput: string; index: string; output: string; cn: string };
 
 /**
  * Section 10.1 plus -pbc and -rmpbc, which also change g(r) (T22): each with its label, unit, and what it

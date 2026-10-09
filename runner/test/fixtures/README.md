@@ -16,7 +16,12 @@ Nothing here is invented. Each file is what GROMACS wrote or printed.
   - `dump-head.txt`: the first 250 lines of `gmx dump -s nvt.tpr`;
   - `sizes.xvg`: `gmx select -s nvt.tpr -n groups.ndx -select 'group 0' 'group 1' 'group 2' -os sizes.xvg`;
   - `select-beyond.stderr`: `gmx select` on an index group with atom 9999.
-- `gmx-2023.3/` — GROMACS 2023.3 (Ubuntu): `version.txt`, `rdf-h.txt`.
+  - `energy-h.txt`: `gmx energy -h`;
+  - `energy-menu.txt`: `gmx energy -f rerun.edr -o e.xvg` with an empty stdin: the term menu, then "No energy terms selected" (R4);
+  - `energy-stats.txt`, `energy-potential.xvg`: the same with the terms `1 6` and `0` on stdin: its output and the file it wrote.
+- `nvt/rerun.edr` — the energy file of `gmx mdrun -rerun nvt.xtc` on your test system (GROMACS 2025.4): 6 terms, 21 frames, 0–20 ps (R4).
+- `gmx-2023.3/` — GROMACS 2023.3 (Ubuntu): `version.txt`, `rdf-h.txt`; `energy-h.txt`, and `energy-menu.txt` and
+  `energy-stats.txt` from the same two runs of `gmx energy` on `nvt/rerun.edr` (the menu is on stderr, the statistics on stdout).
 
 The only edit: the scratch folder these ran in is written as `/home/user/sim/na2so4/nvt`, and the
 GROMACS install as `/opt/gromacs-2025.4`, in the header and banner lines.

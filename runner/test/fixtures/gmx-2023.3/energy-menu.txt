@@ -1,0 +1,28 @@
+          :-) GROMACS - gmx energy, 2023.3-Ubuntu_2023.3_1ubuntu3 (-:
+
+Executable:   /usr/bin/gmx
+Data prefix:  /usr
+Working dir:  /home/user/sim/na2so4/nvt
+Command line:
+  gmx energy -f rerun.edr -o e0.xvg
+
+Opened rerun.edr as single precision energy file
+
+Select the terms you want from the following list by
+selecting either (part of) the name or the number or a combination.
+End your selection with an empty line or a zero.
+-------------------------------------------------------------------
+  1  Bond             2  Angle            3  LJ-(SR)          4  Coulomb-(SR)  
+  5  Coul.-recip.     6  Potential     
+
+
+-------------------------------------------------------
+Program:     gmx energy, version 2023.3-Ubuntu_2023.3_1ubuntu3
+Source file: src/gromacs/gmxana/gmx_energy.cpp (line 299)
+
+Fatal error:
+No energy terms selected
+
+For more information and tips for troubleshooting, please check the GROMACS
+website at http://www.gromacs.org/Documentation/Errors
+-------------------------------------------------------

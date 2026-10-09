@@ -1,0 +1,46 @@
+# This file was created Fri Oct  9 21:40:02 2026
+# Created by:
+#                      :-) GROMACS - gmx energy, 2025.4 (-:
+# 
+# Executable:   /opt/gromacs-2025.4/bin/gmx
+# Data prefix:  /opt/gromacs-2025.4
+# Working dir:  /home/user/sim/na2so4/nvt
+# Command line:
+#   gmx energy -f rerun.edr -o energy-potential.xvg
+# gmx energy is part of G R O M A C S:
+#
+# GROningen Mixture of Alchemy and Childrens' Stories
+#
+@    title "GROMACS Energies"
+@    xaxis  label "Time (ps)"
+@    yaxis  label "(kJ/mol)"
+@TYPE xy
+@ view 0.15, 0.15, 0.75, 0.85
+@ legend on
+@ legend box on
+@ legend loctype view
+@ legend 0.78, 0.8
+@ legend length 2
+@ s0 legend "Bond"
+@ s1 legend "Potential"
+    0.000000   13.833964  -35098.531250
+    1.000000  235.781250  -40139.746094
+    2.000000  144.987045  -42233.910156
+    3.000000  157.231323  -43349.234375
+    4.000000   99.928406  -44084.898438
+    5.000000  157.679947  -44832.187500
+    6.000000  172.227478  -45062.832031
+    7.000000  184.715652  -45984.476562
+    8.000000  184.461929  -46004.632812
+    9.000000  274.968933  -46161.101562
+   10.000000  193.665955  -46226.242188
+   11.000000  143.537704  -45861.316406
+   12.000000  134.078705  -45886.355469
+   13.000000  139.761185  -45942.996094
+   14.000000  149.738297  -46095.636719
+   15.000000  143.659271  -46101.917969
+   16.000000  232.637848  -46629.917969
+   17.000000  235.881210  -46359.066406
+   18.000000  198.484406  -46447.152344
+   19.000000  240.774124  -46219.542969
+   20.000000  191.401398  -46288.496094

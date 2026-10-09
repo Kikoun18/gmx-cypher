@@ -7,6 +7,8 @@ import { DASH, LineChart, type ChartSeries } from '../ui/line-chart'
 import { Section } from '../ui/separator'
 import { getJson } from '../api'
 import { estimateOf, type Job } from '../jobs'
+import { COMMANDS } from '../lib/commands'
+import { driftLarger, type EnergyRow } from '../lib/energy'
 import { firstPeak, resultSeries } from '../lib/rdf'
 import type { RunRecord } from '../lib/record'
 import { toneText, toneVar, type Tone } from '../lib/tones'
@@ -15,11 +17,14 @@ import { SendDialog } from './SendDialog'
 
 const size = (n: number) => (n < 1024 ? n + ' B' : n < 1048576 ? (n / 1024).toFixed(1) + ' kB' : (n / 1048576).toFixed(1) + ' MB')
 
-/** The run record of an ended rdf job (T31): read from the server once the job has ended. */
+/** A job that is a run of one of the commands (rdf, energy…): the ones with a record and a result. */
+const isRun = (kind: string) => COMMANDS.some(c => c.tool === kind)
+
+/** The run record of an ended run (T31): read from the server once the job has ended. */
 function useRecord(job: Job) {
   const [r, setR] = React.useState<{ id: string; record?: RunRecord; error?: string } | null>(null)
   React.useEffect(() => {
-    if (job.kind !== 'rdf' || !job.ended) return
+    if (!isRun(job.kind) || !job.ended) return
     let alive = true
     // The record is written just after the job's end event; the server's answer waits for it.
     getJson<RunRecord>('/api/jobs/' + job.id + '/record').then(record => alive && setR({ id: job.id, record }), e => alive && setR({ id: job.id, error: (e as Error).message }))
@@ -109,12 +114,49 @@ function RdfChart({ job, record }: { job: Job; record: RunRecord }) {
   )
 }
 
+const fmt = (x: number) => (Number.isFinite(x) ? x.toLocaleString('en', { maximumSignificantDigits: 5 }) : '—')
+
+const TONES_FOR_TERMS: Tone[] = ['coral', 'sky', 'mint', 'butter', 'lilac', 'aqua', 'rose', 'stone']
+
+/**
+ * gmx energy's result (R4): a chart per term, since terms differ by orders of magnitude (Bond ≈ 10², Potential ≈ −10⁴
+ * kJ/mol on the test file), and a tile per term with its average, error estimate, RMSD and drift.
+ */
+function EnergyChart({ job, record }: { job: Job; record: RunRecord }) {
+  const xvg = useOutput(job.id, 'xvg')
+  const curves = React.useMemo(() => (xvg ? resultSeries(xvg) : []), [xvg])
+  const rows: EnergyRow[] = record.statistics?.rows ?? [], stats = record.statistics
+  const flagged = rows.filter(driftLarger)
+  if (!xvg) return <p className="m-0 text-caption text-muted-foreground" aria-live="polite">reading {String((job.meta?.names as { xvg: string })?.xvg)}…</p>
+  const b = Number(record.options.find(o => o.flag === 'b')?.value) || 0
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(420px,1fr))] gap-4">
+        {curves.map((c, i) => (
+          <div key={c.label} className="flex min-w-0 flex-col gap-1">
+            <span className={cn('text-label uppercase', toneText[TONES_FOR_TERMS[i % TONES_FOR_TERMS.length]])}>{c.label}</span>
+            <LineChart series={[{ label: c.label, points: c.points, tone: TONES_FOR_TERMS[i % TONES_FOR_TERMS.length] }]} xLabel="time (ps)" yLabel={rows.find(r => r.name === c.label)?.unit ?? ''} height={180} legend={false} />
+          </div>
+        ))}
+      </div>
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3">
+        {rows.map(r => (
+          <Stat key={r.name} label={r.name + ' · average'} value={fmt(r.average) + ' ' + r.unit} hint={'± ' + fmt(r.errEst) + ' Err.Est. · RMSD ' + fmt(r.rmsd) + ' · drift ' + fmt(r.drift) + (driftLarger(r) ? ' · larger than its error' : '')} />
+        ))}
+        {stats && <Stat label="frames" value={String(stats.frames)} hint={stats.t0 + '–' + stats.t1 + ' ps · ' + stats.steps + ' steps'} />}
+      </div>
+      {flagged.length > 0 && <p className="m-0 text-control text-butter-strong">{flagged.map(r => r.name).join(', ')}: the drift is larger than the error estimate, so the average is not steady within its error</p>}
+      <p className="m-0 text-caption text-muted-foreground">{b > 0 ? 'first ' + b + ' ps left out · ' : ''}{record.options.filter(o => !o.isDefault && o.flag !== 'b').map(o => '-' + o.flag + (o.value === true ? '' : ' ' + o.value)).join(' · ') || 'gmx energy defaults'}</p>
+    </div>
+  )
+}
+
 /** What a run wrote, its result, its groups as gmx counted them, and "run again" (sections 10.5, 11.4). */
 export function RunResult({ job, onRunAgain, vault }: { job: Job; onRunAgain: (r: RunRecord) => void; vault: string | null }) {
   const r = useRecord(job)
   const [sending, setSending] = React.useState(false)
   const sendButton = React.useRef<HTMLButtonElement>(null)
-  if (job.kind !== 'rdf' || !job.ended) return null
+  if (!isRun(job.kind) || !job.ended) return null
   if (!r) return <p className="m-0 text-caption text-muted-foreground" aria-live="polite">reading the run record…</p>
   if (r.error) return <p className="m-0 text-caption text-muted-foreground">no run record: {r.error}</p>
   const rec = r.record!, dir = (job.meta?.outDir as string) || ''
@@ -123,9 +165,9 @@ export function RunResult({ job, onRunAgain, vault }: { job: Job; onRunAgain: (r
       {rec.problems.length > 0 && (
         <Alert variant="warning"><TriangleAlert /><AlertTitle>gmx-cypher's promise was broken</AlertTitle><AlertDescription>{rec.problems.map(p => <p key={p}>{p}</p>)}</AlertDescription></Alert>
       )}
-      {job.status === 'done' && <RdfChart job={job} record={rec} />}
-      <Section label="Groups" />
-      <table className="text-control"><tbody>
+      {job.status === 'done' && (job.kind === 'energy' ? <EnergyChart job={job} record={rec} /> : <RdfChart job={job} record={rec} />)}
+      {rec.groups.length > 0 && <Section label="Groups" />}
+      {rec.groups.length > 0 && <table className="text-control"><tbody>
         {rec.groups.map(g => (
           <tr key={g.index}>
             <td className="py-0.5 pr-4 text-muted-foreground">group {g.index}</td>
@@ -134,7 +176,7 @@ export function RunResult({ job, onRunAgain, vault }: { job: Job; onRunAgain: (r
             <td className="text-caption text-muted-foreground">{g.gmxCount === g.count ? '✓ gmx agrees' : 'gmx: ' + g.gmxCount} · {g.atoms.length > 40 ? g.atoms.slice(0, 40) + '…' : g.atoms}</td>
           </tr>
         ))}
-      </tbody></table>
+      </tbody></table>}
       <Section label="Files"><span className="text-caption text-muted-foreground">{dir}</span></Section>
       <table className="text-control"><tbody>
         {[...rec.outputs.map(o => ({ name: o.path.split('/').pop()!, size: size(o.size), hash: 'sha256 ' + o.sha256.slice(0, 12) + '…' })), { name: String(job.meta?.record ?? '').split('/').pop()!, size: '', hash: 'this record' }].map(f => (
@@ -144,7 +186,7 @@ export function RunResult({ job, onRunAgain, vault }: { job: Job; onRunAgain: (r
       <div className="flex flex-wrap items-center gap-3">
         {job.status === 'done' && vault && <Button ref={sendButton} onClick={() => setSending(true)}>send to vault…</Button>}
         <Button variant="outline" onClick={() => onRunAgain(rec)}>run again</Button>
-        <span className="text-caption text-muted-foreground">{job.status === 'done' && !vault ? 'set a PMF Sequences vault in settings to send this result · ' : ''}run again opens this recipe in rdf; the new run gets new names</span>
+        <span className="text-caption text-muted-foreground">{job.status === 'done' && !vault ? 'set a PMF Sequences vault in settings to send this result · ' : ''}run again opens this recipe in {rec.analysis ?? 'rdf'}; the new run gets new names</span>
       </div>
       {vault && <SendDialog job={job} open={sending} onOpenChange={setSending} returnFocus={sendButton} />}
     </div>

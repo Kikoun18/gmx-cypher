@@ -17,6 +17,15 @@ describe('progress from gmx stderr', () => {
     expect(parseProgress(fixture('gmx-2025.4/check.stderr').split('\n').slice(0, 8).join('\n'))).toEqual({});
   });
 
+  it('gmx energy (R4): its energy frames as it reads them, and the frames its statistics are over (real 2025.4 output)', () => {
+    const energy = fixture('gmx-2025.4/energy-stats.txt');
+    expect(parseProgress(energy)).toEqual({ frame: 20, time: 20, analysed: { frames: 21, lastTime: 20 } });
+    expect(parseProgress(energy.slice(0, energy.indexOf('Reading energy frame      8')))).toEqual({ frame: 7, time: 7 });
+    // -b 2 (real 2023.3 output): 19 frames from 2 to 20 ps are in the statistics, though all 21 were read.
+    expect(parseProgress('Last energy frame read 20 time   20.000         \n\nStatistics over 18001 steps [ 2.0000 through 20.0000 ps ], 2 data sets\nAll statistics are over 19 points (frames)\n'))
+      .toEqual({ frame: 20, time: 20, analysed: { frames: 19, lastTime: 20 } });
+  });
+
   it("gives gmx's own error message, without the frame of the block, its wrapped lines joined", () => {
     expect(gmxError(fixture('gmx-2025.4/rdf-badgroup.stderr'))).toBe("Inconsistency in user input:\nInvalid index group reference(s)\nCannot match 'group 7', because no such index group can be found.");
     expect(gmxError(fixture('gmx-2025.4/select-beyond.stderr'))).toBe("Inconsistency in user input:\nInvalid index group references encountered\nGroup 'big' cannot be used in selections, because it contains negative atom indices and/or references atoms not present (largest allowed atom index is 3242).");
