@@ -13,6 +13,7 @@ import { join, recordPaths, vaultPaths } from '../../app/src/lib/storage/path';
 import type { ColumnRecord, PageRecord, ProjectRecord, RowRecord } from '../../app/src/lib/storage/records';
 import { readSettings } from '../../app/src/lib/storage/settings';
 import type { AnalysisType, Store } from '../../app/src/lib/types';
+import { landing, mismatch, nameFromPattern, type Fields } from '../src/lib/landing';
 
 /** Reads go to PMF Sequences' NodeBackend; every write throws. */
 export class ReadOnlyBackend implements StorageBackend {
@@ -114,5 +115,21 @@ export function projectSummary({ state, store }: { state: ProjectState; store: S
       return { id: q.id, name: q.name, seq: q.seq, group: q.group, runs, analyses };
     }),
     settings: { pattern: s.pattern ?? DEFAULT_SETTINGS.pattern, pathPattern: s.pathPattern ?? DEFAULT_SETTINGS.pathPattern, analyses: s.analyses ?? DEFAULT_ANALYSES },
+  };
+}
+
+/**
+ * The send dialog's preview (R6b): fields as the folder pattern reads them from the result's header (unless
+ * typed), the file name from the project's pattern (T34, unless typed), and where planBatch puts that name.
+ */
+export async function landingFor(v: VaultView, pid: string, xvg: { name: string; text: string; lastTime: number | null }, req: { fields?: Fields; name?: string }) {
+  const read = await readProject(v, pid), { pattern, pathPattern } = projectSummary(read).settings;
+  const first = landing(read.store, xvg.name, xvg.text);
+  const fields: Fields = req.fields ?? { name: first.row, col: first.col.label, group: first.group, run: first.run, time: xvg.lastTime == null ? '' : String(Math.round(xvg.lastTime)) };
+  const made = nameFromPattern(pattern, { ...fields, ana: 'rdf' }), name = req.name?.trim() || made.name;
+  const preview = landing(read.store, name, xvg.text);
+  return {
+    project: { id: read.state.project.id, name: read.state.project.name, dir: read.state.project.dir }, pattern, pathPattern,
+    fields, from: first.from, name, missing: req.name?.trim() ? [] : made.missing, preview, reasons: mismatch(preview, fields),
   };
 }

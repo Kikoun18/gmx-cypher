@@ -39,7 +39,7 @@ Order as approved in [`phase0.md`](phase0.md) §10: R5 before R4b, and R4d after
 
 ### Phase 4: Handoff to PMF Sequences (R6)
 - [x] R6a Read-only vault reader (projects, columns, rows, runs, patterns)
-- [ ] R6b Name templates and a landing preview made by `planBatch`
+- [x] R6b Name templates and a landing preview made by `planBatch`
 - [ ] R6c Send to the vault inbox; what to do next in PMF Sequences
 
 ### Phase 5: Batches (R7)

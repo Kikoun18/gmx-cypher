@@ -11,6 +11,7 @@ import { firstPeak, resultSeries } from '../lib/rdf'
 import type { RunRecord } from '../lib/record'
 import { toneText, toneVar, type Tone } from '../lib/tones'
 import { cn } from '../lib/utils'
+import { SendDialog } from './SendDialog'
 
 const size = (n: number) => (n < 1024 ? n + ' B' : n < 1048576 ? (n / 1024).toFixed(1) + ' kB' : (n / 1048576).toFixed(1) + ' MB')
 
@@ -111,8 +112,9 @@ function RdfChart({ job, record }: { job: Job; record: RunRecord }) {
 }
 
 /** What a run wrote, its result, its groups as gmx counted them, and "run again" (sections 10.5, 11.4). */
-export function RunResult({ job, onRunAgain }: { job: Job; onRunAgain: (r: RunRecord) => void }) {
+export function RunResult({ job, onRunAgain, vault }: { job: Job; onRunAgain: (r: RunRecord) => void; vault: string | null }) {
   const r = useRecord(job)
+  const [sending, setSending] = React.useState(false)
   if (job.kind !== 'rdf' || !job.ended) return null
   if (!r) return <p className="m-0 text-caption text-muted-foreground" aria-live="polite">reading the run record…</p>
   if (r.error) return <p className="m-0 text-caption text-muted-foreground">no run record: {r.error}</p>
@@ -140,10 +142,12 @@ export function RunResult({ job, onRunAgain }: { job: Job; onRunAgain: (r: RunRe
           <tr key={f.name}><td className="py-0.5 pr-4">{f.name}</td><td className="pr-4 text-right text-muted-foreground">{f.size}</td><td className="text-caption text-muted-foreground">{f.hash}</td></tr>
         ))}
       </tbody></table>
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
+        {job.status === 'done' && vault && <Button onClick={() => setSending(true)}>send to vault…</Button>}
         <Button variant="outline" onClick={() => onRunAgain(rec)}>run again</Button>
-        <span className="text-caption text-muted-foreground">opens this recipe in rdf; the new run gets new names</span>
+        <span className="text-caption text-muted-foreground">{job.status === 'done' && !vault ? 'set a PMF Sequences vault in settings to send this result · ' : ''}run again opens this recipe in rdf; the new run gets new names</span>
       </div>
+      {vault && <SendDialog job={job} open={sending} onOpenChange={setSending} />}
     </div>
   )
 }

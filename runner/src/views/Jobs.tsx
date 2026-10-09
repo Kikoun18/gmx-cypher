@@ -27,7 +27,7 @@ function useNow(on: boolean) {
   return now
 }
 
-function JobDetail({ job, log, onRunAgain }: { job: Job; log: string | undefined; onRunAgain: (r: RunRecord) => void }) {
+function JobDetail({ job, log, onRunAgain, vault }: { job: Job; log: string | undefined; onRunAgain: (r: RunRecord) => void; vault: string | null }) {
   const [armed, press] = useArmed()
   const logRef = React.useRef<HTMLDivElement>(null)
   React.useEffect(() => { const el = logRef.current?.querySelector('pre'); if (el) el.scrollTop = el.scrollHeight }, [log])
@@ -52,7 +52,7 @@ function JobDetail({ job, log, onRunAgain }: { job: Job; log: string | undefined
       )}
       {(running || job.progress.frame != null) && <p className="m-0 text-control" aria-live="polite">{job.status === 'failed' || job.status === 'cancelled' ? 'stopped at ' : ''}{progressText(job)}{took && ' · ' + took}</p>}
       {job.status === 'interrupted' && <p className="m-0 text-caption text-muted-foreground">{job.error}</p>}
-      <RunResult job={job} onRunAgain={onRunAgain} />
+      <RunResult job={job} onRunAgain={onRunAgain} vault={vault} />
       <Section label="Command" />
       <Code label="command" text={commandText(job)} />
       <Section label="Log"><span className="text-caption text-muted-foreground">{job.status === 'running' ? 'live · stdout and stderr' : 'stdout and stderr'}</span></Section>
@@ -62,7 +62,7 @@ function JobDetail({ job, log, onRunAgain }: { job: Job; log: string | undefined
   )
 }
 
-export function JobsView({ jobs, logs, loadLog, selected, onSelect, onRunAgain }: ReturnType<typeof useJobs> & { selected: string | null; onSelect: (id: string) => void; onRunAgain: (r: RunRecord) => void }) {
+export function JobsView({ jobs, logs, loadLog, selected, onSelect, onRunAgain, vault }: ReturnType<typeof useJobs> & { selected: string | null; onSelect: (id: string) => void; onRunAgain: (r: RunRecord) => void; vault: string | null }) {
   const job = jobs.find(j => j.id === selected) || jobs[0]
   React.useEffect(() => { if (job && !(job.id in logs)) loadLog(job.id) }, [job, logs, loadLog])
   if (!jobs.length) return <p className="m-0 text-control text-muted-foreground">no jobs yet</p>
@@ -78,7 +78,7 @@ export function JobsView({ jobs, logs, loadLog, selected, onSelect, onRunAgain }
           </button>
         ))}
       </nav>
-      {job && <JobDetail key={job.id} job={job} log={logs[job.id]} onRunAgain={onRunAgain} />}
+      {job && <JobDetail key={job.id} job={job} log={logs[job.id]} onRunAgain={onRunAgain} vault={vault} />}
     </div>
   )
 }

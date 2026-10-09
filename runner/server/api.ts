@@ -13,7 +13,9 @@ import { detectGmx, rdfHelp, type GmxState } from './gmx';
 import { HttpError, readJson, type Api } from './http';
 import type { Job, Jobs } from './jobs';
 import { planRun, startRun } from './runs';
-import { listProjects, openVault, projectSummary, readProject } from './vault';
+import { landingFor, listProjects, openVault, projectSummary, readProject } from './vault';
+import type { Fields } from '../src/lib/landing';
+import type { RunRecord } from '../src/lib/record';
 import { saveConfig, type Config } from './state';
 
 export interface Ctx { home: string; version: string; config: Config; gmx: GmxState; jobs: Jobs }
@@ -101,6 +103,17 @@ export function makeApi(ctx: Ctx): Api {
       const id = url.searchParams.get('id') || '';
       if (!(await listProjects(v)).some(p => p.id === id)) throw new HttpError(404, 'no project ' + id + ' in the vault');
       return { body: projectSummary(await readProject(v, id)) };
+    }
+    if (is(req, 'POST', url, '/api/landing')) {
+      const b = await readJson<{ job: string; project: string; fields?: Fields; name?: string }>(req);
+      const j = ctx.jobs.get(b.job);
+      if (!j || j.kind !== 'rdf') throw new HttpError(404, 'no rdf run ' + b.job);
+      if (j.status !== 'done') throw new HttpError(409, 'only a finished run can be sent');
+      if (!ctx.config.vault) throw new HttpError(409, 'no vault set');
+      const names = j.meta!.names as { xvg: string }, rec = JSON.parse(readFileSync(String(j.meta!.record), 'utf8')) as RunRecord;
+      const v = await openVault(ctx.config.vault);
+      if (!(await listProjects(v)).some(p => p.id === b.project)) throw new HttpError(404, 'no project ' + b.project + ' in the vault');
+      return { body: await landingFor(v, b.project, { name: names.xvg, text: readFileSync(join(String(j.meta!.outDir), names.xvg), 'utf8'), lastTime: rec.frames?.lastTime ?? null }, b) };
     }
     if (is(req, 'POST', url, '/api/plan')) {
       // Asked while typing (a template, a folder): a refusal is an answer, not a failed request.
