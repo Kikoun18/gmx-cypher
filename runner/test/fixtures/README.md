@@ -26,6 +26,13 @@ Nothing here is invented. Each file is what GROMACS wrote or printed.
   `gmx awh -f awh.edr -s topol.tpr -o awh/awh.xvg` wrote (`awh_t0.xvg` … `awh_t20.xvg`). The scratch folder is
   written as `/home/user/sim/awh-water`. `gmx-2025.4/awh-h.txt`, `gmx-2023.3/awh-h.txt` and `gmx-2025.4/awh-run.stderr`
   go with it.
+- `wham/` — a small real umbrella set made here with GROMACS 2025.4 for R6 (your umbrella set is still to come): the
+  same water box, 9 windows along the same distance (0.30–0.70 nm, k 2000 kJ/mol/nm², 20 ps each, 300 K), each
+  `winNN/` with `umbrella.tpr` and the `umbrella_pullx.xvg` and `umbrella_pullf.xvg` mdrun wrote. `tpr-files.dat` and
+  `pullx-files.dat` list them; `out/` holds what `gmx wham -it tpr-files.dat -ix pullx-files.dat -b 2 -temp 300
+  -nBootstrap 10 -bs-seed 1` wrote and printed (`profile.xvg`, `histo.xvg`, `bsres.xvg`, `bsprof.xvg`). `dump-head.txt`
+  is the first 250 lines of `gmx dump -s win00/umbrella.tpr`. The scratch folder is written as `/home/user/sim/wham-water`.
+  `gmx-2025.4/wham-h.txt` and `gmx-2023.3/wham-h.txt` go with it.
 - `nvt/rerun.edr` — the energy file of `gmx mdrun -rerun nvt.xtc` on your test system (GROMACS 2025.4): 6 terms, 21 frames, 0–20 ps (R4).
 - `gmx-2023.3/` — GROMACS 2023.3 (Ubuntu): `version.txt`, `rdf-h.txt`; `energy-h.txt`, and `energy-menu.txt` and
   `energy-stats.txt` from the same two runs of `gmx energy` on `nvt/rerun.edr` (the menu is on stderr, the statistics on stdout).

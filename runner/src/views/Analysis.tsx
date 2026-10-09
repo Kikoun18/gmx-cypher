@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrig
 import { Awh } from './Awh'
 import { Energy } from './Energy'
 import { Rdf } from './Rdf'
+import { Wham } from './Wham'
 
 /** The analysis tab (R3b, T99): the command picker, grouped by what each command needs, then that command's own view. */
 export function Analysis({ gmx, draft, setDraft, onStarted }: { gmx: AppState['gmx']; draft: Draft; setDraft: React.Dispatch<React.SetStateAction<Draft>>; onStarted: (id: string) => void }) {
@@ -31,6 +32,7 @@ export function Analysis({ gmx, draft, setDraft, onStarted }: { gmx: AppState['g
       {command.tool === 'rdf' && <Rdf gmx={gmx} draft={draft} setDraft={setDraft} onStarted={onStarted} />}
       {command.tool === 'energy' && <Energy gmx={gmx} draft={draft} setDraft={setDraft} onStarted={onStarted} />}
       {command.tool === 'awh' && <Awh gmx={gmx} draft={draft} setDraft={setDraft} onStarted={onStarted} />}
+      {command.tool === 'wham' && <Wham gmx={gmx} draft={draft} setDraft={setDraft} onStarted={onStarted} />}
     </div>
   )
 }

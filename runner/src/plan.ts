@@ -5,6 +5,8 @@ import { postJson } from './api'
 
 export interface PlanView {
   cwd: string; file: string; argv: string[]; env: Record<string, string>; stdin?: string; problems: string[]; outDir: string; stem: string
+  /** What gmx-cypher filled in or found, in words (gmx wham's temperature from the run inputs, R6). */
+  notes: string[]
   names: { xvg: string; record: string; more?: string[] }
 }
 

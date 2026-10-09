@@ -2,6 +2,7 @@
 // which options it offers, what its files are called and how its argument list is built. Code is written only where
 // a command really differs. RDF is the first; energy (R4) and awh (R5) follow, and the rest come as their own definitions.
 import { AWH_FORM, awhArgv, awhOptionProblems } from './awh';
+import { WHAM_FORM, whamArgv, whamOptionProblems, whamOutputNames, type WhamIo } from './wham';
 import type { HelpOption } from './gmxText';
 import { ENERGY_FORM, energyArgv, energyOptionProblems, energyStdin } from './energy';
 import { outputNames } from './names';
@@ -41,13 +42,13 @@ export interface CommandDef {
    * Each file a run writes: the PMF Sequences type it lands as (section 3), or null with the reason it has none,
    * and whether "send to vault" sends it. Checked against PMF Sequences' own detectAna on real output (tests).
    */
-  outputs: { file: 'xvg' | 'cn'; type: string | null; vault: boolean; why?: string }[];
+  outputs: { file: 'xvg' | 'cn' | 'profile'; type: string | null; vault: boolean; why?: string }[];
   /** The paths gmx is given and the directory it runs in, for the outputs in `outDir`. */
   io(paths: Partial<Record<InputSlot, string>>, outDir: string, stem: string): { cwd: string; io: RunIo };
   /** What gmx would refuse, in words, before anything runs. */
   problems(options: Options, help: HelpOption[]): string[];
   /** The argument list, as gmx is given it. */
-  argv(request: { options: Options; selections: number }, io: RunIo, help: HelpOption[]): string[];
+  argv(request: { options: Options; selections: number; pull?: 'pullx' | 'pullf' }, io: RunIo, help: HelpOption[]): string[];
   /** The answers gmx reads on stdin, for a command that asks questions (T99): from the terms picked by number. */
   stdin?(terms: number[]): string;
 }
@@ -115,7 +116,32 @@ export const awhCommand: CommandDef = {
   argv: (r, io, help) => awhArgv(r, io as { edr: string; tpr: string; output: string }, help),
 };
 
-export const COMMANDS: CommandDef[] = [rdfCommand, energyCommand, awhCommand];
+/**
+ * gmx wham (R6): umbrella windows from lists gmx-cypher writes (a run input and a pull file per window, found with a
+ * folder template). No input slots: the windows are its inputs, and the folder that holds them all names the run.
+ */
+export const whamCommand: CommandDef = {
+  tool: 'wham',
+  title: 'umbrella windows: the profile, its histograms and their overlap',
+  section: 'window lists',
+  inputs: [],
+  required: [],
+  groups: false,
+  options: WHAM_FORM,
+  outputNames: stem => whamOutputNames(stem, false),
+  outputs: [
+    { file: 'xvg', type: 'hist', vault: true, why: 'the histograms, typed Histogram by their title; sent by default (question 28)' },
+    { file: 'profile', type: null, vault: false, why: 'PMF Sequences reads it as a Histogram (its title "Umbrella potential" has its keyword), and as a PMF it would get the AWH correction (+2kT ln r, tail at 0): not sent until you decide (question 28)' },
+  ],
+  io: (_p, outDir, stem) => {
+    const cwd = outDir.slice(0, outDir.lastIndexOf('/')) || '/', out = (f: string) => relPath(cwd, outDir + '/' + stem + f);
+    return { cwd, io: { tpr: out('_tpr-files.dat'), pull: out('_pull-files.dat'), profile: out('_profile.xvg'), hist: out('_histo.xvg'), bsres: out('_bsres.xvg'), bsprof: out('_bsprof.xvg') } };
+  },
+  problems: whamOptionProblems,
+  argv: (r, io, help) => whamArgv({ options: r.options, pull: r.pull ?? 'pullx' }, io as WhamIo, help),
+};
+
+export const COMMANDS: CommandDef[] = [rdfCommand, energyCommand, awhCommand, whamCommand];
 export const commandOf = (tool: string) => COMMANDS.find(c => c.tool === tool);
 
 /** What a draft holds of commands: the picked one, its options and name template, and the others', kept aside. */

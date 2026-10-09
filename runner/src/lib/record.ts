@@ -11,7 +11,8 @@ import type { EnergyStats } from './energy';
 import { FORM, isDefault, type Options } from './rdf';
 
 export interface FileInfo { path: string; size: number; mtime: string; sha256?: string }
-export interface Output { kind: 'xvg' | 'cn' | 'ndx'; path: string; size: number; sha256: string }
+/** A file a run wrote: an .xvg, RDF's cumulative number and index, or gmx wham's window lists (R6). */
+export interface Output { kind: 'xvg' | 'cn' | 'ndx' | 'list'; path: string; size: number; sha256: string }
 type Status = 'running' | 'done' | 'failed' | 'cancelled' | 'interrupted';
 
 export interface RunRecord {
@@ -38,10 +39,12 @@ export interface RunRecord {
   stdin?: string;
   /** gmx energy's statistics block, read from its output (version 3, R4); null when gmx printed none. */
   statistics?: EnergyStats | null;
+  /** gmx wham's windows (version 3, R6): each window's run input and pull file, hashed, in the order of the lists. */
+  windows?: { tpr: FileInfo; pull: FileInfo }[];
   /** Every option of the form this gmx has, with its value and whether that is the installed default. */
   options: { flag: string; value: string | boolean | null; default: string | boolean | null; isDefault: boolean }[];
   outputs: Output[];
-  recipe: { options: Options; template: string; outDir: string | null; terms?: number[] };
+  recipe: { options: Options; template: string; outDir: string | null; terms?: number[]; windows?: { tpr: string; pull: string }[]; pull?: 'pullx' | 'pullf' };
   problems: string[];
 }
 
@@ -69,12 +72,15 @@ export interface RecordParts {
   stdin?: string;
   terms?: number[];
   statistics?: EnergyStats | null;
+  windows?: { tpr: FileInfo; pull: FileInfo }[];
+  pull?: 'pullx' | 'pullf';
 }
 
 export function buildRecord(p: RecordParts): RunRecord {
   const by = new Map(p.help.map(o => [o.flag, o.flag === 'cn' ? { ...o, type: 'bool', default: false } : o]));
   return {
     format: 'gmx-cypher run', version: 3, analysis: p.analysis, ...(p.stdin != null ? { stdin: p.stdin } : {}), ...(p.statistics !== undefined ? { statistics: p.statistics } : {}),
+    ...(p.windows ? { windows: p.windows } : {}),
     runner: { name: 'gmx-cypher', version: p.runner }, gmx: p.gmx, job: p.job.id, command: p.command, env: p.env,
     started: p.job.started ?? null, ended: p.job.ended ?? null, status: p.job.status, exit: p.job.exit ?? null,
     frames: p.frames !== undefined ? p.frames : p.job.progress.analysed ? { analysed: p.job.progress.analysed.frames, lastTime: p.job.progress.analysed.lastTime } : null, log: p.job.log, inputs: p.inputs,
@@ -86,7 +92,9 @@ export function buildRecord(p: RecordParts): RunRecord {
       const o = by.get(flag)!, v = p.options[flag], set = v !== undefined && v !== '';
       return { flag, value: set ? v : o.default, default: o.default, isDefault: isDefault(o, v) };
     }),
-    outputs: p.outputs, recipe: { options: p.options, template: p.template, outDir: p.outDir, ...(p.terms ? { terms: p.terms } : {}) }, problems: p.problems,
+    outputs: p.outputs,
+    recipe: { options: p.options, template: p.template, outDir: p.outDir, ...(p.terms ? { terms: p.terms } : {}), ...(p.windows ? { windows: p.windows.map(w => ({ tpr: w.tpr.path, pull: w.pull.path })), pull: p.pull ?? 'pullx' } : {}) },
+    problems: p.problems,
   };
 }
 
@@ -119,5 +127,6 @@ export function recipeFromRecord(r: RunRecord) {
     // A command without groups (gmx energy) keeps the draft's groups: it has none of its own to bring back.
     ...(r.groups.length ? { groups: r.groups.map(({ role, name, tone, steps }) => ({ role, name, tone, steps })) } : {}),
     options: r.recipe.options, template: r.recipe.template, outDir: r.recipe.outDir, analysis: r.analysis ?? 'rdf', terms: r.recipe.terms,
+    ...(r.recipe.windows ? { wham: { pull: r.recipe.pull ?? 'pullx', windows: r.recipe.windows } } : {}),
   };
 }

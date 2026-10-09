@@ -95,7 +95,7 @@ Spec: [`batch-2.md`](batch-2.md). Phase 0 report: [`batch-2-phase0.md`](batch-2-
 ### Phase 3: Commands without atom groups (R4–R6)
 - [x] R4 `gmx energy`: terms, statistics with errors, equilibration cut (T101–T104; saved recipes and batches for energy not yet)
 - [x] R5 `gmx awh`: time frames, PMF Sequences names, kJ/mol (T111–T114; tested on a small real AWH run made here, until yours comes)
-- [ ] R6 `gmx wham`: window lists, histogram overlap check, bootstrap errors
+- [x] R6 `gmx wham`: window lists, histogram overlap check, bootstrap errors (T115–T118; tested on a small real umbrella set made here, until yours comes)
 
 ### Phase 4: Commands with groups (R7–R9)
 - [ ] R7 `gmx distance`: pairs or centres of mass; average, all and histogram outputs
@@ -117,6 +117,6 @@ Spec: [`batch-2.md`](batch-2.md). Phase 0 report: [`batch-2-phase0.md`](batch-2-
 ### Backlog (Batch 2: add to it, don't do it)
 - Job submission (`qq submit`), and running Cypher's analyses as cluster jobs. (Moved here from the backlog above.)
 - Morpheus: a Table and a Combobox component, and an error band for `LineChart` (built locally in this batch). Morpheus's `DropdownMenu` checkbox items are a non-searchable multi-select option.
-- PMF Sequences (read-only in this batch): `GROMACS Energies` is not matched by its `energy` keyword, so an energy file is typed only from its file name; distance and H-bond distribution histograms (titles with "Histogram") are typed as Histogram, with an umbrella axis. The backlog for a later PMF Sequences batch.
+- PMF Sequences (read-only in this batch): `GROMACS Energies` is not matched by its `energy` keyword, so an energy file is typed only from its file name; distance and H-bond distribution histograms (titles with "Histogram") are typed as Histogram, with an umbrella axis; a gmx wham profile ("Umbrella potential") is typed as Histogram too, by its keyword "umbrella" (T118). The backlog for a later PMF Sequences batch.
 - Trajectory preparation (`trjconv`) is an R9 candidate; it stays out unless chosen.
 

@@ -16,8 +16,8 @@ describe('gmx --version', () => {
 });
 
 describe('gmx dump -s and gmx check -f', () => {
-  it('reads the atom count and the output schedule of the run input (your nvt.tpr)', () => {
-    expect(parseDump(fixture('gmx-2025.4/dump-head.txt'))).toEqual({ natoms: 3242, tinit: 0, dt: 0.001, nsteps: 20000, initStep: 0, nstxout: 0, nstxoutCompressed: 1000 });
+  it('reads the atom count, the output schedule and the temperatures (R6) of the run input (your nvt.tpr)', () => {
+    expect(parseDump(fixture('gmx-2025.4/dump-head.txt'))).toEqual({ natoms: 3242, tinit: 0, dt: 0.001, nsteps: 20000, initStep: 0, nstxout: 0, nstxoutCompressed: 1000, refT: [360, 360] });
     expect(parseDump('nothing here')).toEqual({});
   });
   it('estimates the frames a trajectory of that run holds', () => {

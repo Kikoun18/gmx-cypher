@@ -136,7 +136,8 @@ export function Inputs({ state, draft, setDraft, onSettings, onNext }: { state: 
   const energy = useTerms(command.tool === 'energy' ? draft.inputs.edr?.path : undefined)
   const awh = useAwhScan(command.tool === 'awh' ? draft.inputs.edr?.path : undefined, command.tool === 'awh' ? draft.inputs.runInput?.path : undefined)
   const frames = awh?.scan?.frames
-  const ready = command.tool === 'energy' ? !!energy?.terms : command.tool === 'awh' ? !!frames?.length : !!checked.check?.ok
+  // gmx wham takes no input slots: its windows are found in the analysis tab (R6).
+  const ready = command.tool === 'energy' ? !!energy?.terms : command.tool === 'awh' ? !!frames?.length : command.tool === 'wham' ? true : !!checked.check?.ok
   const roots = state.config.allow
   const [path, setPath] = React.useState<string | null>(() => { const t = draft.inputs.trajectory?.path; return t ? t.slice(0, t.lastIndexOf('/')) : roots[0] || null })
   const [picking, setPicking] = React.useState<Slot | null>(null)
@@ -208,6 +209,8 @@ export function Inputs({ state, draft, setDraft, onSettings, onNext }: { state: 
         <Section label="Checks" />
         {command.tool === 'energy'
           ? <p className="m-0 text-control" aria-live="polite">{draft.inputs.edr ? energy?.terms ? '✓ ' + energy.terms.length + ' terms · read by gmx energy' : energy?.error ? '✗ ' + energy.error : 'reading the terms…' : 'pick an energy file'}</p>
+          : command.tool === 'wham'
+          ? <p className="m-0 text-control text-muted-foreground">gmx wham reads umbrella windows, not these inputs: find them in the analysis tab</p>
           : command.tool === 'awh'
           ? <p className="m-0 text-control" aria-live="polite">{!draft.inputs.edr || !draft.inputs.runInput ? 'pick the energy file and its run input'
             : awh?.error ? '✗ ' + awh.error : !frames ? 'reading the AWH frames…' : !frames.length ? '✗ no AWH data in this energy file'

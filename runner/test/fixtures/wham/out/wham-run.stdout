@@ -1,0 +1,112 @@
+Found 9 tpr and 9 pull position files in tpr-files.dat and pullx-files.dat, respectively
+Reading 9 tpr and pullx/pullf files
+Automatic determination of boundaries...
+
+File win00/umbrella.tpr, 1 coordinates, with these options:
+	Geometry distance   k = 2000      position = 0.3       dimensions [Y Y Y] (3 dimensions). Used: Yes
+	Pull group coordinates of 0 groups expected in pullx files.
+	Reference value of the coordinate not expected in pullx files.
+	Use option -v to see this output for all input tpr files
+
+
+Reading pull position file win00/umbrella_pullx.xvg, expecting 2 columns:
+	Column for time: 1
+	Column(s) with data for pull coordinate 1 are
+		reaction coordinate:             2
+		center-of-mass of groups:        No
+		reference position column:       No
+	Found 201 times in win00/umbrella_pullx.xvg
+
+Determined boundaries to 0.256053 and 0.795983
+
+Wrote out/histo.xvg
+Getting initial potential by integration.
+Initialized rapid wham stuff (contrib tolerance 1.11111e-07)
+Evaluating only 1182 of 1800 expressions.
+
+	   1) Maximum change 8.627344e-02
+	 100) Maximum change 1.554707e-06
+Switched to exact iteration in iteration 108
+Converged in 109 iterations. Final maximum change 8.93072e-07
+Wrote out/profile.xvg
+  *******************************************
+  ******** Start bootstrap nr 1 ************
+  *******************************************
+	   1) Maximum change 2.133764e-02
+	 100) Maximum change 6.272307e-05
+	Converged in 194 iterations. Final maximum change 9.18599e-07
+  *******************************************
+  ******** Start bootstrap nr 2 ************
+  *******************************************
+	   1) Maximum change 1.306744e-01
+	 100) Maximum change 2.223135e-04
+	 200) Maximum change 2.365546e-06
+	Converged in 220 iterations. Final maximum change 9.54594e-07
+  *******************************************
+  ******** Start bootstrap nr 3 ************
+  *******************************************
+	   1) Maximum change 1.682504e-01
+	Converged in 95 iterations. Final maximum change 8.99074e-07
+  *******************************************
+  ******** Start bootstrap nr 4 ************
+  *******************************************
+	   1) Maximum change 1.519116e-01
+	 100) Maximum change 1.922233e-04
+	 200) Maximum change 1.112484e-06
+	Converged in 204 iterations. Final maximum change 8.98018e-07
+  *******************************************
+  ******** Start bootstrap nr 5 ************
+  *******************************************
+	   1) Maximum change 2.295085e-01
+	 100) Maximum change 4.149472e-05
+	Converged in 157 iterations. Final maximum change 8.89396e-07
+  *******************************************
+  ******** Start bootstrap nr 6 ************
+  *******************************************
+	   1) Maximum change 1.172939e-01
+	 100) Maximum change 1.136504e-03
+	 200) Maximum change 3.647795e-04
+	 300) Maximum change 1.170158e-04
+	 400) Maximum change 3.752973e-05
+	 500) Maximum change 1.203593e-05
+	 600) Maximum change 3.859889e-06
+	 700) Maximum change 1.237848e-06
+	Converged in 720 iterations. Final maximum change 9.81118e-07
+  *******************************************
+  ******** Start bootstrap nr 7 ************
+  *******************************************
+	   1) Maximum change 1.005494e-01
+	 100) Maximum change 7.915615e-04
+	 200) Maximum change 3.681541e-05
+	 300) Maximum change 1.713256e-06
+	Converged in 319 iterations. Final maximum change 9.58212e-07
+  *******************************************
+  ******** Start bootstrap nr 8 ************
+  *******************************************
+	   1) Maximum change 2.803649e-01
+	 100) Maximum change 2.073684e-05
+	Converged in 140 iterations. Final maximum change 8.45167e-07
+  *******************************************
+  ******** Start bootstrap nr 9 ************
+  *******************************************
+	   1) Maximum change 8.622908e-02
+	Converged in 98 iterations. Final maximum change 8.29645e-07
+  *******************************************
+  ******** Start bootstrap nr 10 ************
+  *******************************************
+	   1) Maximum change 1.248270e-01
+	 100) Maximum change 1.428789e-04
+	 200) Maximum change 1.881082e-06
+	Converged in 216 iterations. Final maximum change 9.43138e-07
+Wrote boot strap result to out/bsres.xvg
+
+In case you use results from gmx wham for a publication, please cite:
+
+++++ PLEASE READ AND CITE THE FOLLOWING REFERENCE ++++
+J. S. Hub, B. L. de Groot, D. van der Spoel
+g_wham - A free weighted histogram analysis implementation including robust
+error and autocorrelation estimates
+J. Chem. Theory Comput. (2010)
+DOI: 10.1021/ct100494z
+-------- -------- --- Thank You --- -------- --------
+

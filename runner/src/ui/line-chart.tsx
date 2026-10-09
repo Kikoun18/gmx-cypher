@@ -19,6 +19,8 @@ export interface ChartSeries {
   marker?: "max" | "min"
   /** Write the marked point's x or y next to the dot. */
   markerLabel?: "x" | "y"
+  /** ± per point, drawn as a band in the curve's tone (gmx-cypher's addition for WHAM's bootstrap error, R6; a Morpheus candidate). */
+  errors?: number[]
 }
 
 export interface LineChartProps extends Omit<React.ComponentProps<"figure">, "children"> {
@@ -76,7 +78,7 @@ function LineChart({
 }: LineChartProps) {
   const [ref, width] = useWidth(560)
   const m = { l: 44, r: 16, t: yLabel ? 22 : 10, b: xLabel ? 40 : 26 }
-  const all = series.flatMap((s) => s.points)
+  const all = series.flatMap((s) => s.errors ? s.points.flatMap((p, j): [number, number][] => [[p[0], p[1] - (s.errors![j] || 0)], [p[0], p[1] + (s.errors![j] || 0)]]) : s.points)
   const xs = all.map((p) => p[0]),
     ys = all.map((p) => p[1])
   const x0 = xDomain?.[0] ?? Math.min(...xs),
@@ -139,8 +141,13 @@ function LineChart({
             let mk: [number, number] | null = null
             if (s.marker && s.points.length)
               mk = s.points.reduce((a, p) => ((s.marker === "max" ? p[1] > a[1] : p[1] < a[1]) ? p : a))
+            const band = s.errors && s.points.length
+              ? s.points.map((p, j) => (j ? "L" : "M") + sx(p[0]).toFixed(1) + "," + sy(p[1] + (s.errors![j] || 0)).toFixed(1)).join("")
+                + [...s.points].reverse().map((p, j) => "L" + sx(p[0]).toFixed(1) + "," + sy(p[1] - (s.errors![s.points.length - 1 - j] || 0)).toFixed(1)).join("") + "Z"
+              : null
             return (
               <g key={i} opacity={OPACITY[s.state ?? "on"]}>
+                {band && <path d={band} fill={c} fillOpacity={0.18} stroke="none" />}
                 <path d={d} fill="none" stroke={c} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round"
                   strokeDasharray={DASH[(s.dash ?? 0) % DASH.length]} />
                 {mk && (

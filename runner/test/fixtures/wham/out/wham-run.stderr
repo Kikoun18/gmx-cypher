@@ -1,0 +1,59 @@
+                       :-) GROMACS - gmx wham, 2025.4 (-:
+
+Executable:   /opt/gromacs-2025.4/bin/gmx
+Data prefix:  /opt/gromacs-2025.4
+Working dir:  /home/user/sim/wham-water
+Command line:
+  gmx wham -it tpr-files.dat -ix pullx-files.dat -o out/profile.xvg -hist out/histo.xvg -b 2 -temp 300 -nBootstrap 10 -bs-seed 1 -bsres out/bsres.xvg -bsprof out/bsprof.xvg
+
+Reading file win00/umbrella.tpr, VERSION 2025.4 (single precision)
+Reading file win01/umbrella.tpr, VERSION 2025.4 (single precision)
+Reading file win02/umbrella.tpr, VERSION 2025.4 (single precision)
+Reading file win03/umbrella.tpr, VERSION 2025.4 (single precision)
+Reading file win04/umbrella.tpr, VERSION 2025.4 (single precision)
+Reading file win05/umbrella.tpr, VERSION 2025.4 (single precision)
+Reading file win06/umbrella.tpr, VERSION 2025.4 (single precision)
+Reading file win07/umbrella.tpr, VERSION 2025.4 (single precision)
+Reading file win08/umbrella.tpr, VERSION 2025.4 (single precision)
+Reading file win00/umbrella.tpr, VERSION 2025.4 (single precision)
+Reading file win01/umbrella.tpr, VERSION 2025.4 (single precision)
+Reading file win02/umbrella.tpr, VERSION 2025.4 (single precision)
+Reading file win03/umbrella.tpr, VERSION 2025.4 (single precision)
+Reading file win04/umbrella.tpr, VERSION 2025.4 (single precision)
+Reading file win05/umbrella.tpr, VERSION 2025.4 (single precision)
+Reading file win06/umbrella.tpr, VERSION 2025.4 (single precision)
+Reading file win07/umbrella.tpr, VERSION 2025.4 (single precision)
+Reading file win08/umbrella.tpr, VERSION 2025.4 (single precision)
+
+WARNING, no data point in bin 1 (z=0.260102) !
+You may not get a reasonable profile. Check your histograms!
+
+WARNING, no data point in bin 177 (z=0.735241) !
+You may not get a reasonable profile. Check your histograms!
+
+WARNING, no data point in bin 188 (z=0.764937) !
+You may not get a reasonable profile. Check your histograms!
+
+WARNING, no data point in bin 191 (z=0.773036) !
+You may not get a reasonable profile. Check your histograms!
+
+WARNING, no data point in bin 192 (z=0.775736) !
+You may not get a reasonable profile. Check your histograms!
+
+WARNING, no data point in bin 193 (z=0.778435) !
+You may not get a reasonable profile. Check your histograms!
+
+WARNING, no data point in bin 194 (z=0.781135) !
+You may not get a reasonable profile. Check your histograms!
+
+WARNING, no data point in bin 196 (z=0.786534) !
+You may not get a reasonable profile. Check your histograms!
+
+WARNING, no data point in bin 198 (z=0.791933) !
+You may not get a reasonable profile. Check your histograms!
+
+WARNING, no data point in bin 199 (z=0.794633) !
+You may not get a reasonable profile. Check your histograms!
+
+GROMACS reminds you: "Move about like a Scientist, lay down, get kissed" (Red Hot Chili Peppars)
+

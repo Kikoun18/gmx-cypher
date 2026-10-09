@@ -23,6 +23,8 @@ export interface Draft {
   outDir?: string | null
   /** The energy terms picked, by number from the file's menu (R4). */
   terms?: number[]
+  /** gmx wham's windows (R6): where they were found, how, and each window's run input and pull file. */
+  wham?: { root?: string; glob?: string; pull: 'pullx' | 'pullf'; windows: { tpr: string; pull: string }[] }
 }
 
 const KEY = 'gmx-cypher-draft'

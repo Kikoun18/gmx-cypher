@@ -8,6 +8,7 @@ import { Section } from '../ui/separator'
 import { getJson } from '../api'
 import { estimateOf, type Job } from '../jobs'
 import { awhTargetError } from '../lib/awh'
+import { neighbourOverlaps, overlapNotes, parseBootstrap, parseHistograms } from '../lib/wham'
 import { COMMANDS } from '../lib/commands'
 import { driftLarger, type EnergyRow } from '../lib/energy'
 import { firstPeak, resultSeries } from '../lib/rdf'
@@ -188,6 +189,60 @@ function AwhChart({ job, record }: { job: Job; record: RunRecord }) {
   )
 }
 
+/** One of a run's own files, by name (GET /api/jobs/:id/output?name=); null until read, '' when there is none. */
+function useNamed(id: string, name: string | null) {
+  const [t, setT] = React.useState<{ key: string; text: string } | null>(null)
+  const key = id + '\0' + name
+  React.useEffect(() => {
+    if (!name) return
+    let alive = true
+    fetch('/api/jobs/' + id + '/output?name=' + encodeURIComponent(name)).then(r => (r.ok ? r.text() : '')).then(text => alive && setT({ key, text }), () => {})
+    return () => { alive = false }
+  }, [id, name, key])
+  return !name ? '' : t?.key === key ? t.text : null
+}
+
+/**
+ * gmx wham's result (R6): the profile with its bootstrap band, the histograms of the windows, and the overlap of each
+ * pair of neighbours (sorted by where each histogram peaks), as numbers: gaps are named, no other verdict (question 29).
+ */
+function WhamChart({ job, record }: { job: Job; record: RunRecord }) {
+  const file = (end: string) => record.outputs.map(o => o.path.split('/').pop()!).find(n => n.endsWith(end)) ?? null
+  const histo = useOutput(job.id, 'xvg'), profile = useNamed(job.id, file('_profile.xvg')), bsres = useNamed(job.id, file('_bsres.xvg'))
+  const labels = (record.windows ?? []).map(w => w.tpr.path.split('/').slice(-2, -1)[0] || w.tpr.path.split('/').pop()!)
+  const label = (n: number) => n + (labels[n - 1] ? ' (' + labels[n - 1] + ')' : '')
+  const h = React.useMemo(() => (histo ? parseHistograms(histo) : null), [histo])
+  const ov = React.useMemo(() => (h ? neighbourOverlaps(h) : null), [h])
+  if (histo == null || profile == null || bsres == null) return <p className="m-0 text-caption text-muted-foreground" aria-live="polite">reading the profile and the histograms…</p>
+  const prof = resultSeries(profile)[0]?.points ?? [], bs = parseBootstrap(bsres)
+  // The band is the bootstrap's standard deviation at each point of the profile (the same bins).
+  const errors = bs.length === prof.length ? bs.map(b => b[2]) : undefined
+  const hist: ChartSeries[] = h!.windows.map((c, j) => ({ label: 'window ' + label(j + 1), points: h!.x.map((x, i) => [x, c[i]] as [number, number]), tone: TONES_FOR_TERMS[j % 8], dash: Math.floor(j / 8) }))
+  return (
+    <div className="flex flex-col gap-3">
+      <LineChart series={[{ label: 'profile', points: prof, tone: 'coral', ...(errors ? { errors } : {}) }]} xLabel="ξ (nm)" yLabel="E (kJ/mol)" height={260} legend={false} />
+      <p className="m-0 text-caption text-muted-foreground">{errors ? 'the band: ± one standard deviation over ' + (record.options.find(o => o.flag === 'nBootstrap')?.value ?? '') + ' bootstraps' : 'no error estimate: run with bootstraps for one'} · the profile is not sent to the vault until you decide (question 28)</p>
+      <Section label={'Histograms · ' + h!.windows.length + ' windows'} />
+      <LineChart series={hist} xLabel="ξ (nm)" yLabel="count" height={220} legend={false} zeroLine={false} />
+      <Section label="Overlap of neighbouring windows" />
+      <table className="text-control" aria-label="overlap of neighbouring windows">
+        <thead><tr className="text-left text-label uppercase text-muted-foreground"><th className="py-1 pr-4 font-normal">windows</th><th className="pr-4 font-normal">peaks at</th><th className="font-normal">overlap</th></tr></thead>
+        <tbody>
+          {ov!.pairs.map(p => (
+            <tr key={p.a + '-' + p.b} className="border-t border-border">
+              <td className="py-0.5 pr-4">{label(p.a)} – {label(p.b)}</td>
+              <td className="pr-4 text-muted-foreground">{ov!.peaks[p.a - 1].toFixed(3)} – {ov!.peaks[p.b - 1].toFixed(3)} nm</td>
+              <td className={cn('font-bold', p.overlap === 0 && 'text-destructive')}>{p.overlap.toFixed(3)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {overlapNotes(ov!.pairs).map(n => <p key={n} className={cn('m-0 text-control', n.includes('do not overlap') ? 'text-destructive' : 'text-muted-foreground')}>{n}</p>)}
+      <p className="m-0 text-caption text-muted-foreground">overlap: the share two neighbours' normalised histograms have in common, 0 to 1 · no threshold is applied until you choose one (question 29)</p>
+    </div>
+  )
+}
+
 /** What a run wrote, its result, its groups as gmx counted them, and "run again" (sections 10.5, 11.4). */
 export function RunResult({ job, onRunAgain, vault }: { job: Job; onRunAgain: (r: RunRecord) => void; vault: string | null }) {
   const r = useRecord(job)
@@ -202,7 +257,7 @@ export function RunResult({ job, onRunAgain, vault }: { job: Job; onRunAgain: (r
       {rec.problems.length > 0 && (
         <Alert variant="warning"><TriangleAlert /><AlertTitle>gmx-cypher's promise was broken</AlertTitle><AlertDescription>{rec.problems.map(p => <p key={p}>{p}</p>)}</AlertDescription></Alert>
       )}
-      {job.status === 'done' && (job.kind === 'energy' ? <EnergyChart job={job} record={rec} /> : job.kind === 'awh' ? <AwhChart job={job} record={rec} /> : <RdfChart job={job} record={rec} />)}
+      {job.status === 'done' && (job.kind === 'energy' ? <EnergyChart job={job} record={rec} /> : job.kind === 'awh' ? <AwhChart job={job} record={rec} /> : job.kind === 'wham' ? <WhamChart job={job} record={rec} /> : <RdfChart job={job} record={rec} />)}
       {rec.groups.length > 0 && <Section label="Groups" />}
       {rec.groups.length > 0 && <table className="text-control"><tbody>
         {rec.groups.map(g => (

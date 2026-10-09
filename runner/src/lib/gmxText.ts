@@ -8,9 +8,15 @@ export function parseVersion(text: string): string | null {
   return banner ? banner[1] : null;
 }
 
-export interface Dump { natoms?: number; tinit?: number; dt?: number; nsteps?: number; initStep?: number; nstxout?: number; nstxoutCompressed?: number }
+export interface Dump { natoms?: number; tinit?: number; dt?: number; nsteps?: number; initStep?: number; nstxout?: number; nstxoutCompressed?: number; refT?: number[] }
 
-const DUMP_KEYS: Record<string, keyof Dump> = { natoms: 'natoms', tinit: 'tinit', dt: 'dt', nsteps: 'nsteps', 'init-step': 'initStep', nstxout: 'nstxout', 'nstxout-compressed': 'nstxoutCompressed' };
+/** The temperatures `gmx dump -s` gives for the run input's coupling groups (`ref-t:  300`), one per group (R6). */
+export function parseRefT(dump: string): number[] {
+  const m = /^\s*ref-t:\s+(.+)$/m.exec(dump);
+  return m ? m[1].trim().split(/\s+/).map(Number).filter(Number.isFinite) : [];
+}
+
+const DUMP_KEYS: Record<string, Exclude<keyof Dump, 'refT'>> = { natoms: 'natoms', tinit: 'tinit', dt: 'dt', nsteps: 'nsteps', 'init-step': 'initStep', nstxout: 'nstxout', 'nstxout-compressed': 'nstxoutCompressed' };
 
 /** The first value of each key in `gmx dump -s` (the run parameters, then `natoms = N`). */
 export function parseDump(text: string): Dump {
@@ -19,6 +25,8 @@ export function parseDump(text: string): Dump {
     const k = DUMP_KEYS[m[1]];
     if (k && out[k] === undefined) out[k] = Number(m[2]);
   }
+  const refT = parseRefT(text);
+  if (refT.length) out.refT = refT;
   return out;
 }
 

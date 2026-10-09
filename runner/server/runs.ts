@@ -8,6 +8,7 @@ import { basename, dirname, join } from 'node:path';
 import { atomTable, type Atom } from '../src/lib/atoms';
 import { allNames, COMMANDS, commandOf, type InputSlot, type OutputNames, type RunIo } from '../src/lib/commands';
 import { awhFrames, awhNames, framesWritten, type AwhFrame } from '../src/lib/awh';
+import { commonFolder, listFile, WHAM_SUFFIXES, whamOutputNames } from '../src/lib/wham';
 import { energyProblems, parseEnergyStats } from '../src/lib/energy';
 import { groupAtoms, nameProblem, type Group } from '../src/lib/groups';
 import type { Slot } from '../src/lib/inputs';
@@ -37,8 +38,22 @@ export interface RunRequest {
   names?: Record<string, string>;
   /** A batch run whose names were taken meanwhile takes the next free stem instead of stopping (review finding 5). */
   retryNames?: boolean;
+  /** gmx wham's windows (R6): each window's run input and pull file, in the order of the lists. */
+  windows?: { tpr: string; pull: string }[];
+  /** gmx wham: positions (pullx) or forces (pullf). */
+  pull?: 'pullx' | 'pullf';
 }
-export interface Plan { tool: string; cwd: string; outDir: string; stem: string; names: OutputNames; io: RunIo; file: string; argv: string[]; env: Record<string, string>; problems: string[]; stdin?: string }
+export interface Plan {
+  tool: string; cwd: string; outDir: string; stem: string; names: OutputNames; io: RunIo; file: string; argv: string[]; env: Record<string, string>; problems: string[]; stdin?: string
+  /** The options as gmx gets them, when gmx-cypher fills one in (gmx wham's temperature from the run inputs, R6). */
+  options: Options
+  /** What gmx-cypher filled in or found, in words, for the page to show. */
+  notes: string[]
+  /** Files written beside the outputs before gmx starts (gmx wham's window lists), never over an existing file. */
+  writes: { name: string; text: string }[]
+  /** gmx wham's windows, as real paths. */
+  windows?: { tpr: string; pull: string }[]
+}
 
 /** What a job sets in gmx's environment: GROMACS backs up an existing output unless GMX_MAXBACKUP is 0 or -1 (then 2025.4 overwrites; checked), which cluster shells often set (review finding 6). */
 const JOB_ENV = { GMX_MAXBACKUP: '99' };
@@ -60,32 +75,54 @@ export async function planRun(ctx: Ctx, req: RunRequest, roots: string[]): Promi
   // A command without groups may take an optional input (gmx energy's run input): checked like the rest when given.
   // (RDF's structure and index are read for the groups, in startRun; its plan doesn't need them.)
   if (!cmd.groups) for (const slot of cmd.inputs) if (!paths[slot] && req.inputs?.[slot]) paths[slot] = inside(req.inputs[slot]!, roots);
+  // gmx wham's windows (R6) are its inputs: each checked like one, and the folder holding them all names the run.
+  let windows: { tpr: string; pull: string }[] | undefined;
+  if (cmd.tool === 'wham') {
+    if (!Array.isArray(req.windows) || req.windows.length < 2) throw new HttpError(400, 'at least two umbrella windows are needed');
+    windows = req.windows.map(w => {
+      const tpr = inside(String(w?.tpr ?? ''), roots), pull = inside(String(w?.pull ?? ''), roots);
+      if (!/\.tpr$/i.test(tpr)) throw new HttpError(400, tpr + ' is not a run input (.tpr)');
+      if (!/\.xvg$/i.test(pull)) throw new HttpError(400, pull + ' is not a pull file (.xvg)');
+      return { tpr, pull };
+    });
+  }
   // The first required input names the run: its folder holds the outputs, and its name stands in for {trajectory}.
-  const first = paths[cmd.required[0]]!;
+  const first = cmd.required.length ? paths[cmd.required[0]]! : null;
+  const folder = first ? dirname(first) : commonFolder(windows!.map(w => w.tpr));
+  const named = first ? basename(first).replace(/\.[^.]+$/, '') : basename(folder);
   // Uploaded inputs have no folder of their own: their outputs go to the state folder's workspace.
-  const uploaded = first.startsWith(join(ctx.home, 'uploads') + '/');
-  const outDir = req.outDir ? inside(req.outDir, roots) : uploaded ? join(ctx.home, 'workspace') : join(dirname(first), cmd.tool);
+  const uploaded = (folder + '/').startsWith(join(ctx.home, 'uploads') + '/');
+  const outDir = req.outDir ? inside(req.outDir, roots) : uploaded ? join(ctx.home, 'workspace') : join(folder, cmd.tool);
   // The vault is written only by sending, into a project's _inbox (review finding 11).
   const vault = ctx.config.vault && existsSync(ctx.config.vault) ? realpathSync(ctx.config.vault) : null;
   if (vault && within(outDir, vault)) throw new HttpError(400, outDir + ' is inside the PMF Sequences vault; results go there only by send to vault');
   let stem: string;
-  try { stem = renderStem(req.template || DEFAULT_TEMPLATE, { ...req.names, analysis: cmd.tool, trajectory: basename(first).replace(/\.[^.]+$/, '') }); }
+  try { stem = renderStem(req.template || DEFAULT_TEMPLATE, { ...req.names, analysis: cmd.tool, trajectory: named }); }
   catch (e) {
     const m = (e as Error).message;
     throw new HttpError(400, !req.names && m.endsWith('has no value here') ? m + ": in a single run only {analysis} and {trajectory} do; a batch's path template gives the others" : m);
   }
   // gmx awh writes a file per frame (R5): the frames come from a scan of the file, and each one's name must be free too.
-  const frames: AwhFrame[] | null = cmd.tool === 'awh' ? (await awhScan(ctx.gmx, first, paths.runInput!)).frames : null;
-  stem = freeStem(stem, existsSync(outDir) ? readdirSync(outDir) : [], frames?.map(f => f.suffix));
+  const frames: AwhFrame[] | null = cmd.tool === 'awh' ? (await awhScan(ctx.gmx, first!, paths.runInput!)).frames : null;
+  const extra = frames ? frames.map(f => f.suffix) : cmd.tool === 'wham' ? WHAM_SUFFIXES : [];
+  stem = freeStem(stem, existsSync(outDir) ? readdirSync(outDir) : [], extra);
   const help = await toolHelp(ctx.gmx, cmd.tool), { cwd, io } = cmd.io(paths, outDir, stem);
+  let options: Options = req.options || {};
+  const notes: string[] = [], tempProblems: string[] = [];
+  if (windows && (options.temp === undefined || options.temp === '')) {
+    // gmx wham doesn't read the temperature from the run inputs (it assumes 298 K): gmx-cypher does, and passes it.
+    const temps = [...new Set((await mapLimit(windows, 4, w => dumpRunInput(ctx.gmx, w.tpr, folder))).flatMap(d => d.refT ?? []))];
+    if (temps.length === 1) { options = { ...options, temp: String(temps[0]) }; notes.push('temperature ' + temps[0] + ' K, from the run inputs (gmx wham would assume 298 K)'); }
+    else tempProblems.push(temps.length ? 'the run inputs have different temperatures (' + temps.join(', ') + ' K): set the temperature' : 'no temperature in the run inputs: set the temperature');
+  }
   let argv: string[];
-  try { argv = cmd.argv({ options: req.options || {}, selections: (req.groups?.length || 1) - 1 }, io, help); }
+  try { argv = cmd.argv({ options, selections: (req.groups?.length || 1) - 1, pull: req.pull ?? 'pullx' }, io, help); }
   catch (e) { throw new HttpError(400, (e as Error).message); }
-  const problems = cmd.problems(req.options || {}, help);
+  const problems = [...cmd.problems(options, help), ...tempProblems];
   let stdin: string | undefined;
   if (cmd.stdin) {
     // The terms are numbers from this file's own menu (T99): checked against it here, as gmx would refuse them.
-    if (cmd.tool === 'energy') problems.push(...energyProblems(req.terms ?? [], await energyMenu(ctx.gmx, first)));
+    if (cmd.tool === 'energy') problems.push(...energyProblems(req.terms ?? [], await energyMenu(ctx.gmx, first!)));
     stdin = cmd.stdin(req.terms ?? []);
   }
   let names = cmd.outputNames(stem);
@@ -97,7 +134,18 @@ export async function planRun(ctx: Ctx, req: RunRequest, roots: string[]): Promi
     // The last frame is the run's file for the vault (the usual choice for PMF Sequences); the earlier ones come with it.
     if (files.length) names = { xvg: files[files.length - 1], record: names.record, more: files.slice(0, -1) };
   }
-  return { tool: cmd.tool, cwd, outDir, stem, names, io, file: ctx.gmx.path!, argv, env: JOB_ENV, problems, stdin };
+  // gmx wham reads its windows from two lists, written beside the outputs, with the windows' real paths.
+  const writes = windows ? [{ name: stem + '_tpr-files.dat', text: listFile(windows.map(w => w.tpr)) }, { name: stem + '_pull-files.dat', text: listFile(windows.map(w => w.pull)) }] : [];
+  if (windows) names = whamOutputNames(stem, Number(options.nBootstrap) > 0);
+  return { tool: cmd.tool, cwd, outDir, stem, names, io, file: ctx.gmx.path!, argv, env: JOB_ENV, problems, stdin, options, notes, writes, ...(windows ? { windows } : {}) };
+}
+
+/** `f` over `items`, at most `limit` at a time, the results in order. */
+async function mapLimit<T, R>(items: T[], limit: number, f: (x: T) => Promise<R>): Promise<R[]> {
+  const out: R[] = new Array(items.length);
+  let next = 0;
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, async () => { while (next < items.length) { const i = next++; out[i] = await f(items[i]); } }));
+  return out;
 }
 
 /** The groups' atoms from the structure file, as the GUI computed them; names and emptiness refused here too. */
@@ -170,6 +218,8 @@ export async function startRun(ctx: Ctx, req: RunRequest, roots: string[]): Prom
     if (!req.retryNames || attempt >= 5) throw new HttpError(409, appeared.join(', ') + ' appeared in ' + plan.outDir + ' while checking; nothing was started. Start again for a new name.');
     plan = await planRun(ctx, req, roots);
   }
+  // gmx wham's window lists, beside the outputs: names the planner found free and claimed with the stem (T30).
+  for (const w of plan.writes) writeFileSync(join(plan.outDir, w.name), w.text, { flag: 'wx' });
   const ours = new Set(allNames(plan.names).map(nameKey));
   const recordPath = join(plan.outDir, plan.names.record);
 
@@ -187,7 +237,8 @@ export async function startRun(ctx: Ctx, req: RunRequest, roots: string[]): Prom
   const record = new Promise<RunRecord>((done, fail) => {
     const finish = async (j: Job) => {
       const outputs: Output[] = [];
-      const files: [Output['kind'], string | undefined][] = [...(plan.names.more ?? []).map(n => ['xvg', n] as [Output['kind'], string]), ['xvg', plan.names.xvg], ['cn', plan.names.cn], ['ndx', plan.names.ndx]];
+      const kindOf = (n: string): Output['kind'] => (n.endsWith('.dat') ? 'list' : 'xvg');
+      const files: [Output['kind'], string | undefined][] = [...(plan.names.more ?? []).map(n => [kindOf(n), n] as [Output['kind'], string]), ['xvg', plan.names.xvg], ['cn', plan.names.cn], ['ndx', plan.names.ndx]];
       for (const [kind, name] of files) {
         if (!name) continue;
         const p = join(plan.outDir, name);
@@ -198,8 +249,9 @@ export async function startRun(ctx: Ctx, req: RunRequest, roots: string[]): Prom
         .map(n => 'gmx backed up a file that appeared during the run: ' + n);
       const r = buildRecord({
         analysis: plan.tool, runner: ctx.version, gmx: { path: ctx.gmx.path!, version: ctx.gmx.version! }, env, command: { cwd: plan.cwd, file: plan.file, args: plan.argv },
-        inputs, groups: req.groups ?? [], atoms, sizes, options: req.options || {}, help: await toolHelp(ctx.gmx, plan.tool), form: cmd.options, template: req.template || DEFAULT_TEMPLATE,
+        inputs, groups: req.groups ?? [], atoms, sizes, options: plan.options, help: await toolHelp(ctx.gmx, plan.tool), form: cmd.options, template: req.template || DEFAULT_TEMPLATE,
         outDir: req.outDir ?? null, job: j, outputs, problems, stdin: plan.stdin, terms: req.terms,
+        ...(plan.windows ? { windows: await Promise.all(plan.windows.map(async w => ({ tpr: await fileInfo(w.tpr, true), pull: await fileInfo(w.pull, true) }))), pull: req.pull ?? 'pullx' } : {}),
         ...(plan.tool === 'energy' ? { statistics: parseEnergyStats(j.log) } : {}),
         // gmx awh's frames are its files: how many it wrote, and the time of the last (the one for the vault).
         ...(plan.tool === 'awh' ? { frames: awhRecordFrames(plan.stem, outputs.map(o => o.path.split('/').pop()!)) } : {}),

@@ -1,7 +1,7 @@
 // One definition per GROMACS command (R3a, T98): RDF moved in unchanged; records and recipes name their command (v3, T97).
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { awhCommand, COMMANDS, commandOf, energyCommand, rdfCommand, sectionsOf, withCommand } from '../src/lib/commands';
+import { awhCommand, COMMANDS, commandOf, energyCommand, rdfCommand, sectionsOf, whamCommand, withCommand } from '../src/lib/commands';
 import { parseHelp } from '../src/lib/gmxText';
 import { FORM, rdfArgs, rdfIo, recipeProblems } from '../src/lib/rdf';
 import { outputNames } from '../src/lib/names';
@@ -13,11 +13,12 @@ import { parseGmxHeader } from '../../app/src/lib/gmxHeader';
 const read = (name: string) => JSON.parse(readFileSync(new URL('./fixtures/formats/' + name, import.meta.url), 'utf8'));
 
 describe('one definition per command (R3a)', () => {
-  it('each command is found by its tool name: rdf, energy (R4) and awh (R5)', () => {
-    expect(COMMANDS.map(c => c.tool)).toEqual(['rdf', 'energy', 'awh']);
+  it('each command is found by its tool name: rdf, energy (R4), awh (R5) and wham (R6)', () => {
+    expect(COMMANDS.map(c => c.tool)).toEqual(['rdf', 'energy', 'awh', 'wham']);
     expect(commandOf('rdf')).toBe(rdfCommand);
     expect(commandOf('energy')).toBe(energyCommand);
-    expect(commandOf('wham')).toBeUndefined();
+    expect(commandOf('wham')).toBe(whamCommand);
+    expect(commandOf('distance')).toBeUndefined();
   });
 
   it('rdf says what it takes: four inputs, and a reference with selections', () => {
@@ -63,6 +64,7 @@ describe('the picker groups the commands by what they need (R3b)', () => {
     expect(sectionsOf()).toEqual([
       { section: 'trajectory and groups', commands: [rdfCommand] },
       { section: 'an energy file', commands: [energyCommand, awhCommand] },
+      { section: 'window lists', commands: [whamCommand] },
     ]);
   });
 });
@@ -108,9 +110,19 @@ describe('every output has a PMF Sequences type decision (R3a, section 3)', () =
     ['rdf', 'xvg', 'gmx-2025.4/rdf_nvt.xvg', 'rdf_nvt.xvg'],
     ['energy', 'xvg', 'gmx-2025.4/energy-potential.xvg', 'energy_rerun.xvg'],
     ['awh', 'xvg', 'awh/out/awh_t20.xvg', 'awh_awh_t20.xvg'],
+    ['wham', 'xvg', 'wham/out/histo.xvg', 'wham_us_histo.xvg'],
   ])('%s %s: PMF Sequences agrees on %s', (tool, file, fixture, name) => {
     const text = readFileSync(new URL('./fixtures/' + fixture, import.meta.url), 'utf8');
     const want = commandOf(tool)!.outputs.find(o => o.file === file)!.type;
     expect(detectAna(getAnalyses(null), name, parseTable(text).head, parseGmxHeader(text)?.tool ?? null).k).toBe(want);
+  });
+});
+
+describe('a WHAM profile would be mistyped by PMF Sequences (question 28)', () => {
+  it('real 2025.4 profile.xvg: its title "Umbrella potential" reads as Histogram, so it is not sent until you decide', () => {
+    const text = readFileSync(new URL('./fixtures/wham/out/profile.xvg', import.meta.url), 'utf8');
+    expect(whamCommand.outputs.find(o => o.file === 'profile')).toMatchObject({ type: null, vault: false });
+    // What PMF Sequences does today, pinned so a change there is noticed: "umbrella" is a keyword of its Histogram type.
+    expect(detectAna(getAnalyses(null), 'wham_us_profile.xvg', parseTable(text).head, parseGmxHeader(text)?.tool ?? null)).toEqual({ k: 'hist', from: 'header' });
   });
 });

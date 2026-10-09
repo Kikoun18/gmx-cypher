@@ -11,6 +11,7 @@ import { nameProblem } from '../src/lib/groups';
 import { checkInputs, checkSizes } from './check';
 import { awhScan } from './awh';
 import { energyMenu } from './energy';
+import { findWindows } from './wham';
 import { inside, listFolder, namesIn, saveUpload } from './files';
 import { detectGmx, toolHelp, type GmxState } from './gmx';
 import { HttpError, readJson, sendFile, type Api } from './http';
@@ -92,6 +93,12 @@ export function makeApi(ctx: Ctx): Api {
       if (!/\.tpr$/i.test(tpr)) throw new HttpError(400, tpr + ' is not a .tpr file');
       if (!ctx.gmx.ok) throw new HttpError(409, 'no working gmx');
       return { body: await awhScan(ctx.gmx, edr, tpr) };
+    }
+    if (is(req, 'POST', url, '/api/wham/windows')) {
+      // gmx wham's windows under a folder, by a template such as */umbrella.tpr (R6); only inside the allowed folders.
+      const b = await readJson<{ root: string; glob: string; pull?: string }>(req), unread: string[] = [];
+      const windows = findWindows(String(b.root || ''), String(b.glob || ''), b.pull === 'pullf' ? 'pullf' : 'pullx', roots(), unread);
+      return { body: { windows, unread } };
     }
     if (is(req, 'GET', url, '/api/ls')) {
       const path = url.searchParams.get('path');

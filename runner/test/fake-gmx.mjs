@@ -148,13 +148,33 @@ function awh() {
   process.stderr.write(read('awh-run.stderr') + log.join(''));
 }
 
+/**
+ * gmx wham (R6): the real outputs of the 9-window umbrella set in test/fixtures/wham, after checking that every file in
+ * the lists exists, as gmx does. Lists of other windows are refused, so a test never sees invented numbers.
+ */
+function wham() {
+  const out = new URL('./fixtures/wham/out/', import.meta.url), w = name => readFileSync(new URL(name, out), 'utf8');
+  const list = f => readFileSync(f, 'utf8').split('\n').map(l => l.trim()).filter(Boolean);
+  const tprs = list(one('-it')), pulls = list(one('-ix') || one('-if'));
+  for (const f of [...tprs, ...pulls]) if (!existsSync(f)) { process.stderr.write(banner('wham') + 'Fatal error:\nFile input/output error:\n' + f + '\n'); process.exit(1); }
+  if (tprs.length !== 9 || pulls.length !== 9) { process.stderr.write('fake gmx wham: only the 9 windows of the fixtures, not ' + tprs.length + '\n'); process.exit(1); }
+  const log = [], put = (flag, name) => { const o = one(flag); if (o) { backUp(o, log); writeFileSync(o, w(name)); } };
+  put('-o', 'profile.xvg'); put('-hist', 'histo.xvg'); put('-bsres', 'bsres.xvg'); put('-bsprof', 'bsprof.xvg');
+  process.stdout.write(w('wham-run.stdout'));
+  process.stderr.write(w('wham-run.stderr') + log.join(''));
+}
+
 if (argv[0] === '--version') process.stdout.write(read('version.txt'));
 else if (tool === 'rdf' && argv[1] === '-h') process.stdout.write(read('rdf-h.txt'));
 else if (tool === 'energy' && argv[1] === '-h') process.stdout.write(read('energy-h.txt'));
 else if (tool === 'awh' && argv[1] === '-h') process.stdout.write(read('awh-h.txt'));
 else if (tool === 'awh') awh();
+else if (tool === 'wham' && argv[1] === '-h') process.stdout.write(read('wham-h.txt'));
+else if (tool === 'wham') wham();
 else if (tool === 'energy') energy();
 else if (tool === 'rdf') await rdf();
+// gmx dump: the real head of the test system's dump, or of an umbrella window's (300 K, 663 atoms) for those (R6).
+else if (tool === 'dump' && /umbrella\.tpr$/.test(one('-s') || '')) { process.stderr.write(banner('dump')); process.stdout.write(readFileSync(new URL('./fixtures/wham/dump-head.txt', import.meta.url), 'utf8')); }
 else if (tool === 'dump') { process.stderr.write(banner('dump')); process.stdout.write(read('dump-head.txt').replace(/natoms = 3242/g, 'natoms = ' + natomsOf(one('-s')))); }
 else if (tool === 'select') select();
 else if (tool === 'check') { process.stdout.write('Checking file ' + one('-f') + '\n'); process.stderr.write(read('check.stderr').replace('# Atoms  3242', '# Atoms  ' + natomsOf(one('-f')))); }
