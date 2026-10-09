@@ -5,6 +5,7 @@ import { ToggleGroup, ToggleGroupItem } from '../ui/toggle-group'
 import { defaultView, structStyle, toPdb, type Look } from '../../../app/src/lib/structFile'
 import { drawnNumbers, type Atom } from '../lib/atoms'
 import type { Tone } from '../lib/tones'
+import { boxDimensions, boxEdges, outsideBox, parseBox } from '../lib/box'
 
 export type PickHow = 'atom' | 'residue' | 'name'
 
@@ -16,6 +17,10 @@ const groupStyle = (look: Look, color: string) =>
 const neutral = (style: Record<string, unknown>, color: string) =>
   Object.fromEntries(Object.entries(style).map(([k, v]) => { const { colorscheme: _, ...rest } = v as Record<string, unknown>; return [k, { ...rest, color }] }))
 const cssVar = (name: string) => getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+/** A box corner in nm, as the structure's own units (Å). */
+const angstrom = (p: number[]) => ({ x: p[0] * 10, y: p[1] * 10, z: p[2] * 10 })
+/** A box angle: whole when it is whole (90°), else one decimal. */
+const degrees = (a: number) => (Math.abs(a - Math.round(a)) < 0.05 ? String(Math.round(a)) : a.toFixed(1))
 
 /** The theme in use, so colours read from the tokens follow a switch. */
 function useThemeName() {
@@ -40,6 +45,11 @@ export function Viewer({ text, format, atoms, colour, onPick, describe }: {
   describe: (nr: number) => string
 }) {
   const { pdb, info, unknown } = React.useMemo(() => toPdb(text, format), [text, format])
+  // The periodic box the file records (R2, T95): drawn as its twelve edges, with its dimensions and the atoms outside it.
+  const cell = React.useMemo(() => parseBox(text, format), [text, format])
+  const dims = React.useMemo(() => (cell.vectors ? boxDimensions(cell.vectors) : null), [cell])
+  const outside = React.useMemo(() => (cell.vectors ? outsideBox(text, format, cell.vectors) : null), [text, format, cell])
+  const [showCell, setShowCell] = React.useState(true)
   const numbers = React.useMemo(() => drawnNumbers(atoms), [atoms])
   const index = React.useMemo(() => new Map(numbers.map((nr, k) => [nr, k])), [numbers])
   const byNr = React.useMemo(() => new Map(atoms.map(a => [a.nr, a])), [atoms])
@@ -85,6 +95,17 @@ export function Viewer({ text, format, atoms, colour, onPick, describe }: {
     viewer.render()
   }, [viewer, info, look, solvent, hydrogens, colour, index, theme])
 
+  // The box is shapes, not styles: its own layer, redrawn when it is switched or the theme changes.
+  React.useEffect(() => {
+    if (!viewer) return
+    viewer.removeAllShapes()
+    if (showCell && cell.vectors) {
+      const edge = cssVar('--muted-foreground')
+      for (const [p, q] of boxEdges(cell.vectors)) viewer.addLine({ start: angstrom(p), end: angstrom(q), color: edge })
+    }
+    viewer.render()
+  }, [viewer, cell, showCell, theme])
+
   const h = hover != null ? byNr.get(hover) : null
   const virtual = atoms.filter(a => a.elem === 'virtual').length
   return (
@@ -95,11 +116,16 @@ export function Viewer({ text, format, atoms, colour, onPick, describe }: {
         </ToggleGroup>
         <label className="flex items-center gap-2 text-control"><Checkbox checked={hydrogens} onCheckedChange={c => setHydrogens(c === true)} /> hydrogens</label>
         <label className="flex items-center gap-2 text-control"><Checkbox checked={solvent} onCheckedChange={c => setSolvent(c === true)} /> water & ions</label>
+        <label className="flex items-center gap-2 text-control"><Checkbox checked={showCell && !!cell.vectors} disabled={!cell.vectors} onCheckedChange={c => setShowCell(c === true)} /> box</label>
       </div>
       <p className="m-0 text-caption text-muted-foreground">
         {info.atoms} of {atoms.length} atoms drawn{virtual ? ' · ' + virtual + ' virtual sites not drawn' : ''}{unknown.length ? ' · ' + unknown.length + ' not drawn, element unknown (' + unknown.slice(0, 3).join(', ') + ')' : ''}
         {structStyle(info, look, solvent).note && ' · ' + structStyle(info, look, solvent).note}
       </p>
+      <p className="m-0 text-caption text-muted-foreground" aria-live="polite">
+        {cell.vectors && dims ? <>box of the structure file · a {dims.a.toFixed(2)} · b {dims.b.toFixed(2)} · c {dims.c.toFixed(2)} nm · α {degrees(dims.alpha)}° β {degrees(dims.beta)}° γ {degrees(dims.gamma)}° · V {dims.volume.toFixed(3)} nm³{outside && outside.count ? ' · ' + outside.count + ' of ' + outside.total + ' atoms lie outside it, as recorded' : ''}</> : 'no box: ' + cell.problems.join(' ')}
+      </p>
+      {cell.vectors && <p className="m-0 text-caption text-muted-foreground">a molecule that crosses an edge looks broken: that is periodicity, not an error</p>}
       <div className="relative h-[460px] overflow-hidden rounded-xl border border-border bg-card">
         <div ref={box} className="absolute inset-0" role="img" aria-label="3D structure: atoms can also be picked by rule or as a list" />
         {h && (
