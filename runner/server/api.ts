@@ -12,6 +12,7 @@ import { inside, listFolder, namesIn, saveUpload } from './files';
 import { detectGmx, rdfHelp, type GmxState } from './gmx';
 import { HttpError, readJson, type Api } from './http';
 import type { Job, Jobs } from './jobs';
+import { listRecipes, readRecipe, saveRecipe } from './recipes';
 import { planRun, startRun } from './runs';
 import { sendToInbox } from './send';
 import { landingFor, listProjects, openVault, projectSummary, readProject } from './vault';
@@ -127,6 +128,10 @@ export function makeApi(ctx: Ctx): Api {
       // Only g(r): the cumulative-number file is titled "Cumulative Number RDF", which PMF Sequences would read as another RDF (T35).
       return { body: sendToInbox(v, project, join(String(j.meta!.outDir), (j.meta!.names as { xvg: string }).xvg), String(b.name ?? ''), ctx.config.pmfUrl) };
     }
+    if (is(req, 'GET', url, '/api/recipes')) return { body: listRecipes(ctx.home) };
+    if (is(req, 'POST', url, '/api/recipes')) return { body: saveRecipe(ctx.home, await readJson(req)) };
+    const recipe = /^\/api\/recipes\/([^/]+)$/.exec(url.pathname);
+    if (recipe && req.method === 'GET') return { body: readRecipe(ctx.home, decodeURIComponent(recipe[1])) };
     if (is(req, 'POST', url, '/api/plan')) {
       // Asked while typing (a template, a folder): a refusal is an answer, not a failed request.
       try { return { body: await planRun(ctx, await readJson(req), roots()) }; }

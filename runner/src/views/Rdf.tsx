@@ -20,6 +20,7 @@ import { toneText } from '../lib/tones'
 import { cn } from '../lib/utils'
 import { useStructure } from '../structure'
 import { Code } from './Code'
+import { Recipes } from './Recipes'
 
 interface Help { gmx: string; version: string; options: HelpOption[] }
 
@@ -186,6 +187,7 @@ export function Rdf({ gmx, draft, setDraft, onStarted }: { gmx: GmxState; draft:
         })}
       </div>
       <aside className="flex flex-col gap-3">
+        <Recipes draft={draft} setDraft={setDraft} />
         <Section label="Command" />
         {!trajectory || !runInput ? <p className="m-0 text-control text-muted-foreground">pick a trajectory and a run input in inputs</p>
           : planned?.error ? <FieldHint error>✗ {planned.error}</FieldHint>

@@ -43,7 +43,7 @@ Order as approved in [`phase0.md`](phase0.md) §10: R5 before R4b, and R4d after
 - [x] R6c Send to the vault inbox; what to do next in PMF Sequences
 
 ### Phase 5: Batches (R7)
-- [ ] R7a Recipes saved and reused
+- [x] R7a Recipes saved and reused
 - [ ] R7b One recipe over many trajectories by path template; queue with a concurrency limit
 
 ### Phase 6: Finish
