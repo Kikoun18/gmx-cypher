@@ -47,7 +47,7 @@ Order as approved in [`phase0.md`](phase0.md) §10: R5 before R4b, and R4d after
 - [x] R7b One recipe over many trajectories by path template; queue with a concurrency limit
 
 ### Phase 6: Finish
-- [ ] `runner/README.md`
+- [x] `runner/README.md`
 - [ ] Manual QA in Chrome, with my real test system and real `gmx`; results recorded (passed, failed or not run)
 - [ ] Fresh-context review of the whole branch against section 15 (a reviewer that didn't write the code); findings fixed or recorded
 - [ ] Final report `runner/docs/report.md`
