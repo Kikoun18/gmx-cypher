@@ -13,6 +13,7 @@ import { detectGmx, rdfHelp, type GmxState } from './gmx';
 import { HttpError, readJson, type Api } from './http';
 import type { Job, Jobs } from './jobs';
 import { planRun, startRun } from './runs';
+import { listProjects, openVault, projectSummary, readProject } from './vault';
 import { saveConfig, type Config } from './state';
 
 export interface Ctx { home: string; version: string; config: Config; gmx: GmxState; jobs: Jobs }
@@ -33,7 +34,7 @@ function events(jobs: Jobs, res: ServerResponse) {
 }
 
 /** What the GUI may change (T5); anything else is refused. */
-const SETTABLE: (keyof Config)[] = ['gmx', 'allow'];
+const SETTABLE: (keyof Config)[] = ['gmx', 'allow', 'vault'];
 
 /** Allowed folders as real paths; each must exist and be a folder. */
 export function realFolders(paths: string[]): string[] {
@@ -87,7 +88,25 @@ export function makeApi(ctx: Ctx): Api {
       if (!ctx.gmx.ok) throw new HttpError(409, 'no working gmx');
       return { body: await checkSizes(ctx.gmx, runInput, groups, ctx.home) };
     }
-    if (is(req, 'POST', url, '/api/plan')) return { body: await planRun(ctx, await readJson(req), roots()) };
+    if (is(req, 'GET', url, '/api/vault')) {
+      if (!ctx.config.vault) return { body: { path: null } };
+      try {
+        const v = await openVault(ctx.config.vault);
+        return { body: { path: v.path, schema: v.schema, compat: v.compat, projects: (await listProjects(v)).map(p => ({ id: p.id, name: p.name, dir: p.dir, desc: p.desc })) } };
+      } catch (e) { return { body: { path: ctx.config.vault, error: (e as Error).message } }; }
+    }
+    if (is(req, 'GET', url, '/api/vault/project')) {
+      if (!ctx.config.vault) throw new HttpError(409, 'no vault set');
+      const v = await openVault(ctx.config.vault);
+      const id = url.searchParams.get('id') || '';
+      if (!(await listProjects(v)).some(p => p.id === id)) throw new HttpError(404, 'no project ' + id + ' in the vault');
+      return { body: projectSummary(await readProject(v, id)) };
+    }
+    if (is(req, 'POST', url, '/api/plan')) {
+      // Asked while typing (a template, a folder): a refusal is an answer, not a failed request.
+      try { return { body: await planRun(ctx, await readJson(req), roots()) }; }
+      catch (e) { if (e instanceof HttpError) return { body: { error: e.message } }; throw e; }
+    }
     if (is(req, 'POST', url, '/api/runs')) return { body: summary((await startRun(ctx, await readJson(req), roots())).job) };
     if (is(req, 'POST', url, '/api/upload')) return { body: await saveUpload(req, ctx.home, url.searchParams.get('name') || 'upload') };
     const job = /^\/api\/jobs\/([\w-]+)(\/cancel|\/record|\/output)?$/.exec(url.pathname);
@@ -117,6 +136,8 @@ export function makeApi(ctx: Ctx): Api {
       const unknown = Object.keys(patch || {}).filter(k => !SETTABLE.includes(k as keyof Config));
       if (unknown.length) throw new HttpError(400, 'unknown setting: ' + unknown.join(', '));
       if (patch.allow) patch.allow = realFolders(patch.allow);
+      // A vault is checked before it is kept: PMF Sequences' manifest, schema 1–3 (T32).
+      if (patch.vault) patch.vault = (await openVault(patch.vault).catch(e => { throw new HttpError(400, (e as Error).message); })).path;
       ctx.config = { ...ctx.config, ...patch };
       saveConfig(ctx.home, ctx.config);
       if ('gmx' in patch) ctx.gmx = await detectGmx(ctx.config.gmx);

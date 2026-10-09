@@ -105,7 +105,8 @@ describe('runs over HTTP', () => {
     const plan = await s.call('/api/plan', req);
     expect(plan.json).toMatchObject({ cwd: dir, outDir: join(dir, 'rdf'), stem: 'rdf_nvt', problems: [] });
     expect(plan.json.argv).toContain('rdf/rdf_nvt_cn.xvg');
-    expect((await s.call('/api/plan', { ...req, template: '{run}' })).json).toEqual({ error: '{run} has no value here' });
+    // Asked while typing a template: a refusal is an answer (200), so the browser logs no failed request.
+    expect(await s.call('/api/plan', { ...req, template: '{run}' })).toEqual({ status: 200, json: { error: '{run} has no value here' } });
     const started = await s.call('/api/runs', req);
     expect(started.json).toMatchObject({ kind: 'rdf', status: 'running', meta: { stem: 'rdf_nvt' } });
     expect(started.json).not.toHaveProperty('log');

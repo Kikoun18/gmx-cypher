@@ -52,7 +52,7 @@ function usePlan(draft: Draft) {
   React.useEffect(() => {
     if (!body) return
     let alive = true
-    const t = setTimeout(() => postJson<Plan>('/api/plan', body).then(plan => alive && setP({ key, plan }), e => alive && setP({ key, error: (e as Error).message })), 250)
+    const t = setTimeout(() => postJson<Plan & { error?: string }>('/api/plan', body).then(plan => alive && setP(plan.error ? { key, error: plan.error } : { key, plan }), e => alive && setP({ key, error: (e as Error).message })), 250)
     return () => { alive = false; clearTimeout(t) }
   }, [key]) // eslint-disable-line react-hooks/exhaustive-deps -- body is what key says
   return p?.key === key ? p : null
