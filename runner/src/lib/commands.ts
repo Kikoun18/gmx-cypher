@@ -13,6 +13,7 @@ import {
 import { outputNames } from './names';
 import { RMS_FORM, rmsArgv, rmsOptionProblems, rmsStdin, type RmsIo } from './rms';
 import { RMSF_FORM, rmsfArgv, rmsfOptionProblems, rmsfStdin, type RmsfIo } from './rmsf';
+import { GYRATE_FORM, GYRATE_LEGACY_FORM, gyrateArgv, gyrateKind, gyrateLegacyArgv, gyrateLegacyStdin, gyrateOptionProblems, type GyrateIo } from './gyrate';
 import { FORM, rdfArgs, rdfIo, recipeProblems, relPath, type Options, type RdfIo } from './rdf';
 
 export type InputSlot = 'trajectory' | 'runInput' | 'structure' | 'index' | 'edr';
@@ -332,7 +333,49 @@ export const rmsfCommand: CommandDef = {
   stdin: rmsfStdin,
 };
 
-export const COMMANDS: CommandDef[] = [rdfCommand, distanceCommand, hbondCommand, hbondLegacyCommand, rmsCommand, rmsfCommand, energyCommand, awhCommand, whamCommand];
+const GYRATE_OUTPUTS: CommandDef['outputs'] = [{ file: 'xvg', type: 'rg', vault: true, why: 'PMF Sequences reads its first curve: the total radius of gyration' }];
+
+/** gmx gyrate (R9c), the selection tool of GROMACS 2024 and later: the radius of gyration of one group over time. */
+export const gyrateCommand: CommandDef = {
+  tool: 'gyrate',
+  title: 'radius of gyration of one group, over time',
+  section: 'trajectory and groups',
+  inputs: ['trajectory', 'runInput', 'structure', 'index'],
+  required: ['trajectory', 'runInput'],
+  groups: true,
+  roles: ONE_GROUP,
+  options: GYRATE_FORM,
+  outputNames: oneOutput,
+  outputs: GYRATE_OUTPUTS,
+  io: trajectoryIo,
+  problems: gyrateOptionProblems,
+  argv: (r, io, help) => gyrateArgv(r, io as GyrateIo, help),
+  find: { tools: ['gyrate'], accepts: h => gyrateKind(h) === 'selection', missing: "this gmx's gmx gyrate is the legacy tool (before GROMACS 2024): pick gmx gyrate-legacy" },
+};
+
+/** The legacy gyrate tool (R9c): gmx gyrate-legacy from 2024, gmx gyrate before; offered only where the selection tool is missing (T122). */
+export const gyrateLegacyCommand: CommandDef = {
+  tool: 'gyrate-legacy',
+  title: 'radius of gyration by the pre-2024 tool',
+  section: 'trajectory and groups',
+  inputs: ['trajectory', 'runInput', 'structure', 'index'],
+  required: ['trajectory', 'runInput'],
+  groups: true,
+  roles: ONE_GROUP,
+  options: GYRATE_LEGACY_FORM,
+  outputNames: oneOutput,
+  outputs: GYRATE_OUTPUTS,
+  io: trajectoryIo,
+  problems: gyrateOptionProblems,
+  argv: (r, io, help) => gyrateLegacyArgv(r, io as GyrateIo, help),
+  stdin: gyrateLegacyStdin,
+  find: {
+    tools: ['gyrate', 'gyrate-legacy'], accepts: h => gyrateKind(h) === 'legacy', missing: 'this gmx has no legacy gyrate tool (gmx gyrate-legacy, or gmx gyrate before GROMACS 2024)',
+    unless: { tool: 'gyrate', why: "this gmx has the selection tool, gmx gyrate: the legacy one is offered only without it, so the two tools' results never mix (T122)" },
+  },
+};
+
+export const COMMANDS: CommandDef[] = [rdfCommand, distanceCommand, hbondCommand, hbondLegacyCommand, rmsCommand, rmsfCommand, gyrateCommand, gyrateLegacyCommand, energyCommand, awhCommand, whamCommand];
 export const commandOf = (tool: string) => COMMANDS.find(c => c.tool === tool);
 
 /** What a draft holds of commands: the picked one, its options and name template, and the others', kept aside. */

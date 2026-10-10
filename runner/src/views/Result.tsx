@@ -363,6 +363,27 @@ function RmsfChart({ job, record }: { job: Job; record: RunRecord }) {
   )
 }
 
+/** gmx gyrate (R9c), either tool: the radius of gyration over time, and dimmed, its parts about the x, y and z axes. */
+function GyrateChart({ job, record }: { job: Job; record: RunRecord }) {
+  const xvg = useOutput(job.id, 'xvg')
+  if (xvg == null) return <p className="m-0 text-caption text-muted-foreground" aria-live="polite">reading the result…</p>
+  const curves = resultSeries(xvg), g = record.groups[0], label = (i: number) => (i ? 'about ' + 'xyz'[i - 1] : 'Rg')
+  const legacy = record.analysis === 'gyrate-legacy', weight = legacy ? (record.options.find(o => o.flag === 'q')?.value === true ? 'charge' : 'mass') : String(record.options.find(o => o.flag === 'mode')?.value ?? 'mass')
+  const stats = curves.map(c => curveStats(c.points))
+  return (
+    <div className="flex flex-col gap-3">
+      <LineChart series={curves.map((c, i) => ({ label: label(i), points: c.points, tone: i ? TONES_FOR_TERMS[i] : g?.tone ?? 'coral', ...(i ? { dash: 1, state: 'dim' as const } : {}) }))} xLabel="time (ps)" yLabel="radius (nm)" height={240} legend zeroLine={false} />
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3">
+        {stats[0] && <Stat label={'Rg · ' + g?.name + ' · mean'} value={stats[0].mean.toFixed(3) + ' nm'} hint={'± ' + stats[0].sd.toFixed(3) + ' (standard deviation) · last ' + stats[0].last.toFixed(3) + ' · ' + stats[0].frames + ' frames'} />}
+        {stats.length === 4 && <Stat label="about x, y, z · mean" value={stats.slice(1).map(x => x!.mean.toFixed(3)).join(' · ')} hint="nm" />}
+      </div>
+      <p className="m-0 text-caption text-muted-foreground">
+        weighted by {weight} · {legacy ? 'the legacy tool (' + (record.command.args[0] === 'gyrate' ? 'gmx gyrate of this GROMACS' : 'gmx gyrate-legacy') + ')' : 'the selection tool, gmx gyrate'} · PMF Sequences takes the first curve, Rg
+      </p>
+    </div>
+  )
+}
+
 /** What a run wrote, its result, its groups as gmx counted them, and "run again" (sections 10.5, 11.4). */
 export function RunResult({ job, onRunAgain, vault }: { job: Job; onRunAgain: (r: RunRecord) => void; vault: string | null }) {
   const r = useRecord(job)
@@ -377,7 +398,7 @@ export function RunResult({ job, onRunAgain, vault }: { job: Job; onRunAgain: (r
       {rec.problems.length > 0 && (
         <Alert variant="warning"><TriangleAlert /><AlertTitle>gmx-cypher's promise was broken</AlertTitle><AlertDescription>{rec.problems.map(p => <p key={p}>{p}</p>)}</AlertDescription></Alert>
       )}
-      {job.status === 'done' && (job.kind === 'energy' ? <EnergyChart job={job} record={rec} /> : job.kind === 'awh' ? <AwhChart job={job} record={rec} /> : job.kind === 'wham' ? <WhamChart job={job} record={rec} /> : job.kind === 'distance' ? <DistanceChart job={job} record={rec} /> : job.kind === 'hbond' || job.kind === 'hbond-legacy' ? <HbondChart job={job} record={rec} /> : job.kind === 'rms' ? <RmsChart job={job} record={rec} /> : job.kind === 'rmsf' ? <RmsfChart job={job} record={rec} /> : <RdfChart job={job} record={rec} />)}
+      {job.status === 'done' && (job.kind === 'energy' ? <EnergyChart job={job} record={rec} /> : job.kind === 'awh' ? <AwhChart job={job} record={rec} /> : job.kind === 'wham' ? <WhamChart job={job} record={rec} /> : job.kind === 'distance' ? <DistanceChart job={job} record={rec} /> : job.kind === 'hbond' || job.kind === 'hbond-legacy' ? <HbondChart job={job} record={rec} /> : job.kind === 'rms' ? <RmsChart job={job} record={rec} /> : job.kind === 'rmsf' ? <RmsfChart job={job} record={rec} /> : job.kind === 'gyrate' || job.kind === 'gyrate-legacy' ? <GyrateChart job={job} record={rec} /> : <RdfChart job={job} record={rec} />)}
       {rec.groups.length > 0 && <Section label="Groups" />}
       {rec.groups.length > 0 && <table className="text-control"><tbody>
         {rec.groups.map(g => (

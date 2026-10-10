@@ -256,6 +256,17 @@ else if (tool === 'hbond') (OLD ? hbondLegacy : hbondNew)();
 else if (tool === 'hbond-legacy') hbondLegacy();
 else if (tool === 'rms' && argv[1] === '-h') process.stdout.write(read('rms-h.txt'));
 else if (tool === 'rms') rms();
+else if (tool === 'gyrate' && argv[1] === '-h') process.stdout.write(OLD ? readFileSync(new URL('./fixtures/gmx-2023.3/gyrate-h.txt', import.meta.url), 'utf8') : read('gyrate-h.txt'));
+else if (tool === 'gyrate-legacy' && OLD) { process.stderr.write(readFileSync(new URL('./fixtures/gmx-2023.3/gyrate-legacy.stderr', import.meta.url), 'utf8')); process.exit(1); }
+else if (tool === 'gyrate-legacy' && argv[1] === '-h') process.stdout.write(read('gyrate-legacy-h.txt'));
+// gmx gyrate (R9c): the selection tool takes its one group as -sel; the legacy one (gyrate-legacy, or gyrate as 2023.3) on stdin.
+else if ((tool === 'gyrate' && OLD) || tool === 'gyrate-legacy') { const [g] = stdinGroups(1); r9Outputs('gyrate-legacy', { sulfate: g }, [['-o', 'gyrate_nvt.xvg']]); }
+else if (tool === 'gyrate') {
+  const names = groupNames(one('-n')), sel = values('-sel'), m = /^group (\d+)$/.exec(sel[0] ?? '');
+  if (sel.length !== 1) fail('Too many values');
+  if (!m || !names[+m[1]]) fail("Cannot match '" + sel[0] + "', because no such index group can be found.");
+  r9Outputs('gyrate', { sulfate: names[+m[1]] }, [['-o', 'gyrate_nvt.xvg']]);
+}
 else if (tool === 'rmsf' && argv[1] === '-h') process.stdout.write(read('rmsf-h.txt'));
 // gmx rmsf (R9b): its one group on stdin; the fixture is sulfate's, per atom or per residue (-res), fitted.
 else if (tool === 'rmsf') { const [g] = stdinGroups(1); if (argv.includes('-nofit')) { process.stderr.write('fake gmx rmsf: -nofit is not in the fixtures\n'); process.exit(1); } r9Outputs(argv.includes('-res') ? 'rmsf-res' : 'rmsf', { sulfate: g }, [['-o', 'rmsf_nvt.xvg']]); }
