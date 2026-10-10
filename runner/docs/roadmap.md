@@ -112,7 +112,7 @@ Spec: [`batch-2.md`](batch-2.md). Phase 0 report: [`batch-2-phase0.md`](batch-2-
 - [ ] R10d Not built: watch only (question 3) means no kill; "analyse this job" needs a `qq jobs -e` sample for the input folder (T136)
 
 ### Phase 6: Finish
-- [ ] `runner/README.md` updated
+- [x] `runner/README.md` updated (T137)
 - [ ] Manual QA in Chrome with real `gmx`, `qq` and `gmx-eta`; results recorded (passed, failed or not run)
 - [ ] Fresh-context review of the whole branch against section 20 of the spec; findings fixed or recorded
 - [ ] Final report `runner/docs/batch-2-report.md`

@@ -41,13 +41,17 @@ export function Analysis({ gmx, draft, setDraft, onStarted }: { gmx: AppState['g
                 {commands.map(c => {
                   // A command this gmx lacks is shown, not offered; one it runs under another name says which (gmx hbond before 2024).
                   const a = available.get(c.tool), other = a?.gmxTool && a.gmxTool !== c.tool ? ' (runs gmx ' + a.gmxTool + ' here)' : ''
-                  return <SelectItem key={c.tool} value={c.tool} disabled={a?.ok === false}>gmx {c.tool} · {c.title}{other}</SelectItem>
+                  return (
+                    <SelectItem key={c.tool} value={c.tool} disabled={a?.ok === false}>
+                      gmx {c.tool} · {c.title}{other}{a?.ok === false && <span className="block text-caption">{a.why}</span>}
+                    </SelectItem>
+                  )
                 })}
               </SelectGroup>
             ))}
           </SelectContent>
         </Select>
-        <FieldHint>the commands gmx-cypher runs, grouped by what each needs{off.length ? ' · not offered here: ' + off.map(c => 'gmx ' + c.tool + ', ' + c.why).join('; ') : ''}</FieldHint>
+        <FieldHint>the commands gmx-cypher runs, grouped by what each needs{off.length ? ' · greyed, with the reason: ' + off.map(c => 'gmx ' + c.tool).join(', ') + ', not for this gmx' : ''}</FieldHint>
       </Field>
       {command.groups && <GroupCommand key={command.tool} command={command} gmx={gmx} draft={draft} setDraft={setDraft} onStarted={onStarted} />}
       {command.tool === 'energy' && <Energy gmx={gmx} draft={draft} setDraft={setDraft} onStarted={onStarted} />}
