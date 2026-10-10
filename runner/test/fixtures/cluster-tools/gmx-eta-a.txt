@@ -1,0 +1,18 @@
+[1374596] hmr+fast+sol4_pull_l.sh: No information is available: Could not read remote file '/scratch.ssd/user01/job_1374596.server.cluster/main/hmr+fast+sol4_pull_l.err' on 'node7.cluster': 
+cat: /scratch.ssd/user01/job_1374596.server.cluster/main/hmr+fast+sol4_pull_l.err: No such file or directory.
+[1374597] hmr+fast+sol4_pull_k.sh: Simulation will finish in 00:01:45.
+[1374598] hmr+fast+sol4_pull_f.sh: Simulation will finish in 00:27:18.
+[1374599] hmr+fast+sol4_pull_p.sh: Simulation will finish in 00:15:07.
+[1374600] hmr+fast+sol4_pull_w.sh: Simulation will finish in 00:21:22.
+[1374601] hmr+fast+sol4_pull_v.sh: Simulation will finish in 00:19:12.
+[1374603] hmr+fast+sol4_pull_r.sh: Simulation will finish in 00:39:48.
+[1374604] hmr+fast+sol4_pull_c.sh: Simulation will finish in 00:46:46.
+[1374605] hmr+fast+sol4_pull_g.sh: No information is available: Job does not have a working directory.
+[1374606] hmr+fast+sol4_pull_h.sh: No information is available: Job does not have a working directory.
+[1374607] hmr+fast+sol4_pull_i.sh: No information is available: Job does not have a working directory.
+[1374608] hmr+fast+sol4_pull_l.sh: No information is available: Job does not have a working directory.
+[1374609] hmr+fast+sol4_pull_k.sh: No information is available: Job does not have a working directory.
+[1374610] hmr+fast+sol4_pull_f.sh: No information is available: Job does not have a working directory.
+[1374611] hmr+fast+sol4_pull_p.sh: No information is available: Job does not have a working directory.
+[1374612] hmr+fast+sol4_pull_w.sh: No information is available: Job does not have a working directory.
+[1374613] hmr+fast+sol4_pull_v.sh: No information is available: Job does not have a working directory.
