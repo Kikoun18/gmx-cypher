@@ -13,6 +13,7 @@ import type { Draft } from '../draft'
 import { useIndex, useStructure } from '../structure'
 import { fromRanges, toRanges, type Atom } from '../lib/atoms'
 import { atomNameCounts, clickStep, groupAtoms, nameProblem, parseNames, ruleText, shared, toggleName, type Group, type Rule, type Step } from '../lib/groups'
+import { commandOf, rdfCommand, rolesOf } from '../lib/commands'
 import { fitKeys, initialKeys, removeKey } from '../lib/keys'
 import type { NdxGroup } from '../lib/ndx'
 import { TONES, toneSolid, toneText, type Tone } from '../lib/tones'
@@ -50,7 +51,7 @@ function NameMenu({ atoms, resn, value, onChange }: { atoms: Atom[]; resn: strin
   )
 }
 
-function RuleForm({ atoms, index, onStep, start }: { atoms: Atom[]; index: { file: string; groups: NdxGroup[] }; onStep: (s: Step, keep?: boolean) => void; start?: { within: string } }) {
+function RuleForm({ atoms, index, onStep, start, nextGroup = true }: { atoms: Atom[]; index: { file: string; groups: NdxGroup[] }; onStep: (s: Step, keep?: boolean) => void; start?: { within: string }; nextGroup?: boolean }) {
   // A form opened by Shift+Enter in the group before starts as an atom-name rule in the same residue name, focused.
   const [kind, setKind] = React.useState<Kind>(start ? 'name' : 'resname')
   const [value, setValue] = React.useState('')
@@ -107,7 +108,7 @@ function RuleForm({ atoms, index, onStep, start }: { atoms: Atom[]; index: { fil
         <Button variant="ghost" size="sm" disabled={!r} onClick={() => go('remove')}>− remove</Button>
       </div>
       {kind === 'name' && <NameMenu atoms={atoms} resn={within.trim()} value={value} onChange={setValue} />}
-      {kind === 'name' && <p className="m-0 text-caption text-muted-foreground"><Kbd>Enter</Kbd> adds the rule and closes it · <Kbd>Shift</Kbd>+<Kbd>Enter</Kbd> adds it and starts a new selection group with the same residue name</p>}
+      {kind === 'name' && <p className="m-0 text-caption text-muted-foreground"><Kbd>Enter</Kbd> adds the rule and closes it · <Kbd>Shift</Kbd>+<Kbd>Enter</Kbd> adds it and {nextGroup ? 'starts a new selection group' : 'keeps this form open for another rule'} with the same residue name</p>}
       {value.trim() && names?.problems.map(p => <FieldHint key={p} error>✗ {p}</FieldHint>)}
       {unknown.length > 0 && <FieldHint error>✗ 0 atoms: {unknown.join(', ')}{within.trim() ? ' in ' + within.trim() : ' in this structure'}</FieldHint>}
       {r && <span className="text-caption text-muted-foreground">{picked ? picked.label + ' · ' + picked.atoms.length + ' atoms' : ruleText(r) + ' · ' + groupAtoms(atoms, [{ op: 'add', rule: r }]).length + ' atoms'}</span>}
@@ -169,7 +170,7 @@ function GroupCard({ group, atoms, index, nrs, others, current, onCurrent, onCha
         onChange={e => setTyped(e.target.value)} onBlur={commitTyped} onKeyDown={e => { if (e.key === 'Enter') commitTyped(); if (e.key === 'Escape') setTyped(null) }} />
       {typedError && <FieldHint error>✗ {typedError}</FieldHint>}
       {beyond.length > 0 && <FieldHint error>✗ atoms {toRanges(beyond)} are beyond the structure's {atoms.length}</FieldHint>}
-      {rule ? <RuleForm atoms={atoms} index={index} start={opened !== undefined ? { within: opened } : undefined} onStep={(s, keep) => {
+      {rule ? <RuleForm atoms={atoms} index={index} start={opened !== undefined ? { within: opened } : undefined} nextGroup={!!onNext} onStep={(s, keep) => {
         steps([...group.steps, s])
         setRule(!!keep && !onNext)
         if (keep && onNext) onNext(s.rule.kind === 'names' ? s.rule.resn ?? '' : '')
@@ -208,6 +209,9 @@ export function Groups({ draft, setDraft }: { draft: Draft; setDraft: React.Disp
   if (!structure) return <p className="m-0 text-control text-muted-foreground" aria-live="polite">reading the structure…</p>
   if ('error' in structure) return <p className="m-0 text-control text-destructive">✗ {structure.error}</p>
   const ref = draft.groups[0], names = (i: number) => draft.groups.filter((_, j) => j !== i).map(g => g.name)
+  // What the picked command calls its groups, and how many it takes after the first (R9: gmx rmsf takes one).
+  const command = commandOf(draft.analysis ?? 'rdf') ?? rdfCommand, roles = rolesOf(command), others = draft.groups.length - 1
+  const canAdd = roles.max === undefined || others < roles.max, title = (w: string) => w[0].toUpperCase() + w.slice(1)
   const addSelection = () => setDraft(d => ({ ...d, groups: [...d.groups, { role: 'selection', name: 'selection' + d.groups.length, tone: TONES[d.groups.length % TONES.length], steps: [] }] }))
   // Each name its own curve: the next rule goes into a new selection group, which clicks then fill too.
   const nextGroup = (resn: string) => { const i = draft.groups.length; addSelection(); setCurrent(i); setOpened({ i, resn }) }
@@ -222,16 +226,19 @@ export function Groups({ draft, setDraft }: { draft: Draft; setDraft: React.Disp
         </p>
       </div>
       <div className="flex flex-col gap-3">
-        <Section label="Reference" />
-        <GroupCard group={ref} atoms={structure.atoms} index={index} nrs={sets[0]} others={names(0)} current={current === 0} onCurrent={() => setCurrent(0)} onChange={g => setGroup(0, g)} onNext={nextGroup} />
-        <Section label={'Selections ' + String(draft.groups.length - 1).padStart(2, '0')}><Button variant="dashed" size="sm" shape="pill" onClick={() => { setOpened(null); addSelection() }}><Plus /> group</Button></Section>
+        <Section label={title(roles.first)} />
+        <GroupCard group={ref} atoms={structure.atoms} index={index} nrs={sets[0]} others={names(0)} current={current === 0} onCurrent={() => setCurrent(0)} onChange={g => setGroup(0, g)} onNext={canAdd ? nextGroup : undefined} />
+        {roles.max === 0 ? others > 0 && <Section label={'Not used by gmx ' + command.tool + ' ' + String(others).padStart(2, '0')}><span className="text-caption text-muted-foreground">it takes one group</span></Section>
+          : <Section label={title(roles.rest) + 's ' + String(others).padStart(2, '0')}>{canAdd ? <Button variant="dashed" size="sm" shape="pill" onClick={() => { setOpened(null); addSelection() }}><Plus /> group</Button>
+            : <span className="text-caption text-muted-foreground">gmx {command.tool} takes {roles.max === 1 ? 'one' : roles.max}</span>}</Section>}
         {draft.groups.slice(1).map((g, k) => {
           const i = k + 1
           return <GroupCard key={keys.keys[i]} group={g} atoms={structure.atoms} index={index} nrs={sets[i]} others={names(i)} current={current === i} onCurrent={() => setCurrent(i)} onChange={x => setGroup(i, x)}
-            onNext={nextGroup} opened={opened?.i === i ? opened.resn : undefined}
-            onRemove={draft.groups.length > 2 ? () => { setDraft(d => ({ ...d, groups: d.groups.filter((_, j) => j !== i) })); setCardKeys(c => removeKey(c, i)); setCurrent(0); setOpened(null) } : undefined} />
+            onNext={canAdd ? nextGroup : undefined} opened={opened?.i === i ? opened.resn : undefined}
+            onRemove={others > roles.min ? () => { setDraft(d => ({ ...d, groups: d.groups.filter((_, j) => j !== i) })); setCardKeys(c => removeKey(c, i)); setCurrent(0); setOpened(null) } : undefined} />
         })}
-        {draft.groups.slice(1).map((g, k) => {
+        {/* RDF's own advice: other commands read shared atoms otherwise (gmx hbond refuses some, R8). */}
+        {command.tool === 'rdf' && draft.groups.slice(1).map((g, k) => {
           const both = shared(sets[0], sets[k + 1])
           if (!both.length) return null
           return (

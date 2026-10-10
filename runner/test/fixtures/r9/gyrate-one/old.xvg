@@ -1,0 +1,48 @@
+# This file was created Sat Oct 10 04:22:08 2026
+# Created by:
+#                  :-) GROMACS - gmx gyrate-legacy, 2025.4 (-:
+# 
+# Executable:   /opt/gromacs-2025.4/bin/gmx
+# Data prefix:  /opt/gromacs-2025.4
+# Working dir:  /home/user/sim/na2so4/nvt
+# Command line:
+#   gmx gyrate-legacy -s nvt.tpr -f nvt.xtc -n cmp/one.ndx -o cmp/old.xvg
+# gmx gyrate-legacy is part of G R O M A C S:
+#
+# GRowing Old MAkes el Chrono Sweat
+#
+@    title "Radius of gyration (total and around axes)"
+@    xaxis  label "Time (ps)"
+@    yaxis  label "Rg (nm)"
+@TYPE xy
+@ view 0.15, 0.15, 0.75, 0.85
+@ legend on
+@ legend box on
+@ legend loctype view
+@ legend 0.78, 0.8
+@ legend length 2
+@ s0 legend "Rg"
+@ s1 legend "Rg\sX\N"
+@ s2 legend "Rg\sY\N"
+@ s3 legend "Rg\sZ\N"
+         0    0.121679   0.0966062   0.0997231    0.101656
+         1    0.105508   0.0874691   0.0845706   0.0863756
+         2    0.109886   0.0935872   0.0863516   0.0890768
+         3    0.106119   0.0873397   0.0876239   0.0849476
+         4    0.108673   0.0921228   0.0875055   0.0864624
+         5    0.107113   0.0891805   0.0864145   0.0867505
+         6    0.107732   0.0865446   0.0896189   0.0876973
+         7    0.104282    0.082464    0.086265   0.0866447
+         8    0.115226   0.0924332   0.0946707   0.0951201
+         9    0.103857   0.0834575   0.0891053   0.0816546
+        10    0.108447   0.0883829   0.0889383   0.0883182
+        11    0.108646    0.087648   0.0900013   0.0884628
+        12    0.112541   0.0893475   0.0924586   0.0938049
+        13    0.118916   0.0976638   0.0980314    0.095571
+        14     0.11515   0.0914219   0.0940364   0.0965309
+        15    0.115428   0.0927018   0.0914232   0.0984653
+        16    0.110856   0.0877567   0.0894959   0.0941674
+        17    0.107344   0.0889513   0.0881443   0.0858133
+        18    0.108418   0.0882708   0.0868805    0.090382
+        19    0.111744   0.0928182   0.0882825   0.0925432
+        20    0.103613   0.0839717   0.0844494   0.0853708

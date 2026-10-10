@@ -6,7 +6,7 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, statSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import { atomTable, type Atom } from '../src/lib/atoms';
-import { allNames, COMMANDS, commandOf, type InputSlot, type OutputNames, type RunIo } from '../src/lib/commands';
+import { allNames, COMMANDS, commandOf, roleProblems, type CommandDef, type InputSlot, type OutputNames, type RunIo } from '../src/lib/commands';
 import { awhFrames, awhNames, framesWritten, type AwhFrame } from '../src/lib/awh';
 import { commonFolder, listFile, whamOutputNames } from '../src/lib/wham';
 import { parseDistanceStats } from '../src/lib/distance';
@@ -130,7 +130,7 @@ export async function planRun(ctx: Ctx, req: RunRequest, roots: string[]): Promi
   if (cmd.stdin) {
     // The terms are numbers from this file's own menu (T99): checked against it here, as gmx would refuse them.
     if (cmd.tool === 'energy') problems.push(...energyProblems(req.terms ?? [], await energyMenu(ctx.gmx, first!)));
-    stdin = cmd.stdin({ terms: req.terms ?? [] });
+    stdin = cmd.stdin({ terms: req.terms ?? [], selections: (req.groups?.length || 1) - 1 });
   }
   let names = cmd.outputNames(stem, options);
   if (frames) {
@@ -155,12 +155,13 @@ async function mapLimit<T, R>(items: T[], limit: number, f: (x: T) => Promise<R>
   return out;
 }
 
-/** The groups' atoms from the structure file, as the GUI computed them; names and emptiness refused here too. */
-function groupsAtoms(req: RunRequest, roots: string[]): { atoms: Atom[]; sets: number[][] } {
+/** The groups' atoms from the structure file, as the GUI computed them; their number, names and emptiness refused here too. */
+function groupsAtoms(cmd: CommandDef, req: RunRequest, roots: string[]): { atoms: Atom[]; sets: number[][] } {
   if (!req.inputs.structure) throw new HttpError(400, 'a structure is needed for the groups');
   const path = inside(req.inputs.structure, roots), text = readFileSync(path, 'utf8'), format = structFormat(path, text);
   if (!format) throw new HttpError(400, path + ' is not a .gro or .pdb');
-  if (!Array.isArray(req.groups) || req.groups.length < 2) throw new HttpError(400, 'a reference and at least one selection are needed');
+  const count = roleProblems(cmd, Array.isArray(req.groups) ? req.groups.length : 0);
+  if (count.length) throw new HttpError(400, count.join('\n'));
   const names = req.groups.map(g => g.name), atoms = atomTable(text, format);
   const sets = req.groups.map((g, i) => {
     const bad = nameProblem(g.name, names.filter((_, j) => j !== i));
@@ -198,7 +199,7 @@ export async function startRun(ctx: Ctx, req: RunRequest, roots: string[]): Prom
   // Only a command with groups has an index to check against the structure and to write (R3a).
   let atoms: Atom[] = [], groups: { name: string; atoms: number[] }[] = [], d: Awaited<ReturnType<typeof dumpRunInput>> | null = null, sizes: number[] | null = null;
   if (cmd.groups) {
-    const picked = groupsAtoms(req, roots);
+    const picked = groupsAtoms(cmd, req, roots);
     atoms = picked.atoms;
     groups = req.groups.map((g, i) => ({ name: g.name, atoms: picked.sets[i] }));
     // What the command would get wrong with these groups (gmx distance's pairs of unequal sizes, R7): refused here.
@@ -239,7 +240,7 @@ export async function startRun(ctx: Ctx, req: RunRequest, roots: string[]): Prom
   const estimate = d && cmd.groups ? runEstimate(frameEstimate(d, inputs.trajectory!.path), req.options || {}) : null;
   const env = { ...Object.fromEntries(Object.entries(process.env).filter(([k]) => k.startsWith('GMX'))) as Record<string, string>, ...plan.env };
   const job = ctx.jobs.start({
-    kind: plan.tool, title: cmd.groups ? plan.stem + ' · ' + req.groups[0].name + ' → ' + req.groups.slice(1).map(g => g.name).join(', ') : plan.stem + ' · gmx ' + plan.tool,
+    kind: plan.tool, title: !cmd.groups ? plan.stem + ' · gmx ' + plan.tool : plan.stem + ' · ' + req.groups[0].name + (req.groups.length > 1 ? ' → ' + req.groups.slice(1).map(g => g.name).join(', ') : ''),
     file: plan.file, args: plan.argv, cwd: plan.cwd, env: plan.env, meta: { stem: plan.stem, outDir: plan.outDir, record: recordPath, names: plan.names, estimate },
     ...(plan.stdin != null ? { stdin: plan.stdin } : {}),
   });

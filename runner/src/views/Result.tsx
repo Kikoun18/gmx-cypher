@@ -11,7 +11,7 @@ import { awhTargetError } from '../lib/awh'
 import { neighbourOverlaps, overlapNotes, parseBootstrap, parseHistograms } from '../lib/wham'
 import { COMMANDS } from '../lib/commands'
 import { driftLarger, type EnergyRow } from '../lib/energy'
-import { countStats } from '../lib/hbond'
+import { curveStats } from '../lib/curves'
 import { firstPeak, resultSeries } from '../lib/rdf'
 import { parseTable } from '../../../app/src/lib/seq'
 import type { RunRecord } from '../lib/record'
@@ -286,7 +286,7 @@ function HbondChart({ job, record }: { job: Job; record: RunRecord }) {
   const files = record.outputs.map(o => o.path.split('/').pop()!), named = (suffix: string) => files.find(n => n.endsWith(suffix)) ?? null
   const xvg = useOutput(job.id, 'xvg'), dist = useNamed(job.id, named('_dist.xvg')), ang = useNamed(job.id, named('_ang.xvg')), dan = useNamed(job.id, named('_dan.xvg'))
   if (xvg == null || dist == null || ang == null || dan == null) return <p className="m-0 text-caption text-muted-foreground" aria-live="polite">reading the H-bonds…</p>
-  const [ref, target] = record.groups, curves = resultSeries(xvg), stats = countStats(curves[0]?.points ?? [])
+  const [ref, target] = record.groups, curves = resultSeries(xvg), stats = curveStats(curves[0]?.points ?? [])
   const series: ChartSeries[] = curves.map((c, i) => ({ label: i ? c.label.toLowerCase() : 'H-bonds', points: c.points, tone: target?.tone ?? 'coral', ...(i ? { dash: 1, state: 'dim' as const } : {}) }))
   const legacy = record.analysis === 'hbond-legacy'
   const distribution = (text: string, label: string, xLabel: string, yLabel: string) => <>
@@ -312,6 +312,36 @@ function HbondChart({ job, record }: { job: Job; record: RunRecord }) {
   )
 }
 
+/**
+ * A quantity per group over time (R9), one curve each in the group's tone, and a tile each: the mean with its standard
+ * deviation over the frames, and the last value. `groups` are the curves' groups, in the file's column order.
+ */
+function GroupSeries({ job, groups, yLabel, unit, note }: { job: Job; groups: { name: string; tone: Tone }[]; yLabel: string; unit: string; note: string }) {
+  const xvg = useOutput(job.id, 'xvg')
+  if (xvg == null) return <p className="m-0 text-caption text-muted-foreground" aria-live="polite">reading the result…</p>
+  const curves = resultSeries(xvg), at = (i: number) => groups[i] ?? { name: curves[i].label, tone: TONES_FOR_TERMS[i % 8] }
+  return (
+    <div className="flex flex-col gap-3">
+      <LineChart series={curves.map((c, i) => ({ label: at(i).name, points: c.points, tone: at(i).tone }))} xLabel="time (ps)" yLabel={yLabel} height={240} legend={curves.length > 1} zeroLine={false} />
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3">
+        {curves.map((c, i) => {
+          const st = curveStats(c.points)
+          return st && <Stat key={i} label={at(i).name + ' · mean'} value={st.mean.toFixed(3) + ' ' + unit} hint={'± ' + st.sd.toFixed(3) + ' (standard deviation) · last ' + st.last.toFixed(3) + ' · ' + st.frames + ' frames'} />
+        })}
+      </div>
+      <p className="m-0 text-caption text-muted-foreground">{note}</p>
+    </div>
+  )
+}
+
+/** gmx rms (R9a): the fit group's RMSD and each further group's, after the fit. */
+function RmsChart({ job, record }: { job: Job; record: RunRecord }) {
+  const fit = String(record.options.find(o => o.flag === 'fit')?.value ?? 'rot+trans'), prev = Number(record.options.find(o => o.flag === 'prev')?.value ?? 0)
+  const against = prev > 0 ? 'the frame ' + prev + ' frame' + (prev > 1 ? 's' : '') + ' before' : "the run input's structure"
+  const how = fit === 'none' ? 'without a fit' : 'after a fit of ' + record.groups[0]?.name + ' (' + (fit === 'translation' ? 'translation only' : 'rotation and translation') + ')'
+  return <GroupSeries job={job} groups={record.groups} yLabel="RMSD (nm)" unit="nm" note={'against ' + against + ', ' + how + (record.groups.length > 1 ? ' · PMF Sequences takes the first curve, ' + record.groups[0].name : '')} />
+}
+
 /** What a run wrote, its result, its groups as gmx counted them, and "run again" (sections 10.5, 11.4). */
 export function RunResult({ job, onRunAgain, vault }: { job: Job; onRunAgain: (r: RunRecord) => void; vault: string | null }) {
   const r = useRecord(job)
@@ -326,7 +356,7 @@ export function RunResult({ job, onRunAgain, vault }: { job: Job; onRunAgain: (r
       {rec.problems.length > 0 && (
         <Alert variant="warning"><TriangleAlert /><AlertTitle>gmx-cypher's promise was broken</AlertTitle><AlertDescription>{rec.problems.map(p => <p key={p}>{p}</p>)}</AlertDescription></Alert>
       )}
-      {job.status === 'done' && (job.kind === 'energy' ? <EnergyChart job={job} record={rec} /> : job.kind === 'awh' ? <AwhChart job={job} record={rec} /> : job.kind === 'wham' ? <WhamChart job={job} record={rec} /> : job.kind === 'distance' ? <DistanceChart job={job} record={rec} /> : job.kind === 'hbond' || job.kind === 'hbond-legacy' ? <HbondChart job={job} record={rec} /> : <RdfChart job={job} record={rec} />)}
+      {job.status === 'done' && (job.kind === 'energy' ? <EnergyChart job={job} record={rec} /> : job.kind === 'awh' ? <AwhChart job={job} record={rec} /> : job.kind === 'wham' ? <WhamChart job={job} record={rec} /> : job.kind === 'distance' ? <DistanceChart job={job} record={rec} /> : job.kind === 'hbond' || job.kind === 'hbond-legacy' ? <HbondChart job={job} record={rec} /> : job.kind === 'rms' ? <RmsChart job={job} record={rec} /> : <RdfChart job={job} record={rec} />)}
       {rec.groups.length > 0 && <Section label="Groups" />}
       {rec.groups.length > 0 && <table className="text-control"><tbody>
         {rec.groups.map(g => (

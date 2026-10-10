@@ -12,7 +12,7 @@ import { ToggleGroup, ToggleGroupItem } from '../ui/toggle-group'
 import { getJson, postJson, type GmxState } from '../api'
 import type { Draft } from '../draft'
 import { commandText } from '../lib/command'
-import { formHelp, type CommandDef, type CommandOption } from '../lib/commands'
+import { formHelp, roleProblems, rolesOf, type CommandDef, type CommandOption } from '../lib/commands'
 import type { HelpOption } from '../lib/gmxText'
 import { groupAtoms, nameProblem } from '../lib/groups'
 import { DEFAULT_TEMPLATE, NAME_TOKENS } from '../lib/names'
@@ -142,7 +142,8 @@ export function GroupCommand({ command, gmx, draft, setDraft, onStarted }: ViewP
   const sets = atoms ? draft.groups.map(g => groupAtoms(atoms, g.steps)) : null, counts = sets?.map(s => s.length) ?? null
   const plan = planned?.plan
   const names = draft.groups.map(g => g.name)
-  const groupProblems = counts ? command.groupProblems?.(options, counts, names, sets!) ?? [] : []
+  // Too many or too few groups for this command (R9), then what it would get wrong with these.
+  const roles = rolesOf(command), groupProblems = [...roleProblems(command, draft.groups.length), ...(counts ? command.groupProblems?.(options, counts, names, sets!) ?? [] : [])]
   const blockers = [
     !draft.inputs.structure && 'pick a structure in inputs: the groups are built on it',
     problems.length && 'change the options gmx would refuse',
@@ -205,7 +206,7 @@ export function GroupCommand({ command, gmx, draft, setDraft, onStarted }: ViewP
                 <td className="py-0.5 pr-4 text-muted-foreground">group {i}</td>
                 <td className={cn('pr-4 font-bold', toneText[g.tone])}>{g.name}</td>
                 <td className="text-right">{counts ? counts[i] + ' atoms' : '…'}</td>
-                <td className="pl-3 text-caption text-muted-foreground">{i === 0 ? 'reference' : tool.startsWith('hbond') ? 'target' : 'selection'}</td>
+                <td className="pl-3 text-caption text-muted-foreground">{i === 0 ? roles.first : roles.rest}</td>
               </tr>
             ))}
           </tbody></table>

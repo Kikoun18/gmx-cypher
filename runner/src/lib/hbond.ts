@@ -1,10 +1,12 @@
 // `gmx hbond` (R8): two tools under GROMACS's names. The selection tool (`gmx hbond` from 2024; -r and -t are
 // selections) and the legacy one (`gmx hbond-legacy` from 2024, and `gmx hbond` before it: 2023.3 checked; groups
 // asked on stdin). Each has its own criteria, never mixed (question 33). Every rule here was checked with 2025.4.
+import type { CommandOption } from './commands';
+import { checkOptions, numberProblems, optionArgs } from './form';
 import type { HelpOption } from './gmxText';
-import { isDefault, type Options } from './rdf';
+import type { Options } from './rdf';
 
-type FormOption = { flag: string; group: string; label: string; unit?: string; what: string; switch?: string };
+type FormOption = CommandOption;
 
 /** Which tool a `gmx <name> -h` describes: -t a selection (the selection tool), -r a distance (legacy), or neither. */
 export function hbondKind(help: HelpOption[]): 'selection' | 'legacy' | null {
@@ -44,28 +46,9 @@ export const LEGACY_FORM: FormOption[] = [
   { flag: 'ang', group: 'output', label: 'angle distribution too', what: 'not sent to the vault; needs merging off', switch: 'ang' },
 ];
 
-/** Set whatever the form says: PMF Sequences reads ps and the xmgrace @ lines (as T22 for rdf). */
-const FIXED: Record<string, string> = { tu: 'ps', xvg: 'xmgrace' };
-const NUMBERS = ['b', 'e', 'dt', 'cutoff', 'hbr', 'hba', 'r', 'a'];
-
-function numberProblems(options: Options, by: Map<string, HelpOption>): string[] {
-  const p: string[] = [];
-  for (const f of NUMBERS) {
-    const v = options[f];
-    if (v === undefined || v === '') continue;
-    const n = Number(v);
-    if (typeof v !== 'string' || !v.trim() || !Number.isFinite(n)) p.push('-' + f + ': not a number: ' + v);
-    else if (['hba', 'r', 'a', 'hbr'].includes(f) && n <= 0) p.push('-' + f + ' must be above 0');
-    else if (f === 'dt' && n < 0) p.push('-dt must be 0 or more');
-  }
-  const b = Number(options.b ?? by.get('b')?.default ?? 0), e = Number(options.e || 0);
-  if (!p.length && e > 0 && e <= b) p.push('-e must be after -b');
-  return p;
-}
-
 /** What the selection tool would refuse, in words (2025.4 refuses -cutoff below 0.35 and -hbr above -cutoff). */
 export function hbondOptionProblems(options: Options, help: HelpOption[]): string[] {
-  const by = new Map(help.map(o => [o.flag, o])), p = numberProblems(options, by);
+  const by = new Map(help.map(o => [o.flag, o])), p = numberProblems(options, help, ['cutoff', 'hbr', 'hba'], ['hbr', 'hba']);
   const value = (f: string) => Number(options[f] === undefined || options[f] === '' ? by.get(f)?.default : options[f]);
   if (!p.length && value('cutoff') < 0.35) p.push('-cutoff must be 0.35 nm or more');
   else if (!p.length && value('hbr') > value('cutoff')) p.push('-hbr must not exceed -cutoff (' + value('cutoff') + ' nm)');
@@ -78,61 +61,34 @@ export function hbondOptionProblems(options: Options, help: HelpOption[]): strin
 
 /** What the legacy tool would refuse: with merging on (its default) it can't write the angle distribution. */
 export function legacyOptionProblems(options: Options, help: HelpOption[]): string[] {
-  const p = numberProblems(options, new Map(help.map(o => [o.flag, o])));
+  const p = numberProblems(options, help, ['r', 'a'], ['r', 'a']);
   if (options.ang === true && options.merge !== false) p.push("the angle distribution can't be written while H-bonds are merged: switch merging off (-nomerge)");
   return p;
 }
 
-const oneTarget = (tool: string, counts: number[]) => (counts.length === 2 ? [] : ['gmx ' + tool + ' takes one target group after the reference, not ' + (counts.length - 1)]);
-
-/** One target; and for the selection tool, the reference and the target are the same atoms or share none (its -h). */
-export function hbondGroupProblems(_o: Options, counts: number[], names: string[], sets?: number[][]): string[] {
-  const one = oneTarget('hbond', counts);
-  if (one.length || !sets) return one;
+/** The reference and the target of the selection tool are the same atoms or share none (2025.4: "Partial overlap between groups"). */
+export function hbondGroupProblems(_o: Options, _counts: number[], names: string[], sets?: number[][]): string[] {
+  if (!sets || sets.length !== 2) return [];
   const ref = new Set(sets[0]), shared = sets[1].filter(n => ref.has(n)).length;
   const same = shared === sets[0].length && shared === sets[1].length;
   return shared && !same ? [names[0] + ' and ' + names[1] + ' share ' + shared + ' atom' + (shared > 1 ? 's' : '') + ': gmx hbond needs the same atoms or none in common'] : [];
-}
-export const legacyGroupProblems = (_o: Options, counts: number[], _names: string[]) => oneTarget('hbond-legacy', counts);
-
-function check(tool: string, form: FormOption[], options: Options, help: HelpOption[]) {
-  const has = new Set(help.map(o => o.flag)), by = new Map(form.map(f => [f.flag, f]));
-  for (const k of Object.keys(options)) {
-    const f = by.get(k);
-    if (!f) throw new Error('-' + k + ' is not an option gmx-cypher sets for ' + tool);
-    if (!has.has(f.switch ?? k)) throw new Error('this gmx ' + tool + ' has no -' + (f.switch ?? k));
-  }
-  return by;
-}
-
-/** The options that differ from the installed defaults, in -h order; element lists as one token each (as typed in a shell). */
-function optionArgs(form: Map<string, FormOption>, options: Options, help: HelpOption[]): string[] {
-  const args: string[] = [];
-  for (const o of help) {
-    const f = form.get(o.flag);
-    const v = FIXED[o.flag] ?? (f && !f.switch ? options[o.flag] : undefined);
-    if (isDefault(o, v)) continue;
-    if (o.flag === 'de' || o.flag === 'ae') args.push('-' + o.flag, ...String(v).trim().split(/\s+/));
-    else args.push(...(o.type === 'bool' ? [(v ? '-' : '-no') + o.flag] : ['-' + o.flag, String(v)]));
-  }
-  return args;
 }
 
 export type HbondIo = { trajectory: string; runInput: string; index: string; output: string; hbonds: string; dist: string; ang: string; dan: string };
 
 /** The selection tool: its index of the bonds always (-o, named by gmx-cypher), the count, then -r and -t by number. */
 export function hbondArgv(r: { options: Options; selections: number }, io: HbondIo, help: HelpOption[]): string[] {
-  const form = check('hbond', HBOND_FORM, r.options, help);
+  const form = checkOptions('hbond', HBOND_FORM, r.options, help);
   const args = ['hbond', '-f', io.trajectory, '-s', io.runInput, '-n', io.index, '-o', io.hbonds, '-num', io.output];
   for (const s of ['dist', 'ang', 'dan'] as const) if (r.options[s] === true) args.push('-' + s, io[s]);
-  return [...args, ...optionArgs(form, r.options, help), '-r', 'group 0', '-t', 'group 1'];
+  return [...args, ...optionArgs(form, r.options, help, undefined, ['de', 'ae']), '-r', 'group 0', '-t', 'group 1'];
 }
 
 export type LegacyIo = Omit<HbondIo, 'hbonds' | 'dan'>;
 
 /** The legacy tool: the count, and the groups as answers on stdin (legacyStdin). gmx-cypher sets argv[0] to the tool found. */
 export function legacyArgv(r: { options: Options; selections: number }, io: LegacyIo, help: HelpOption[]): string[] {
-  const form = check('hbond-legacy', LEGACY_FORM, r.options, help);
+  const form = checkOptions('hbond-legacy', LEGACY_FORM, r.options, help);
   const args = ['hbond-legacy', '-f', io.trajectory, '-s', io.runInput, '-n', io.index, '-num', io.output];
   for (const s of ['dist', 'ang'] as const) if (r.options[s] === true) args.push('-' + s, io[s]);
   return [...args, ...optionArgs(form, r.options, help)];
@@ -157,9 +113,3 @@ export const HBOND_SUMMARY = /^Selection '.*' has \d+ acceptors and \d+ donors\.
 export const LEGACY_SUMMARY = /^(Found \d+ donors and \d+ acceptors|Average number of hbonds per timeframe .*)$/;
 export const summaryLines = (text: string, re: RegExp) => text.split('\n').map(l => l.trim()).filter(l => re.test(l));
 
-/** The count over time in numbers: its mean per frame (the legacy tool prints the same), lowest and highest. */
-export function countStats(points: [number, number][]) {
-  if (!points.length) return null;
-  const ys = points.map(p => p[1]);
-  return { frames: ys.length, mean: ys.reduce((a, b) => a + b, 0) / ys.length, min: Math.min(...ys), max: Math.max(...ys) };
-}

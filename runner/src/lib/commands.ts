@@ -8,9 +8,10 @@ import type { HelpOption } from './gmxText';
 import { ENERGY_FORM, energyArgv, energyOptionProblems, energyStdin } from './energy';
 import {
   HBOND_FORM, HBOND_SUFFIXES, HBOND_SUMMARY, hbondArgv, hbondGroupProblems, hbondKind, hbondNames, hbondOptionProblems, LEGACY_FORM, LEGACY_SUMMARY,
-  legacyArgv, legacyGroupProblems, legacyNames, legacyOptionProblems, legacyStdin, type HbondIo, type LegacyIo,
+  legacyArgv, legacyNames, legacyOptionProblems, legacyStdin, type HbondIo, type LegacyIo,
 } from './hbond';
 import { outputNames } from './names';
+import { RMS_FORM, rmsArgv, rmsOptionProblems, rmsStdin, type RmsIo } from './rms';
 import { FORM, rdfArgs, rdfIo, recipeProblems, relPath, type Options, type RdfIo } from './rdf';
 
 export type InputSlot = 'trajectory' | 'runInput' | 'structure' | 'index' | 'edr';
@@ -49,8 +50,10 @@ export interface CommandDef {
   inputs: InputSlot[];
   /** The inputs a run cannot start without. The first names the folder of its outputs: `<its folder>/<tool>`. */
   required: InputSlot[];
-  /** Whether it takes atom groups (a reference and selections, picked in 3D). */
+  /** Whether it takes atom groups (picked in 3D): a reference and selections, unless `roles` says otherwise. */
   groups: boolean;
+  /** What its groups are, when not a reference and one or more selections (R9: gmx rmsf takes one group). */
+  roles?: Roles;
   /** The options it offers, each with a note; the rest of gmx's options are not offered. */
   options: CommandOption[];
   /** The file names of one run, from its stem (and its options, where they switch outputs on). */
@@ -70,8 +73,8 @@ export interface CommandDef {
   argv(request: { options: Options; selections: number; pull?: 'pullx' | 'pullf' }, io: RunIo, help: HelpOption[]): string[];
   /** What gmx would get wrong with these groups (their atom counts, and their atoms when known), in words: refused before anything runs. */
   groupProblems?(options: Options, counts: number[], names: string[], sets?: number[][]): string[];
-  /** The answers gmx reads on stdin, for a command that asks questions (T99): gmx energy's terms by number, the legacy H-bond tool's groups. */
-  stdin?(r: { terms: number[] }): string;
+  /** The answers gmx reads on stdin, for a command that asks questions (T99): gmx energy's terms by number, the groups of the tools that ask for them. */
+  stdin?(r: { terms: number[]; selections: number }): string;
   /**
    * Which gmx tool this command is, when the name alone doesn't say (R8): the names tried in order, the first whose -h
    * `accepts` runs, and why none did. `unless` names a command that, when this gmx has it, is offered instead.
@@ -79,6 +82,23 @@ export interface CommandDef {
   find?: { tools: string[]; accepts(help: HelpOption[]): boolean; missing: string; unless?: { tool: string; why: string } };
   /** The lines of gmx's output the result shows and the record keeps (R8: the donors and acceptors gmx hbond found). */
   summary?: RegExp;
+}
+
+/**
+ * What a command's groups are (R9): the first group's role, the others' role, and how many others it takes (at least
+ * `min`, at most `max`). The groups step and the form name them so, and a run with another number is refused.
+ */
+export interface Roles { first: string; rest: string; min: number; max?: number }
+const REFERENCE_AND_SELECTIONS: Roles = { first: 'reference', rest: 'selection', min: 1 };
+export const rolesOf = (c: CommandDef): Roles => c.roles ?? REFERENCE_AND_SELECTIONS;
+
+/** The number of groups a command can't take, in words: too few after the first, or too many. */
+export function roleProblems(c: CommandDef, groups: number): string[] {
+  const r = rolesOf(c), others = groups - 1;
+  if (groups < 1 || others < r.min) return [r.min ? 'a ' + r.first + ' and at least ' + (r.min === 1 ? 'one ' + r.rest : r.min + ' ' + r.rest + 's') + ' are needed' : 'a ' + r.first + ' is needed'];
+  if (r.max === undefined || others <= r.max) return [];
+  return [r.max ? 'gmx ' + c.tool + ' takes ' + (r.max === 1 ? 'one ' + r.rest + ' group' : r.max + ' ' + r.rest + ' groups') + ' after the ' + r.first + ', not ' + others
+    : 'gmx ' + c.tool + ' takes one group, the ' + r.first + ': remove the other ' + (others === 1 ? 'one' : others)];
 }
 
 export const rdfCommand: CommandDef = {
@@ -228,6 +248,7 @@ export const hbondCommand: CommandDef = {
   io: hbondIo,
   problems: hbondOptionProblems,
   argv: (r, io, help) => hbondArgv(r, io as HbondIo, help),
+  roles: { first: 'reference', rest: 'target', min: 1, max: 1 },
   groupProblems: hbondGroupProblems,
   find: { tools: ['hbond'], accepts: h => hbondKind(h) === 'selection', missing: "this gmx's gmx hbond is the legacy tool (before GROMACS 2024): pick gmx hbond-legacy" },
   summary: HBOND_SUMMARY,
@@ -251,7 +272,7 @@ export const hbondLegacyCommand: CommandDef = {
   io: hbondIo,
   problems: legacyOptionProblems,
   argv: (r, io, help) => legacyArgv(r, io as LegacyIo, help),
-  groupProblems: legacyGroupProblems,
+  roles: { first: 'reference', rest: 'target', min: 1, max: 1 },
   stdin: legacyStdin,
   // gmx hbond first: its -h is read for the selection tool anyway, so a gmx before 2024 answers without a failed call.
   find: {
@@ -261,7 +282,35 @@ export const hbondLegacyCommand: CommandDef = {
   summary: LEGACY_SUMMARY,
 };
 
-export const COMMANDS: CommandDef[] = [rdfCommand, distanceCommand, hbondCommand, hbondLegacyCommand, energyCommand, awhCommand, whamCommand];
+/** The files of a command whose one output goes to the vault (R9): that .xvg, the groups' index and the record. */
+const oneOutput = (stem: string) => ({ xvg: stem + '.xvg', ndx: stem + '.ndx', record: stem + '.run.json' });
+const trajectoryIo = (p: Partial<Record<InputSlot, string>>, outDir: string, stem: string) => {
+  const { cwd, io } = rdfIo({ trajectory: p.trajectory ?? '', runInput: p.runInput ?? '' }, outDir, stem);
+  return { cwd, io: { trajectory: io.trajectory, runInput: io.runInput, index: io.index, output: io.output } };
+};
+
+/**
+ * gmx rms (R9a): the RMSD over time of the fit group and of each further group, after the fit group is fitted onto the
+ * run input's structure. Its groups are asked for on stdin.
+ */
+export const rmsCommand: CommandDef = {
+  tool: 'rms',
+  title: "RMSD over time, after a fit onto the run input's structure",
+  section: 'trajectory and groups',
+  inputs: ['trajectory', 'runInput', 'structure', 'index'],
+  required: ['trajectory', 'runInput'],
+  groups: true,
+  roles: { first: 'fit group', rest: 'RMSD group', min: 0 },
+  options: RMS_FORM,
+  outputNames: oneOutput,
+  outputs: [{ file: 'xvg', type: 'rmsd', vault: true, why: "PMF Sequences reads its first curve: the fit group's own RMSD" }],
+  io: trajectoryIo,
+  problems: rmsOptionProblems,
+  argv: (r, io, help) => rmsArgv(r, io as RmsIo, help),
+  stdin: r => rmsStdin(r.selections),
+};
+
+export const COMMANDS: CommandDef[] = [rdfCommand, distanceCommand, hbondCommand, hbondLegacyCommand, rmsCommand, energyCommand, awhCommand, whamCommand];
 export const commandOf = (tool: string) => COMMANDS.find(c => c.tool === tool);
 
 /** What a draft holds of commands: the picked one, its options and name template, and the others', kept aside. */

@@ -1,4 +1,4 @@
-import { commandOf, withCommand } from './commands';
+import { commandOf, rdfCommand, roleProblems, withCommand } from './commands';
 // Recipes (R7a, T37): the saved form of a run, without its inputs: options, groups as steps (rules where
 // possible, hand-picked atoms as ranges), the name template and output folder. One recipe serves other
 // trajectories of the same system, and is checked against each system before it runs there.
@@ -46,9 +46,12 @@ export function recipeFileProblems(x: unknown): string[] {
   const analysis = r.analysis ?? 'rdf';
   if (!commandOf(String(analysis))) p.push('analysis ' + analysis + ' is not a command gmx-cypher knows');
   if (!r.options || typeof r.options !== 'object') p.push('options are missing');
-  // A command without groups (R4) has none to check; the others need a reference and at least one selection.
-  if (commandOf(String(analysis))?.groups === false) return p;
-  if (!Array.isArray(r.groups) || r.groups.length < 2) return [...p, 'a reference and at least one selection are needed'];
+  // A command without groups (R4) has none to check; the others need as many as their roles say (R9).
+  const command = commandOf(String(analysis));
+  if (command?.groups === false) return p;
+  if (!Array.isArray(r.groups)) return [...p, 'a reference and at least one selection are needed'];
+  const wrong = roleProblems(command ?? rdfCommand, r.groups.length);
+  if (wrong.length) return [...p, ...wrong];
   r.groups.forEach(g => (Array.isArray(g?.steps) ? g.steps : [null]).forEach((s, i) => {
     if (!s || !KINDS.has(s.rule?.kind)) p.push((g?.name || '?') + ': step ' + (i + 1) + ' is not a rule gmx-cypher knows');
   }));

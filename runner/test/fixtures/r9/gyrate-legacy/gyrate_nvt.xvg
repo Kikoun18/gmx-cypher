@@ -1,0 +1,48 @@
+# This file was created Sat Oct 10 04:21:56 2026
+# Created by:
+#                  :-) GROMACS - gmx gyrate-legacy, 2025.4 (-:
+# 
+# Executable:   /opt/gromacs-2025.4/bin/gmx
+# Data prefix:  /opt/gromacs-2025.4
+# Working dir:  /home/user/sim/na2so4/nvt
+# Command line:
+#   gmx gyrate-legacy -s nvt.tpr -f nvt.xtc -n idx.ndx -o gyrate-legacy/gyrate_nvt.xvg
+# gmx gyrate-legacy is part of G R O M A C S:
+#
+# Gravel Rubs Often Many Awfully Cauterized Sores
+#
+@    title "Radius of gyration (total and around axes)"
+@    xaxis  label "Time (ps)"
+@    yaxis  label "Rg (nm)"
+@TYPE xy
+@ view 0.15, 0.15, 0.75, 0.85
+@ legend on
+@ legend box on
+@ legend loctype view
+@ legend 0.78, 0.8
+@ legend length 2
+@ s0 legend "Rg"
+@ s1 legend "Rg\sX\N"
+@ s2 legend "Rg\sY\N"
+@ s3 legend "Rg\sZ\N"
+         0     1.54799     1.30753     1.05507     1.40347
+         1      1.5373     1.28138     1.07718      1.3872
+         2     1.62188     1.33127     1.16489     1.46005
+         3     1.72403     1.46363     1.13695     1.58421
+         4     1.56049     1.29159     1.10804      1.4051
+         5     1.59411     1.29587     1.17318     1.42363
+         6      1.5986     1.26829     1.21364     1.42465
+         7     1.58868     1.23331     1.22869     1.42023
+         8     1.64978     1.28822     1.34738     1.40306
+         9     1.62326     1.26729     1.32464     1.38175
+        10      1.6348     1.25335     1.34444      1.4024
+        11      1.6186     1.22038      1.3198     1.41723
+        12     1.59926     1.17588     1.31001     1.42002
+        13     1.55522     1.15866     1.27069     1.37122
+        14     1.52694     1.17326     1.20985      1.3501
+        15     1.51823     1.16084     1.20787     1.34295
+        16     1.50014     1.15238     1.19053     1.32496
+        17     1.49606     1.14263     1.17716     1.33607
+        18      1.4975     1.14737     1.17387     1.33813
+        19     1.49872     1.12313     1.18495     1.35159
+        20     1.53802     1.11239     1.21713     1.41852

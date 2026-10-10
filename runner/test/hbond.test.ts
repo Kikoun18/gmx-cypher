@@ -2,9 +2,11 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { parseHelp } from '../src/lib/gmxText';
 import {
-  countStats, hbondArgv, hbondGroupProblems, hbondKind, hbondNames, hbondOptionProblems, HBOND_SUMMARY,
-  legacyArgv, legacyGroupProblems, legacyNames, legacyOptionProblems, LEGACY_SUMMARY, legacyStdin, summaryLines,
+  hbondArgv, hbondGroupProblems, hbondKind, hbondNames, hbondOptionProblems, HBOND_SUMMARY,
+  legacyArgv, legacyNames, legacyOptionProblems, LEGACY_SUMMARY, legacyStdin, summaryLines,
 } from '../src/lib/hbond';
+import { hbondCommand, hbondLegacyCommand, roleProblems } from '../src/lib/commands';
+import { curveStats as countStats } from '../src/lib/curves';
 import { detectAna, getAnalyses, parseTable } from '../../app/src/lib/seq';
 import { resultSeries } from '../src/lib/rdf';
 import { parseGmxHeader } from '../../app/src/lib/gmxHeader';
@@ -60,7 +62,8 @@ describe('the selection tool, gmx hbond 2024+ (R8)', () => {
     expect(hbondGroupProblems({}, [30, 3200], names, [[1, 2], [3, 4]])).toEqual([]);
     expect(hbondGroupProblems({}, [2, 2], names, [[1, 2], [1, 2]])).toEqual([]);
     expect(hbondGroupProblems({}, [2, 2], names, [[1, 2], [2, 3]])).toEqual(['sulfate and water share 1 atom: gmx hbond needs the same atoms or none in common']);
-    expect(hbondGroupProblems({}, [2, 2, 2], [...names, 'x'], [[1], [2], [3]])).toEqual(['gmx hbond takes one target group after the reference, not 2']);
+    expect(roleProblems(hbondCommand, 3)).toEqual(['gmx hbond takes one target group after the reference, not 2']);
+    expect(roleProblems(hbondCommand, 1)).toEqual(['a reference and at least one target are needed']);
   });
 
   it('its files: the count over time for the vault (question 34), gmx\'s own index of the bonds, the rest when asked', () => {
@@ -97,7 +100,7 @@ describe('the legacy tool, gmx hbond-legacy (and gmx hbond before 2024) (R8)', (
   });
 
   it('one target', () => {
-    expect(legacyGroupProblems({}, [1, 1, 1], ['a', 'b', 'c'])).toEqual(['gmx hbond-legacy takes one target group after the reference, not 2']);
+    expect(roleProblems(hbondLegacyCommand, 3)).toEqual(['gmx hbond-legacy takes one target group after the reference, not 2']);
   });
 
   it('its files and what it printed', () => {

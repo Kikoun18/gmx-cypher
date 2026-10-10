@@ -185,6 +185,33 @@ function distance() {
 
 const OLD = process.env.FAKE_GMX_VERSION === '2023.3';
 
+/**
+ * The real outputs of an R9 command in test/fixtures/r9/<dir>, with this run's group names in place of the fixture's
+ * (`names`: fixture name → this run's), written where the flags say; then what gmx printed.
+ */
+function r9Outputs(dir, names, files) {
+  const text = n => readFileSync(new URL('./fixtures/r9/' + dir + '/' + n, import.meta.url), 'utf8');
+  const w = n => text(n).replace(new RegExp('\\b(' + Object.keys(names).join('|') + ')\\b', 'g'), m => names[m]);
+  const log = [];
+  for (const [flag, name] of files) { const o = one(flag); if (o) { backUp(o, log); writeFileSync(o, w(name)); } }
+  process.stdout.write(w('run.stdout'));
+  process.stderr.write(w('run.stderr') + log.join(''));
+}
+
+/** Index groups answered on stdin, by number, as the tools that ask for groups read them; n of them at least. */
+function stdinGroups(n) {
+  const names = groupNames(one('-n')), answers = readFileSync(0, 'utf8').split(/\s+/).filter(Boolean);
+  if (answers.length < n || answers.slice(0, n).some(a => !names[+a])) { process.stderr.write('fake gmx ' + tool + ': ' + n + ' index groups on stdin, not ' + JSON.stringify(answers) + '\n'); process.exit(1); }
+  return answers.slice(0, n).map(a => names[+a]);
+}
+
+/** gmx rms (R9a): the fit group, then -ng groups measured, on stdin; the fixture measured sulfate and sodium after a fit on sulfate. */
+function rms() {
+  const ng = Number(one('-ng') || 1), [fit, ...measured] = stdinGroups(ng + 1);
+  if (ng !== 2) { process.stderr.write('fake gmx rms: only two groups measured are in the fixtures, not ' + ng + '\n'); process.exit(1); }
+  r9Outputs('rms', { sulfate: fit, sodium: measured[1] }, [['-o', 'rmsd_nvt.xvg']]);
+}
+
 /** The real outputs of gmx hbond in test/fixtures/hbond, with this run's group names where gmx prints them. */
 function hbondOutputs(dir, names, files) {
   const w = n => readFileSync(new URL('./fixtures/hbond/' + dir + '/' + n, import.meta.url), 'utf8').replaceAll('sulfate', names[0]).replaceAll('water', names[1]);
@@ -227,6 +254,8 @@ else if (tool === 'hbond-legacy' && OLD) { process.stderr.write(readFileSync(new
 else if (tool === 'hbond-legacy' && argv[1] === '-h') process.stdout.write(read('hbond-legacy-h.txt'));
 else if (tool === 'hbond') (OLD ? hbondLegacy : hbondNew)();
 else if (tool === 'hbond-legacy') hbondLegacy();
+else if (tool === 'rms' && argv[1] === '-h') process.stdout.write(read('rms-h.txt'));
+else if (tool === 'rms') rms();
 else if (tool === 'energy') energy();
 else if (tool === 'rdf') await rdf();
 // gmx dump: the real head of the test system's dump, or of an umbrella window's (300 K, 663 atoms) for those (R6).

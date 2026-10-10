@@ -1,0 +1,48 @@
+# This file was created Sat Oct 10 04:21:56 2026
+# Created by:
+#                      :-) GROMACS - gmx gyrate, 2025.4 (-:
+# 
+# Executable:   /opt/gromacs-2025.4/bin/gmx
+# Data prefix:  /opt/gromacs-2025.4
+# Working dir:  /home/user/sim/na2so4/nvt
+# Command line:
+#   gmx gyrate -s nvt.tpr -f nvt.xtc -n idx.ndx -o gyrate/gyrate_nvt.xvg -sel 'group 0'
+# gmx gyrate is part of G R O M A C S:
+#
+# Gravel Rubs Often Many Awfully Cauterized Sores
+#
+@    title "Radius of gyration (total and around axes)"
+@    xaxis  label "Time (ps)"
+@    yaxis  label "Radius (nm)"
+@TYPE xy
+@ view 0.15, 0.15, 0.75, 0.85
+@ legend on
+@ legend box on
+@ legend loctype view
+@ legend 0.78, 0.8
+@ legend length 2
+@ s0 legend "Rg"
+@ s1 legend "Rg/sX/N"
+@ s2 legend "Rg/sY/N"
+@ s3 legend "Rg/sZ/N"
+      0.000 1.489480 1.237706 1.055070 1.338662
+      1.000 1.522664 1.263790 1.077177 1.370962
+      2.000 1.577895 1.277319 1.164891 1.411024
+      3.000 1.698220 1.433137 1.136945 1.556077
+      4.000 1.527003 1.250927 1.108043 1.367808
+      5.000 1.558505 1.251815 1.173177 1.383650
+      6.000 1.587584 1.254366 1.213635 1.412268
+      7.000 1.584342 1.227718 1.228693 1.415380
+      8.000 1.646869 1.284497 1.347379 1.399641
+      9.000 1.609708 1.249888 1.324645 1.365802
+     10.000 1.616422 1.229288 1.344442 1.380931
+     11.000 1.570472 1.155782 1.319805 1.362001
+     12.000 1.549261 1.106917 1.310010 1.363462
+     13.000 1.508289 1.094866 1.270694 1.317755
+     14.000 1.443002 1.061727 1.209852 1.254393
+     15.000 1.445746 1.064298 1.207867 1.260432
+     16.000 1.431778 1.061851 1.190531 1.247031
+     17.000 1.421494 1.043101 1.177156 1.252012
+     18.000 1.414548 1.036776 1.173866 1.244599
+     19.000 1.417613 1.012366 1.184952 1.261053
+     20.000 1.441568 0.974694 1.217130 1.313316

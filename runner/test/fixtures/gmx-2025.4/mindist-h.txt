@@ -1,0 +1,89 @@
+SYNOPSIS
+
+gmx mindist [-f [<.xtc/.trr/...>]] [-s [<.tpr/.gro/...>]] [-n [<.ndx>]]
+            [-od [<.xvg>]] [-on [<.xvg>]] [-o [<.out>]]
+            [-ox [<.xtc/.trr/...>]] [-or [<.xvg>]] [-b <time>] [-e <time>]
+            [-dt <time>] [-tu <enum>] [-[no]w] [-xvg <enum>] [-[no]matrix]
+            [-[no]max] [-d <real>] [-[no]group] [-[no]pi] [-[no]split]
+            [-ng <int>] [-[no]pbc] [-[no]respertime] [-[no]printresname]
+
+DESCRIPTION
+
+gmx mindist computes the distance between one group and a number of other
+groups. Both the minimum distance (between any pair of atoms from the
+respective groups) and the number of contacts within a given distance are
+written to two separate output files. With the -group option a contact of an
+atom in another group with multiple atoms in the first group is counted as one
+contact instead of as multiple contacts. With -or, minimum distances to each
+residue in the first group are determined and plotted as a function of residue
+number.
+
+With option -pi the minimum distance of a group to its periodic image is
+plotted. This is useful for checking if a protein has seen its periodic image
+during a simulation. Only one shift in each direction is considered, giving a
+total of 26 shifts. Note that periodicity information is required from the
+file supplied with with -s, either as a .tpr file or a .pdb file with CRYST1
+fields. It also plots the maximum distance within the group and the lengths of
+the three box vectors.
+
+Also gmx distance and gmx pairdist calculate distances.
+
+OPTIONS
+
+Options to specify input files:
+
+ -f      [<.xtc/.trr/...>]  (traj.xtc)
+           Trajectory: xtc trr cpt gro g96 pdb tng
+ -s      [<.tpr/.gro/...>]  (topol.tpr)      (Opt.)
+           Structure+mass(db): tpr gro g96 pdb brk ent
+ -n      [<.ndx>]           (index.ndx)      (Opt.)
+           Index file
+
+Options to specify output files:
+
+ -od     [<.xvg>]           (mindist.xvg)
+           xvgr/xmgr file
+ -on     [<.xvg>]           (numcont.xvg)    (Opt.)
+           xvgr/xmgr file
+ -o      [<.out>]           (atm-pair.out)   (Opt.)
+           Generic output file
+ -ox     [<.xtc/.trr/...>]  (mindist.xtc)    (Opt.)
+           Trajectory: xtc trr gro g96 pdb tng
+ -or     [<.xvg>]           (mindistres.xvg) (Opt.)
+           xvgr/xmgr file
+
+Other options:
+
+ -b      <time>             (0)
+           Time of first frame to read from trajectory (default unit ps)
+ -e      <time>             (0)
+           Time of last frame to read from trajectory (default unit ps)
+ -dt     <time>             (0)
+           Only use frame when t MOD dt = first time (default unit ps)
+ -tu     <enum>             (ps)
+           Unit for time values: fs, ps, ns, us, ms, s
+ -[no]w                     (no)
+           View output .xvg, .xpm, .eps and .pdb files
+ -xvg    <enum>             (xmgrace)
+           xvg plot formatting: xmgrace, xmgr, none
+ -[no]matrix                (no)
+           Calculate half a matrix of group-group distances
+ -[no]max                   (no)
+           Calculate *maximum* distance instead of minimum
+ -d      <real>             (0.6)
+           Distance for contacts
+ -[no]group                 (no)
+           Count contacts with multiple atoms in the first group as one
+ -[no]pi                    (no)
+           Calculate minimum distance with periodic images
+ -[no]split                 (no)
+           Split graph where time is zero
+ -ng     <int>              (1)
+           Number of secondary groups to compute distance to a central group
+ -[no]pbc                   (yes)
+           Take periodic boundary conditions into account
+ -[no]respertime            (no)
+           When writing per-residue distances, write distance for each time
+           point
+ -[no]printresname          (no)
+           Write residue names

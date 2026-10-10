@@ -1,7 +1,7 @@
 // One definition per GROMACS command (R3a, T98): RDF moved in unchanged; records and recipes name their command (v3, T97).
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { awhCommand, COMMANDS, commandOf, distanceCommand, energyCommand, hbondCommand, hbondLegacyCommand, rdfCommand, sectionsOf, whamCommand, withCommand } from '../src/lib/commands';
+import { awhCommand, COMMANDS, commandOf, distanceCommand, energyCommand, hbondCommand, hbondLegacyCommand, rdfCommand, rmsCommand, roleProblems, rolesOf, sectionsOf, whamCommand, withCommand } from '../src/lib/commands';
 import { parseHelp } from '../src/lib/gmxText';
 import { FORM, rdfArgs, rdfIo, recipeProblems } from '../src/lib/rdf';
 import { outputNames } from '../src/lib/names';
@@ -13,15 +13,16 @@ import { parseGmxHeader } from '../../app/src/lib/gmxHeader';
 const read = (name: string) => JSON.parse(readFileSync(new URL('./fixtures/formats/' + name, import.meta.url), 'utf8'));
 
 describe('one definition per command (R3a)', () => {
-  it('each command is found by its tool name: rdf, distance (R7), hbond and hbond-legacy (R8), energy (R4), awh (R5) and wham (R6)', () => {
-    expect(COMMANDS.map(c => c.tool)).toEqual(['rdf', 'distance', 'hbond', 'hbond-legacy', 'energy', 'awh', 'wham']);
+  it('each command is found by its tool name: rdf, distance (R7), hbond and hbond-legacy (R8), rms (R9), energy (R4), awh (R5) and wham (R6)', () => {
+    expect(COMMANDS.map(c => c.tool)).toEqual(['rdf', 'distance', 'hbond', 'hbond-legacy', 'rms', 'energy', 'awh', 'wham']);
     expect(commandOf('rdf')).toBe(rdfCommand);
     expect(commandOf('energy')).toBe(energyCommand);
     expect(commandOf('wham')).toBe(whamCommand);
     expect(commandOf('distance')).toBe(distanceCommand);
     expect(commandOf('hbond')).toBe(hbondCommand);
     expect(commandOf('hbond-legacy')).toBe(hbondLegacyCommand);
-    expect(commandOf('rms')).toBeUndefined();
+    expect(commandOf('rms')).toBe(rmsCommand);
+    expect(commandOf('sasa')).toBeUndefined();
   });
 
   it('rdf says what it takes: four inputs, and a reference with selections', () => {
@@ -65,7 +66,7 @@ describe('records and recipes name their command (v3)', () => {
 describe('the picker groups the commands by what they need (R3b)', () => {
   it('only the sections with commands are shown: rdf under its section, energy under its own', () => {
     expect(sectionsOf()).toEqual([
-      { section: 'trajectory and groups', commands: [rdfCommand, distanceCommand, hbondCommand, hbondLegacyCommand] },
+      { section: 'trajectory and groups', commands: [rdfCommand, distanceCommand, hbondCommand, hbondLegacyCommand, rmsCommand] },
       { section: 'an energy file', commands: [energyCommand, awhCommand] },
       { section: 'window lists', commands: [whamCommand] },
     ]);
@@ -100,6 +101,23 @@ describe('each command keeps its own options (review finding 1)', () => {
   });
 });
 
+describe('what each command calls its groups, and how many it takes (R9)', () => {
+  it('a reference and one or more selections, unless the definition says otherwise', () => {
+    expect(rolesOf(rdfCommand)).toEqual({ first: 'reference', rest: 'selection', min: 1 });
+    expect(roleProblems(rdfCommand, 2)).toEqual([]);
+    expect(roleProblems(rdfCommand, 1)).toEqual(['a reference and at least one selection are needed']);
+    expect(roleProblems(distanceCommand, 9)).toEqual([]);
+  });
+
+  it('the run record and the recipe say the same, in the same words', () => {
+    const rec = { ...read('run-v1.run.json'), version: 3, analysis: 'rdf' };
+    expect(recordProblems({ ...rec, groups: rec.groups.slice(0, 1) })).toEqual(['groups: a reference and at least one selection are needed']);
+    expect(recordProblems({ ...rec, analysis: 'rms', groups: rec.groups.slice(0, 1) })).toEqual([]);
+    const recipe = recipeFromDraft({ groups: read('recipe-v1.json').groups, options: {} }, 'x', '2026-10-10T00:00:00.000Z');
+    expect(recipeFileProblems({ ...recipe, analysis: 'hbond' })).toEqual(['gmx hbond takes one target group after the reference, not 2']);
+  });
+});
+
 describe('every output has a PMF Sequences type decision (R3a, section 3)', () => {
   it.each(COMMANDS.map(c => [c.tool, c] as const))('%s: each file has a type, or none with the reason; one goes to the vault by default', (_, c) => {
     expect(c.outputs.length).toBeGreaterThan(0);
@@ -118,6 +136,7 @@ describe('every output has a PMF Sequences type decision (R3a, section 3)', () =
     ['distance', 'all', 'distance/com/distance_nvt_all.xvg', 'distance_nvt_all.xvg'],
     ['hbond', 'xvg', 'hbond/new/hbond_nvt.xvg', 'hbond_nvt.xvg'],
     ['hbond-legacy', 'xvg', 'hbond/legacy/hbond_nvt.xvg', 'hbond-legacy_nvt.xvg'],
+    ['rms', 'xvg', 'r9/rms/rmsd_nvt.xvg', 'rms_nvt.xvg'],
   ])('%s %s: PMF Sequences agrees on %s', (tool, file, fixture, name) => {
     const text = readFileSync(new URL('./fixtures/' + fixture, import.meta.url), 'utf8');
     const want = commandOf(tool)!.outputs.find(o => o.file === file)!.type;

@@ -1,0 +1,47 @@
+# This file was created Sat Oct 10 04:21:34 2026
+# Created by:
+#                       :-) GROMACS - gmx rms, 2025.4 (-:
+# 
+# Executable:   /opt/gromacs-2025.4/bin/gmx
+# Data prefix:  /opt/gromacs-2025.4
+# Working dir:  /home/user/sim/na2so4/nvt
+# Command line:
+#   gmx rms -s nvt.tpr -f nvt.xtc -n idx.ndx -o rms/rmsd_nvt.xvg -ng 2
+# gmx rms is part of G R O M A C S:
+#
+# Grunge ROck MAChoS
+#
+@    title "RMSD"
+@    xaxis  label "Time (ps)"
+@    yaxis  label "RMSD (nm)"
+@TYPE xy
+@ subtitle "of sulfate after lsq fit to sulfate"
+@ view 0.15, 0.15, 0.75, 0.85
+@ legend on
+@ legend box on
+@ legend loctype view
+@ legend 0.78, 0.8
+@ legend length 2
+@ s0 legend "sulfate"
+@ s1 legend "sodium"
+   0.0000000    0.0000004    0.0000004
+   1.0000000    0.1782661    0.3821121
+   2.0000000    0.2272139    1.3366400
+   3.0000000    1.1131902    1.9369512
+   4.0000000    0.2478482    1.5882233
+   5.0000000    0.2313010    1.9648370
+   6.0000000    0.2302700    2.2175798
+   7.0000000    0.2360512    1.9489591
+   8.0000000    0.9420146    2.9048772
+   9.0000000    0.9343065    2.4944582
+  10.0000000    0.9166746    2.1666706
+  11.0000000    0.8743860    2.5365050
+  12.0000000    0.8703493    2.6414878
+  13.0000000    0.8740256    2.7271404
+  14.0000000    0.8817502    2.6964371
+  15.0000000    0.8397904    2.5147355
+  16.0000000    0.7910796    2.4714296
+  17.0000000    0.7698420    2.4522495
+  18.0000000    0.7822988    2.4554224
+  19.0000000    0.7290460    2.4550898
+  20.0000000    0.7394357    2.4020066

@@ -1,0 +1,46 @@
+# This file was created Sat Oct 10 04:21:56 2026
+# Created by:
+#                     :-) GROMACS - gmx mindist, 2025.4 (-:
+# 
+# Executable:   /opt/gromacs-2025.4/bin/gmx
+# Data prefix:  /opt/gromacs-2025.4
+# Working dir:  /home/user/sim/na2so4/nvt
+# Command line:
+#   gmx mindist -s nvt.tpr -f nvt.xtc -n idx.ndx -od mindist/mindist_nvt.xvg -on mindist/mindist_nvt_numcont.xvg -ng 2
+# gmx mindist is part of G R O M A C S:
+#
+# Gravel Rubs Often Many Awfully Cauterized Sores
+#
+@    title "Minimum Distance"
+@    xaxis  label "Time (ps)"
+@    yaxis  label "Distance (nm)"
+@TYPE xy
+@ view 0.15, 0.15, 0.75, 0.85
+@ legend on
+@ legend box on
+@ legend loctype view
+@ legend 0.78, 0.8
+@ legend length 2
+@ s0 legend "sulfate-sodium"
+@ s1 legend "sulfate-water"
+0.000000e+00  4.532218e-01  1.777329e-01
+1.000000e+00  2.352553e-01  1.565247e-01
+2.000000e+00  2.504877e-01  1.802361e-01
+3.000000e+00  2.504637e-01  1.727801e-01
+4.000000e+00  2.405764e-01  1.690739e-01
+5.000000e+00  2.406533e-01  1.745994e-01
+6.000000e+00  2.329248e-01  1.666853e-01
+7.000000e+00  2.432798e-01  1.727831e-01
+8.000000e+00  2.581589e-01  1.676932e-01
+9.000000e+00  2.464569e-01  1.709911e-01
+1.000000e+01  2.314843e-01  1.655204e-01
+1.100000e+01  2.544838e-01  1.697233e-01
+1.200000e+01  2.428683e-01  1.739369e-01
+1.300000e+01  2.416549e-01  1.676425e-01
+1.400000e+01  2.392927e-01  1.707776e-01
+1.500000e+01  2.337009e-01  1.689911e-01
+1.600000e+01  2.311385e-01  1.721628e-01
+1.700000e+01  2.329700e-01  1.700207e-01
+1.800000e+01  2.398208e-01  1.668141e-01
+1.900000e+01  2.432982e-01  1.703350e-01
+2.000000e+01  2.360594e-01  1.704962e-01

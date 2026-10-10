@@ -44,6 +44,12 @@ Nothing here is invented. Each file is what GROMACS wrote or printed.
   with merging on. `gmx-2025.4/hbond-h.txt`, `hbond-legacy-h.txt` and `help-commands.txt` go with them;
   `gmx-2023.3/hbond-h.txt` (the legacy tool under the old name), `help-commands.txt` and `hbond-legacy.stderr` (no such
   command) show the tools of GROMACS before 2024.
+- `r9/` — the R9 commands (2025.4) on `nvt/` with `groups.ndx` (sulfate 1–30, sodium 31–42, water 43–3242), each
+  folder with its outputs and what gmx printed: `rms/` (`-ng 2`, `0 0 1` on stdin: fit on sulfate, sulfate and sodium
+  measured), `rmsf/` and `rmsf-res/` (`0` on stdin; `-res`), `gyrate/` (`-sel 'group 0'`), `gyrate-legacy/` (`0` on
+  stdin), `gyrate-one/` (both tools on one sulfate ion, `one.ndx`), `mindist/` (`-ng 2 -on …`, `0 1 2` on stdin).
+  `gmx-2025.4/{rms,rmsf,gyrate,gyrate-legacy,mindist}-h.txt` and `gmx-2023.3/{rms,rmsf,gyrate,mindist}-h.txt` and
+  `gyrate-legacy.stderr` go with them.
 - `nvt/rerun.edr` — the energy file of `gmx mdrun -rerun nvt.xtc` on your test system (GROMACS 2025.4): 6 terms, 21 frames, 0–20 ps (R4).
 - `gmx-2023.3/` — GROMACS 2023.3 (Ubuntu): `version.txt`, `rdf-h.txt`; `energy-h.txt`, and `energy-menu.txt` and
   `energy-stats.txt` from the same two runs of `gmx energy` on `nvt/rerun.edr` (the menu is on stderr, the statistics on stdout).

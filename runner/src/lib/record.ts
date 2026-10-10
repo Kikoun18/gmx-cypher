@@ -6,7 +6,7 @@ import type { HelpOption } from './gmxText';
 import { groupAtoms, type Group } from './groups';
 import type { Slot } from './inputs';
 import type { Progress } from './progress';
-import { commandOf, formHelp, type CommandOption } from './commands';
+import { commandOf, formHelp, rdfCommand, roleProblems, type CommandOption } from './commands';
 import type { DistanceStat } from './distance';
 import type { EnergyStats } from './energy';
 import { FORM, isDefault, type Options } from './rdf';
@@ -118,9 +118,10 @@ export function recordProblems(x: unknown): string[] {
   // The inputs the command cannot run without: a trajectory and a run input for RDF, an energy file for energy (R4).
   const required = commandOf(r.analysis ?? 'rdf')?.required ?? ['trajectory', 'runInput'];
   need(required.every(slot => typeof r.inputs?.[slot]?.path === 'string'), 'inputs');
-  // A command without groups (R4) has none; the others need a reference and at least one selection.
-  if (commandOf(r.analysis ?? 'rdf')?.groups !== false) {
-    if (!Array.isArray(r.groups) || r.groups.length < 2) p.push('groups: a reference and at least one selection are needed');
+  // A command without groups (R4) has none; the others need as many as their roles say (R9: gmx rmsf one).
+  const command = commandOf(r.analysis ?? 'rdf') ?? rdfCommand;
+  if (command.groups) {
+    p.push(...roleProblems(command, Array.isArray(r.groups) ? r.groups.length : 0).map(x => 'groups: ' + x));
     (r.groups || []).forEach((g, i) => { need(typeof g?.name === 'string', 'groups[' + i + '].name'); need(Array.isArray(g?.steps), 'groups[' + i + '].steps'); });
   }
   need(!!r.recipe && typeof r.recipe.options === 'object' && typeof r.recipe.template === 'string', 'recipe');
