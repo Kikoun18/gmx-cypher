@@ -12,7 +12,7 @@ import type { EnergyStats } from './energy';
 import { FORM, isDefault, type Options } from './rdf';
 
 export interface FileInfo { path: string; size: number; mtime: string; sha256?: string }
-/** A file a run wrote: an .xvg, RDF's cumulative number and index, or gmx wham's window lists (R6). */
+/** A file a run wrote: an .xvg, RDF's cumulative number, an index (the groups', or gmx hbond's of its bonds, R8), or gmx wham's window lists (R6). */
 export interface Output { kind: 'xvg' | 'cn' | 'ndx' | 'list'; path: string; size: number; sha256: string }
 type Status = 'running' | 'done' | 'failed' | 'cancelled' | 'interrupted';
 
@@ -44,6 +44,8 @@ export interface RunRecord {
   windows?: { tpr: FileInfo; pull: FileInfo }[];
   /** gmx distance's averages per selection, as it printed them (version 3, R7). */
   distances?: DistanceStat[];
+  /** The lines of gmx's output a result shows (version 3, R8): the donors and acceptors gmx hbond found. */
+  summary?: string[];
   /** Every option of the form this gmx has, with its value and whether that is the installed default. */
   options: { flag: string; value: string | boolean | null; default: string | boolean | null; isDefault: boolean }[];
   outputs: Output[];
@@ -78,6 +80,7 @@ export interface RecordParts {
   windows?: { tpr: FileInfo; pull: FileInfo }[];
   pull?: 'pullx' | 'pullf';
   distances?: DistanceStat[];
+  summary?: string[];
 }
 
 export function buildRecord(p: RecordParts): RunRecord {
@@ -85,7 +88,7 @@ export function buildRecord(p: RecordParts): RunRecord {
   const by = new Map(formHelp((p.form ?? FORM) as CommandOption[], p.help).map(o => [o.flag, o]));
   return {
     format: 'gmx-cypher run', version: 3, analysis: p.analysis, ...(p.stdin != null ? { stdin: p.stdin } : {}), ...(p.statistics !== undefined ? { statistics: p.statistics } : {}),
-    ...(p.windows ? { windows: p.windows } : {}), ...(p.distances ? { distances: p.distances } : {}),
+    ...(p.windows ? { windows: p.windows } : {}), ...(p.distances ? { distances: p.distances } : {}), ...(p.summary ? { summary: p.summary } : {}),
     runner: { name: 'gmx-cypher', version: p.runner }, gmx: p.gmx, job: p.job.id, command: p.command, env: p.env,
     started: p.job.started ?? null, ended: p.job.ended ?? null, status: p.job.status, exit: p.job.exit ?? null,
     frames: p.frames !== undefined ? p.frames : p.job.progress.analysed ? { analysed: p.job.progress.analysed.frames, lastTime: p.job.progress.analysed.lastTime } : null, log: p.job.log, inputs: p.inputs,

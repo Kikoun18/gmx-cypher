@@ -82,7 +82,7 @@ function OptionField({ f, o, value, set }: { f: CommandOption; o: HelpOption; va
             <SelectContent>{o.values!.map(x => <SelectItem key={x} value={x}>{x}</SelectItem>)}</SelectContent>
           </Select>
         ) : (
-          <Input id={id} size="sm" className="w-28" inputMode="decimal" value={v ?? ''} placeholder={String(o.default)} onChange={e => set(e.target.value.trim() || undefined)} />
+          <Input id={id} size="sm" className="w-28" inputMode={o.type === 'string' ? 'text' : 'decimal'} value={v ?? ''} placeholder={String(o.default)} onChange={e => set(e.target.value.trim() || undefined)} />
         )}
         {f.unit && <span className="text-caption text-muted-foreground">{f.unit}</span>}
         {chip}
@@ -139,10 +139,10 @@ export function GroupCommand({ command, gmx, draft, setDraft, onStarted }: ViewP
   const problems = command.problems(options, help.options)
   const { trajectory, runInput } = draft.inputs
   const atoms = structure && !('error' in structure) ? structure.atoms : null
-  const counts = atoms ? draft.groups.map(g => groupAtoms(atoms, g.steps).length) : null
+  const sets = atoms ? draft.groups.map(g => groupAtoms(atoms, g.steps)) : null, counts = sets?.map(s => s.length) ?? null
   const plan = planned?.plan
   const names = draft.groups.map(g => g.name)
-  const groupProblems = counts ? command.groupProblems?.(options, counts, names) ?? [] : []
+  const groupProblems = counts ? command.groupProblems?.(options, counts, names, sets!) ?? [] : []
   const blockers = [
     !draft.inputs.structure && 'pick a structure in inputs: the groups are built on it',
     problems.length && 'change the options gmx would refuse',
@@ -205,7 +205,7 @@ export function GroupCommand({ command, gmx, draft, setDraft, onStarted }: ViewP
                 <td className="py-0.5 pr-4 text-muted-foreground">group {i}</td>
                 <td className={cn('pr-4 font-bold', toneText[g.tone])}>{g.name}</td>
                 <td className="text-right">{counts ? counts[i] + ' atoms' : '…'}</td>
-                <td className="pl-3 text-caption text-muted-foreground">{i === 0 ? 'reference' : 'selection'}</td>
+                <td className="pl-3 text-caption text-muted-foreground">{i === 0 ? 'reference' : tool.startsWith('hbond') ? 'target' : 'selection'}</td>
               </tr>
             ))}
           </tbody></table>

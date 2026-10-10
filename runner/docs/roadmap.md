@@ -99,7 +99,7 @@ Spec: [`batch-2.md`](batch-2.md). Phase 0 report: [`batch-2-phase0.md`](batch-2-
 
 ### Phase 4: Commands with groups (R7–R9)
 - [x] R7 `gmx distance`: pairs or centres of mass; average, all and histogram outputs (T119–T121)
-- [ ] R8 `gmx hbond`: the 2023+ tool and the legacy tool, whichever is installed
+- [x] R8 `gmx hbond`: the selection tool (GROMACS 2024+) and the legacy tool, whichever this gmx has (T122–T126; the legacy tool under its pre-2024 name tested through a fake gmx that answers as 2023.3)
 - [ ] R9 The commands I chose in Phase 0, one item each
 
 ### Phase 5: Cluster jobs (R10)

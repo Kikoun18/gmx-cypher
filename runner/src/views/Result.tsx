@@ -11,6 +11,7 @@ import { awhTargetError } from '../lib/awh'
 import { neighbourOverlaps, overlapNotes, parseBootstrap, parseHistograms } from '../lib/wham'
 import { COMMANDS } from '../lib/commands'
 import { driftLarger, type EnergyRow } from '../lib/energy'
+import { countStats } from '../lib/hbond'
 import { firstPeak, resultSeries } from '../lib/rdf'
 import { parseTable } from '../../../app/src/lib/seq'
 import type { RunRecord } from '../lib/record'
@@ -277,6 +278,40 @@ function DistanceChart({ job, record }: { job: Job; record: RunRecord }) {
   )
 }
 
+/**
+ * gmx hbond's result (R8), from either tool: the H-bonds over time (and the legacy tool's pairs within its distance,
+ * dimmed), their mean per frame, what gmx printed of donors and acceptors, and the distributions asked for.
+ */
+function HbondChart({ job, record }: { job: Job; record: RunRecord }) {
+  const files = record.outputs.map(o => o.path.split('/').pop()!), named = (suffix: string) => files.find(n => n.endsWith(suffix)) ?? null
+  const xvg = useOutput(job.id, 'xvg'), dist = useNamed(job.id, named('_dist.xvg')), ang = useNamed(job.id, named('_ang.xvg')), dan = useNamed(job.id, named('_dan.xvg'))
+  if (xvg == null || dist == null || ang == null || dan == null) return <p className="m-0 text-caption text-muted-foreground" aria-live="polite">reading the H-bonds…</p>
+  const [ref, target] = record.groups, curves = resultSeries(xvg), stats = countStats(curves[0]?.points ?? [])
+  const series: ChartSeries[] = curves.map((c, i) => ({ label: i ? c.label.toLowerCase() : 'H-bonds', points: c.points, tone: target?.tone ?? 'coral', ...(i ? { dash: 1, state: 'dim' as const } : {}) }))
+  const legacy = record.analysis === 'hbond-legacy'
+  const distribution = (text: string, label: string, xLabel: string, yLabel: string) => <>
+    <Section label={label} />
+    <LineChart series={resultSeries(text).map((c, i) => ({ label: c.label, points: c.points, tone: i ? 'sky' : target?.tone ?? 'coral', ...(i ? { dash: 1 } : {}) }))} xLabel={xLabel} yLabel={yLabel} height={200} legend={resultSeries(text).length > 1} zeroLine={false} />
+  </>
+  return (
+    <div className="flex flex-col gap-3">
+      <LineChart series={series} xLabel="time (ps)" yLabel="H-bonds" height={240} legend={series.length > 1} zeroLine={false} />
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3">
+        {stats && <Stat label="H-bonds · mean per frame" value={stats.mean.toFixed(1)} hint={'from ' + stats.min + ' to ' + stats.max + ' · ' + stats.frames + ' frames'} />}
+        {(record.summary ?? []).map(l => <Stat key={l} label="gmx printed" value={<span className="text-control">{l}</span>} />)}
+      </div>
+      <p className="m-0 text-caption text-muted-foreground">
+        between {ref?.name} and {target?.name} · {legacy ? 'legacy criteria (' + (record.command.args[0] === 'hbond' ? 'gmx hbond of this GROMACS' : 'gmx hbond-legacy') + ')' : 'the selection tool, gmx hbond'} · the count over time is the file for the vault
+      </p>
+      {/* Both tools write densities: each integrates to 1 (checked on their 2025.4 output). */}
+      {dist && distribution(dist, 'Distance distribution', legacy ? 'donor – acceptor (nm)' : 'distance (nm)', 'density (1/nm)')}
+      {ang && distribution(ang, 'Angle distribution', 'angle (°)', 'density (1/°)')}
+      {dan && distribution(dan, 'Donors and acceptors', 'time (ps)', 'number')}
+      {(dist || ang || dan) && <p className="m-0 text-caption text-muted-foreground">not sent to the vault: PMF Sequences would read these as an umbrella histogram or as H-bonds</p>}
+    </div>
+  )
+}
+
 /** What a run wrote, its result, its groups as gmx counted them, and "run again" (sections 10.5, 11.4). */
 export function RunResult({ job, onRunAgain, vault }: { job: Job; onRunAgain: (r: RunRecord) => void; vault: string | null }) {
   const r = useRecord(job)
@@ -291,7 +326,7 @@ export function RunResult({ job, onRunAgain, vault }: { job: Job; onRunAgain: (r
       {rec.problems.length > 0 && (
         <Alert variant="warning"><TriangleAlert /><AlertTitle>gmx-cypher's promise was broken</AlertTitle><AlertDescription>{rec.problems.map(p => <p key={p}>{p}</p>)}</AlertDescription></Alert>
       )}
-      {job.status === 'done' && (job.kind === 'energy' ? <EnergyChart job={job} record={rec} /> : job.kind === 'awh' ? <AwhChart job={job} record={rec} /> : job.kind === 'wham' ? <WhamChart job={job} record={rec} /> : job.kind === 'distance' ? <DistanceChart job={job} record={rec} /> : <RdfChart job={job} record={rec} />)}
+      {job.status === 'done' && (job.kind === 'energy' ? <EnergyChart job={job} record={rec} /> : job.kind === 'awh' ? <AwhChart job={job} record={rec} /> : job.kind === 'wham' ? <WhamChart job={job} record={rec} /> : job.kind === 'distance' ? <DistanceChart job={job} record={rec} /> : job.kind === 'hbond' || job.kind === 'hbond-legacy' ? <HbondChart job={job} record={rec} /> : <RdfChart job={job} record={rec} />)}
       {rec.groups.length > 0 && <Section label="Groups" />}
       {rec.groups.length > 0 && <table className="text-control"><tbody>
         {rec.groups.map(g => (

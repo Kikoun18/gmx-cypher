@@ -6,6 +6,7 @@ import type { Readable, Writable } from 'node:stream';
 import { accessSync, constants, statSync } from 'node:fs';
 import { delimiter, isAbsolute, join, resolve } from 'node:path';
 import { parseHelp, parseVersion, type HelpOption } from '../src/lib/gmxText';
+import { commandOf, type CommandDef } from '../src/lib/commands';
 
 export interface GmxState { ok: boolean; name: string; path?: string; version?: string; versionText?: string; error?: string }
 
@@ -79,6 +80,24 @@ export function toolHelp(g: GmxState, tool: string): Promise<HelpOption[]> {
     read.catch(() => helps.delete(key));
   }
   return helps.get(key)!;
+}
+
+export type Found = { ok: true; tool: string; help: HelpOption[] } | { ok: false; why: string };
+
+/**
+ * The gmx tool a command runs, with its -h (R8): its own name, or the first of its `find.tools` whose -h it accepts.
+ * Refused in words when none is, or when this gmx has the command it gives way to (`find.unless`).
+ */
+export async function findTool(g: GmxState, cmd: CommandDef): Promise<Found> {
+  if (!cmd.find) return { ok: true, tool: cmd.tool, help: await toolHelp(g, cmd.tool) };
+  const other = cmd.find.unless && commandOf(cmd.find.unless.tool);
+  if (other && (await findTool(g, other)).ok) return { ok: false, why: cmd.find.unless!.why };
+  for (const tool of cmd.find.tools) {
+    // A name this gmx doesn't know (gmx hbond-legacy before 2024) fails its -h: the next name is tried.
+    const help = await toolHelp(g, tool).catch(() => null);
+    if (help && cmd.find.accepts(help)) return { ok: true, tool, help };
+  }
+  return { ok: false, why: cmd.find.missing };
 }
 
 /** `gmx rdf -h` (T22). */

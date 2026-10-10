@@ -1,0 +1,47 @@
+# This file was created Fri Oct  9 23:38:43 2026
+# Created by:
+#                      :-) GROMACS - gmx hbond, 2025.4 (-:
+# 
+# Executable:   /opt/gromacs-2025.4/bin/gmx
+# Data prefix:  /opt/gromacs-2025.4
+# Working dir:  /home/user/sim/na2so4/nvt
+# Command line:
+#   gmx hbond -f nvt.xtc -s nvt.tpr -n hb.ndx -r 'group 0' -t 'group 1' -o new/hbond_nvt_hbonds.ndx -num new/hbond_nvt.xvg -dist new/hbond_nvt_dist.xvg -ang new/hbond_nvt_ang.xvg -dan new/hbond_nvt_dan.xvg
+# gmx hbond is part of G R O M A C S:
+#
+# Gromacs Runs One Microsecond At Cannonball Speeds
+#
+@    title "Hydrogen Bond Angle Distribution Histogram"
+@    xaxis  label "Hydrogen - Donor - Acceptor Angle (degrees)"
+@    yaxis  label "Probability"
+@TYPE xy
+       0.5  0.0049400
+       1.5  0.0176429
+       2.5  0.0197601
+       3.5  0.0232886
+       4.5  0.0345801
+       5.5  0.0395201
+       6.5  0.0536344
+       7.5  0.0472830
+       8.5  0.0536344
+       9.5  0.0423430
+      10.5  0.0486944
+      11.5  0.0635145
+      12.5  0.0550459
+      13.5  0.0494001
+      14.5  0.0458716
+      15.5  0.0374030
+      16.5  0.0458716
+      17.5  0.0416373
+      18.5  0.0338744
+      19.5  0.0317572
+      20.5  0.0303458
+      21.5  0.0261115
+      22.5  0.0211715
+      23.5  0.0289344
+      24.5  0.0204658
+      25.5  0.0183486
+      26.5  0.0190543
+      27.5  0.0148200
+      28.5  0.0183486
+      29.5  0.0127029

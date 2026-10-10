@@ -1,0 +1,13 @@
+
+Checking for overlap in atoms between sulfate (30 atoms) and water (3200 atoms)
+Selection 'sulfate' has 24 acceptors and 0 donors.
+Selection 'water' has 800 acceptors and 800 donors.
+
+++++ PLEASE READ AND CITE THE FOLLOWING REFERENCE ++++
+S. Gorelov, A. Titov, O. Tolicheva, A. Konevega, A. Shvetsov
+Determination of Hydrogen Bonds in GROMACS: A New Implementation to Overcome
+Memory Limitation
+Journal of Chemical Information and Modeling (2024)
+DOI: 10.1021/acs.jcim.3c02087
+-------- -------- --- Thank You --- -------- --------
+

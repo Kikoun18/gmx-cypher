@@ -1,0 +1,142 @@
+LIST OF AVAILABLE COMMANDS
+
+Usage: gmx [<options>] <command> [<args>]
+
+Available commands:
+    anaeig               Analyze eigenvectors/normal modes
+    analyze              Analyze data sets
+    angle                Calculate distributions and correlations for angles
+                         and dihedrals
+    awh                  Extract data from an accelerated weight histogram
+                         (AWH) run
+    bar                  Calculate free energy difference estimates through
+                         Bennett's acceptance ratio
+    bundle               Analyze bundles of axes, e.g., helices
+    check                Check and compare files
+    chi                  Calculate everything you want to know about chi and
+                         other dihedrals
+    cluster              Cluster structures
+    clustsize            Calculate size distributions of atomic clusters
+    confrms              Fit two structures and calculates the RMSD
+    convert-tpr          Make a modified run-input file
+    convert-trj          Converts between different trajectory types
+    covar                Calculate and diagonalize the covariance matrix
+    current              Calculate dielectric constants and current
+                         autocorrelation function
+    density              Calculate the density of the system
+    densmap              Calculate 2D planar or axial-radial density maps
+    densorder            Calculate surface fluctuations
+    dielectric           Calculate frequency dependent dielectric constants
+    dipoles              Compute the total dipole plus fluctuations
+    disre                Analyze distance restraints
+    distance             Calculate distances between pairs of positions
+    dos                  Analyze density of states and properties based on
+                         that
+    dssp                 Calculate protein secondary structure via DSSP
+                         algorithm
+    dump                 Make binary files human readable
+    dyecoupl             Extract dye dynamics from trajectories
+    editconf             Convert and manipulates structure files
+    eneconv              Convert energy files
+    enemat               Extract an energy matrix from an energy file
+    energy               Writes energies to xvg files and display averages
+    extract-cluster      Allows extracting frames corresponding to clusters
+                         from trajectory
+    filter               Frequency filter trajectories, useful for making
+                         smooth movies
+    freevolume           Calculate free volume
+    gangle               Calculate angles
+    genconf              Multiply a conformation in 'random' orientations
+    genion               Generate monoatomic ions on energetically favorable
+                         positions
+    genrestr             Generate position restraints or distance restraints
+                         for index groups
+    grompp               Make a run input file
+    gyrate               Calculate radius of gyration of a molecule
+    gyrate-legacy        Calculate the radius of gyration
+    h2order              Compute the orientation of water molecules
+    hbond                Compute and analyze hydrogen bonds.
+    hbond-legacy         Compute and analyze hydrogen bonds
+    helix                Calculate basic properties of alpha helices
+    helixorient          Calculate local pitch/bending/rotation/orientation
+                         inside helices
+    help                 Print help information
+    hydorder             Compute tetrahedrality parameters around a given atom
+    insert-molecules     Insert molecules into existing vacancies
+    lie                  Estimate free energy from linear combinations
+    make_edi             Generate input files for essential dynamics sampling
+    make_ndx             Make index files
+    mdmat                Calculate residue contact maps
+    mdrun                Perform a simulation, do a normal mode analysis or an
+                         energy minimization
+    mindist              Calculate the minimum distance between two groups
+    mk_angndx            Generate index files for 'gmx angle'
+    msd                  Compute mean squared displacements
+    nmeig                Diagonalize the Hessian for normal mode analysis
+    nmens                Generate an ensemble of structures from the normal
+                         modes
+    nmr                  Analyze nuclear magnetic resonance properties from an
+                         energy file
+    nmtraj               Generate a virtual oscillating trajectory from an
+                         eigenvector
+    nonbonded-benchmark  Benchmarking tool for the non-bonded pair kernels.
+    order                Compute the order parameter per atom for carbon tails
+    pairdist             Calculate pairwise distances between groups of
+                         positions
+    pdb2gmx              Convert coordinate files to topology and FF-compliant
+                         coordinate files
+    pme_error            Estimate the error of using PME with a given input
+                         file
+    polystat             Calculate static properties of polymers
+    potential            Calculate the electrostatic potential across the box
+    principal            Calculate principal axes of inertia for a group of
+                         atoms
+    rama                 Compute Ramachandran plots
+    rdf                  Calculate radial distribution functions
+    report-methods       Write short summary about the simulation setup to a
+                         text file and/or to the standard output.
+    rms                  Calculate RMSDs with a reference structure and RMSD
+                         matrices
+    rmsdist              Calculate atom pair distances averaged with power -2,
+                         -3 or -6
+    rmsf                 Calculate atomic fluctuations
+    rotacf               Calculate the rotational correlation function for
+                         molecules
+    rotmat               Plot the rotation matrix for fitting to a reference
+                         structure
+    saltbr               Compute salt bridges
+    sans-legacy          Compute small angle neutron scattering spectra
+    sasa                 Compute solvent accessible surface area
+    saxs-legacy          Compute small angle X-ray scattering spectra
+    scattering           Calculate small angle scattering profiles for SANS or
+                         SAXS
+    select               Print general information about selections
+    sham                 Compute free energies or other histograms from
+                         histograms
+    sigeps               Convert c6/12 or c6/cn combinations to and from
+                         sigma/epsilon
+    solvate              Solvate a system
+    sorient              Analyze solvent orientation around solutes
+    spatial              Calculate the spatial distribution function
+    spol                 Analyze solvent dipole orientation and polarization
+                         around solutes
+    tcaf                 Calculate viscosities of liquids
+    traj                 Plot x, v, f, box, temperature and rotational energy
+                         from trajectories
+    trajectory           Print coordinates, velocities, and/or forces for
+                         selections
+    trjcat               Concatenate trajectory files
+    trjconv              Convert and manipulates trajectory files
+    trjorder             Order molecules according to their distance to a
+                         group
+    tune_pme             Time mdrun as a function of PME ranks to optimize
+                         settings
+    vanhove              Compute Van Hove displacement and correlation
+                         functions
+    velacc               Calculate velocity autocorrelation functions
+    wham                 Perform weighted histogram analysis after umbrella
+                         sampling
+    wheel                Plot helical wheels
+    x2top                Generate a primitive topology from coordinates
+    xpm2ps               Convert XPM (XPixelMap) matrices to postscript or XPM
+For help on a command, use 'gmx help <command>'.

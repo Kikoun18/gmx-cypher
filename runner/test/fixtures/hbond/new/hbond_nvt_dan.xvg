@@ -1,0 +1,46 @@
+# This file was created Fri Oct  9 23:38:43 2026
+# Created by:
+#                      :-) GROMACS - gmx hbond, 2025.4 (-:
+# 
+# Executable:   /opt/gromacs-2025.4/bin/gmx
+# Data prefix:  /opt/gromacs-2025.4
+# Working dir:  /home/user/sim/na2so4/nvt
+# Command line:
+#   gmx hbond -f nvt.xtc -s nvt.tpr -n hb.ndx -r 'group 0' -t 'group 1' -o new/hbond_nvt_hbonds.ndx -num new/hbond_nvt.xvg -dist new/hbond_nvt_dist.xvg -ang new/hbond_nvt_ang.xvg -dan new/hbond_nvt_dan.xvg
+# gmx hbond is part of G R O M A C S:
+#
+# Gromacs Runs One Microsecond At Cannonball Speeds
+#
+@    title "Number of Donors and Acceptors"
+@    xaxis  label "Time (ps)"
+@    yaxis  label "Donors/Acceptors"
+@TYPE xy
+@ view 0.15, 0.15, 0.75, 0.85
+@ legend on
+@ legend box on
+@ legend loctype view
+@ legend 0.78, 0.8
+@ legend length 2
+@ s0 legend "Number of Donors"
+@ s1 legend "Number of Acceptors"
+         0         29         19
+         1         55         23
+         2         66         24
+         3         64         24
+         4         69         24
+         5         65         24
+         6         65         24
+         7         66         24
+         8         64         24
+         9         64         23
+        10         70         24
+        11         65         24
+        12         57         24
+        13         63         24
+        14         61         24
+        15         59         24
+        16         62         24
+        17         64         24
+        18         60         24
+        19         57         24
+        20         60         24

@@ -13,7 +13,7 @@ import { awhScan } from './awh';
 import { energyMenu } from './energy';
 import { findWindows } from './wham';
 import { inside, listFolder, namesIn, saveUpload } from './files';
-import { detectGmx, toolHelp, type GmxState } from './gmx';
+import { detectGmx, findTool, type GmxState } from './gmx';
 import { HttpError, readJson, sendFile, type Api } from './http';
 import type { Job, Jobs } from './jobs';
 import { Batches, checkRunInputs, findTrajectories, sendAll } from './batch';
@@ -74,10 +74,21 @@ export function makeApi(ctx: Ctx): Api {
     if (is(req, 'GET', url, '/api/state')) return { body: state() };
     if (is(req, 'GET', url, '/api/events')) { events(ctx.jobs, batches, res); return 'handled'; }
     if (is(req, 'GET', url, '/api/jobs')) return { body: ctx.jobs.list().map(summary) };
-    const help = /^\/api\/help\/([a-z-]+)$/.exec(url.pathname);
-    if (help && req.method === 'GET' && commandOf(help[1])) {
+    if (is(req, 'GET', url, '/api/commands')) {
+      // Which commands this gmx runs, and as which of its tools (R8: gmx hbond is another tool before 2024); [] without a gmx.
+      if (!ctx.gmx.ok) return { body: [] };
+      return { body: await Promise.all(COMMANDS.map(async c => {
+        if (!c.find) return { tool: c.tool, ok: true, gmxTool: c.tool };
+        const f = await findTool(ctx.gmx, c);
+        return f.ok ? { tool: c.tool, ok: true, gmxTool: f.tool } : { tool: c.tool, ok: false, why: f.why };
+      })) };
+    }
+    const help = /^\/api\/help\/([a-z-]+)$/.exec(url.pathname), helpOf = help && commandOf(help[1]);
+    if (helpOf && req.method === 'GET') {
       if (!ctx.gmx.ok) throw new HttpError(409, 'no working gmx');
-      return { body: { gmx: ctx.gmx.path, version: ctx.gmx.version, options: await toolHelp(ctx.gmx, help[1]) } };
+      const f = await findTool(ctx.gmx, helpOf);
+      if (!f.ok) throw new HttpError(409, f.why);
+      return { body: { gmx: ctx.gmx.path, version: ctx.gmx.version, tool: f.tool, options: f.help } };
     }
     if (is(req, 'GET', url, '/api/energy/menu')) {
       // The terms of an energy file, as gmx energy lists them (R4); only inside the allowed folders.

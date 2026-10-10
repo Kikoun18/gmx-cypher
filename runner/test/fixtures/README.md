@@ -37,6 +37,13 @@ Nothing here is invented. Each file is what GROMACS wrote or printed.
   `com/` from `-select 'com of group 0 plus com of group 1' 'com of group 0 plus com of group 2'`, `pairs/` from
   `-select 'group 0 merge group 1' 'group 0 merge group 2'`, each with `-oav`, `-oall` and `-oh` (`-len 0.5 -binw 0.05`)
   and what gmx printed. `gmx-2025.4/distance-h.txt` and `gmx-2023.3/distance-h.txt` go with them (R7).
+- `hbond/` — the H-bond tools (2025.4) on `nvt/` with `hb.ndx` (sulfate 1–30, water 43–3242) (R8). `new/`: `gmx hbond
+  -r 'group 0' -t 'group 1' -o new/hbond_nvt_hbonds.ndx -num new/hbond_nvt.xvg -dist … -ang … -dan …`, its files and what
+  it printed. `legacy/`: `gmx hbond-legacy -num legacy/hbond_nvt.xvg -dist legacy/hbond_nvt_dist.xvg` with `0 1` on
+  stdin, and what it printed; `hbond_nvt_ang.xvg` from a run with `-ang -nomerge`; `ang.stderr` is its refusal of `-ang`
+  with merging on. `gmx-2025.4/hbond-h.txt`, `hbond-legacy-h.txt` and `help-commands.txt` go with them;
+  `gmx-2023.3/hbond-h.txt` (the legacy tool under the old name), `help-commands.txt` and `hbond-legacy.stderr` (no such
+  command) show the tools of GROMACS before 2024.
 - `nvt/rerun.edr` — the energy file of `gmx mdrun -rerun nvt.xtc` on your test system (GROMACS 2025.4): 6 terms, 21 frames, 0–20 ps (R4).
 - `gmx-2023.3/` — GROMACS 2023.3 (Ubuntu): `version.txt`, `rdf-h.txt`; `energy-h.txt`, and `energy-menu.txt` and
   `energy-stats.txt` from the same two runs of `gmx energy` on `nvt/rerun.edr` (the menu is on stderr, the statistics on stdout).

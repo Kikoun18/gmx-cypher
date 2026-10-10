@@ -1,0 +1,45 @@
+# This file was created Fri Oct  9 23:38:43 2026
+# Created by:
+#                      :-) GROMACS - gmx hbond, 2025.4 (-:
+# 
+# Executable:   /opt/gromacs-2025.4/bin/gmx
+# Data prefix:  /opt/gromacs-2025.4
+# Working dir:  /home/user/sim/na2so4/nvt
+# Command line:
+#   gmx hbond -f nvt.xtc -s nvt.tpr -n hb.ndx -r 'group 0' -t 'group 1' -o new/hbond_nvt_hbonds.ndx -num new/hbond_nvt.xvg -dist new/hbond_nvt_dist.xvg -ang new/hbond_nvt_ang.xvg -dan new/hbond_nvt_dan.xvg
+# gmx hbond is part of G R O M A C S:
+#
+# Gromacs Runs One Microsecond At Cannonball Speeds
+#
+@    title "Number of hydrogen bonds"
+@    xaxis  label "Time (ps)"
+@    yaxis  label "Hbonds"
+@TYPE xy
+@ view 0.15, 0.15, 0.75, 0.85
+@ legend on
+@ legend box on
+@ legend loctype view
+@ legend 0.78, 0.8
+@ legend length 2
+@ s0 legend "Hydrogen bonds"
+      0.000         30
+      1.000         57
+      2.000         72
+      3.000         65
+      4.000         72
+      5.000         71
+      6.000         69
+      7.000         69
+      8.000         72
+      9.000         69
+     10.000         75
+     11.000         71
+     12.000         63
+     13.000         73
+     14.000         68
+     15.000         66
+     16.000         74
+     17.000         79
+     18.000         68
+     19.000         66
+     20.000         68

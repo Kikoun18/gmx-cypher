@@ -1,0 +1,19 @@
+                   :-) GROMACS - gmx hbond-legacy, 2025.4 (-:
+
+Executable:   /opt/gromacs-2025.4/bin/gmx
+Data prefix:  /opt/gromacs-2025.4
+Working dir:  /home/user/sim/na2so4/nvt
+Command line:
+  gmx hbond-legacy -f nvt.xtc -s nvt.tpr -n hb.ndx -num z.xvg -ang z_ang.xvg
+
+
+-------------------------------------------------------
+Program:     gmx hbond-legacy, version 2025.4
+Source file: src/gromacs/gmxana/gmx_hbond.cpp (line 2576)
+
+Fatal error:
+Can't combine merging hbonds and writing angle distribution
+
+For more information and tips for troubleshooting, please check the GROMACS
+website at https://manual.gromacs.org/current/user-guide/run-time-errors.html
+-------------------------------------------------------

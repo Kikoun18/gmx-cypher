@@ -1,0 +1,46 @@
+# This file was created Fri Oct  9 23:39:02 2026
+# Created by:
+#                   :-) GROMACS - gmx hbond-legacy, 2025.4 (-:
+# 
+# Executable:   /opt/gromacs-2025.4/bin/gmx
+# Data prefix:  /opt/gromacs-2025.4
+# Working dir:  /home/user/sim/na2so4/nvt
+# Command line:
+#   gmx hbond-legacy -f nvt.xtc -s nvt.tpr -n hb.ndx -num legacy/hbond_nvt.xvg -dist legacy/hbond_nvt_dist.xvg
+# gmx hbond-legacy is part of G R O M A C S:
+#
+# Glycine aRginine prOline Methionine Alanine Cystine Serine
+#
+@    title "Hydrogen Bonds"
+@    xaxis  label "Time (ps)"
+@    yaxis  label "Number"
+@TYPE xy
+@ view 0.15, 0.15, 0.75, 0.85
+@ legend on
+@ legend box on
+@ legend loctype view
+@ legend 0.78, 0.8
+@ legend length 2
+@ s0 legend "Hydrogen bonds"
+@ s1 legend "Pairs within 0.35 nm"
+         0          30          13
+         1          57          30
+         2          72          26
+         3          65          21
+         4          72          21
+         5          71          27
+         6          69          25
+         7          69          27
+         8          72          23
+         9          69          25
+        10          75          26
+        11          71          24
+        12          63          23
+        13          73          18
+        14          68          19
+        15          66          29
+        16          74          33
+        17          79          14
+        18          68          28
+        19          66          23
+        20          68          22

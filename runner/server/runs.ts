@@ -10,6 +10,7 @@ import { allNames, COMMANDS, commandOf, type InputSlot, type OutputNames, type R
 import { awhFrames, awhNames, framesWritten, type AwhFrame } from '../src/lib/awh';
 import { commonFolder, listFile, whamOutputNames } from '../src/lib/wham';
 import { parseDistanceStats } from '../src/lib/distance';
+import { summaryLines } from '../src/lib/hbond';
 import { energyProblems, parseEnergyStats } from '../src/lib/energy';
 import { groupAtoms, nameProblem, type Group } from '../src/lib/groups';
 import type { Slot } from '../src/lib/inputs';
@@ -25,7 +26,7 @@ import { awhScan } from './awh';
 import { checkSizes, dumpRunInput } from './check';
 import { energyMenu } from './energy';
 import { inside, sha256File, within } from './files';
-import { toolHelp } from './gmx';
+import { findTool, toolHelp } from './gmx';
 import { HttpError } from './http';
 import type { Job } from './jobs';
 
@@ -45,7 +46,8 @@ export interface RunRequest {
   pull?: 'pullx' | 'pullf';
 }
 export interface Plan {
-  tool: string; cwd: string; outDir: string; stem: string; names: OutputNames; io: RunIo; file: string; argv: string[]; env: Record<string, string>; problems: string[]; stdin?: string
+  /** The command, and the gmx tool it runs as (R8: gmx hbond is the legacy H-bond tool before GROMACS 2024). */
+  tool: string; gmxTool: string; cwd: string; outDir: string; stem: string; names: OutputNames; io: RunIo; file: string; argv: string[]; env: Record<string, string>; problems: string[]; stdin?: string
   /** The options as gmx gets them, when gmx-cypher fills one in (gmx wham's temperature from the run inputs, R6). */
   options: Options
   /** What gmx-cypher filled in or found, in words, for the page to show. */
@@ -68,6 +70,8 @@ export async function planRun(ctx: Ctx, req: RunRequest, roots: string[]): Promi
   if (!ctx.gmx.ok) throw new HttpError(409, 'no working gmx');
   const cmd = commandOf(req.tool ?? 'rdf');
   if (!cmd) throw new HttpError(400, 'no command ' + req.tool + ': gmx-cypher runs ' + COMMANDS.map(c => c.tool).join(', '));
+  const found = await findTool(ctx.gmx, cmd);
+  if (!found.ok) throw new HttpError(409, found.why);
   const paths: Partial<Record<InputSlot, string>> = {};
   for (const slot of cmd.required) {
     if (!req.inputs?.[slot]) throw new HttpError(400, cmd.required.map(s => LABELS[s]).join(' and ') + (cmd.required.length > 1 ? ' are' : ' is') + ' needed');
@@ -107,7 +111,7 @@ export async function planRun(ctx: Ctx, req: RunRequest, roots: string[]): Promi
   const frames: AwhFrame[] | null = cmd.tool === 'awh' ? (await awhScan(ctx.gmx, first!, paths.runInput!)).frames : null;
   const extra = frames ? frames.map(f => f.suffix) : cmd.suffixes ?? [];
   stem = freeStem(stem, existsSync(outDir) ? readdirSync(outDir) : [], extra);
-  const help = await toolHelp(ctx.gmx, cmd.tool), { cwd, io } = cmd.io(paths, outDir, stem);
+  const help = found.help, { cwd, io } = cmd.io(paths, outDir, stem);
   let options: Options = req.options || {};
   const notes: string[] = [], tempProblems: string[] = [];
   if (windows && (options.temp === undefined || options.temp === '')) {
@@ -119,12 +123,14 @@ export async function planRun(ctx: Ctx, req: RunRequest, roots: string[]): Promi
   let argv: string[];
   try { argv = cmd.argv({ options, selections: (req.groups?.length || 1) - 1, pull: req.pull ?? 'pullx' }, io, help); }
   catch (e) { throw new HttpError(400, (e as Error).message); }
+  // The tool as this gmx names it: the definition writes its own name first.
+  argv = [found.tool, ...argv.slice(1)];
   const problems = [...cmd.problems(options, help), ...tempProblems];
   let stdin: string | undefined;
   if (cmd.stdin) {
     // The terms are numbers from this file's own menu (T99): checked against it here, as gmx would refuse them.
     if (cmd.tool === 'energy') problems.push(...energyProblems(req.terms ?? [], await energyMenu(ctx.gmx, first!)));
-    stdin = cmd.stdin(req.terms ?? []);
+    stdin = cmd.stdin({ terms: req.terms ?? [] });
   }
   let names = cmd.outputNames(stem, options);
   if (frames) {
@@ -138,7 +144,7 @@ export async function planRun(ctx: Ctx, req: RunRequest, roots: string[]): Promi
   // gmx wham reads its windows from two lists, written beside the outputs, with the windows' real paths.
   const writes = windows ? [{ name: stem + '_tpr-files.dat', text: listFile(windows.map(w => w.tpr)) }, { name: stem + '_pull-files.dat', text: listFile(windows.map(w => w.pull)) }] : [];
   if (windows) names = whamOutputNames(stem, Number(options.nBootstrap) > 0);
-  return { tool: cmd.tool, cwd, outDir, stem, names, io, file: ctx.gmx.path!, argv, env: JOB_ENV, problems, stdin, options, notes, writes, ...(windows ? { windows } : {}) };
+  return { tool: cmd.tool, gmxTool: found.tool, cwd, outDir, stem, names, io, file: ctx.gmx.path!, argv, env: JOB_ENV, problems, stdin, options, notes, writes, ...(windows ? { windows } : {}) };
 }
 
 /** `f` over `items`, at most `limit` at a time, the results in order. */
@@ -196,7 +202,7 @@ export async function startRun(ctx: Ctx, req: RunRequest, roots: string[]): Prom
     atoms = picked.atoms;
     groups = req.groups.map((g, i) => ({ name: g.name, atoms: picked.sets[i] }));
     // What the command would get wrong with these groups (gmx distance's pairs of unequal sizes, R7): refused here.
-    const wrong = cmd.groupProblems?.(plan.options, picked.sets.map(s => s.length), req.groups.map(g => g.name)) ?? [];
+    const wrong = cmd.groupProblems?.(plan.options, picked.sets.map(s => s.length), req.groups.map(g => g.name), picked.sets) ?? [];
     if (wrong.length) throw new HttpError(409, wrong.join('\n'));
     const runInput = inside(req.inputs.runInput!, roots);
     // The groups' atom numbers come from the structure: it must be the run input's system, or every group
@@ -241,7 +247,7 @@ export async function startRun(ctx: Ctx, req: RunRequest, roots: string[]): Prom
   const record = new Promise<RunRecord>((done, fail) => {
     const finish = async (j: Job) => {
       const outputs: Output[] = [];
-      const kindOf = (n: string): Output['kind'] => (n.endsWith('.dat') ? 'list' : 'xvg');
+      const kindOf = (n: string): Output['kind'] => (n.endsWith('.dat') ? 'list' : n.endsWith('.ndx') ? 'ndx' : 'xvg');
       const files: [Output['kind'], string | undefined][] = [...(plan.names.more ?? []).map(n => [kindOf(n), n] as [Output['kind'], string]), ['xvg', plan.names.xvg], ['cn', plan.names.cn], ['ndx', plan.names.ndx]];
       for (const [kind, name] of files) {
         if (!name) continue;
@@ -253,11 +259,13 @@ export async function startRun(ctx: Ctx, req: RunRequest, roots: string[]): Prom
         .map(n => 'gmx backed up a file that appeared during the run: ' + n);
       const r = buildRecord({
         analysis: plan.tool, runner: ctx.version, gmx: { path: ctx.gmx.path!, version: ctx.gmx.version! }, env, command: { cwd: plan.cwd, file: plan.file, args: plan.argv },
-        inputs, groups: req.groups ?? [], atoms, sizes, options: plan.options, help: await toolHelp(ctx.gmx, plan.tool), form: cmd.options, template: req.template || DEFAULT_TEMPLATE,
+        inputs, groups: req.groups ?? [], atoms, sizes, options: plan.options, help: await toolHelp(ctx.gmx, plan.gmxTool), form: cmd.options, template: req.template || DEFAULT_TEMPLATE,
         outDir: req.outDir ?? null, job: j, outputs, problems, stdin: plan.stdin, terms: req.terms,
         ...(plan.windows ? { windows: await Promise.all(plan.windows.map(async w => ({ tpr: await fileInfo(w.tpr, true), pull: await fileInfo(w.pull, true) }))), pull: req.pull ?? 'pullx' } : {}),
         ...(plan.tool === 'energy' ? { statistics: parseEnergyStats(j.log) } : {}),
         ...(plan.tool === 'distance' ? { distances: parseDistanceStats(j.log) } : {}),
+        // What gmx hbond found (R8): the donors and acceptors of each group, and the legacy tool's average.
+        ...(cmd.summary ? { summary: summaryLines(j.log, cmd.summary) } : {}),
         // gmx awh's frames are its files: how many it wrote, and the time of the last (the one for the vault).
         ...(plan.tool === 'awh' ? { frames: awhRecordFrames(plan.stem, outputs.map(o => o.path.split('/').pop()!)) } : {}),
       });

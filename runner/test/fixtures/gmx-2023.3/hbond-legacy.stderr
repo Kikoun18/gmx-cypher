@@ -1,0 +1,19 @@
+              :-) GROMACS - gmx, 2023.3-Ubuntu_2023.3_1ubuntu3 (-:
+
+Executable:   /usr/bin/gmx
+Data prefix:  /usr
+Working dir:  /home/user/sim/na2so4/nvt
+Command line:
+  gmx hbond-legacy -h
+
+-------------------------------------------------------
+Program:     gmx, version 2023.3-Ubuntu_2023.3_1ubuntu3
+Source file: src/gromacs/commandline/cmdlinemodulemanager.cpp (line 385)
+Function:    gmx::ICommandLineModule* gmx::CommandLineModuleManager::Impl::processCommonOptions(gmx::CommandLineCommonOptionsHolder*, int*, char***)
+
+Error in user input:
+'hbond-legacy' is not a GROMACS command.
+
+For more information and tips for troubleshooting, please check the GROMACS
+website at http://www.gromacs.org/Documentation/Errors
+-------------------------------------------------------

@@ -1,0 +1,10 @@
+You are going to use a deprecated gmx tool. Please migrate to the new one, gmx hbondSpecify 2 groups to analyze:
+Selected 0: 'sulfate'
+Selected 1: 'water'
+Checking for overlap in atoms between sulfate and water
+Calculating hydrogen bonds between sulfate (30 atoms) and water (3200 atoms)
+Found 800 donors and 824 acceptors
+
+Will do grid-search on 8x8x8 grid, rcut=0.34999999
+Frame loop parallelized with OpenMP using 4 threads.
+Average number of hbonds per timeframe 67.476 out of 329600 possible

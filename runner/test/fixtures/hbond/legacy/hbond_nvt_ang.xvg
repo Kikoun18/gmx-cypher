@@ -1,0 +1,47 @@
+# This file was created Sat Oct 10 04:15:17 2026
+# Created by:
+#                   :-) GROMACS - gmx hbond-legacy, 2025.4 (-:
+# 
+# Executable:   /opt/gromacs-2025.4/bin/gmx
+# Data prefix:  /opt/gromacs-2025.4
+# Working dir:  /home/user/sim/na2so4/nvt
+# Command line:
+#   gmx hbond-legacy -f nvt.xtc -s nvt.tpr -n hb.ndx -num nomerge/hbond_nvt.xvg -ang nomerge/hbond_nvt_ang.xvg -nomerge
+# gmx hbond-legacy is part of G R O M A C S:
+#
+# Georgetown Riga Oslo Madrid Amsterdam Chisinau Stockholm
+#
+@    title "Hydrogen Bond Distribution"
+@    xaxis  label "Hydrogen - Donor - Acceptor Angle (\SO\N)"
+@    yaxis  label ""
+@TYPE xy
+       0.5 0.00494001
+       1.5  0.0176429
+       2.5  0.0197601
+       3.5  0.0232886
+       4.5  0.0345801
+       5.5  0.0395201
+       6.5  0.0536344
+       7.5   0.047283
+       8.5  0.0536344
+       9.5   0.042343
+      10.5  0.0486944
+      11.5  0.0635145
+      12.5  0.0550459
+      13.5  0.0494001
+      14.5  0.0458716
+      15.5   0.037403
+      16.5  0.0458716
+      17.5  0.0416373
+      18.5  0.0338744
+      19.5  0.0317572
+      20.5  0.0303458
+      21.5  0.0261115
+      22.5  0.0211715
+      23.5  0.0289344
+      24.5  0.0204658
+      25.5  0.0183486
+      26.5  0.0190543
+      27.5    0.01482
+      28.5  0.0183486
+      29.5  0.0127029

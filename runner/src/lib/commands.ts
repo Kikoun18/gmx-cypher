@@ -6,6 +6,10 @@ import { DISTANCE_FORM, DISTANCE_SUFFIXES, distanceArgv, distanceNames, distance
 import { WHAM_FORM, WHAM_SUFFIXES, whamArgv, whamOptionProblems, whamOutputNames, type WhamIo } from './wham';
 import type { HelpOption } from './gmxText';
 import { ENERGY_FORM, energyArgv, energyOptionProblems, energyStdin } from './energy';
+import {
+  HBOND_FORM, HBOND_SUFFIXES, HBOND_SUMMARY, hbondArgv, hbondGroupProblems, hbondKind, hbondNames, hbondOptionProblems, LEGACY_FORM, LEGACY_SUMMARY,
+  legacyArgv, legacyGroupProblems, legacyNames, legacyOptionProblems, legacyStdin, type HbondIo, type LegacyIo,
+} from './hbond';
 import { outputNames } from './names';
 import { FORM, rdfArgs, rdfIo, recipeProblems, relPath, type Options, type RdfIo } from './rdf';
 
@@ -64,10 +68,17 @@ export interface CommandDef {
   problems(options: Options, help: HelpOption[]): string[];
   /** The argument list, as gmx is given it. */
   argv(request: { options: Options; selections: number; pull?: 'pullx' | 'pullf' }, io: RunIo, help: HelpOption[]): string[];
-  /** What gmx would get wrong with these groups (their atom counts), in words: refused before anything runs. */
-  groupProblems?(options: Options, counts: number[], names: string[]): string[];
-  /** The answers gmx reads on stdin, for a command that asks questions (T99): from the terms picked by number. */
-  stdin?(terms: number[]): string;
+  /** What gmx would get wrong with these groups (their atom counts, and their atoms when known), in words: refused before anything runs. */
+  groupProblems?(options: Options, counts: number[], names: string[], sets?: number[][]): string[];
+  /** The answers gmx reads on stdin, for a command that asks questions (T99): gmx energy's terms by number, the legacy H-bond tool's groups. */
+  stdin?(r: { terms: number[] }): string;
+  /**
+   * Which gmx tool this command is, when the name alone doesn't say (R8): the names tried in order, the first whose -h
+   * `accepts` runs, and why none did. `unless` names a command that, when this gmx has it, is offered instead.
+   */
+  find?: { tools: string[]; accepts(help: HelpOption[]): boolean; missing: string; unless?: { tool: string; why: string } };
+  /** The lines of gmx's output the result shows and the record keeps (R8: the donors and acceptors gmx hbond found). */
+  summary?: RegExp;
 }
 
 export const rdfCommand: CommandDef = {
@@ -107,7 +118,7 @@ export const energyCommand: CommandDef = {
   },
   problems: energyOptionProblems,
   argv: (r, io, help) => energyArgv(r, io as { edr: string; tpr?: string; output: string }, help),
-  stdin: energyStdin,
+  stdin: r => energyStdin(r.terms),
 };
 
 /**
@@ -187,7 +198,70 @@ export const distanceCommand: CommandDef = {
   groupProblems: distancePairProblems,
 };
 
-export const COMMANDS: CommandDef[] = [rdfCommand, distanceCommand, energyCommand, awhCommand, whamCommand];
+/** The paths of an H-bond run: the trajectory's, as gmx rdf's, and its optional files under the stem (R8). */
+function hbondIo(p: Partial<Record<InputSlot, string>>, outDir: string, stem: string) {
+  const { cwd, io } = rdfIo({ trajectory: p.trajectory ?? '', runInput: p.runInput ?? '' }, outDir, stem), out = (f: string) => relPath(cwd, outDir + '/' + stem + f);
+  return { cwd, io: { trajectory: io.trajectory, runInput: io.runInput, index: io.index, output: io.output, hbonds: out('_hbonds.ndx'), dist: out('_dist.xvg'), ang: out('_ang.xvg'), dan: out('_dan.xvg') } };
+}
+
+const HBOND_OUTPUTS: CommandDef['outputs'] = [
+  { file: 'xvg', type: 'hbond', vault: true, why: 'the number of H-bonds over time (question 34)' },
+  { file: 'dist', type: null, vault: false, why: 'a distribution, which PMF Sequences reads as an umbrella Histogram or as H-bonds (question 34)' },
+  { file: 'ang', type: null, vault: false, why: 'a distribution, likewise' },
+];
+
+/**
+ * gmx hbond (R8), the selection tool of GROMACS 2024 and later: H-bonds between the reference and the target, by its
+ * own criteria (donor–acceptor distance, angle, the elements of donors and acceptors from the topology).
+ */
+export const hbondCommand: CommandDef = {
+  tool: 'hbond',
+  title: 'H-bonds between the reference and the target, over time',
+  section: 'trajectory and groups',
+  inputs: ['trajectory', 'runInput', 'structure', 'index'],
+  required: ['trajectory', 'runInput'],
+  groups: true,
+  options: HBOND_FORM,
+  outputNames: (stem, options = {}) => hbondNames(stem, options),
+  suffixes: HBOND_SUFFIXES,
+  outputs: [...HBOND_OUTPUTS, { file: 'dan', type: null, vault: false, why: 'donors and acceptors per frame: PMF Sequences reads them as H-bonds from the name' }],
+  io: hbondIo,
+  problems: hbondOptionProblems,
+  argv: (r, io, help) => hbondArgv(r, io as HbondIo, help),
+  groupProblems: hbondGroupProblems,
+  find: { tools: ['hbond'], accepts: h => hbondKind(h) === 'selection', missing: "this gmx's gmx hbond is the legacy tool (before GROMACS 2024): pick gmx hbond-legacy" },
+  summary: HBOND_SUMMARY,
+};
+
+/**
+ * The legacy H-bond tool (R8): gmx hbond-legacy from GROMACS 2024, gmx hbond before. Its criteria are its own (-r is
+ * the distance here), never mixed with the selection tool's; offered only where that one is missing (question 33).
+ */
+export const hbondLegacyCommand: CommandDef = {
+  tool: 'hbond-legacy',
+  title: 'H-bonds by the pre-2024 criteria',
+  section: 'trajectory and groups',
+  inputs: ['trajectory', 'runInput', 'structure', 'index'],
+  required: ['trajectory', 'runInput'],
+  groups: true,
+  options: LEGACY_FORM,
+  outputNames: (stem, options = {}) => legacyNames(stem, options),
+  suffixes: HBOND_SUFFIXES,
+  outputs: HBOND_OUTPUTS,
+  io: hbondIo,
+  problems: legacyOptionProblems,
+  argv: (r, io, help) => legacyArgv(r, io as LegacyIo, help),
+  groupProblems: legacyGroupProblems,
+  stdin: legacyStdin,
+  // gmx hbond first: its -h is read for the selection tool anyway, so a gmx before 2024 answers without a failed call.
+  find: {
+    tools: ['hbond', 'hbond-legacy'], accepts: h => hbondKind(h) === 'legacy', missing: 'this gmx has no legacy H-bond tool (gmx hbond-legacy, or gmx hbond before GROMACS 2024)',
+    unless: { tool: 'hbond', why: "this gmx has the selection tool, gmx hbond: the legacy one is offered only without it, so the two tools' criteria never mix (question 33)" },
+  },
+  summary: LEGACY_SUMMARY,
+};
+
+export const COMMANDS: CommandDef[] = [rdfCommand, distanceCommand, hbondCommand, hbondLegacyCommand, energyCommand, awhCommand, whamCommand];
 export const commandOf = (tool: string) => COMMANDS.find(c => c.tool === tool);
 
 /** What a draft holds of commands: the picked one, its options and name template, and the others', kept aside. */

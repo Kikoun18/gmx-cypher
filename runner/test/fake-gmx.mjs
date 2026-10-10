@@ -3,6 +3,8 @@
 // test/fixtures/gmx-2025.4, with the header's command, working directory and group names taken from its
 // own arguments. FAKE_GMX_FRAMES (11), FAKE_GMX_SLOW (ms per frame) and FAKE_GMX_FAIL change its run;
 // FAKE_GMX_TOUCH=<tool>=<path> makes a file appear at that path while that tool runs (no-overwrite tests).
+// FAKE_GMX_VERSION=2023.3 (fake-gmx-2023.mjs) answers --version and the H-bond tools as 2023.3 does: gmx hbond is the
+// legacy tool and there is no gmx hbond-legacy (R8). Everything else it prints is still 2025.4's text.
 
 import { existsSync, readdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
@@ -181,7 +183,37 @@ function distance() {
   process.stderr.write(w('run.stderr') + log.join(''));
 }
 
-if (argv[0] === '--version') process.stdout.write(read('version.txt'));
+const OLD = process.env.FAKE_GMX_VERSION === '2023.3';
+
+/** The real outputs of gmx hbond in test/fixtures/hbond, with this run's group names where gmx prints them. */
+function hbondOutputs(dir, names, files) {
+  const w = n => readFileSync(new URL('./fixtures/hbond/' + dir + '/' + n, import.meta.url), 'utf8').replaceAll('sulfate', names[0]).replaceAll('water', names[1]);
+  const log = [];
+  for (const [flag, name] of files) { const o = one(flag); if (o) { backUp(o, log); writeFileSync(o, w(name)); } }
+  process.stdout.write(w('run.stdout'));
+  process.stderr.write(w('run.stderr') + log.join(''));
+}
+
+/** gmx hbond, the selection tool (2024+): -r and -t as index groups by number, its real outputs for sulfate and water. */
+function hbondNew() {
+  const names = groupNames(one('-n')), picked = [one('-r'), one('-t')].map(s => { const m = /^group (\d+)$/.exec(s ?? ''); return m && names[+m[1]]; });
+  picked.forEach((g, i) => { if (!g) fail("Cannot match '" + [one('-r'), one('-t')][i] + "', because no such index group can be found."); });
+  hbondOutputs('new', picked, [['-o', 'hbond_nvt_hbonds.ndx'], ['-num', 'hbond_nvt.xvg'], ['-dist', 'hbond_nvt_dist.xvg'], ['-ang', 'hbond_nvt_ang.xvg'], ['-dan', 'hbond_nvt_dan.xvg']]);
+}
+
+/**
+ * The legacy tool (gmx hbond-legacy, gmx hbond before 2024): the two groups answered on stdin by number. With merging
+ * on (its default) it refuses the angle distribution, as 2025.4 does; -dan is not in the fixtures.
+ */
+function hbondLegacy() {
+  const names = groupNames(one('-n')), answers = readFileSync(0, 'utf8').split(/\s+/).filter(Boolean);
+  if (answers.length < 2 || answers.slice(0, 2).some(a => !names[+a])) { process.stderr.write('fake gmx hbond-legacy: two index groups on stdin, not ' + JSON.stringify(answers) + '\n'); process.exit(1); }
+  if (one('-ang') && !argv.includes('-nomerge')) { process.stderr.write(read('../hbond/legacy/ang.stderr')); process.exit(1); }
+  if (one('-dan')) { process.stderr.write('fake gmx hbond-legacy: -dan is not in the fixtures\n'); process.exit(1); }
+  hbondOutputs('legacy', answers.slice(0, 2).map(a => names[+a]), [['-num', 'hbond_nvt.xvg'], ['-dist', 'hbond_nvt_dist.xvg'], ['-ang', 'hbond_nvt_ang.xvg']]);
+}
+
+if (argv[0] === '--version') process.stdout.write(OLD ? readFileSync(new URL('./fixtures/gmx-2023.3/version.txt', import.meta.url), 'utf8') : read('version.txt'));
 else if (tool === 'rdf' && argv[1] === '-h') process.stdout.write(read('rdf-h.txt'));
 else if (tool === 'energy' && argv[1] === '-h') process.stdout.write(read('energy-h.txt'));
 else if (tool === 'awh' && argv[1] === '-h') process.stdout.write(read('awh-h.txt'));
@@ -190,6 +222,11 @@ else if (tool === 'wham' && argv[1] === '-h') process.stdout.write(read('wham-h.
 else if (tool === 'wham') wham();
 else if (tool === 'distance' && argv[1] === '-h') process.stdout.write(read('distance-h.txt'));
 else if (tool === 'distance') distance();
+else if (tool === 'hbond' && argv[1] === '-h') process.stdout.write(OLD ? readFileSync(new URL('./fixtures/gmx-2023.3/hbond-h.txt', import.meta.url), 'utf8') : read('hbond-h.txt'));
+else if (tool === 'hbond-legacy' && OLD) { process.stderr.write(readFileSync(new URL('./fixtures/gmx-2023.3/hbond-legacy.stderr', import.meta.url), 'utf8')); process.exit(1); }
+else if (tool === 'hbond-legacy' && argv[1] === '-h') process.stdout.write(read('hbond-legacy-h.txt'));
+else if (tool === 'hbond') (OLD ? hbondLegacy : hbondNew)();
+else if (tool === 'hbond-legacy') hbondLegacy();
 else if (tool === 'energy') energy();
 else if (tool === 'rdf') await rdf();
 // gmx dump: the real head of the test system's dump, or of an umbrella window's (300 K, 663 atoms) for those (R6).
