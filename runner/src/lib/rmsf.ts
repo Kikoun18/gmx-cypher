@@ -2,7 +2,7 @@
 // fit of the group onto the run input's structure (-fit, on by default). It asks for the group on stdin. Its x is the
 // atom's number in the system (or the residue's), not its place in the group (checked with 2025.4: sodium is 31–42).
 import type { CommandOption } from './commands';
-import { checkOptions, numberProblems, optionArgs } from './form';
+import { checkOptions, numberProblems, optionArgs, valueProblems } from './form';
 import type { HelpOption } from './gmxText';
 import type { Options } from './rdf';
 
@@ -15,7 +15,7 @@ export const RMSF_FORM: CommandOption[] = [
   { flag: 'dt', group: 'frames', label: 'every', unit: 'ps', what: 'one frame per this many ps; 0 = every frame' },
 ];
 
-export const rmsfOptionProblems = (options: Options, help: HelpOption[]) => numberProblems(options, help, []);
+export const rmsfOptionProblems = (options: Options, help: HelpOption[]) => [...numberProblems(options, help, []), ...valueProblems(options, RMSF_FORM, help)];
 
 export type RmsfIo = { trajectory: string; runInput: string; index: string; output: string };
 

@@ -3,7 +3,7 @@
 // group is always the first measured: the usual "fit on the backbone, RMSD of the backbone"; each further group is
 // measured after the same fit. Every rule here was checked with GROMACS 2025.4 on the test system.
 import type { CommandOption } from './commands';
-import { checkOptions, numberProblems, optionArgs } from './form';
+import { checkOptions, numberProblems, optionArgs, valueProblems } from './form';
 import type { HelpOption } from './gmxText';
 import type { Options } from './rdf';
 
@@ -18,7 +18,7 @@ export const RMS_FORM: CommandOption[] = [
 ];
 
 /** What gmx rms would refuse among the options, in words. */
-export const rmsOptionProblems = (options: Options, help: HelpOption[]) => numberProblems(options, help, ['prev'], [], ['prev']);
+export const rmsOptionProblems = (options: Options, help: HelpOption[]) => [...numberProblems(options, help, ['prev'], [], ['prev']), ...valueProblems(options, RMS_FORM, help)];
 
 export type RmsIo = { trajectory: string; runInput: string; index: string; output: string };
 
@@ -28,5 +28,9 @@ export function rmsArgv(r: { options: Options; selections: number }, io: RmsIo, 
   return ['rms', '-f', io.trajectory, '-s', io.runInput, '-n', io.index, '-o', io.output, ...(r.selections ? ['-ng', String(r.selections + 1)] : []), ...optionArgs(form, r.options, help)];
 }
 
-/** Its prompts, answered by number in its own index: the fit group (0), then the groups measured (0, 1, …). */
-export const rmsStdin = (selections: number) => ['0', ...Array.from({ length: selections + 1 }, (_, i) => String(i))].join('\n') + '\n';
+/**
+ * Its prompts, answered by number in its own index: the fit group (0), then the groups measured (0, 1, …). With
+ * `-fit none` gmx asks for no fit group (2025.4, checked): an answer for it would shift every group by one (review).
+ */
+export const rmsStdin = (selections: number, options: Options = {}) =>
+  [...(options.fit === 'none' ? [] : ['0']), ...Array.from({ length: selections + 1 }, (_, i) => String(i))].join('\n') + '\n';

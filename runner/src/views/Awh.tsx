@@ -20,6 +20,9 @@ import { Code } from './Code'
 
 type Kind = FrameChoice['kind']
 
+/** 2nd, 3rd, 4th, 11th, 21st: for "every N-th frame" (review). */
+const ordinal = (n: number) => n + (n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] ?? 'th')
+
 /** The choice the options say: -skip 1 is every frame, another -skip every N-th, else the last time (-b). */
 function choiceOf(options: Options): Kind {
   const skip = options.skip
@@ -44,6 +47,8 @@ export function Awh({ gmx, draft, setDraft, onStarted }: { gmx: GmxState; draft:
   const read = useAwhScan(edr, tpr), frames = read?.scan?.frames ?? []
   const [starting, setStarting] = React.useState(false)
   const [refused, setRefused] = React.useState<{ key: string; message: string } | null>(null)
+  // What is typed in "every" while it is typed: "1" on the way to "10" is not clamped to 2 (review).
+  const [everyText, setEveryText] = React.useState<string | null>(null)
   const options = draft.options, choice = choiceOf(options)
   const lastTime = frames.length ? String(frames[frames.length - 1].time) : null
   // The last time is the file's own: set when the file is read, and again when another file has another last frame.
@@ -83,7 +88,7 @@ export function Awh({ gmx, draft, setDraft, onStarted }: { gmx: GmxState; draft:
           <Label id="awh-frames">frames</Label>
           <ToggleGroup type="single" value={choice} onValueChange={choose} aria-labelledby="awh-frames" className="self-start">
             <ToggleGroupItem value="last">the last time · {count({ kind: 'last' })} file{count({ kind: 'last' }) > 1 ? 's' : ''}</ToggleGroupItem>
-            <ToggleGroupItem value="every">every {every}th · {count({ kind: 'every', n: every })} files</ToggleGroupItem>
+            <ToggleGroupItem value="every">every {ordinal(every)} · {count({ kind: 'every', n: every })} files</ToggleGroupItem>
             <ToggleGroupItem value="all">all · {count({ kind: 'all' })} files</ToggleGroupItem>
           </ToggleGroup>
           <FieldHint>{choice === 'last' ? 'the usual choice for PMF Sequences: the profile at the end' : choice === 'every' ? 'for convergence: the profile as it grew' : 'one file per stored frame'} · t = {timesText(written)} ps</FieldHint>
@@ -91,7 +96,8 @@ export function Awh({ gmx, draft, setDraft, onStarted }: { gmx: GmxState; draft:
         {choice === 'every' && (
           <Field>
             <Label htmlFor="awh-every">every</Label>
-            <Input id="awh-every" size="sm" type="number" min={2} step={1} className="w-28" value={String(every)} onChange={e => { const n = Math.max(2, Math.round(Number(e.target.value) || 2)); setOptions(withChoice(options, { kind: 'every', n }, frames)) }} />
+            <Input id="awh-every" size="sm" type="number" min={2} step={1} className="w-28" value={everyText ?? String(every)} onBlur={() => setEveryText(null)}
+              onChange={e => { setEveryText(e.target.value); const n = Math.round(Number(e.target.value)); if (n >= 2) setOptions(withChoice(options, { kind: 'every', n }, frames)) }} />
             <FieldHint>one frame in this many, from the first (gmx awh -skip)</FieldHint>
           </Field>
         )}

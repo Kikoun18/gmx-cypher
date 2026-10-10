@@ -33,6 +33,11 @@ describe('qq jobs, the table you sent (R10b)', () => {
     expect(stateOf('X')).toEqual({ letter: 'X', word: 'X', tone: 'stone' });
   });
 
+  it('a running job without %CPU and %Mem (as Slurm prints it): its node, not a plan', () => {
+    const t = parseQqJobs('│  R  12345  me name  q  4  0  1  01:00:00 / 02:00:00  node22 │');
+    expect(t.jobs[0]).toMatchObject({ node: 'node22', planned: null, cpu: null, mem: null });
+  });
+
   it('colour codes and other borders are taken away; an ID with a server suffix merges by its number', () => {
     const t = parseQqJobs('\x1b[1m│  R  12345.server  me name…  q  4  0  1  01:00:00 / 02:00:00  n1  50  1 │\x1b[0m');
     expect(t.jobs[0]).toMatchObject({ id: '12345.server', key: '12345', runtime: 3600, walltime: 7200, node: 'n1' });

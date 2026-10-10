@@ -205,11 +205,14 @@ function stdinGroups(n) {
   return answers.slice(0, n).map(a => names[+a]);
 }
 
-/** gmx rms (R9a): the fit group, then -ng groups measured, on stdin; the fixture measured sulfate and sodium after a fit on sulfate. */
+/**
+ * gmx rms (R9a): the fit group, then -ng groups measured, on stdin; with -fit none no fit group is asked for, as
+ * 2025.4 does. The fixtures measured sulfate and sodium: after a fit on sulfate (rms/), or without one (rms-nofit/).
+ */
 function rms() {
-  const ng = Number(one('-ng') || 1), [fit, ...measured] = stdinGroups(ng + 1);
+  const ng = Number(one('-ng') || 1), none = one('-fit') === 'none', groups = stdinGroups(ng + (none ? 0 : 1)), measured = none ? groups : groups.slice(1);
   if (ng !== 2) { process.stderr.write('fake gmx rms: only two groups measured are in the fixtures, not ' + ng + '\n'); process.exit(1); }
-  r9Outputs('rms', { sulfate: fit, sodium: measured[1] }, [['-o', 'rmsd_nvt.xvg']]);
+  r9Outputs(none ? 'rms-nofit' : 'rms', { sulfate: measured[0], sodium: measured[1] }, [['-o', 'rmsd_nvt.xvg']]);
 }
 
 /** The real outputs of gmx hbond in test/fixtures/hbond, with this run's group names where gmx prints them. */

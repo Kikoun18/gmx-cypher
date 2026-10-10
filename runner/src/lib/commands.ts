@@ -8,7 +8,7 @@ import type { HelpOption } from './gmxText';
 import { ENERGY_FORM, energyArgv, energyOptionProblems, energyStdin } from './energy';
 import {
   HBOND_FORM, HBOND_SUFFIXES, HBOND_SUMMARY, hbondArgv, hbondGroupProblems, hbondKind, hbondNames, hbondOptionProblems, LEGACY_FORM, LEGACY_SUMMARY,
-  legacyArgv, legacyNames, legacyOptionProblems, legacyStdin, type HbondIo, type LegacyIo,
+  legacyArgv, legacyGroupProblems, legacyNames, legacyOptionProblems, legacyStdin, type HbondIo, type LegacyIo,
 } from './hbond';
 import { outputNames } from './names';
 import { RMS_FORM, rmsArgv, rmsOptionProblems, rmsStdin, type RmsIo } from './rms';
@@ -77,7 +77,7 @@ export interface CommandDef {
   /** What gmx would get wrong with these groups (their atom counts, and their atoms when known), in words: refused before anything runs. */
   groupProblems?(options: Options, counts: number[], names: string[], sets?: number[][]): string[];
   /** The answers gmx reads on stdin, for a command that asks questions (T99): gmx energy's terms by number, the groups of the tools that ask for them. */
-  stdin?(r: { terms: number[]; selections: number }): string;
+  stdin?(r: { terms: number[]; selections: number; options: Options }): string;
   /**
    * Which gmx tool this command is, when the name alone doesn't say (R8): the names tried in order, the first whose -h
    * `accepts` runs, and why none did. `unless` names a command that, when this gmx has it, is offered instead.
@@ -276,6 +276,7 @@ export const hbondLegacyCommand: CommandDef = {
   problems: legacyOptionProblems,
   argv: (r, io, help) => legacyArgv(r, io as LegacyIo, help),
   roles: { first: 'reference', rest: 'target', min: 1, max: 1 },
+  groupProblems: legacyGroupProblems,
   stdin: legacyStdin,
   // gmx hbond first: its -h is read for the selection tool anyway, so a gmx before 2024 answers without a failed call.
   find: {
@@ -310,7 +311,7 @@ export const rmsCommand: CommandDef = {
   io: trajectoryIo,
   problems: rmsOptionProblems,
   argv: (r, io, help) => rmsArgv(r, io as RmsIo, help),
-  stdin: r => rmsStdin(r.selections),
+  stdin: r => rmsStdin(r.selections, r.options),
 };
 
 /** One group, the only one a command takes (R9b, R9c). */
@@ -349,7 +350,7 @@ export const gyrateCommand: CommandDef = {
   outputNames: oneOutput,
   outputs: GYRATE_OUTPUTS,
   io: trajectoryIo,
-  problems: gyrateOptionProblems,
+  problems: gyrateOptionProblems(GYRATE_FORM),
   argv: (r, io, help) => gyrateArgv(r, io as GyrateIo, help),
   find: { tools: ['gyrate'], accepts: h => gyrateKind(h) === 'selection', missing: "this gmx's gmx gyrate is the legacy tool (before GROMACS 2024): pick gmx gyrate-legacy" },
 };
@@ -367,7 +368,7 @@ export const gyrateLegacyCommand: CommandDef = {
   outputNames: oneOutput,
   outputs: GYRATE_OUTPUTS,
   io: trajectoryIo,
-  problems: gyrateOptionProblems,
+  problems: gyrateOptionProblems(GYRATE_LEGACY_FORM),
   argv: (r, io, help) => gyrateLegacyArgv(r, io as GyrateIo, help),
   stdin: gyrateLegacyStdin,
   find: {

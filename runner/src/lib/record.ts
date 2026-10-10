@@ -21,6 +21,8 @@ export interface RunRecord {
   version: 1 | 2 | 3;
   /** The command (version 3): its tool name. Versions 1 and 2 are RDF. */
   analysis?: string;
+  /** This record's own file name (version 3, Phase 6): what *run again* says it came from. */
+  record?: string;
   runner: { name: 'gmx-cypher'; version: string };
   gmx: { path: string; version: string };
   job: string;
@@ -55,6 +57,7 @@ export interface RunRecord {
 
 export interface RecordParts {
   analysis: string;
+  record?: string;
   runner: string;
   gmx: { path: string; version: string };
   env: Record<string, string>;
@@ -87,7 +90,7 @@ export function buildRecord(p: RecordParts): RunRecord {
   // The form's options as gmx describes them: RDF's -cn as a switch, gmx-cypher's own choices (R7) as enums.
   const by = new Map(formHelp((p.form ?? FORM) as CommandOption[], p.help).map(o => [o.flag, o]));
   return {
-    format: 'gmx-cypher run', version: 3, analysis: p.analysis, ...(p.stdin != null ? { stdin: p.stdin } : {}), ...(p.statistics !== undefined ? { statistics: p.statistics } : {}),
+    format: 'gmx-cypher run', version: 3, analysis: p.analysis, ...(p.record ? { record: p.record } : {}), ...(p.stdin != null ? { stdin: p.stdin } : {}), ...(p.statistics !== undefined ? { statistics: p.statistics } : {}),
     ...(p.windows ? { windows: p.windows } : {}), ...(p.distances ? { distances: p.distances } : {}), ...(p.summary ? { summary: p.summary } : {}),
     runner: { name: 'gmx-cypher', version: p.runner }, gmx: p.gmx, job: p.job.id, command: p.command, env: p.env,
     started: p.job.started ?? null, ended: p.job.ended ?? null, status: p.job.status, exit: p.job.exit ?? null,
@@ -130,7 +133,8 @@ export function recordProblems(x: unknown): string[] {
 
 /** The record as the form's draft: same inputs, groups (as steps), options, template and folder. */
 export function recipeFromRecord(r: RunRecord) {
-  const why = 'from ' + (r.outputs.find(o => o.kind === 'xvg')?.path.split('/').pop()?.replace(/\.xvg$/, '') ?? r.job) + '.run.json';
+  // A record names itself (Phase 6); an older one by its first .xvg, which was the run's own until runs wrote others first.
+  const why = 'from ' + (r.record ?? (r.outputs.find(o => o.kind === 'xvg')?.path.split('/').pop()?.replace(/\.xvg$/, '') ?? r.job) + '.run.json');
   return {
     inputs: Object.fromEntries(Object.entries(r.inputs).map(([slot, f]) => [slot, { path: f!.path, why }])) as Partial<Record<Slot, { path: string; why: string }>>,
     // A command without groups (gmx energy) keeps the draft's groups: it has none of its own to bring back.

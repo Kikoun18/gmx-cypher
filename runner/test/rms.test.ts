@@ -25,6 +25,11 @@ describe('gmx rms (R9a): the fit group, then the groups measured, on stdin', () 
     expect(rmsStdin(2)).toBe('0\n0\n1\n2\n');
   });
 
+  it('without a fit gmx asks for no fit group (2025.4): the groups measured only, or every group would shift by one (review)', () => {
+    expect(rmsStdin(1, { fit: 'none' })).toBe('0\n1\n');
+    expect(rmsStdin(1, { fit: 'translation' })).toBe('0\n0\n1\n');
+  });
+
   it('its groups: a fit group, and any number of groups measured', () => {
     expect(roleProblems(rmsCommand, 1)).toEqual([]);
     expect(roleProblems(rmsCommand, 4)).toEqual([]);
@@ -36,6 +41,8 @@ describe('gmx rms (R9a): the fit group, then the groups measured, on stdin', () 
     [{ prev: '-1' }, ['-prev: a whole number, 0 or more']],
     [{ prev: '1.5' }, ['-prev: a whole number, 0 or more']],
     [{ b: '5', e: '2' }, ['-e must be after -b']],
+    [{ fit: 'rot' }, ['-fit: one of rot+trans, translation, none']],
+    [{ mw: 'no' }, ['-mw: on or off, not "no"']],
   ])('%o → %o', (options, problems) => {
     expect(rmsOptionProblems(options, HELP)).toEqual(problems);
   });
@@ -73,6 +80,14 @@ describe('a run of gmx rms (R9a)', () => {
     expect(data(readFileSync(join(dir, 'rms/rms_nvt.xvg'), 'utf8'))).toEqual(data(text('r9/rms/rmsd_nvt.xvg')));
     expect(readdirSync(join(dir, 'rms')).sort()).toEqual(['rms_nvt.ndx', 'rms_nvt.run.json', 'rms_nvt.xvg']);
     expect(recordProblems(r)).toEqual([]);
+    // Without a fit: no fit group on stdin, and the curves are still sulfate and sodium (the real run's legends).
+    const nofit = { ...req, options: { fit: 'none' } };
+    expect((await planRun(s.ctx, nofit, [dir])).stdin).toBe('0\n1\n');
+    const r2 = await (await startRun(s.ctx, nofit, [dir])).record;
+    expect(r2).toMatchObject({ status: 'done', stdin: '0\n1\n' });
+    const legends = readFileSync(join(dir, 'rms/rms_nvt (2).xvg'), 'utf8').match(/^@ s\d legend "(.*)"$/gm);
+    expect(legends).toEqual(['@ s0 legend "sulfate"', '@ s1 legend "sodium"']);
+    expect(data(readFileSync(join(dir, 'rms/rms_nvt (2).xvg'), 'utf8'))).toEqual(data(text('r9/rms-nofit/rmsd_nvt.xvg')));
     await s.close();
   });
 });

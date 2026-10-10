@@ -2,6 +2,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { Cluster } from '../server/cluster';
+import { capture } from '../server/gmx';
 import { apiServer, RUNNER, tmp } from './helpers';
 
 // The cluster runner (R10a) with fakes that print your samples: qq jobs and gmx-eta -a, on this machine, one at a time.
@@ -53,14 +54,32 @@ describe('reading the cluster (R10a)', () => {
     expect(failed.eta.ok).toBe(true);
   });
 
+  it('a tool past its time is stopped with everything it started (review): no program left behind to overlap the next read', async () => {
+    const dir = tmp('hang'), script = join(dir, 'hang.mjs'), pidFile = join(dir, 'child.pid');
+    // Starts a child that holds the output open, as a tool calling ssh or cat might, then waits.
+    writeFileSync(script, "import { spawn } from 'node:child_process'; import { writeFileSync } from 'node:fs';\n"
+      + "const c = spawn('sleep', ['30'], { stdio: 'inherit' }); writeFileSync(" + JSON.stringify(pidFile) + ", String(c.pid)); setTimeout(() => {}, 30000);\n");
+    const started = Date.now(), r = await capture(process.execPath, [script], { timeoutMs: 500, group: true });
+    expect(r.timedOut).toBe(true);
+    expect(Date.now() - started).toBeLessThan(5000);
+    // Stopped, not running: gone, or a zombie nobody reaps in a container (Linux's /proc says which).
+    const pid = Number(readFileSync(pidFile, 'utf8'));
+    await new Promise(res => setTimeout(res, 200));
+    let state = 'gone';
+    try { state = /State:\s+(\S)/.exec(readFileSync('/proc/' + pid + '/status', 'utf8'))![1]; } catch { /* gone, or no /proc */ }
+    expect(['gone', 'Z', 'X']).toContain(state);
+  });
+
   it('the API: POST /api/cluster, and the tools set in settings (a name or a path, nothing a shell would read)', async () => {
     const s = await apiServer();
     s.ctx.config = { ...s.ctx.config, qq: QQ, gmxEta: ETA };
     const r = await s.call('/api/cluster', { finished: false });
     expect(r.status).toBe(200);
     expect(r.json.qq.table.counts).toEqual({ R: 9, Q: 2, 'Σ': 11 });
-    expect((await s.call('/api/config', { qq: 'qq; rm -rf ~' })).json).toEqual({ error: 'qq: a program name or path, without spaces' });
-    expect((await s.call('/api/config', { gmxEta: '/opt/tools/gmx-eta' })).status).toBe(200);
+    const refused = { error: 'qq: qq (found on PATH), or the absolute path of a program that exists' };
+    for (const qq of ['qq; rm -rf ~', 'rm', 'test/fake-qq.mjs', '/no/such/qq']) expect((await s.call('/api/config', { qq })).json).toEqual(refused);
+    expect((await s.call('/api/config', { qq: 'qq' })).status).toBe(200);
+    expect((await s.call('/api/config', { gmxEta: ETA })).status).toBe(200);
     await s.close();
   });
 });

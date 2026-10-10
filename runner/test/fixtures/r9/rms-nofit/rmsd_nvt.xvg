@@ -1,0 +1,47 @@
+# This file was created Sat Oct 10 05:08:18 2026
+# Created by:
+#                       :-) GROMACS - gmx rms, 2025.4 (-:
+# 
+# Executable:   /opt/gromacs-2025.4/bin/gmx
+# Data prefix:  /opt/gromacs-2025.4
+# Working dir:  /home/user/sim/na2so4/nvt
+# Command line:
+#   gmx rms -s nvt.tpr -f nvt.xtc -n idx.ndx -o rms-nofit/rmsd_nvt.xvg -ng 2 -fit none
+# gmx rms is part of G R O M A C S:
+#
+# Glycine aRginine prOline Methionine Alanine Cystine Serine
+#
+@    title "RMSD"
+@    xaxis  label "Time (ps)"
+@    yaxis  label "RMSD (nm)"
+@TYPE xy
+@ subtitle "of sulfate after no fit"
+@ view 0.15, 0.15, 0.75, 0.85
+@ legend on
+@ legend box on
+@ legend loctype view
+@ legend 0.78, 0.8
+@ legend length 2
+@ s0 legend "sulfate"
+@ s1 legend "sodium"
+   0.0000000    0.0000002    0.0000003
+   1.0000000    0.2324135    0.3518070
+   2.0000000    0.3323537    1.3657225
+   3.0000000    1.3911866    1.6415933
+   4.0000000    0.3787897    1.6552594
+   5.0000000    0.3880143    1.9836465
+   6.0000000    0.4008629    2.1983426
+   7.0000000    0.4434918    1.9139146
+   8.0000000    1.2166597    1.8856980
+   9.0000000    1.2144989    1.6787976
+  10.0000000    1.1928800    1.6600322
+  11.0000000    1.1784788    1.8840421
+  12.0000000    1.1917169    2.0842261
+  13.0000000    1.2030467    2.1892188
+  14.0000000    1.1906352    2.0254540
+  15.0000000    1.1745673    2.0006089
+  16.0000000    1.1299182    1.9814622
+  17.0000000    1.1355487    1.9716597
+  18.0000000    1.1429683    1.9363779
+  19.0000000    1.1362473    2.1945651
+  20.0000000    1.1349214    2.1625504

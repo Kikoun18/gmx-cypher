@@ -2,7 +2,7 @@
 // number of their atom pairs within -d. It asks for its groups on stdin: the reference, then -ng groups. Every rule
 // here was checked with GROMACS 2025.4 on the test system.
 import type { CommandOption } from './commands';
-import { checkOptions, numberProblems, optionArgs } from './form';
+import { checkOptions, numberProblems, optionArgs, valueProblems } from './form';
 import type { HelpOption } from './gmxText';
 import type { Options } from './rdf';
 
@@ -17,7 +17,7 @@ export const MINDIST_FORM: CommandOption[] = [
   { flag: 'pbc', group: 'periodic boundaries', label: 'periodic boundaries', what: 'distances across the box edges' },
 ];
 
-export const mindistOptionProblems = (options: Options, help: HelpOption[]) => numberProblems(options, help, ['d'], ['d']);
+export const mindistOptionProblems = (options: Options, help: HelpOption[]) => [...numberProblems(options, help, ['d'], ['d']), ...valueProblems(options, MINDIST_FORM, help)];
 
 export type MindistIo = { trajectory: string; runInput: string; index: string; output: string; contacts: string };
 

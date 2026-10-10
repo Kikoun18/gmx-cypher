@@ -98,6 +98,10 @@ export async function planRun(ctx: Ctx, req: RunRequest, roots: string[]): Promi
   // Uploaded inputs have no folder of their own: their outputs go to the state folder's workspace.
   const uploaded = (folder + '/').startsWith(join(ctx.home, 'uploads') + '/');
   const outDir = req.outDir ? inside(req.outDir, roots) : uploaded ? join(ctx.home, 'workspace') : join(folder, cmd.tool);
+  // The default folder is beside the inputs, so inside an allowed folder, except for gmx wham, whose windows may sit
+  // in two allowed folders with their common folder in neither: then an output folder is asked for (review).
+  if (!req.outDir && !uploaded && !roots.some(r => { try { return within(outDir, realpathSync(r)); } catch { return false; } }))
+    throw new HttpError(400, folder + ', the folder that holds all the inputs, is outside the allowed folders: choose an output folder inside them');
   // The vault is written only by sending, into a project's _inbox (review finding 11).
   const vault = ctx.config.vault && existsSync(ctx.config.vault) ? realpathSync(ctx.config.vault) : null;
   if (vault && within(outDir, vault)) throw new HttpError(400, outDir + ' is inside the PMF Sequences vault; results go there only by send to vault');
@@ -130,7 +134,7 @@ export async function planRun(ctx: Ctx, req: RunRequest, roots: string[]): Promi
   if (cmd.stdin) {
     // The terms are numbers from this file's own menu (T99): checked against it here, as gmx would refuse them.
     if (cmd.tool === 'energy') problems.push(...energyProblems(req.terms ?? [], await energyMenu(ctx.gmx, first!)));
-    stdin = cmd.stdin({ terms: req.terms ?? [], selections: (req.groups?.length || 1) - 1 });
+    stdin = cmd.stdin({ terms: req.terms ?? [], selections: (req.groups?.length || 1) - 1, options });
   }
   let names = cmd.outputNames(stem, options);
   if (frames) {
@@ -259,7 +263,7 @@ export async function startRun(ctx: Ctx, req: RunRequest, roots: string[]): Prom
       const problems = readdirSync(plan.outDir).filter(n => { const m = /^#(.+)\.\d+#$/.exec(n); return m && ours.has(nameKey(m[1])); })
         .map(n => 'gmx backed up a file that appeared during the run: ' + n);
       const r = buildRecord({
-        analysis: plan.tool, runner: ctx.version, gmx: { path: ctx.gmx.path!, version: ctx.gmx.version! }, env, command: { cwd: plan.cwd, file: plan.file, args: plan.argv },
+        analysis: plan.tool, record: plan.names.record, runner: ctx.version, gmx: { path: ctx.gmx.path!, version: ctx.gmx.version! }, env, command: { cwd: plan.cwd, file: plan.file, args: plan.argv },
         inputs, groups: req.groups ?? [], atoms, sizes, options: plan.options, help: await toolHelp(ctx.gmx, plan.gmxTool), form: cmd.options, template: req.template || DEFAULT_TEMPLATE,
         outDir: req.outDir ?? null, job: j, outputs, problems, stdin: plan.stdin, terms: req.terms,
         ...(plan.windows ? { windows: await Promise.all(plan.windows.map(async w => ({ tpr: await fileInfo(w.tpr, true), pull: await fileInfo(w.pull, true) }))), pull: req.pull ?? 'pullx' } : {}),

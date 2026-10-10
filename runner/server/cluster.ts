@@ -65,14 +65,14 @@ export class Cluster {
     else {
       const args = finished ? QQ_ALL : QQ_JOBS;
       try {
-        const r = await capture(qqPath, args, { timeoutMs: QQ_TIMEOUT, env: QQ_ENV });
+        const r = await capture(qqPath, args, { timeoutMs: QQ_TIMEOUT, env: QQ_ENV, group: true });
         qq = r.code === 0 && !r.timedOut ? { ok: true, path: qqPath, args, table: parseQqJobs(r.stdout) } : { ok: false, error: failure('qq ' + args.join(' '), r, QQ_TIMEOUT) };
       } catch (e) { qq = { ok: false, error: 'qq could not be started: ' + (e as Error).message }; }
     }
     if (!etaPath) eta = { ok: false, error: (etaName || 'gmx-eta') + ' is not on PATH: the ETA column shows — (set its path in settings)' };
     else {
       try {
-        const r = await capture(etaPath, GMX_ETA, { timeoutMs: ETA_TIMEOUT });
+        const r = await capture(etaPath, GMX_ETA, { timeoutMs: ETA_TIMEOUT, group: true });
         eta = r.code === 0 && !r.timedOut ? { ok: true, path: etaPath, sha256: await sha256File(etaPath), ...parseGmxEta(r.stdout) } : { ok: false, error: failure('gmx-eta -a', r, ETA_TIMEOUT) };
       } catch (e) { eta = { ok: false, error: 'gmx-eta could not be started: ' + (e as Error).message }; }
     }

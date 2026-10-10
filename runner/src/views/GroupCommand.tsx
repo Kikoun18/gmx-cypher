@@ -82,7 +82,10 @@ function OptionField({ f, o, value, set }: { f: CommandOption; o: HelpOption; va
             <SelectContent>{o.values!.map(x => <SelectItem key={x} value={x}>{x}</SelectItem>)}</SelectContent>
           </Select>
         ) : (
-          <Input id={id} size="sm" className="w-28" inputMode={o.type === 'string' ? 'text' : 'decimal'} value={v ?? ''} placeholder={String(o.default)} onChange={e => set(e.target.value.trim() || undefined)} />
+          // A list (-de N O) keeps its spaces while typed and is tidied on leaving the field; a number is trimmed as typed (review).
+          o.type === 'string'
+            ? <Input id={id} size="sm" className="w-28" inputMode="text" value={typeof value === 'string' ? value : ''} placeholder={String(o.default)} onChange={e => set(e.target.value.trim() ? e.target.value : undefined)} onBlur={e => set(e.target.value.trim().split(/\s+/).join(' ') || undefined)} />
+            : <Input id={id} size="sm" className="w-28" inputMode="decimal" value={v ?? ''} placeholder={String(o.default)} onChange={e => set(e.target.value.trim() || undefined)} />
         )}
         {f.unit && <span className="text-caption text-muted-foreground">{f.unit}</span>}
         {chip}
@@ -191,6 +194,8 @@ export function GroupCommand({ command, gmx, draft, setDraft, onStarted }: ViewP
           : planned?.error ? <FieldHint error>✗ {planned.error}</FieldHint>
           : plan ? <Code label="command" text={commandText({ cwd: plan.cwd, file: plan.file, args: plan.argv, env: plan.env })} />
           : <p className="m-0 text-control text-muted-foreground" aria-live="polite">choosing names…</p>}
+        {/* The tools that ask for their groups get them on stdin: part of what runs (review). */}
+        {plan?.stdin != null && <p className="m-0 text-caption text-muted-foreground">answers on stdin, by group number: <span className="font-bold text-foreground">{plan.stdin.trimEnd().split('\n').join(' · ')}</span></p>}
         <FieldHint>exactly what will run, without a shell · options read from this {gmx.name} {gmx.version} (gmx {tool} -h)</FieldHint>
         {problems.length > 0 && (
           <Alert variant="destructive" aria-live="polite"><X /><AlertTitle>gmx would refuse these options</AlertTitle><AlertDescription>{problems.map(p => <p key={p}>{p}</p>)}</AlertDescription></Alert>

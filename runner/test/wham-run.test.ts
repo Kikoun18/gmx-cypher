@@ -111,3 +111,16 @@ describe('a run of gmx wham (R6)', () => {
     await s.close();
   });
 });
+
+describe('where gmx wham writes when its windows are in two allowed folders (review)', () => {
+  it('their common folder is in neither: refused until an output folder inside them is chosen', async () => {
+    const { us, s, req } = await setup();
+    // Allowed: two window folders, not their parent. The default output folder would be <us>/wham.
+    const roots = [join(us, 'win00'), join(us, 'win01')];
+    const two = { ...req, windows: req.windows!.slice(0, 2) };
+    await expect(planRun(s.ctx, two, roots)).rejects.toMatchObject({ status: 400, message: us + ', the folder that holds all the inputs, is outside the allowed folders: choose an output folder inside them' });
+    expect(existsSync(join(us, 'wham'))).toBe(false);
+    expect((await planRun(s.ctx, { ...two, outDir: join(us, 'win00') }, roots)).outDir).toBe(join(us, 'win00'));
+    await s.close();
+  });
+});

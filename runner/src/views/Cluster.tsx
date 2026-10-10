@@ -42,7 +42,9 @@ function useCluster(finished: boolean) {
   const [failed, setFailed] = React.useState(0)
   const refresh = React.useRef<() => void>(() => {})
   React.useEffect(() => {
-    let alive = true, inFlight = false, failures = 0, timer: ReturnType<typeof setTimeout> | undefined
+    // `lastAt`: the time of the read last seen, so a reused read (the server keeps one 50 s) isn't counted as a new
+    // failure; `due`: when the next read is, which a return to the page keeps (review).
+    let alive = true, inFlight = false, failures = 0, lastAt = '', due = 0, timer: ReturnType<typeof setTimeout> | undefined
     const load = async (fresh: boolean) => {
       if (inFlight) return
       inFlight = true
@@ -50,18 +52,22 @@ function useCluster(finished: boolean) {
       clearTimeout(timer)
       try {
         const r = await postJson<ClusterRead>('/api/cluster', { finished, refresh: fresh })
-        if (alive) { setRead(r); setError(''); failures = r.qq.ok ? 0 : failures + 1 }
+        if (alive) { setRead(r); setError(''); if (r.at !== lastAt) { lastAt = r.at; failures = r.qq.ok ? 0 : failures + 1 } }
       } catch (e) { if (alive) { setError((e as Error).message); failures++ } }
       inFlight = false
       if (!alive) return
       setBusy(false)
       setFailed(failures)
-      if (document.visibilityState === 'visible') timer = setTimeout(() => load(false), nextPoll(failures) * 1000)
+      due = Date.now() + nextPoll(failures) * 1000
+      if (document.visibilityState === 'visible') timer = setTimeout(() => load(false), due - Date.now())
     }
     refresh.current = () => { load(true) }
     load(false)
-    // Hidden: no reads; back: one now (the server reuses one younger than 50 s).
-    const onVisible = () => { if (document.visibilityState === 'visible') load(false); else clearTimeout(timer) }
+    // Hidden: no reads; back: the next one when it is due, now if that has passed.
+    const onVisible = () => {
+      clearTimeout(timer)
+      if (document.visibilityState === 'visible') timer = setTimeout(() => load(false), Math.max(0, due - Date.now()))
+    }
     document.addEventListener('visibilitychange', onVisible)
     return () => { alive = false; clearTimeout(timer); document.removeEventListener('visibilitychange', onVisible) }
   }, [finished])

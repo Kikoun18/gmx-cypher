@@ -153,7 +153,7 @@ describe('batch names and folders (review findings 4 and 5)', () => {
     const root = clusterCopy(), s = await apiServer();
     await s.call('/api/config', { allow: [root] });
     const energy = { ...recipe, name: 'energy terms', analysis: 'energy', groups: [], options: { b: '2' } };
-    expect(await s.call('/api/batch/preview', { root, template: TEMPLATE, recipe: energy })).toEqual({ status: 400, json: { error: 'batches run recipes of commands with groups (rdf); energy terms is a gmx energy recipe' } });
+    expect(await s.call('/api/batch/preview', { root, template: TEMPLATE, recipe: energy })).toEqual({ status: 400, json: { error: 'batches run recipes of commands with atom groups; energy terms is a gmx energy recipe' } });
     await s.close();
   });
 

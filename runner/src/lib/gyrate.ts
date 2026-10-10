@@ -4,7 +4,7 @@
 // own options. On one molecule they agree to the last digit; on a group of several molecules they don't (2025.4, the
 // fixtures): their criteria are never mixed.
 import type { CommandOption } from './commands';
-import { checkOptions, numberProblems, optionArgs } from './form';
+import { checkOptions, numberProblems, optionArgs, valueProblems } from './form';
 import type { HelpOption } from './gmxText';
 import type { Options } from './rdf';
 
@@ -35,7 +35,8 @@ export const GYRATE_LEGACY_FORM: CommandOption[] = [
   ...FRAMES,
 ];
 
-export const gyrateOptionProblems = (options: Options, help: HelpOption[]) => numberProblems(options, help, []);
+/** What either tool would refuse: its numbers, and values outside its own form (each tool's, by `form`). */
+export const gyrateOptionProblems = (form: CommandOption[]) => (options: Options, help: HelpOption[]) => [...numberProblems(options, help, []), ...valueProblems(options, form, help)];
 
 export type GyrateIo = { trajectory: string; runInput: string; index: string; output: string };
 

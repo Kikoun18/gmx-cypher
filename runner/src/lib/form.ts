@@ -27,6 +27,18 @@ export function numberProblems(options: Options, help: HelpOption[], numbers: st
   return p;
 }
 
+/** The values gmx would refuse, in words: an enum outside its values, a switch or bool that isn't on or off (review). */
+export function valueProblems(options: Options, form: CommandOption[], help: HelpOption[]): string[] {
+  const by = new Map(help.map(o => [o.flag, o])), p: string[] = [];
+  for (const f of form) {
+    const v = options[f.flag], o = by.get(f.flag);
+    if (v === undefined || v === '') continue;
+    if ((f.switch || o?.type === 'bool') && typeof v !== 'boolean') p.push('-' + (f.switch ?? f.flag) + ': on or off, not ' + JSON.stringify(v));
+    else if (!f.switch && o?.type === 'enum' && !o.values?.includes(String(v))) p.push('-' + f.flag + ': one of ' + (o.values ?? []).join(', '));
+  }
+  return p;
+}
+
 /** The form by flag, once every option given is one of it and this gmx has it (else a thrown reason). */
 export function checkOptions(tool: string, form: CommandOption[], options: Options, help: HelpOption[]) {
   const has = new Set(help.map(o => o.flag)), by = new Map(form.map(f => [f.flag, f]));

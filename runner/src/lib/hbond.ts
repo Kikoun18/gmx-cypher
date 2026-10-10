@@ -2,7 +2,7 @@
 // selections) and the legacy one (`gmx hbond-legacy` from 2024, and `gmx hbond` before it: 2023.3 checked; groups
 // asked on stdin). Each has its own criteria, never mixed (question 33). Every rule here was checked with 2025.4.
 import type { CommandOption } from './commands';
-import { checkOptions, numberProblems, optionArgs } from './form';
+import { checkOptions, numberProblems, optionArgs, valueProblems } from './form';
 import type { HelpOption } from './gmxText';
 import type { Options } from './rdf';
 
@@ -52,27 +52,32 @@ export function hbondOptionProblems(options: Options, help: HelpOption[]): strin
   const value = (f: string) => Number(options[f] === undefined || options[f] === '' ? by.get(f)?.default : options[f]);
   if (!p.length && value('cutoff') < 0.35) p.push('-cutoff must be 0.35 nm or more');
   else if (!p.length && value('hbr') > value('cutoff')) p.push('-hbr must not exceed -cutoff (' + value('cutoff') + ' nm)');
+  // Symbols apart, as gmx reads them: "NO" would be one element, not N and O (review).
   for (const f of ['de', 'ae']) {
     const v = options[f];
-    if (typeof v === 'string' && v.trim() && !/^\s*([A-Z][a-z]?\s*)+$/.test(v)) p.push('-' + f + ': element symbols, e.g. N O');
+    if (typeof v === 'string' && v.trim() && !/^\s*[A-Z][a-z]?(\s+[A-Z][a-z]?)*\s*$/.test(v)) p.push('-' + f + ': element symbols with spaces between them, e.g. N O');
   }
-  return p;
+  return [...p, ...valueProblems(options, HBOND_FORM, help)];
 }
 
 /** What the legacy tool would refuse: with merging on (its default) it can't write the angle distribution. */
 export function legacyOptionProblems(options: Options, help: HelpOption[]): string[] {
   const p = numberProblems(options, help, ['r', 'a'], ['r', 'a']);
   if (options.ang === true && options.merge !== false) p.push("the angle distribution can't be written while H-bonds are merged: switch merging off (-nomerge)");
-  return p;
+  return [...p, ...valueProblems(options, LEGACY_FORM, help)];
 }
 
-/** The reference and the target of the selection tool are the same atoms or share none (2025.4: "Partial overlap between groups"). */
-export function hbondGroupProblems(_o: Options, _counts: number[], names: string[], sets?: number[][]): string[] {
+/**
+ * The reference and the target are the same atoms or share none: both tools stop otherwise (2025.4: "Partial overlap
+ * between groups", the selection tool's assertion and the legacy tool's fatal error; the review checked the latter).
+ */
+const overlapProblems = (tool: string) => (_o: Options, _counts: number[], names: string[], sets?: number[][]): string[] => {
   if (!sets || sets.length !== 2) return [];
   const ref = new Set(sets[0]), shared = sets[1].filter(n => ref.has(n)).length;
   const same = shared === sets[0].length && shared === sets[1].length;
-  return shared && !same ? [names[0] + ' and ' + names[1] + ' share ' + shared + ' atom' + (shared > 1 ? 's' : '') + ': gmx hbond needs the same atoms or none in common'] : [];
-}
+  return shared && !same ? [names[0] + ' and ' + names[1] + ' share ' + shared + ' atom' + (shared > 1 ? 's' : '') + ': gmx ' + tool + ' needs the same atoms or none in common'] : [];
+};
+export const hbondGroupProblems = overlapProblems('hbond'), legacyGroupProblems = overlapProblems('hbond-legacy');
 
 export type HbondIo = { trajectory: string; runInput: string; index: string; output: string; hbonds: string; dist: string; ang: string; dan: string };
 

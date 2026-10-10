@@ -3,7 +3,7 @@
 import { COMMANDS, commandOf, type OutputNames } from '../src/lib/commands';
 import { existsSync, readFileSync, realpathSync, statSync } from 'node:fs';
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { basename, dirname, join } from 'node:path';
+import { basename, dirname, isAbsolute, join } from 'node:path';
 import { TOKENS } from '../../app/src/lib/seq';
 import { inputRole, suggestInputs } from '../src/lib/inputs';
 import { fromRanges } from '../src/lib/atoms';
@@ -13,7 +13,7 @@ import { awhScan } from './awh';
 import { energyMenu } from './energy';
 import { findWindows } from './wham';
 import { inside, listFolder, namesIn, saveUpload } from './files';
-import { detectGmx, findTool, type GmxState } from './gmx';
+import { detectGmx, executable, findTool, type GmxState } from './gmx';
 import { HttpError, readJson, sendFile, type Api } from './http';
 import type { Job, Jobs } from './jobs';
 import { Batches, checkRunInputs, findTrajectories, sendAll } from './batch';
@@ -69,7 +69,7 @@ export function makeApi(ctx: Ctx): Api {
   const checked = (r: unknown) => { const p = recipeFileProblems(r); if (p.length) throw new HttpError(400, p.join('; ')); return r as Recipe; };
   // A batch runs a recipe over trajectories: only a command with groups has that shape (energy and AWH batches are not built yet).
   const batchable = (r: Recipe) => {
-    if (commandOf(r.analysis ?? 'rdf')?.groups === false) throw new HttpError(400, 'batches run recipes of commands with groups (rdf); ' + r.name + ' is a gmx ' + r.analysis + ' recipe');
+    if (commandOf(r.analysis ?? 'rdf')?.groups === false) throw new HttpError(400, 'batches run recipes of commands with atom groups; ' + r.name + ' is a gmx ' + r.analysis + ' recipe');
     return r;
   };
   return async (req, url, res) => {
@@ -252,8 +252,13 @@ export function makeApi(ctx: Ctx): Api {
       if (unknown.length) throw new HttpError(400, 'unknown setting: ' + unknown.join(', '));
       if (patch.allow) patch.allow = realFolders(patch.allow);
       if (patch.pmfUrl && !/^https?:\/\/[^\s]+$/.test(patch.pmfUrl)) throw new HttpError(400, 'the PMF Sequences address must start with http:// or https://');
-      // A name on PATH or a path, run without a shell: no spaces or shell syntax to mistake for one.
-      for (const k of ['qq', 'gmxEta'] as const) if (patch[k] != null && (typeof patch[k] !== 'string' || !/^[\w./+-]+$/.test(patch[k]!))) throw new HttpError(400, k + ': a program name or path, without spaces');
+      // The tool's own name, found on PATH, or the absolute path of a program that exists: never a relative path
+      // resolved against the server's folder, or another program's name (review).
+      for (const k of ['qq', 'gmxEta'] as const) {
+        const v = patch[k], name = k === 'qq' ? 'qq' : 'gmx-eta';
+        if (v != null && (typeof v !== 'string' || !(v === name || (isAbsolute(v) && /^[\w./+-]+$/.test(v) && executable(v)))))
+          throw new HttpError(400, k + ': ' + name + ' (found on PATH), or the absolute path of a program that exists');
+      }
       // A vault is checked before it is kept: PMF Sequences' manifest, schema 1–3 (T32).
       if (patch.vault) patch.vault = (await openVault(patch.vault).catch(e => { throw new HttpError(400, (e as Error).message); })).path;
       ctx.config = { ...ctx.config, ...patch };

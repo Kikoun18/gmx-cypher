@@ -114,7 +114,7 @@ Spec: [`batch-2.md`](batch-2.md). Phase 0 report: [`batch-2-phase0.md`](batch-2-
 ### Phase 6: Finish
 - [x] `runner/README.md` updated (T137)
 - [ ] Manual QA in Chrome with real `gmx`, `qq` and `gmx-eta`; results recorded (passed, failed or not run)
-- [ ] Fresh-context review of the whole branch against section 20 of the spec; findings fixed or recorded
+- [x] Fresh-context review of the whole branch against section 20 of the spec; findings fixed or recorded (R1–R4: T105–T110; R5–R10: T138)
 - [ ] Final report `runner/docs/batch-2-report.md`
 
 ### Backlog (Batch 2: add to it, don't do it)

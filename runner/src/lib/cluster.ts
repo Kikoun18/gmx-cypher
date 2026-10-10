@@ -66,8 +66,9 @@ export function parseQqJobs(text: string): QqTable {
     if (rest[1] === '/' && clock(rest[0]) !== null && clock(rest[2] ?? '') !== null) { runtime = clock(rest[0]); walltime = clock(rest[2]); i = 3; }
     else if (clock(rest[0]) !== null) { waiting = clock(rest[0]); i = 1; }
     const tail = rest.slice(i);
-    // A running job ends with its node, %CPU and %Mem; anything else is a plan, kept as printed.
-    const usage = tail.length === 3 && num(tail[1]) !== null && num(tail[2]) !== null;
+    // A running job ends with its node, then %CPU and %Mem when the batch system gives them (Slurm doesn't); a
+    // queued one with a plan, kept as printed (review: a running row with its node alone is not a plan).
+    const usage = (tail.length === 3 && num(tail[1]) !== null && num(tail[2]) !== null) || (['R', 'E'].includes(letter) && tail.length === 1);
     jobs.push({
       id, key: id.replace(/\..*$/, ''), state: stateOf(letter), user, name: name.replace(/…$/, ''), truncated: name.endsWith('…'), queue,
       cpus: num(cpus), gpus: num(gpus), nodes: num(nodes), runtime, walltime, waiting,

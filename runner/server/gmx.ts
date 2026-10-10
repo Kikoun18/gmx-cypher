@@ -10,7 +10,7 @@ import { commandOf, type CommandDef } from '../src/lib/commands';
 
 export interface GmxState { ok: boolean; name: string; path?: string; version?: string; versionText?: string; error?: string }
 
-const executable = (p: string) => { try { accessSync(p, constants.X_OK); return statSync(p).isFile(); } catch { return false; } };
+export const executable = (p: string) => { try { accessSync(p, constants.X_OK); return statSync(p).isFile(); } catch { return false; } };
 
 export function findOnPath(name: string, PATH = process.env.PATH || ''): string | null {
   for (const dir of PATH.split(delimiter).filter(Boolean)) if (executable(join(dir, name))) return join(dir, name);
@@ -19,14 +19,19 @@ export function findOnPath(name: string, PATH = process.env.PATH || ''): string 
 
 export interface Captured { code: number | null; stdout: string; stderr: string }
 
-/** Runs a program without a shell and collects its output; `until` stops it once the output matches; `env` adds to the environment. */
-export function capture(file: string, args: string[], o: { cwd?: string; until?: RegExp; timeoutMs?: number; stdin?: string; env?: Record<string, string> } = {}): Promise<Captured & { timedOut?: boolean }> {
+/**
+ * Runs a program without a shell and collects its output; `until` stops it once the output matches; `env` adds to the
+ * environment. With `group` it runs in a process group of its own, and a stop stops everything it started (the cluster
+ * tools, which start programs of their own: review).
+ */
+export function capture(file: string, args: string[], o: { cwd?: string; until?: RegExp; timeoutMs?: number; stdin?: string; env?: Record<string, string>; group?: boolean } = {}): Promise<Captured & { timedOut?: boolean }> {
   return new Promise((done, fail) => {
-    const p = spawn(file, args, { cwd: o.cwd, shell: false, stdio: [o.stdin == null ? 'ignore' : 'pipe', 'pipe', 'pipe'], ...(o.env ? { env: { ...process.env, ...o.env } } : {}) }) as ChildProcessByStdio<Writable | null, Readable, Readable>;
+    const p = spawn(file, args, { cwd: o.cwd, shell: false, stdio: [o.stdin == null ? 'ignore' : 'pipe', 'pipe', 'pipe'], detached: !!o.group, ...(o.env ? { env: { ...process.env, ...o.env } } : {}) }) as ChildProcessByStdio<Writable | null, Readable, Readable>;
+    const kill = (signal: NodeJS.Signals) => { try { if (o.group && p.pid) process.kill(-p.pid, signal); else p.kill(signal); } catch { p.kill(signal); } };
     if (o.stdin != null) { p.stdin!.on('error', () => { /* the process ended before reading its answers */ }); p.stdin!.end(o.stdin); }
     let stdout = '', stderr = '', finished = false, timedOut = false;
-    const timer = setTimeout(() => { timedOut = true; p.kill('SIGKILL'); }, o.timeoutMs ?? 60_000);
-    const check = () => { if (o.until && !finished && o.until.test(stdout + '\n' + stderr)) { finished = true; p.kill('SIGTERM'); } };
+    const timer = setTimeout(() => { timedOut = true; kill('SIGKILL'); }, o.timeoutMs ?? 60_000);
+    const check = () => { if (o.until && !finished && o.until.test(stdout + '\n' + stderr)) { finished = true; kill('SIGTERM'); } };
     p.stdout.on('data', d => { stdout += d; check(); });
     p.stderr.on('data', d => { stderr += d; check(); });
     p.on('error', e => { clearTimeout(timer); fail(e); });

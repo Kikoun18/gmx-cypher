@@ -261,7 +261,8 @@ gmx-cypher can:
 - read files inside the allowed folders, and read your PMF Sequences vault;
 - start `gmx` and the GROMACS tools it knows (never through a shell), in a trajectory's folder;
 - in the cluster view: start `qq jobs` (`qq jobs -a` with *show finished*) and `gmx-eta -a`, on this machine. The
-  commands and their options are fixed in the code, one runs at a time, and nothing you type reaches them;
+  programs are `qq` and `gmx-eta` from your `PATH`, or the absolute paths set in *settings*; their arguments are
+  fixed in the code, one runs at a time, and nothing typed in the page reaches them;
 - write new files: a run's outputs, under names that are free; files in its own state folder; and a result you
   send, into the project's `_inbox` folder.
 

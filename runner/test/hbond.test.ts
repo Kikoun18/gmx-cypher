@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { parseHelp } from '../src/lib/gmxText';
 import {
   hbondArgv, hbondGroupProblems, hbondKind, hbondNames, hbondOptionProblems, HBOND_SUMMARY,
-  legacyArgv, legacyNames, legacyOptionProblems, LEGACY_SUMMARY, legacyStdin, summaryLines,
+  legacyArgv, legacyGroupProblems, legacyNames, legacyOptionProblems, LEGACY_SUMMARY, legacyStdin, summaryLines,
 } from '../src/lib/hbond';
 import { hbondCommand, hbondLegacyCommand, roleProblems } from '../src/lib/commands';
 import { curveStats as countStats } from '../src/lib/curves';
@@ -52,7 +52,12 @@ describe('the selection tool, gmx hbond 2024+ (R8)', () => {
     [{ cutoff: '0.5', hbr: '0.4' }, []],
     [{ hba: '0' }, ['-hba must be above 0']],
     [{ de: '' }, []],
-    [{ ae: 'N 1' }, ['-ae: element symbols, e.g. N O']],
+    [{ ae: 'N 1' }, ['-ae: element symbols with spaces between them, e.g. N O']],
+    // "NO" is one symbol to gmx, not N and O (review): refused, so a lost space can't change the criteria.
+    [{ de: 'NO' }, ['-de: element symbols with spaces between them, e.g. N O']],
+    [{ de: 'N O S ' }, []],
+    [{ dist: 'yes' }, ['-dist: on or off, not "yes"']],
+    [{ pbc: 'no' }, ['-pbc: on or off, not "no"']],
   ])('refusals, each as 2025.4 refuses: %o → %o', (options, problems) => {
     expect(hbondOptionProblems(options, NEW)).toEqual(problems);
   });
@@ -95,8 +100,14 @@ describe('the legacy tool, gmx hbond-legacy (and gmx hbond before 2024) (R8)', (
     [{ ang: true }, ["the angle distribution can't be written while H-bonds are merged: switch merging off (-nomerge)"]],
     [{ ang: true, merge: false }, []],
     [{ r: '-1' }, ['-r must be above 0']],
+    [{ merge: 'no' }, ['-merge: on or off, not "no"']],
   ])('%o → %o (checked with 2025.4: "Can\'t combine merging hbonds and writing angle distribution")', (options, problems) => {
     expect(legacyOptionProblems(options, LEGACY)).toEqual(problems);
+  });
+
+  it('one target, the same atoms as the reference or none of them: the legacy tool stops too (2025.4: "Partial overlap")', () => {
+    expect(legacyGroupProblems({}, [2, 2], ['sulfate', 'water'], [[1, 2], [2, 3]])).toEqual(['sulfate and water share 1 atom: gmx hbond-legacy needs the same atoms or none in common']);
+    expect(legacyGroupProblems({}, [2, 2], ['a', 'b'], [[1, 2], [1, 2]])).toEqual([]);
   });
 
   it('one target', () => {

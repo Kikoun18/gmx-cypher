@@ -2,7 +2,7 @@ import { copyFileSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { Group } from '../src/lib/groups';
-import { recordProblems } from '../src/lib/record';
+import { recipeFromRecord, recordProblems } from '../src/lib/record';
 import { planRun, startRun, type RunRequest } from '../server/runs';
 import { apiServer, FAKE_GMX, RUNNER, tmp } from './helpers';
 
@@ -44,6 +44,9 @@ describe('a run of gmx distance (R7)', () => {
     expect(r.outputs.map(o => o.path.split('/').pop())).toEqual(['distance_nvt_all.xvg', 'distance_nvt_hist.xvg', 'distance_nvt.xvg', 'distance_nvt.ndx']);
     expect(r.distances?.map(d => d.samples)).toEqual([126, 126]);
     expect(r.options.find(o => o.flag === 'all')).toMatchObject({ value: true, isDefault: false });
+    // Run again says the record it came from, not the first of the other files (review).
+    expect(r.record).toBe('distance_nvt.run.json');
+    expect(recipeFromRecord(r).inputs.trajectory?.why).toBe('from distance_nvt.run.json');
     expect(readdirSync(join(dir, 'distance'))).toHaveLength(5);
     await s.close();
   });

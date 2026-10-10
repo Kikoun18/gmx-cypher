@@ -100,7 +100,7 @@ export function BatchView({ state, draft, jobs, onOpenJob }: { state: AppState; 
   const [busy, setBusy] = React.useState(false)
   const batches = useBatches()
   React.useEffect(() => { getJson<{ id: string; name: string }[]>('/api/recipes').then(setRecipes, () => {}) }, [])
-  const recipe = async (): Promise<Recipe> => (recipeId === FORM ? recipeFromDraft(draft, 'the rdf form') : getJson<Recipe>('/api/recipes/' + encodeURIComponent(recipeId)))
+  const recipe = async (): Promise<Recipe> => (recipeId === FORM ? recipeFromDraft(draft, 'the ' + (draft.analysis ?? 'rdf') + ' form') : getJson<Recipe>('/api/recipes/' + encodeURIComponent(recipeId)))
   const preview = async () => {
     setBusy(true); setError('')
     try {
@@ -120,7 +120,7 @@ export function BatchView({ state, draft, jobs, onOpenJob }: { state: AppState; 
           <Select value={recipeId} onValueChange={v => { setRecipeId(v); setItems(null) }}>
             <SelectTrigger id="b-recipe" size="sm"><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value={FORM}>the rdf form, as it is</SelectItem>
+              <SelectItem value={FORM}>the {draft.analysis ?? 'rdf'} form, as it is</SelectItem>
               {recipes.map(r => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}
             </SelectContent>
           </Select>

@@ -1,5 +1,6 @@
 // `gmx distance` (R7): what is measured between the reference and each selection, written as selection text from the
 // groups by number (T17); its outputs; and the averages it prints. Each behaviour checked with GROMACS 2025.4 on nvt.
+import { valueProblems } from './form';
 import type { HelpOption } from './gmxText';
 import { isDefault, type Options } from './rdf';
 
@@ -56,6 +57,7 @@ export function distanceOptionProblems(options: Options, help: HelpOption[]): st
     else if (f === 'dt' && n < 0) p.push('-dt must be 0 or more');
   }
   if (options.measure !== undefined && !MEASURES.includes(options.measure as Measure)) p.push('measure: one of ' + MEASURES.join(', '));
+  p.push(...valueProblems(options, DISTANCE_FORM, help));
   const b = Number(options.b ?? by.get('b')?.default ?? 0), e = Number(options.e || 0);
   if (!p.length && e > 0 && e <= b) p.push('-e must be after -b');
   return p;
