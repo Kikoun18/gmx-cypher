@@ -17,6 +17,7 @@ import { detectGmx, findTool, type GmxState } from './gmx';
 import { HttpError, readJson, sendFile, type Api } from './http';
 import type { Job, Jobs } from './jobs';
 import { Batches, checkRunInputs, findTrajectories, sendAll } from './batch';
+import { Cluster } from './cluster';
 import { listRecipes, readRecipe, saveRecipe } from './recipes';
 import { recipeFileProblems, type Recipe } from '../src/lib/recipe';
 import { cpus } from 'node:os';
@@ -47,7 +48,7 @@ function events(jobs: Jobs, batches: Batches, res: ServerResponse) {
 }
 
 /** What the GUI may change (T5); anything else is refused. */
-const SETTABLE: (keyof Config)[] = ['gmx', 'allow', 'vault', 'pmfUrl'];
+const SETTABLE: (keyof Config)[] = ['gmx', 'allow', 'vault', 'pmfUrl', 'qq', 'gmxEta'];
 
 /** Allowed folders as real paths; each must exist and be a folder. */
 export function realFolders(paths: string[]): string[] {
@@ -64,6 +65,7 @@ export function makeApi(ctx: Ctx): Api {
   // Uploaded inputs are used like picked ones, so the uploads folder counts as allowed.
   const roots = () => [...ctx.config.allow, join(ctx.home, 'uploads')];
   const batches = new Batches(ctx, roots);
+  const cluster = new Cluster(() => ({ qq: ctx.config.qq ?? null, gmxEta: ctx.config.gmxEta ?? null }));
   const checked = (r: unknown) => { const p = recipeFileProblems(r); if (p.length) throw new HttpError(400, p.join('; ')); return r as Recipe; };
   // A batch runs a recipe over trajectories: only a command with groups has that shape (energy and AWH batches are not built yet).
   const batchable = (r: Recipe) => {
@@ -110,6 +112,11 @@ export function makeApi(ctx: Ctx): Api {
       const b = await readJson<{ root: string; glob: string; pull?: string }>(req), unread: string[] = [];
       const windows = findWindows(String(b.root || ''), String(b.glob || ''), b.pull === 'pullf' ? 'pullf' : 'pullx', roots(), unread);
       return { body: { windows, unread } };
+    }
+    if (is(req, 'POST', url, '/api/cluster')) {
+      // Your cluster jobs (R10): the last read if recent, else qq jobs and gmx-eta -a now; `refresh` asks for a new one.
+      const b = await readJson<{ finished?: boolean; refresh?: boolean }>(req);
+      return { body: await cluster.read(b.finished === true, b.refresh === true ? 0 : 50_000) };
     }
     if (is(req, 'GET', url, '/api/ls')) {
       const path = url.searchParams.get('path');
@@ -245,6 +252,8 @@ export function makeApi(ctx: Ctx): Api {
       if (unknown.length) throw new HttpError(400, 'unknown setting: ' + unknown.join(', '));
       if (patch.allow) patch.allow = realFolders(patch.allow);
       if (patch.pmfUrl && !/^https?:\/\/[^\s]+$/.test(patch.pmfUrl)) throw new HttpError(400, 'the PMF Sequences address must start with http:// or https://');
+      // A name on PATH or a path, run without a shell: no spaces or shell syntax to mistake for one.
+      for (const k of ['qq', 'gmxEta'] as const) if (patch[k] != null && (typeof patch[k] !== 'string' || !/^[\w./+-]+$/.test(patch[k]!))) throw new HttpError(400, k + ': a program name or path, without spaces');
       // A vault is checked before it is kept: PMF Sequences' manifest, schema 1–3 (T32).
       if (patch.vault) patch.vault = (await openVault(patch.vault).catch(e => { throw new HttpError(400, (e as Error).message); })).path;
       ctx.config = { ...ctx.config, ...patch };

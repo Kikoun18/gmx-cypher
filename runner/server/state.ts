@@ -18,9 +18,12 @@ export interface Config {
   concurrency: number;
   /** SHA-256 of trajectories in run records (R5). */
   hashTrajectories: boolean;
+  /** qq and gmx-eta, by name or path, for the cluster view (R10); null: found on PATH. */
+  qq: string | null;
+  gmxEta: string | null;
 }
 
-export const DEFAULT_CONFIG: Config = { gmx: null, allow: [], vault: null, pmfUrl: null, concurrency: 2, hashTrajectories: false };
+export const DEFAULT_CONFIG: Config = { gmx: null, allow: [], vault: null, pmfUrl: null, concurrency: 2, hashTrajectories: false, qq: null, gmxEta: null };
 
 export const stateDir = (env: NodeJS.ProcessEnv = process.env) => env.GMX_CYPHER_HOME || join(homedir(), '.gmx-cypher');
 

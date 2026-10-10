@@ -106,7 +106,7 @@ Spec: [`batch-2.md`](batch-2.md). Phase 0 report: [`batch-2-phase0.md`](batch-2-
 - [x] R9d `gmx mindist`: minimum distance and contacts (T131)
 
 ### Phase 5: Cluster jobs (R10)
-- [ ] R10a Fixed-list runner (local or SSH), with timeouts
+- [x] R10a Fixed-list runner, on this machine (question 1), with timeouts (T134)
 - [x] R10b Parsers: `qq jobs` (the table you sent; no `--yaml` sample yet) and `gmx-eta -a`; merged by job ID (T132–T133)
 - [ ] R10c Cluster view: states, ETA, finish time, walltime warning, refresh
 - [ ] R10d Kill (if agreed), and "analyse this job" (if agreed)

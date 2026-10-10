@@ -19,18 +19,18 @@ export function findOnPath(name: string, PATH = process.env.PATH || ''): string 
 
 export interface Captured { code: number | null; stdout: string; stderr: string }
 
-/** Runs a program without a shell and collects its output; `until` stops it once the output matches. */
-export function capture(file: string, args: string[], o: { cwd?: string; until?: RegExp; timeoutMs?: number; stdin?: string } = {}): Promise<Captured> {
+/** Runs a program without a shell and collects its output; `until` stops it once the output matches; `env` adds to the environment. */
+export function capture(file: string, args: string[], o: { cwd?: string; until?: RegExp; timeoutMs?: number; stdin?: string; env?: Record<string, string> } = {}): Promise<Captured & { timedOut?: boolean }> {
   return new Promise((done, fail) => {
-    const p = spawn(file, args, { cwd: o.cwd, shell: false, stdio: [o.stdin == null ? 'ignore' : 'pipe', 'pipe', 'pipe'] }) as ChildProcessByStdio<Writable | null, Readable, Readable>;
+    const p = spawn(file, args, { cwd: o.cwd, shell: false, stdio: [o.stdin == null ? 'ignore' : 'pipe', 'pipe', 'pipe'], ...(o.env ? { env: { ...process.env, ...o.env } } : {}) }) as ChildProcessByStdio<Writable | null, Readable, Readable>;
     if (o.stdin != null) { p.stdin!.on('error', () => { /* the process ended before reading its answers */ }); p.stdin!.end(o.stdin); }
-    let stdout = '', stderr = '', finished = false;
-    const timer = setTimeout(() => p.kill('SIGKILL'), o.timeoutMs ?? 60_000);
+    let stdout = '', stderr = '', finished = false, timedOut = false;
+    const timer = setTimeout(() => { timedOut = true; p.kill('SIGKILL'); }, o.timeoutMs ?? 60_000);
     const check = () => { if (o.until && !finished && o.until.test(stdout + '\n' + stderr)) { finished = true; p.kill('SIGTERM'); } };
     p.stdout.on('data', d => { stdout += d; check(); });
     p.stderr.on('data', d => { stderr += d; check(); });
     p.on('error', e => { clearTimeout(timer); fail(e); });
-    p.on('close', code => { clearTimeout(timer); done({ code: finished ? 0 : code, stdout, stderr }); });
+    p.on('close', code => { clearTimeout(timer); done({ code: finished ? 0 : code, stdout, stderr, ...(timedOut ? { timedOut } : {}) }); });
   });
 }
 

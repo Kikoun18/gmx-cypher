@@ -15,6 +15,11 @@ export function Settings({ state, open, onOpenChange, onState, returnFocus }: { 
   const [vaultError, setVaultError] = React.useState('')
   const [pmfUrl, setPmfUrl] = React.useState(state.config.pmfUrl || '')
   const [pmfError, setPmfError] = React.useState('')
+  // The cluster tools (R10), each a name on PATH or a path; empty: its usual name on PATH.
+  const [tools, setTools] = React.useState({ qq: state.config.qq || '', gmxEta: state.config.gmxEta || '' })
+  const [toolsError, setToolsError] = React.useState('')
+  const saveTools = async () => { try { onState(await postJson<AppState>('/api/config', { qq: tools.qq.trim() || null, gmxEta: tools.gmxEta.trim() || null })); setToolsError('') } catch (e) { setToolsError((e as Error).message) } }
+  const toolsChanged = tools.qq.trim() !== (state.config.qq || '') || tools.gmxEta.trim() !== (state.config.gmxEta || '')
   const savePmfUrl = async () => { try { onState(await postJson<AppState>('/api/config', { pmfUrl: pmfUrl.trim() || null })); setPmfError('') } catch (e) { setPmfError((e as Error).message) } }
   const chooseVault = async (path: string | null) => {
     try { onState(await postJson<AppState>('/api/config', { vault: path })); setVaultError(''); if (!path) setVault('') } catch (e) { setVaultError((e as Error).message) }
@@ -81,6 +86,21 @@ export function Settings({ state, open, onOpenChange, onState, returnFocus }: { 
             </div>
             {pmfError ? <FieldHint error>✗ {pmfError}</FieldHint> : <FieldHint>Where you open PMF Sequences; after sending, gmx-cypher links to the project there.</FieldHint>}
           </Field>
+          <Section label="Cluster" />
+          <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+            <Field>
+              <Label htmlFor="qq">qq</Label>
+              <Input id="qq" size="sm" value={tools.qq} placeholder="qq, on PATH" onChange={e => setTools(t => ({ ...t, qq: e.target.value }))} onKeyDown={e => e.key === 'Enter' && saveTools()} />
+            </Field>
+            <Field>
+              <Label htmlFor="gmx-eta">gmx-eta</Label>
+              <Input id="gmx-eta" size="sm" value={tools.gmxEta} placeholder="gmx-eta, on PATH" onChange={e => setTools(t => ({ ...t, gmxEta: e.target.value }))} onKeyDown={e => e.key === 'Enter' && saveTools()} />
+            </Field>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={saveTools} disabled={!toolsChanged}>save</Button>
+            {toolsError ? <FieldHint error>✗ {toolsError}</FieldHint> : <FieldHint>The cluster view runs qq jobs and gmx-eta -a on this machine, as you would after kinit. Watch only: it never kills or submits a job.</FieldHint>}
+          </div>
         </DialogBody>
         <DialogFooter><Button variant="ghost" onClick={() => onOpenChange(false)}>close</Button></DialogFooter>
       </DialogContent>

@@ -153,17 +153,20 @@ is backed up by GROMACS and named in the record, even where your shell sets `GMX
 
 gmx-cypher can:
 - read files inside the allowed folders, and read your PMF Sequences vault;
-- start `gmx` (only that program, never through a shell) in a trajectory's folder;
-- write new files: a run's four outputs, under names that are free; files in its own state folder; and a
-  result you send, into the project's `_inbox` folder.
+- start `gmx` and the GROMACS tools it knows (never through a shell), in a trajectory's folder;
+- in the cluster view: start `qq jobs` (`qq jobs -a` with *show finished*) and `gmx-eta -a`, on this machine. The
+  commands and their options are fixed in the code, one runs at a time, and nothing you type reaches them;
+- write new files: a run's outputs, under names that are free; files in its own state folder; and a result you
+  send, into the project's `_inbox` folder.
 
 It cannot, by design:
-- overwrite or delete any of your files (new names are created exclusively; the vault reader's every
-  write throws);
-- be reached from another computer, or used by another page in your browser (it listens on 127.0.0.1
-  only; every request needs the token and a local Host; a request from a page must come from this very
-  address, so not from another port of 127.0.0.1 either; and every POST must be JSON);
-- run anything but `gmx`, or reach the network beyond serving its own page.
+- overwrite or delete any of your files (new names are created exclusively; the vault reader's every write throws);
+- be reached from another computer, or used by another page in your browser (it listens on 127.0.0.1 only; every
+  request needs the token and a local Host; a request from a page must come from this very address, so not from
+  another port of 127.0.0.1 either; and every POST must be JSON);
+- run anything but the commands above, kill or submit a cluster job, or send free text from the page to a shell;
+- reach the network beyond serving its own page (`qq` and `gmx-eta` reach the cluster themselves, as they do from
+  your shell).
 
 *cancel* stops the whole process group of a run (SIGTERM, then SIGKILL after 5 s); stopping gmx-cypher
 cancels its running jobs first.
