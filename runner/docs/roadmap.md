@@ -103,7 +103,7 @@ Spec: [`batch-2.md`](batch-2.md). Phase 0 report: [`batch-2-phase0.md`](batch-2-
 - [x] R9a `gmx rms`: the fit group and further groups measured after that fit; group roles per command (T127–T128)
 - [x] R9b `gmx rmsf`: fluctuation per atom or per residue (T129)
 - [x] R9c `gmx gyrate`: the selection tool (2024+) and the legacy one, whichever this gmx has (T130)
-- [ ] R9d `gmx mindist`: minimum distance and contacts
+- [x] R9d `gmx mindist`: minimum distance and contacts (T131)
 
 ### Phase 5: Cluster jobs (R10)
 - [ ] R10a Fixed-list runner (local or SSH), with timeouts

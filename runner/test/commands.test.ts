@@ -1,7 +1,7 @@
 // One definition per GROMACS command (R3a, T98): RDF moved in unchanged; records and recipes name their command (v3, T97).
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { awhCommand, COMMANDS, commandOf, distanceCommand, energyCommand, hbondCommand, hbondLegacyCommand, rdfCommand, rmsCommand, rmsfCommand, gyrateCommand, gyrateLegacyCommand, roleProblems, rolesOf, sectionsOf, whamCommand, withCommand } from '../src/lib/commands';
+import { awhCommand, COMMANDS, commandOf, distanceCommand, energyCommand, hbondCommand, hbondLegacyCommand, rdfCommand, rmsCommand, rmsfCommand, gyrateCommand, gyrateLegacyCommand, mindistCommand, roleProblems, rolesOf, sectionsOf, whamCommand, withCommand } from '../src/lib/commands';
 import { parseHelp } from '../src/lib/gmxText';
 import { FORM, rdfArgs, rdfIo, recipeProblems } from '../src/lib/rdf';
 import { outputNames } from '../src/lib/names';
@@ -13,8 +13,8 @@ import { parseGmxHeader } from '../../app/src/lib/gmxHeader';
 const read = (name: string) => JSON.parse(readFileSync(new URL('./fixtures/formats/' + name, import.meta.url), 'utf8'));
 
 describe('one definition per command (R3a)', () => {
-  it('each command is found by its tool name: rdf, distance (R7), hbond and hbond-legacy (R8), rms, rmsf, gyrate and gyrate-legacy (R9), energy (R4), awh (R5) and wham (R6)', () => {
-    expect(COMMANDS.map(c => c.tool)).toEqual(['rdf', 'distance', 'hbond', 'hbond-legacy', 'rms', 'rmsf', 'gyrate', 'gyrate-legacy', 'energy', 'awh', 'wham']);
+  it('each command is found by its tool name: rdf, distance (R7), hbond and hbond-legacy (R8), rms, rmsf, gyrate, gyrate-legacy and mindist (R9), energy (R4), awh (R5) and wham (R6)', () => {
+    expect(COMMANDS.map(c => c.tool)).toEqual(['rdf', 'distance', 'hbond', 'hbond-legacy', 'rms', 'rmsf', 'gyrate', 'gyrate-legacy', 'mindist', 'energy', 'awh', 'wham']);
     expect(commandOf('rdf')).toBe(rdfCommand);
     expect(commandOf('energy')).toBe(energyCommand);
     expect(commandOf('wham')).toBe(whamCommand);
@@ -66,7 +66,7 @@ describe('records and recipes name their command (v3)', () => {
 describe('the picker groups the commands by what they need (R3b)', () => {
   it('only the sections with commands are shown: rdf under its section, energy under its own', () => {
     expect(sectionsOf()).toEqual([
-      { section: 'trajectory and groups', commands: [rdfCommand, distanceCommand, hbondCommand, hbondLegacyCommand, rmsCommand, rmsfCommand, gyrateCommand, gyrateLegacyCommand] },
+      { section: 'trajectory and groups', commands: [rdfCommand, distanceCommand, hbondCommand, hbondLegacyCommand, rmsCommand, rmsfCommand, gyrateCommand, gyrateLegacyCommand, mindistCommand] },
       { section: 'an energy file', commands: [energyCommand, awhCommand] },
       { section: 'window lists', commands: [whamCommand] },
     ]);
@@ -140,6 +140,7 @@ describe('every output has a PMF Sequences type decision (R3a, section 3)', () =
     ['rmsf', 'xvg', 'r9/rmsf/rmsf_nvt.xvg', 'rmsf_nvt.xvg'],
     ['gyrate', 'xvg', 'r9/gyrate/gyrate_nvt.xvg', 'gyrate_nvt.xvg'],
     ['gyrate-legacy', 'xvg', 'r9/gyrate-legacy/gyrate_nvt.xvg', 'gyrate-legacy_nvt.xvg'],
+    ['mindist', 'xvg', 'r9/mindist/mindist_nvt.xvg', 'mindist_nvt.xvg'],
   ])('%s %s: PMF Sequences agrees on %s', (tool, file, fixture, name) => {
     const text = readFileSync(new URL('./fixtures/' + fixture, import.meta.url), 'utf8');
     const want = commandOf(tool)!.outputs.find(o => o.file === file)!.type;

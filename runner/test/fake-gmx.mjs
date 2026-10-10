@@ -267,6 +267,13 @@ else if (tool === 'gyrate') {
   if (!m || !names[+m[1]]) fail("Cannot match '" + sel[0] + "', because no such index group can be found.");
   r9Outputs('gyrate', { sulfate: names[+m[1]] }, [['-o', 'gyrate_nvt.xvg']]);
 }
+else if (tool === 'mindist' && argv[1] === '-h') process.stdout.write(read('mindist-h.txt'));
+// gmx mindist (R9d): the reference and -ng groups on stdin; the fixture is sulfate to sodium and to water, with contacts.
+else if (tool === 'mindist') {
+  const ng = Number(one('-ng') || 1), [ref, ...others] = stdinGroups(ng + 1);
+  if (ng !== 2 || (one('-d') && one('-d') !== '0.6')) { process.stderr.write('fake gmx mindist: only two groups and -d 0.6 are in the fixtures\n'); process.exit(1); }
+  r9Outputs('mindist', { sulfate: ref, sodium: others[0], water: others[1] }, [['-od', 'mindist_nvt.xvg'], ['-on', 'mindist_nvt_numcont.xvg']]);
+}
 else if (tool === 'rmsf' && argv[1] === '-h') process.stdout.write(read('rmsf-h.txt'));
 // gmx rmsf (R9b): its one group on stdin; the fixture is sulfate's, per atom or per residue (-res), fitted.
 else if (tool === 'rmsf') { const [g] = stdinGroups(1); if (argv.includes('-nofit')) { process.stderr.write('fake gmx rmsf: -nofit is not in the fixtures\n'); process.exit(1); } r9Outputs(argv.includes('-res') ? 'rmsf-res' : 'rmsf', { sulfate: g }, [['-o', 'rmsf_nvt.xvg']]); }

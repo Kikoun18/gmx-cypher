@@ -13,6 +13,7 @@ import {
 import { outputNames } from './names';
 import { RMS_FORM, rmsArgv, rmsOptionProblems, rmsStdin, type RmsIo } from './rms';
 import { RMSF_FORM, rmsfArgv, rmsfOptionProblems, rmsfStdin, type RmsfIo } from './rmsf';
+import { MINDIST_FORM, MINDIST_SUFFIXES, mindistArgv, mindistNames, mindistOptionProblems, mindistStdin, type MindistIo } from './mindist';
 import { GYRATE_FORM, GYRATE_LEGACY_FORM, gyrateArgv, gyrateKind, gyrateLegacyArgv, gyrateLegacyStdin, gyrateOptionProblems, type GyrateIo } from './gyrate';
 import { FORM, rdfArgs, rdfIo, recipeProblems, relPath, type Options, type RdfIo } from './rdf';
 
@@ -375,7 +376,32 @@ export const gyrateLegacyCommand: CommandDef = {
   },
 };
 
-export const COMMANDS: CommandDef[] = [rdfCommand, distanceCommand, hbondCommand, hbondLegacyCommand, rmsCommand, rmsfCommand, gyrateCommand, gyrateLegacyCommand, energyCommand, awhCommand, whamCommand];
+/** gmx mindist (R9d): the minimum distance from the reference to each other group over time, and their contacts when asked. */
+export const mindistCommand: CommandDef = {
+  tool: 'mindist',
+  title: 'minimum distance from the reference to each group, and contacts',
+  section: 'trajectory and groups',
+  inputs: ['trajectory', 'runInput', 'structure', 'index'],
+  required: ['trajectory', 'runInput'],
+  groups: true,
+  roles: { first: 'reference', rest: 'group', min: 1 },
+  options: MINDIST_FORM,
+  outputNames: (stem, options = {}) => mindistNames(stem, options),
+  suffixes: MINDIST_SUFFIXES,
+  outputs: [
+    { file: 'xvg', type: 'dist', vault: true, why: 'PMF Sequences reads its first curve: the reference to the first group' },
+    { file: 'contacts', type: null, vault: false, why: 'titled "Number of Contacts < d nm": PMF Sequences gives it no type (section 3)' },
+  ],
+  io: (p, outDir, stem) => {
+    const { cwd, io } = trajectoryIo(p, outDir, stem);
+    return { cwd, io: { ...io, contacts: relPath(cwd, outDir + '/' + stem + '_contacts.xvg') } };
+  },
+  problems: mindistOptionProblems,
+  argv: (r, io, help) => mindistArgv(r, io as MindistIo, help),
+  stdin: r => mindistStdin(r.selections),
+};
+
+export const COMMANDS: CommandDef[] = [rdfCommand, distanceCommand, hbondCommand, hbondLegacyCommand, rmsCommand, rmsfCommand, gyrateCommand, gyrateLegacyCommand, mindistCommand, energyCommand, awhCommand, whamCommand];
 export const commandOf = (tool: string) => COMMANDS.find(c => c.tool === tool);
 
 /** What a draft holds of commands: the picked one, its options and name template, and the others', kept aside. */

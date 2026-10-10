@@ -384,6 +384,32 @@ function GyrateChart({ job, record }: { job: Job; record: RunRecord }) {
   )
 }
 
+/** gmx mindist (R9d): the minimum distance from the reference to each group over time, then the contacts if asked for. */
+function MindistChart({ job, record }: { job: Job; record: RunRecord }) {
+  const xvg = useOutput(job.id, 'xvg'), contacts = useNamed(job.id, record.outputs.map(o => o.path.split('/').pop()!).find(n => n.endsWith('_contacts.xvg')) ?? null)
+  if (xvg == null || contacts == null) return <p className="m-0 text-caption text-muted-foreground" aria-live="polite">reading the result…</p>
+  const [ref, ...others] = record.groups, d = record.options.find(o => o.flag === 'd')?.value ?? 0.6
+  const named = (t: string) => resultSeries(t).map((c, i) => ({ label: others[i]?.name ?? c.label, points: c.points, tone: others[i]?.tone ?? TONES_FOR_TERMS[i % 8] }))
+  const curves = named(xvg)
+  return (
+    <div className="flex flex-col gap-3">
+      <LineChart series={curves} xLabel="time (ps)" yLabel={'minimum distance to ' + ref?.name + ' (nm)'} height={240} legend={curves.length > 1} zeroLine={false} />
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3">
+        {curves.map((c, i) => {
+          const st = curveStats(c.points), at = c.points.find(p => p[1] === st?.min)
+          return st && <Stat key={i} label={c.label + ' · closest'} value={st.min.toFixed(3) + ' nm'} hint={'at ' + at?.[0] + ' ps · mean ' + st.mean.toFixed(3) + ' ± ' + st.sd.toFixed(3) + ' nm'} />
+        })}
+      </div>
+      <p className="m-0 text-caption text-muted-foreground">between any atom of {ref?.name} and any atom of each group{curves.length > 1 ? ' · PMF Sequences takes the first curve, ' + curves[0].label : ''}</p>
+      {contacts && <>
+        <Section label={'Contacts within ' + d + ' nm'} />
+        <LineChart series={named(contacts)} xLabel="time (ps)" yLabel="atom pairs" height={200} legend={curves.length > 1} zeroLine={false} />
+        <p className="m-0 text-caption text-muted-foreground">not sent to the vault: PMF Sequences gives this file no type</p>
+      </>}
+    </div>
+  )
+}
+
 /** What a run wrote, its result, its groups as gmx counted them, and "run again" (sections 10.5, 11.4). */
 export function RunResult({ job, onRunAgain, vault }: { job: Job; onRunAgain: (r: RunRecord) => void; vault: string | null }) {
   const r = useRecord(job)
@@ -398,7 +424,7 @@ export function RunResult({ job, onRunAgain, vault }: { job: Job; onRunAgain: (r
       {rec.problems.length > 0 && (
         <Alert variant="warning"><TriangleAlert /><AlertTitle>gmx-cypher's promise was broken</AlertTitle><AlertDescription>{rec.problems.map(p => <p key={p}>{p}</p>)}</AlertDescription></Alert>
       )}
-      {job.status === 'done' && (job.kind === 'energy' ? <EnergyChart job={job} record={rec} /> : job.kind === 'awh' ? <AwhChart job={job} record={rec} /> : job.kind === 'wham' ? <WhamChart job={job} record={rec} /> : job.kind === 'distance' ? <DistanceChart job={job} record={rec} /> : job.kind === 'hbond' || job.kind === 'hbond-legacy' ? <HbondChart job={job} record={rec} /> : job.kind === 'rms' ? <RmsChart job={job} record={rec} /> : job.kind === 'rmsf' ? <RmsfChart job={job} record={rec} /> : job.kind === 'gyrate' || job.kind === 'gyrate-legacy' ? <GyrateChart job={job} record={rec} /> : <RdfChart job={job} record={rec} />)}
+      {job.status === 'done' && (job.kind === 'energy' ? <EnergyChart job={job} record={rec} /> : job.kind === 'awh' ? <AwhChart job={job} record={rec} /> : job.kind === 'wham' ? <WhamChart job={job} record={rec} /> : job.kind === 'distance' ? <DistanceChart job={job} record={rec} /> : job.kind === 'hbond' || job.kind === 'hbond-legacy' ? <HbondChart job={job} record={rec} /> : job.kind === 'rms' ? <RmsChart job={job} record={rec} /> : job.kind === 'rmsf' ? <RmsfChart job={job} record={rec} /> : job.kind === 'gyrate' || job.kind === 'gyrate-legacy' ? <GyrateChart job={job} record={rec} /> : job.kind === 'mindist' ? <MindistChart job={job} record={rec} /> : <RdfChart job={job} record={rec} />)}
       {rec.groups.length > 0 && <Section label="Groups" />}
       {rec.groups.length > 0 && <table className="text-control"><tbody>
         {rec.groups.map(g => (
