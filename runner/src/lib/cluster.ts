@@ -150,3 +150,12 @@ export function etaOf(row: ClusterRow, read: Date, timeZone?: string): { left: s
     warning: left !== null && eta.eta > left ? 'needs ' + span(eta.eta - left) + ' more than its walltime' : null,
   };
 }
+
+/** The wait before the next read, in seconds: 60 (question 5), doubled after each failed one, at most 10 min. */
+export const nextPoll = (failures: number) => Math.min(60 * 2 ** Math.max(0, failures), 600);
+
+/** "updated just now", "updated 3 min ago": how old a read is. */
+export const ageText = (at: string, now: number) => {
+  const s = Math.max(0, (now - Date.parse(at)) / 1000);
+  return 'updated ' + (s < 60 ? 'just now' : span(s) + ' ago');
+};

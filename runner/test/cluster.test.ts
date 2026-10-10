@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { clock, duration, etaOf, finishText, mergeJobs, parseGmxEta, parseQqJobs, span, stateOf } from '../src/lib/cluster';
+import { ageText, clock, duration, etaOf, finishText, mergeJobs, nextPoll, parseGmxEta, parseQqJobs, span, stateOf } from '../src/lib/cluster';
 
 // Your real samples (R10b), with your user name, scratch paths and host names replaced by stand-ins of the same length.
 const text = (p: string) => readFileSync(new URL('./fixtures/cluster-tools/' + p, import.meta.url), 'utf8');
@@ -92,5 +92,16 @@ describe('the two merged, and what the view shows (R10b)', () => {
   it('spans and finish times', () => {
     expect([45, 2388, 7800, 97200].map(span)).toEqual(['45 s', '40 min', '2 h 10 min', '1 d 3 h']);
     expect(finishText(new Date('2026-10-16T01:40:00Z'), 'Europe/Prague')).toBe('Fri 03:40');
+  });
+});
+
+describe('polling (R10c)', () => {
+  it('every 60 s while the view is open; after failed reads, twice as long each time, at most 10 min', () => {
+    expect([0, 1, 2, 3, 4, 9].map(nextPoll)).toEqual([60, 120, 240, 480, 600, 600]);
+  });
+
+  it('how old the read is', () => {
+    const at = '2026-10-10T10:00:00Z', t = Date.parse(at);
+    expect([0, 59_000, 180_000, 7_500_000].map(d => ageText(at, t + d))).toEqual(['updated just now', 'updated just now', 'updated 3 min ago', 'updated 2 h 5 min ago']);
   });
 });

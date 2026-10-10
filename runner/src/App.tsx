@@ -12,13 +12,14 @@ import { useDraft } from './draft'
 import { recipeFromRecord } from './lib/record'
 import { BatchView } from './views/Batch'
 import { Groups } from './views/Groups'
+import { ClusterView } from './views/Cluster'
 import { Inputs } from './views/Inputs'
 import { Analysis } from './views/Analysis'
 import { commandOf, withCommand } from './lib/commands'
 import { JobsView } from './views/Jobs'
 import { Settings } from './views/Settings'
 
-const TABS = ['inputs', 'groups', 'analysis', 'jobs', 'batch'] as const
+const TABS = ['inputs', 'groups', 'analysis', 'jobs', 'batch', 'cluster'] as const
 type Tab = (typeof TABS)[number]
 
 /** The open tab lives in the address (#jobs), so a reload keeps it. */
@@ -98,6 +99,8 @@ export function App() {
           <TabsTrigger value="analysis">analysis</TabsTrigger>
           <TabsTrigger value="jobs">jobs {jobs.jobs.length > 0 && <TabsCount>{running ? running + ' running' : String(jobs.jobs.length).padStart(2, '0')}</TabsCount>}</TabsTrigger>
           <TabsTrigger value="batch">batch</TabsTrigger>
+          {/* Your cluster jobs (R10): another kind of job than gmx-cypher's own, so another tab. */}
+          <TabsTrigger value="cluster">cluster</TabsTrigger>
         </TabsList>
       <main className="flex flex-col gap-4 p-5">
         {error && <Alert variant="destructive"><X /><AlertTitle>can't reach the gmx-cypher server</AlertTitle><AlertDescription><p>{error}</p></AlertDescription></Alert>}
@@ -113,6 +116,7 @@ export function App() {
         <TabsContent value="groups"><Groups draft={draft} setDraft={setDraft} /></TabsContent>
         <TabsContent value="analysis">{state && <Analysis gmx={state.gmx} draft={draft} setDraft={setDraft} onStarted={id => { setSelectedJob(id); setTab('jobs') }} />}</TabsContent>
         <TabsContent value="jobs"><JobsView {...jobs} selected={selectedJob} onSelect={setSelectedJob} vault={state?.config.vault ?? null} onRunAgain={r => { setDraft(d => ({ ...withCommand(d, r.analysis ?? 'rdf'), ...recipeFromRecord(r) })); setTab('analysis') }} /></TabsContent>
+        <TabsContent value="cluster"><ClusterView /></TabsContent>
         <TabsContent value="batch">{state && <BatchView state={state} draft={draft} jobs={jobs.jobs} onOpenJob={id => { setSelectedJob(id); setTab('jobs') }} />}</TabsContent>
       </main>
       </Tabs>

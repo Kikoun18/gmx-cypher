@@ -36,6 +36,10 @@ describe('reading the cluster (R10a)', () => {
     expect(calls()).toHaveLength(1);
     await c.read(false, 0);
     expect(calls()).toHaveLength(2);
+    // The other list asked for during a read: run after it, never alongside, and never answered with it.
+    const [now, finished] = await Promise.all([c.read(false, 0), c.read(true)]);
+    expect([now.finished, finished.finished]).toEqual([false, true]);
+    expect(calls().map(x => x.args)).toEqual([['jobs'], ['jobs'], ['jobs'], ['jobs', '-a']]);
   });
 
   it('what went wrong, in words: not on PATH, its own message with the ticket hint, too slow', async () => {

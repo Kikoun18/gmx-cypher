@@ -38,7 +38,7 @@ function failure(label: string, r: { code: number | null; stdout: string; stderr
 }
 
 export class Cluster {
-  private reading: Promise<ClusterRead> | null = null;
+  private reading: { finished: boolean; read: Promise<ClusterRead> } | null = null;
   last: ClusterRead | null = null;
   private tools: () => { qq: string | null; gmxEta: string | null };
   constructor(tools: () => { qq: string | null; gmxEta: string | null }) { this.tools = tools; }
@@ -48,10 +48,12 @@ export class Cluster {
    * while one runs waits for that one (they never overlap).
    */
   read(finished: boolean, maxAge = 50_000): Promise<ClusterRead> {
-    if (this.reading) return this.reading;
+    // A read of the other list (show finished) is waited for first: one command at a time.
+    if (this.reading) return this.reading.finished === finished ? this.reading.read : this.reading.read.catch(() => null).then(() => this.read(finished, maxAge));
     if (this.last && this.last.finished === finished && Date.now() - Date.parse(this.last.at) < maxAge) return Promise.resolve(this.last);
-    this.reading = this.run(finished).then(r => (this.last = r)).finally(() => { this.reading = null; });
-    return this.reading;
+    const read = this.run(finished).then(r => (this.last = r)).finally(() => { this.reading = null; });
+    this.reading = { finished, read };
+    return read;
   }
 
   private async run(finished: boolean): Promise<ClusterRead> {
