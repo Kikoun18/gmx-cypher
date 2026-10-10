@@ -256,6 +256,9 @@ else if (tool === 'hbond') (OLD ? hbondLegacy : hbondNew)();
 else if (tool === 'hbond-legacy') hbondLegacy();
 else if (tool === 'rms' && argv[1] === '-h') process.stdout.write(read('rms-h.txt'));
 else if (tool === 'rms') rms();
+else if (tool === 'rmsf' && argv[1] === '-h') process.stdout.write(read('rmsf-h.txt'));
+// gmx rmsf (R9b): its one group on stdin; the fixture is sulfate's, per atom or per residue (-res), fitted.
+else if (tool === 'rmsf') { const [g] = stdinGroups(1); if (argv.includes('-nofit')) { process.stderr.write('fake gmx rmsf: -nofit is not in the fixtures\n'); process.exit(1); } r9Outputs(argv.includes('-res') ? 'rmsf-res' : 'rmsf', { sulfate: g }, [['-o', 'rmsf_nvt.xvg']]); }
 else if (tool === 'energy') energy();
 else if (tool === 'rdf') await rdf();
 // gmx dump: the real head of the test system's dump, or of an umbrella window's (300 K, 663 atoms) for those (R6).

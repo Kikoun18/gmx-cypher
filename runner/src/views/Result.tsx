@@ -342,6 +342,27 @@ function RmsChart({ job, record }: { job: Job; record: RunRecord }) {
   return <GroupSeries job={job} groups={record.groups} yLabel="RMSD (nm)" unit="nm" note={'against ' + against + ', ' + how + (record.groups.length > 1 ? ' · PMF Sequences takes the first curve, ' + record.groups[0].name : '')} />
 }
 
+/** gmx rmsf (R9b): the fluctuation along the group's atoms or residues, its highest point marked. */
+function RmsfChart({ job, record }: { job: Job; record: RunRecord }) {
+  const xvg = useOutput(job.id, 'xvg')
+  if (xvg == null) return <p className="m-0 text-caption text-muted-foreground" aria-live="polite">reading the result…</p>
+  const curve = resultSeries(xvg)[0], st = curve && curveStats(curve.points), g = record.groups[0]
+  const res = record.options.find(o => o.flag === 'res')?.value === true, fit = record.options.find(o => o.flag === 'fit')?.value !== false, unit = res ? 'residue' : 'atom'
+  const top = curve?.points.reduce((a, p) => (p[1] > a[1] ? p : a), curve.points[0])
+  return (
+    <div className="flex flex-col gap-3">
+      {curve && <LineChart series={[{ label: g?.name ?? 'RMSF', points: curve.points, tone: g?.tone ?? 'coral', marker: 'max', markerLabel: 'x' }]} xLabel={unit + ' (number in the system)'} yLabel="RMSF (nm)" height={240} legend={false} zeroLine={false} />}
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3">
+        {st && <Stat label={'mean over ' + st.frames + ' ' + unit + 's'} value={st.mean.toFixed(3) + ' nm'} hint={'± ' + st.sd.toFixed(3) + ' (standard deviation) · lowest ' + st.min.toFixed(3)} />}
+        {top && <Stat label={'highest · ' + unit + ' ' + top[0]} value={top[1].toFixed(3) + ' nm'} hint={g?.name} />}
+      </div>
+      <p className="m-0 text-caption text-muted-foreground">
+        per {unit} of {g?.name}, {fit ? "after a fit onto the run input's structure" : 'without a fit: the group\'s own motion is included'} · PMF Sequences labels this x "Residue"{res ? '' : ', though here it is atoms'}
+      </p>
+    </div>
+  )
+}
+
 /** What a run wrote, its result, its groups as gmx counted them, and "run again" (sections 10.5, 11.4). */
 export function RunResult({ job, onRunAgain, vault }: { job: Job; onRunAgain: (r: RunRecord) => void; vault: string | null }) {
   const r = useRecord(job)
@@ -356,7 +377,7 @@ export function RunResult({ job, onRunAgain, vault }: { job: Job; onRunAgain: (r
       {rec.problems.length > 0 && (
         <Alert variant="warning"><TriangleAlert /><AlertTitle>gmx-cypher's promise was broken</AlertTitle><AlertDescription>{rec.problems.map(p => <p key={p}>{p}</p>)}</AlertDescription></Alert>
       )}
-      {job.status === 'done' && (job.kind === 'energy' ? <EnergyChart job={job} record={rec} /> : job.kind === 'awh' ? <AwhChart job={job} record={rec} /> : job.kind === 'wham' ? <WhamChart job={job} record={rec} /> : job.kind === 'distance' ? <DistanceChart job={job} record={rec} /> : job.kind === 'hbond' || job.kind === 'hbond-legacy' ? <HbondChart job={job} record={rec} /> : job.kind === 'rms' ? <RmsChart job={job} record={rec} /> : <RdfChart job={job} record={rec} />)}
+      {job.status === 'done' && (job.kind === 'energy' ? <EnergyChart job={job} record={rec} /> : job.kind === 'awh' ? <AwhChart job={job} record={rec} /> : job.kind === 'wham' ? <WhamChart job={job} record={rec} /> : job.kind === 'distance' ? <DistanceChart job={job} record={rec} /> : job.kind === 'hbond' || job.kind === 'hbond-legacy' ? <HbondChart job={job} record={rec} /> : job.kind === 'rms' ? <RmsChart job={job} record={rec} /> : job.kind === 'rmsf' ? <RmsfChart job={job} record={rec} /> : <RdfChart job={job} record={rec} />)}
       {rec.groups.length > 0 && <Section label="Groups" />}
       {rec.groups.length > 0 && <table className="text-control"><tbody>
         {rec.groups.map(g => (

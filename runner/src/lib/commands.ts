@@ -12,6 +12,7 @@ import {
 } from './hbond';
 import { outputNames } from './names';
 import { RMS_FORM, rmsArgv, rmsOptionProblems, rmsStdin, type RmsIo } from './rms';
+import { RMSF_FORM, rmsfArgv, rmsfOptionProblems, rmsfStdin, type RmsfIo } from './rmsf';
 import { FORM, rdfArgs, rdfIo, recipeProblems, relPath, type Options, type RdfIo } from './rdf';
 
 export type InputSlot = 'trajectory' | 'runInput' | 'structure' | 'index' | 'edr';
@@ -98,7 +99,7 @@ export function roleProblems(c: CommandDef, groups: number): string[] {
   if (groups < 1 || others < r.min) return [r.min ? 'a ' + r.first + ' and at least ' + (r.min === 1 ? 'one ' + r.rest : r.min + ' ' + r.rest + 's') + ' are needed' : 'a ' + r.first + ' is needed'];
   if (r.max === undefined || others <= r.max) return [];
   return [r.max ? 'gmx ' + c.tool + ' takes ' + (r.max === 1 ? 'one ' + r.rest + ' group' : r.max + ' ' + r.rest + ' groups') + ' after the ' + r.first + ', not ' + others
-    : 'gmx ' + c.tool + ' takes one group, the ' + r.first + ': remove the other ' + (others === 1 ? 'one' : others)];
+    : 'gmx ' + c.tool + ' takes one group' + (r.first === 'group' ? '' : ', the ' + r.first) + ': remove the other ' + (others === 1 ? 'one' : others)];
 }
 
 export const rdfCommand: CommandDef = {
@@ -310,7 +311,28 @@ export const rmsCommand: CommandDef = {
   stdin: r => rmsStdin(r.selections),
 };
 
-export const COMMANDS: CommandDef[] = [rdfCommand, distanceCommand, hbondCommand, hbondLegacyCommand, rmsCommand, energyCommand, awhCommand, whamCommand];
+/** One group, the only one a command takes (R9b, R9c). */
+const ONE_GROUP: Roles = { first: 'group', rest: 'other group', min: 0, max: 0 };
+
+/** gmx rmsf (R9b): the fluctuation of each atom or residue of one group, after a fit onto the run input's structure. */
+export const rmsfCommand: CommandDef = {
+  tool: 'rmsf',
+  title: 'fluctuation of each atom or residue of one group',
+  section: 'trajectory and groups',
+  inputs: ['trajectory', 'runInput', 'structure', 'index'],
+  required: ['trajectory', 'runInput'],
+  groups: true,
+  roles: ONE_GROUP,
+  options: RMSF_FORM,
+  outputNames: oneOutput,
+  outputs: [{ file: 'xvg', type: 'rmsf', vault: true, why: 'PMF Sequences labels its x "Residue", also when it is atoms' }],
+  io: trajectoryIo,
+  problems: rmsfOptionProblems,
+  argv: (r, io, help) => rmsfArgv(r, io as RmsfIo, help),
+  stdin: rmsfStdin,
+};
+
+export const COMMANDS: CommandDef[] = [rdfCommand, distanceCommand, hbondCommand, hbondLegacyCommand, rmsCommand, rmsfCommand, energyCommand, awhCommand, whamCommand];
 export const commandOf = (tool: string) => COMMANDS.find(c => c.tool === tool);
 
 /** What a draft holds of commands: the picked one, its options and name template, and the others', kept aside. */

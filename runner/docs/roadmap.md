@@ -101,7 +101,7 @@ Spec: [`batch-2.md`](batch-2.md). Phase 0 report: [`batch-2-phase0.md`](batch-2-
 - [x] R7 `gmx distance`: pairs or centres of mass; average, all and histogram outputs (T119–T121)
 - [x] R8 `gmx hbond`: the selection tool (GROMACS 2024+) and the legacy tool, whichever this gmx has (T122–T126; the legacy tool under its pre-2024 name tested through a fake gmx that answers as 2023.3)
 - [x] R9a `gmx rms`: the fit group and further groups measured after that fit; group roles per command (T127–T128)
-- [ ] R9b `gmx rmsf`: fluctuation per atom or per residue
+- [x] R9b `gmx rmsf`: fluctuation per atom or per residue (T129)
 - [ ] R9c `gmx gyrate`: the selection tool (2024+) and the legacy one, whichever this gmx has
 - [ ] R9d `gmx mindist`: minimum distance and contacts
 
