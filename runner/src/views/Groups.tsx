@@ -12,13 +12,13 @@ import { postJson } from '../api'
 import type { Draft } from '../draft'
 import { useIndex, useStructure } from '../structure'
 import { fromRanges, toRanges, type Atom } from '../lib/atoms'
-import { atomNameCounts, clickStep, groupAtoms, nameProblem, parseNames, ruleText, shared, toggleName, type Group, type Rule, type Step } from '../lib/groups'
+import { atomNameCounts, clickStep, groupAtoms, groupHolding, nameProblem, parseNames, ruleText, shared, toggleName, type Group, type Rule, type Step } from '../lib/groups'
 import { commandOf, rdfCommand, rolesOf } from '../lib/commands'
 import { fitKeys, initialKeys, removeKey } from '../lib/keys'
 import type { NdxGroup } from '../lib/ndx'
 import { TONES, toneSolid, toneText, type Tone } from '../lib/tones'
 import { cn } from '../lib/utils'
-import { Viewer, type PickHow } from './Viewer'
+import { Viewer, type Centre, type PickHow } from './Viewer'
 
 type Kind = 'resname' | 'resnr' | 'name' | 'element' | 'index'
 const KINDS: { kind: Kind; label: string }[] = [
@@ -51,13 +51,11 @@ function NameMenu({ atoms, resn, value, onChange }: { atoms: Atom[]; resn: strin
   )
 }
 
-function RuleForm({ atoms, index, onStep, start, nextGroup = true }: { atoms: Atom[]; index: { file: string; groups: NdxGroup[] }; onStep: (s: Step, keep?: boolean) => void; start?: { within: string }; nextGroup?: boolean }) {
-  // A form opened by Shift+Enter in the group before starts as an atom-name rule in the same residue name, focused.
-  const [kind, setKind] = React.useState<Kind>(start ? 'name' : 'resname')
+function RuleForm({ atoms, index, onStep }: { atoms: Atom[]; index: { file: string; groups: NdxGroup[] }; onStep: (s: Step, keep?: boolean) => void }) {
+  const [kind, setKind] = React.useState<Kind>('resname')
   const [value, setValue] = React.useState('')
-  const [within, setWithin] = React.useState(start?.within ?? '')
+  const [within, setWithin] = React.useState('')
   const valueRef = React.useRef<HTMLInputElement>(null)
-  React.useEffect(() => { if (start) valueRef.current?.focus() }, []) // eslint-disable-line react-hooks/exhaustive-deps -- once, when opened
   const options = React.useMemo(() => {
     const vals = kind === 'resname' ? atoms.map(a => a.resn) : kind === 'element' ? atoms.map(a => a.elem || '') : []
     return [...new Set(vals)].filter(Boolean).sort()
@@ -75,7 +73,8 @@ function RuleForm({ atoms, index, onStep, start, nextGroup = true }: { atoms: At
   }
   const r = rule()
   const note = picked && 'index group ' + picked.label + ' (#' + value + ' in ' + index.file + ')'
-  // Shift+Enter in the name field adds the rule, then the next group starts with the same residue name (R1b, T105).
+  // Shift+Enter in the name field adds the rule and keeps the form open for the next one, in the same group and the same
+  // residue name, field focused: OH1, then OH2 in every SUG (T139; T105 started a new group here instead).
   const go = (op: Step['op'], keep = false) => {
     if (!r) return
     onStep({ op, rule: r, ...(note ? { note } : {}) }, keep)
@@ -108,7 +107,7 @@ function RuleForm({ atoms, index, onStep, start, nextGroup = true }: { atoms: At
         <Button variant="ghost" size="sm" disabled={!r} onClick={() => go('remove')}>− remove</Button>
       </div>
       {kind === 'name' && <NameMenu atoms={atoms} resn={within.trim()} value={value} onChange={setValue} />}
-      {kind === 'name' && <p className="m-0 text-caption text-muted-foreground"><Kbd>Enter</Kbd> adds the rule and closes it · <Kbd>Shift</Kbd>+<Kbd>Enter</Kbd> adds it and {nextGroup ? 'starts a new selection group' : 'keeps this form open for another rule'} with the same residue name</p>}
+      {kind === 'name' && <p className="m-0 text-caption text-muted-foreground"><Kbd>Enter</Kbd> adds the rule and closes it · <Kbd>Shift</Kbd>+<Kbd>Enter</Kbd> adds it and keeps this form open for another rule in this group, with the same residue name</p>}
       {value.trim() && names?.problems.map(p => <FieldHint key={p} error>✗ {p}</FieldHint>)}
       {unknown.length > 0 && <FieldHint error>✗ 0 atoms: {unknown.join(', ')}{within.trim() ? ' in ' + within.trim() : ' in this structure'}</FieldHint>}
       {r && <span className="text-caption text-muted-foreground">{picked ? picked.label + ' · ' + picked.atoms.length + ' atoms' : ruleText(r) + ' · ' + groupAtoms(atoms, [{ op: 'add', rule: r }]).length + ' atoms'}</span>}
@@ -116,15 +115,13 @@ function RuleForm({ atoms, index, onStep, start, nextGroup = true }: { atoms: At
   )
 }
 
-function GroupCard({ group, atoms, index, nrs, others, current, onCurrent, onChange, onRemove, onNext, opened }: {
+function GroupCard({ group, atoms, index, nrs, others, current, onCurrent, onChange, onRemove, onCentre }: {
   group: Group; atoms: Atom[]; index: { file: string; groups: NdxGroup[] }; nrs: number[]; others: string[]; current: boolean
   onCurrent: () => void; onChange: (g: Group) => void; onRemove?: () => void
-  /** Shift+Enter: a new selection group after this one, its rule form open in this residue name. */
-  onNext?: (resn: string) => void
-  /** This card was made by Shift+Enter: its rule form opens at once, in this residue name. */
-  opened?: string
+  /** Rotate the 3D view around this group (T140): the card's own way to do what C + click does. */
+  onCentre: () => void
 }) {
-  const [rule, setRule] = React.useState(opened !== undefined)
+  const [rule, setRule] = React.useState(false)
   const [typed, setTyped] = React.useState<string | null>(null)
   const [armed, setArmed] = React.useState(false)
   React.useEffect(() => { if (!armed) return; const t = setTimeout(() => setArmed(false), 2600); return () => clearTimeout(t) }, [armed])
@@ -152,6 +149,7 @@ function GroupCard({ group, atoms, index, nrs, others, current, onCurrent, onCha
         <span className={cn('whitespace-nowrap text-control font-bold', toneText[group.tone])}>{nrs.length} atoms</span>
         <span className="flex-1" />
         <Button variant={current ? 'secondary' : 'ghost'} size="sm" aria-pressed={current} onClick={onCurrent}>{current ? 'picking' : 'pick'}</Button>
+        <Button variant="ghost" size="sm" disabled={!nrs.length} onClick={onCentre} title="rotate the 3D view around this group" aria-label={'rotate around ' + group.name}>centre</Button>
         {onRemove && <Button variant="ghost" size="sm" onClick={() => (armed ? onRemove() : setArmed(true))}>{armed ? 'click again to remove' : 'remove'}</Button>}
       </div>
       {problem && <FieldHint error>✗ {problem}</FieldHint>}
@@ -170,11 +168,7 @@ function GroupCard({ group, atoms, index, nrs, others, current, onCurrent, onCha
         onChange={e => setTyped(e.target.value)} onBlur={commitTyped} onKeyDown={e => { if (e.key === 'Enter') commitTyped(); if (e.key === 'Escape') setTyped(null) }} />
       {typedError && <FieldHint error>✗ {typedError}</FieldHint>}
       {beyond.length > 0 && <FieldHint error>✗ atoms {toRanges(beyond)} are beyond the structure's {atoms.length}</FieldHint>}
-      {rule ? <RuleForm atoms={atoms} index={index} start={opened !== undefined ? { within: opened } : undefined} nextGroup={!!onNext} onStep={(s, keep) => {
-        steps([...group.steps, s])
-        setRule(!!keep && !onNext)
-        if (keep && onNext) onNext(s.rule.kind === 'names' ? s.rule.resn ?? '' : '')
-      }} /> : <Button variant="ghost" size="sm" className="self-start" onClick={() => setRule(true)}>+ rule</Button>}
+      {rule ? <RuleForm atoms={atoms} index={index} onStep={(s, keep) => { steps([...group.steps, s]); setRule(!!keep) }} /> : <Button variant="ghost" size="sm" className="self-start" onClick={() => setRule(true)}>+ rule</Button>}
     </section>
   )
 }
@@ -184,8 +178,6 @@ export function Groups({ draft, setDraft }: { draft: Draft; setDraft: React.Disp
   const indexGroups = useIndex(draft.inputs.index?.path)
   const index = React.useMemo(() => ({ file: draft.inputs.index?.path.split('/').pop() || '', groups: indexGroups }), [draft.inputs.index, indexGroups])
   const [current, setCurrent] = React.useState(0)
-  // The card Shift+Enter made, and the residue name its rule form opens in (T105).
-  const [opened, setOpened] = React.useState<{ i: number; resn: string } | null>(null)
   // Each card keeps its own key, so removing one doesn't pass its state to the next (review finding 7).
   const [cardKeys, setCardKeys] = React.useState(() => initialKeys(draft.groups.length))
   const keys = fitKeys(cardKeys, draft.groups.length)
@@ -203,6 +195,10 @@ export function Groups({ draft, setDraft }: { draft: Draft; setDraft: React.Disp
     if (!atoms) return
     setDraft(d => ({ ...d, groups: d.groups.map((g, j) => (j === current ? { ...g, steps: clickStep(atoms, g.steps, nr, how) } : g)) }))
   }, [atoms, current, setDraft])
+  // C + click rotates around the clicked atom's group: the one being picked if it holds the atom, else the first that does.
+  const groupOf = React.useCallback((nr: number) => { const i = groupHolding(nr, sets, current); return i == null ? null : { name: draft.groups[i].name, atoms: sets[i] } }, [sets, current, draft.groups])
+  const [centreReq, setCentreReq] = React.useState<Centre | null>(null)
+  const centreOn = (i: number) => setCentreReq(c => ({ label: draft.groups[i].name, atoms: sets[i], id: (c?.id ?? 0) + 1 }))
   const describe = React.useCallback((nr: number) => { const names = draft.groups.filter((_, i) => sets[i]?.includes(nr)).map(g => g.name); return names.length ? 'in ' + names.join(', ') : '' }, [draft.groups, sets])
 
   if (!draft.inputs.structure) return <p className="m-0 text-control text-muted-foreground">pick a structure in inputs first</p>
@@ -213,29 +209,27 @@ export function Groups({ draft, setDraft }: { draft: Draft; setDraft: React.Disp
   const command = commandOf(draft.analysis ?? 'rdf') ?? rdfCommand, roles = rolesOf(command), others = draft.groups.length - 1
   const canAdd = roles.max === undefined || others < roles.max, title = (w: string) => w[0].toUpperCase() + w.slice(1)
   const addSelection = () => setDraft(d => ({ ...d, groups: [...d.groups, { role: 'selection', name: 'selection' + d.groups.length, tone: TONES[d.groups.length % TONES.length], steps: [] }] }))
-  // Each name its own curve: the next rule goes into a new selection group, which clicks then fill too.
-  const nextGroup = (resn: string) => { const i = draft.groups.length; addSelection(); setCurrent(i); setOpened({ i, resn }) }
   return (
     <div className="grid grid-cols-[minmax(0,1fr)_420px] gap-5">
       <div className="flex min-w-0 flex-col gap-3">
-        <Viewer text={structure.text} format={structure.format} atoms={structure.atoms} colour={colour} onPick={onPick} describe={describe} />
+        <Viewer text={structure.text} format={structure.format} atoms={structure.atoms} colour={colour} onPick={onPick} describe={describe} groupOf={groupOf} centreRequest={centreReq} />
         <p className="m-0 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-caption text-muted-foreground">
           <span className="whitespace-nowrap">click an atom: in or out of <b className={toneText[draft.groups[current]?.tone || 'coral']}>{draft.groups[current]?.name}</b></span>
           <span className="whitespace-nowrap"><Kbd>shift</Kbd> click: its residue</span>
           <span className="whitespace-nowrap"><Kbd>{altName(browserPlatform())}</Kbd> click: its atom name in every residue of that name</span>
+          <span className="whitespace-nowrap"><Kbd>C</Kbd> click: rotate around its group (or the atom, in none)</span>
         </p>
       </div>
       <div className="flex flex-col gap-3">
         <Section label={title(roles.first)} />
-        <GroupCard group={ref} atoms={structure.atoms} index={index} nrs={sets[0]} others={names(0)} current={current === 0} onCurrent={() => setCurrent(0)} onChange={g => setGroup(0, g)} onNext={canAdd ? nextGroup : undefined} />
+        <GroupCard group={ref} atoms={structure.atoms} index={index} nrs={sets[0]} others={names(0)} current={current === 0} onCurrent={() => setCurrent(0)} onChange={g => setGroup(0, g)} onCentre={() => centreOn(0)} />
         {roles.max === 0 ? others > 0 && <Section label={'Not used by gmx ' + command.tool + ' ' + String(others).padStart(2, '0')}><span className="text-caption text-muted-foreground">it takes one group</span></Section>
-          : <Section label={title(roles.rest) + 's ' + String(others).padStart(2, '0')}>{canAdd ? <Button variant="dashed" size="sm" shape="pill" onClick={() => { setOpened(null); addSelection() }}><Plus /> group</Button>
+          : <Section label={title(roles.rest) + 's ' + String(others).padStart(2, '0')}>{canAdd ? <Button variant="dashed" size="sm" shape="pill" onClick={addSelection}><Plus /> group</Button>
             : <span className="text-caption text-muted-foreground">gmx {command.tool} takes {roles.max === 1 ? 'one' : roles.max}</span>}</Section>}
         {draft.groups.slice(1).map((g, k) => {
           const i = k + 1
-          return <GroupCard key={keys.keys[i]} group={g} atoms={structure.atoms} index={index} nrs={sets[i]} others={names(i)} current={current === i} onCurrent={() => setCurrent(i)} onChange={x => setGroup(i, x)}
-            onNext={canAdd ? nextGroup : undefined} opened={opened?.i === i ? opened.resn : undefined}
-            onRemove={others > roles.min ? () => { setDraft(d => ({ ...d, groups: d.groups.filter((_, j) => j !== i) })); setCardKeys(c => removeKey(c, i)); setCurrent(0); setOpened(null) } : undefined} />
+          return <GroupCard key={keys.keys[i]} group={g} atoms={structure.atoms} index={index} nrs={sets[i]} others={names(i)} current={current === i} onCurrent={() => setCurrent(i)} onChange={x => setGroup(i, x)} onCentre={() => centreOn(i)}
+            onRemove={others > roles.min ? () => { setDraft(d => ({ ...d, groups: d.groups.filter((_, j) => j !== i) })); setCardKeys(c => removeKey(c, i)); setCurrent(0) } : undefined} />
         })}
         {/* RDF's own advice: other commands read shared atoms otherwise (gmx hbond refuses some, R8). */}
         {command.tool === 'rdf' && draft.groups.slice(1).map((g, k) => {

@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { atomTable, toRanges } from '../src/lib/atoms';
-import { clickStep, groupAtoms, nameProblem, ruleText, shared, type Rule, type Step } from '../src/lib/groups';
+import { clickStep, groupAtoms, groupHolding, nameProblem, ruleText, shared, type Rule, type Step } from '../src/lib/groups';
 
 const nvt = atomTable(readFileSync(new URL('./fixtures/nvt/nvt.gro', import.meta.url), 'utf8'), 'gro');
 const pdb = atomTable(readFileSync(new URL('../../app/test/fixtures/test.pdb', import.meta.url), 'utf8'), 'pdb');
@@ -77,5 +77,26 @@ describe('overlap', () => {
   it('on your nvt.gro: sulfur in sulfate shares 6 atoms', () => {
     const s = groupAtoms(nvt, [add({ kind: 'name', value: 'S1' })]), so4 = groupAtoms(nvt, [add({ kind: 'resname', value: 'SO4' })]);
     expect(shared(s, so4)).toEqual([5, 10, 15, 20, 25, 30]);
+  });
+});
+
+describe('which group C + click rotates around (T140)', () => {
+  // Reference sulfate 1–30, a selection of the sodium 31–42, and one that overlaps the reference: 25–40.
+  const sets = [groupAtoms(nvt, [add({ kind: 'resname', value: 'SO4' })]), groupAtoms(nvt, [add({ kind: 'resname', value: 'Na' })]), groupAtoms(nvt, [add({ kind: 'atoms', atoms: '25-40' })])];
+
+  it('an atom of one group: that group', () => {
+    expect(groupHolding(5, sets, 1)).toBe(0);
+    expect(groupHolding(35, sets, 0)).toBe(1);
+  });
+
+  it('an atom in several: the group being picked if it holds it, else the first (the reference first)', () => {
+    expect(groupHolding(27, sets, 2)).toBe(2);
+    expect(groupHolding(27, sets, 1)).toBe(0);
+    expect(groupHolding(32, sets, 0)).toBe(1);
+  });
+
+  it('an atom in no group: none, so the atom alone is the centre', () => {
+    expect(groupHolding(100, sets, 0)).toBeNull();
+    expect(groupHolding(1, [], 0)).toBeNull();
   });
 });

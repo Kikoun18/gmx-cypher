@@ -84,7 +84,7 @@ Spec: [`batch-2.md`](batch-2.md). Phase 0 report: [`batch-2-phase0.md`](batch-2-
 ### Phase 1: Picking and the box (R1, R2)
 - [x] R1-0 Frozen v1 recipe and run-record files (section 1.5)
 - [x] R1a Atom-name lists: `,`, spaces and `and` → one set, said in words; recipe v2 (T92, T93)
-- [x] R1b Shift+Enter: keep this rule, start the next one with the same residue name and no atom names
+- [x] R1b Shift+Enter: keep this rule, start the next one with the same residue name and no atom names (T105; a new rule in the same group since T139)
 - [x] R1c The same-name click, as decided (section 8): kept as it is (T94)
 - [x] R2 PBC box: read, draw, toggle and dimensions, for `.gro` and `.pdb`, rectangular and triclinic (T95, T96)
 
@@ -116,6 +116,11 @@ Spec: [`batch-2.md`](batch-2.md). Phase 0 report: [`batch-2-phase0.md`](batch-2-
 - [x] Manual QA in Chrome with real `gmx` (and fakes for `qq` and `gmx-eta`, which aren't here); results recorded (passed, failed or not run) in the report
 - [x] Fresh-context review of the whole branch against section 20 of the spec; findings fixed or recorded (R1–R4: T105–T110; R5–R10: T138)
 - [x] Final report `runner/docs/batch-2-report.md`
+
+### After batch 2 (your requests, T139–T141)
+- [x] Shift+Enter adds a new rule in the same group, not a new group
+- [x] Atoms keep their element colours when grouped or clicked; a group shows as a halo (group hues kept as an option)
+- [x] C + click sets the centre of rotation to the clicked atom's whole group
 
 ### Backlog (Batch 2: add to it, don't do it)
 - Job submission (`qq submit`), and running Cypher's analyses as cluster jobs. (Moved here from the backlog above.)

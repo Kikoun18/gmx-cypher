@@ -54,13 +54,12 @@ lines of tests, in `runner/`; 620 tests passing (1 skipped) against 273 before; 
 **R1 Atom picking.** *Before:* an atom-name rule took one name, matched exactly; `OH1, OH2` matched
 nothing. *After:* a rule takes a list (`OH1, OH2 OH3 and OH4`), says it in words ("atom name OH1, OH2,
 OH3 or OH4 in every SUG") with its count, flags a missing name with "0 atoms", and a menu lists the names
-in the chosen residue with counts. Shift+Enter adds the rule and starts a new selection group with the
-same residue name, focused; where a command takes no more groups (R9), it keeps the form open in the same
-group instead. Alt-click (option-click on macOS) keeps its scope, this atom name in every residue of its
+in the chosen residue with counts. Shift+Enter adds the rule and keeps the form open for the next one in
+the same group, with the same residue name (as built in R1b it started a new group; you asked for this
+instead, T139). Alt-click (option-click on macOS) keeps its scope, this atom name in every residue of its
 name (T94); Ctrl was not used, because 3Dmol moves the structure on Ctrl+drag and macOS opens a menu on
 Ctrl+click. Recipes and run records are version 3; version 1 files load and select the same atoms (frozen
-fixtures). *Limitation:* no wildcards (question 19), and the Shift+Enter question in T105 (new group or
-same group) is still yours to answer.
+fixtures). *Limitation:* no wildcards (question 19).
 
 **R2 The box.** *Before:* none. *After:* the structure file's own box (`.gro` last line, rectangular or
 triclinic; `.pdb` CRYST1), with lengths, angles, volume and the atoms outside; on by default, *B* toggles
@@ -146,8 +145,12 @@ the name gmx-cypher gives it (tests in `commands.test.ts` and each command's tes
 
 All in `runner/docs/img/batch-2/`:
 
-- atom-name list: `r1-names-light`, `p6-names-dark`; Shift+Enter: `r1b-shift-enter-groups-light`,
-  `p6-shift-enter-dark`; the same-name click with its count (OW1 in every SOL: 800 atoms):
+- atom-name list: `r1-names-light`, `p6-names-dark`; Shift+Enter, as it is now (a new rule in the same
+  group, T139): `t139-shift-enter-same-group-light`, `-dark` (`r1b-shift-enter-groups-light` and
+  `p6-shift-enter-dark` show the earlier behaviour, a new group); element colours with halos, and the
+  group hues option (T141): `t141-element-colours-halo-light`, `-dark`, `t141-group-hues-light`,
+  `t141-halo-looks-sheet`; C + click and the centre button (T140): `t140-centre-on-atom-light`,
+  `t140-c-click-group-light`, `t140-centre-button-group-light`; the same-name click with its count (OW1 in every SOL: 800 atoms):
   `p6-alt-click-light`, `p6-alt-click-dark`;
 - the box: `r2-box-nvt-light`, `p6-box-nvt-dark`, `r2-box-triclinic-synthetic-dark`,
   `p6-box-triclinic-light`;
@@ -185,7 +188,7 @@ All in `runner/docs/img/batch-2/`:
 | Check | Result |
 |---|---|
 | Atom-name list, its words and count; unknown name flagged | passed |
-| Shift+Enter: next group, same residue name, focused | passed |
+| Shift+Enter: a new rule in the same group, same residue name, focused (after your request) | passed (also an e2e test) |
 | Alt-click: the name in every residue of its name, with count | passed |
 | Box, rectangular (nvt) and triclinic (synthetic); B key; no-box reason | passed |
 | Picker; a tool this gmx lacks greyed with the reason | passed (2025.4, and the 2023.3 fake) |
@@ -291,7 +294,6 @@ it fixtures: real GROMACS outputs, help texts and your samples, and screenshots)
    triclinic structure (question 13).
 5. **`-h` texts from 2021.4 and 2022.3** (question 12), and a real pre-2024 run of the legacy H-bond and
    gyrate tools on your data.
-6. **Shift+Enter** (T105): a new group per name, as built, or the same group?
-7. **The WHAM profile** (question 28): send it, and as what?
-8. **The push:** the branch is on `claude/quirky-cray-q845sa` (a fast-forward, nothing rewritten). Say
+6. **The WHAM profile** (question 28): send it, and as what?
+7. **The push:** the branch is on `claude/quirky-cray-q845sa` (a fast-forward, nothing rewritten). Say
    if it should go elsewhere, or if you'd rather it hadn't been pushed.

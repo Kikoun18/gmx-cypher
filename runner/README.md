@@ -166,12 +166,20 @@ keep xmgrace's `@` lines (gmx's defaults; no form offers others): PMF Sequences 
 - **Atom names as a list:** `OH1, OH2 OH3 and OH4` (commas, spaces or `and`) means atoms named OH1, OH2,
   OH3 or OH4; the rule says so in words, with its atom count, and a name the structure lacks shows
   "0 atoms". The menu beside the field lists the names in the chosen residue name, with counts.
-- **Shift+Enter** in the name field adds the rule and starts a new selection group with the same residue
-  name (each name its own curve); where the command takes no more groups, it keeps the form open for
-  another rule in the same group. **Enter** adds the rule and closes it.
+- **Shift+Enter** in the name field adds the rule and keeps the form open for the next one, in the same
+  group and the same residue name (OH1, then OH2 in every SUG), the field focused. **Enter** adds the rule
+  and closes it. A new group is *+ group*.
 - **alt-click** (option-click on macOS) toggles that atom name in every residue of its name; the hint
   under the 3D view says so, and the group shows its new atom count. Every rule can also be typed, so all of this
   works from the keyboard.
+- **Colours:** by default atoms keep their element colours and a group is a translucent halo in its hue
+  round its atoms, so clicking and selecting never repaints them. *group hues* draws the group's atoms in
+  its hue and the rest in grey, as before; the choice is remembered.
+- **Centre of rotation:** hold **C** and click an atom to rotate the view around its whole group (the group
+  being picked if it holds the atom, else the first that does, the reference first); an atom in no group
+  is the centre itself. The middle of the group's extent becomes the pivot, the caption says what the view
+  rotates around, and *reset* goes back to the middle of the structure. Each group card has a *centre*
+  button for the same, from the keyboard. C typed in a field is only a letter.
 
 ## The periodic box
 

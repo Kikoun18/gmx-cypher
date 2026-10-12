@@ -135,3 +135,13 @@ export function shared(a: number[], b: number[]): number[] {
   const s = new Set(a);
   return b.filter(x => s.has(x));
 }
+
+/**
+ * The group C + click rotates around (T140): the one being picked if it holds the atom, else the first that does (the
+ * reference comes first); null when no group has it, and the atom alone is the centre.
+ */
+export function groupHolding(nr: number, sets: number[][], preferred: number): number | null {
+  if (sets[preferred]?.includes(nr)) return preferred;
+  const i = sets.findIndex(s => s.includes(nr));
+  return i < 0 ? null : i;
+}

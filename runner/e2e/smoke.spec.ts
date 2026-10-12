@@ -65,3 +65,39 @@ test('pick inputs, make groups, run, see the chart', async ({ page }) => {
   await expect(page.getByText('rdf_nvt.run.json')).toBeVisible()
   expect(errors).toEqual([])
 })
+
+test('Shift+Enter adds a rule and keeps the form open in the same group, with the same residue name', async ({ page }) => {
+  const errors: string[] = []
+  page.on('console', m => { if (m.type() === 'error') errors.push(m.text()) })
+  page.on('pageerror', e => errors.push(e.message))
+  await page.goto(url)
+  await page.getByRole('button', { name: 'nvt.xtc' }).click()
+  await expect(page.getByText('✓ the inputs agree')).toBeVisible()
+  await page.getByRole('button', { name: 'use these inputs' }).click()
+  await expect(page.locator('canvas')).toBeVisible()
+
+  const card = page.locator('section[aria-label^="reference "]')
+  await card.getByRole('button', { name: '+ rule' }).click()
+  await card.getByRole('combobox', { name: 'rule' }).click()
+  await page.getByRole('option', { name: 'atom name' }).click()
+  await card.getByRole('combobox', { name: 'in every residue named' }).fill('SOL')
+  const names = card.getByRole('textbox', { name: 'atom names' })
+  await names.fill('HW1')
+  await names.press('Shift+Enter')
+
+  // The rule is in, in this group; the form is still open, empty, in the same residue name, and focused.
+  await expect(card.getByText('800 atoms')).toBeVisible()
+  await expect(card.getByText('atom name HW1 in every SOL')).toBeVisible()
+  await expect(names).toBeVisible()
+  await expect(names).toHaveValue('')
+  await expect(names).toBeFocused()
+  await expect(card.getByRole('combobox', { name: 'in every residue named' })).toHaveValue('SOL')
+  await names.fill('HW2')
+  await names.press('Enter')
+  await expect(card.getByText('1600 atoms')).toBeVisible()
+  await expect(card.getByText('atom name HW2 in every SOL')).toBeVisible()
+  // Enter closes the form; and no group was made on the way.
+  await expect(names).toBeHidden()
+  await expect(page.locator('section[aria-label^="selection "]')).toHaveCount(1)
+  expect(errors).toEqual([])
+})
