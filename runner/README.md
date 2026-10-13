@@ -290,7 +290,7 @@ cancels its running jobs first.
 
 ```sh
 npm run dev        # server and page with hot reload
-npm test           # checks app/ is unchanged, then the tests (fake gmx)
+npm test           # checks app/ is as agreed (T144), then the tests (fake gmx)
 npm run lint
 npm run build
 npm run e2e        # the browser smoke test (Playwright, Chromium)
