@@ -1,0 +1,118 @@
+{
+  "analyses": [
+    {
+      "added": "2026-10-11",
+      "column": "ha",
+      "curves": [
+        {
+          "file": "fmv3ncwe8wdrwn",
+          "id": "cmv3ncwe8um0c3",
+          "label": "Protein-CARB",
+          "parse": {
+            "xCol": 1,
+            "xScale": 1,
+            "yCol": 2
+          }
+        }
+      ],
+      "dir": "sugar-pmfs--pmv3ncwehsvzci/ha--ha/krwycr--smv3ncwdmshwk6/dist-run-1--xmv3ncwebukgy6",
+      "id": "xmv3ncwebukgy6",
+      "slot": "a",
+      "time": "",
+      "type": "dist"
+    }
+  ],
+  "desc": "",
+  "dirs": {
+    "cells": {
+      "ha": "sugar-pmfs--pmv3ncwehsvzci/ha--ha/krwycr--smv3ncwdmshwk6",
+      "pg": "sugar-pmfs--pmv3ncwehsvzci/pg--pg/krwycr--smv3ncwdmshwk6"
+    },
+    "row": null
+  },
+  "files": [
+    {
+      "id": "fmv3ncwdmy6i91",
+      "kind": "pmf-xvg",
+      "mime": "",
+      "name": "hmrfast6_ha_a_t200000.xvg",
+      "origin": "upload",
+      "owner": "rmv3ncwdmup12m",
+      "path": "sugar-pmfs--pmv3ncwehsvzci/ha--ha/krwycr--smv3ncwdmshwk6/hmrfast6_ha_a_t200000.xvg",
+      "sha256": "eac75cf451ca03b4df43abbd2fd4758c512adb3349f63d2abc97e8502a65db59",
+      "size": 9516,
+      "uploaded": "2026-10-11T09:54:54.125Z"
+    },
+    {
+      "id": "fmv3ncwdplk91r",
+      "kind": "pmf-xvg",
+      "mime": "",
+      "name": "translocation_free_energy.dat",
+      "origin": "upload",
+      "owner": "rmv3ncwdpt7l7n",
+      "path": "sugar-pmfs--pmv3ncwehsvzci/pg--pg/krwycr--smv3ncwdmshwk6/translocation_free_energy.dat",
+      "sha256": "edc94a3305e68fe56bad7af803c810557262c9d6f398b5ac8b6f5fee3ed24e03",
+      "size": 8519,
+      "uploaded": "2026-10-11T09:54:54.126Z"
+    },
+    {
+      "id": "fmv3ncwe8wdrwn",
+      "kind": "analysis-xvg",
+      "mime": "",
+      "name": "07.md_mindist_protein_sugar.xvg",
+      "origin": "upload",
+      "owner": "xmv3ncwebukgy6",
+      "path": "sugar-pmfs--pmv3ncwehsvzci/ha--ha/krwycr--smv3ncwdmshwk6/dist-run-1--xmv3ncwebukgy6/07.md_mindist_protein_sugar.xvg",
+      "sha256": "5fab69ddfc5a1f0835fa9b9eda81eebe0ea9c7e523b654091d46f2cdd7050d76",
+      "size": 135977,
+      "uploaded": "2026-10-11T09:54:54.127Z"
+    }
+  ],
+  "group": "hmr+fast+6",
+  "id": "smv3ncwdmshwk6",
+  "literature": {},
+  "name": "KRWYCR",
+  "notes": {
+    "cells": {}
+  },
+  "runs": [
+    {
+      "added": "2026-10-11",
+      "column": "ha",
+      "file": "fmv3ncwdmy6i91",
+      "id": "rmv3ncwdmup12m",
+      "parse": {
+        "xCol": 1,
+        "yCol": 2
+      },
+      "slot": "a",
+      "tags": [
+        "prosecco75"
+      ],
+      "temp": 310.15,
+      "time": "200000"
+    },
+    {
+      "added": "2026-10-11",
+      "column": "pg",
+      "file": "fmv3ncwdplk91r",
+      "id": "rmv3ncwdpt7l7n",
+      "parse": {
+        "xCol": 1,
+        "yCol": 2
+      },
+      "slot": "a",
+      "tags": [],
+      "temp": 310.15,
+      "time": "200000"
+    }
+  ],
+  "seq": "KRWYCR",
+  "structures": [],
+  "type": "row",
+  "visibility": {
+    "pg": {
+      "a": "off"
+    }
+  }
+}

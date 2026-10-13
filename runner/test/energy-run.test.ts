@@ -75,13 +75,14 @@ describe('the energy output in PMF Sequences (R4): typed Energy, every column a 
     ['energy_rerun (2).xvg', 'energy'],
   ])('%s → %s, with both terms as curves', (name, k) => {
     const a = detectAna(getAnalyses(null), name, t.head, h.tool);
-    expect(a).toEqual({ k, from: 'auto' });
+    // PMF Sequences batch 3 reads the file's own header ("GROMACS Energies", from gmx energy): the name no longer matters.
+    expect(a).toEqual({ k, from: 'header' });
     expect(getAnalyses(null).find(x => x.k === a.k)?.yCols).toBe('all');
     expect(t.head.legends).toEqual(['Bond', 'Potential']);
   });
 
-  it('a name without "energy" is not typed: the reason the default template starts with {analysis}', () => {
-    expect(detectAna(getAnalyses(null), 'pot.xvg', t.head, h.tool).k).not.toBe('energy');
+  it('a name without "energy" is typed Energy too, from the header (PMF Sequences before batch 3 needed "energy" in the name)', () => {
+    expect(detectAna(getAnalyses(null), 'pot.xvg', t.head, h.tool)).toEqual({ k: 'energy', from: 'header' });
   });
 });
 

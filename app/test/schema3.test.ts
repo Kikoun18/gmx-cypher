@@ -29,15 +29,16 @@ const rdf = (s: Store) => s.seqs.flatMap(q => q.extras).find(e => e.type === 'rd
 const display = (s: Store) => rdf(s).curves.map(c => [c.label, c.vis ?? null, c.shade ?? null]);
 
 describe('schema 2 → 3: curve display on the record (R4e)', () => {
-  it('versions moved together', () => expect([SCHEMA_VERSION, EXPORT_VERSION]).toEqual([3, 6]));
+  // Version-relative since batch 3 (F119): the schema and the export move together (3/6 here, 4/7 in F-1).
+  it('versions moved together', () => expect(EXPORT_VERSION - SCHEMA_VERSION).toBe(3));
 
   it('upgrades the frozen schema-2 vault without changing a record, with a backup', async () => {
     const b = await vaultFixture(FROZEN), before = await files(b);
     const v = await Vault.open(b);
-    expect([v.upgradedFrom, v.manifest.schemaVersion]).toEqual([2, 3]);
+    expect([v.upgradedFrom, v.manifest.schemaVersion]).toEqual([2, SCHEMA_VERSION]);
     const after = await files(b);
     for (const [p, t] of Object.entries(before)) if (p !== 'schema') expect([p, after[p]]).toEqual([p, t]);
-    expect((await v.listTrash()).map(t => t.manifest?.type)).toEqual(['schema-backup']);
+    expect((await v.listTrash()).map(t => t.manifest?.type)).toEqual(Array(SCHEMA_VERSION - 2).fill('schema-backup')); // one per step from 2 (F119)
   });
 
   it('the step changes nothing and is safe to run again', async () => {
@@ -60,15 +61,15 @@ describe('schema 2 → 3: curve display on the record (R4e)', () => {
     await expect(Vault.open(b)).rejects.toThrow();
     b.fault = null;
     const v = await Vault.open(b);
-    expect(v.manifest.schemaVersion).toBe(3);
+    expect(v.manifest.schemaVersion).toBe(SCHEMA_VERSION);
     expect(await files(b)).toEqual(await files(clean));
   });
 
-  it('a schema-4 vault (newer than this app) opens read-only and is not changed', async () => {
+  it('a vault newer than this app opens read-only and is not changed', async () => {
     const b = await vaultFixture(FROZEN);
     await Vault.open(b);
     const m = JSON.parse(await b.readText('.matrix/manifest.json'));
-    await b.writeText('.matrix/manifest.json', JSON.stringify({ ...m, schemaVersion: 4 }));
+    await b.writeText('.matrix/manifest.json', JSON.stringify({ ...m, schemaVersion: SCHEMA_VERSION + 1 }));
     const before = await files(b);
     const v = await Vault.open(b);
     expect([v.readOnly, v.upgradedFrom]).toEqual([true, null]);
@@ -90,14 +91,14 @@ describe('schema 2 → 3: curve display on the record (R4e)', () => {
     expect(display((await reopen(b)).svc.store)).toEqual([['Protein', null, null], ['second sugar', null, 3]]);
   });
 
-  it('export v6 → import keeps visibility and shade', async () => {
+  it('export → import keeps visibility and shade', async () => {
     const b = await vaultFixture(FROZEN);
     const { svc } = await reopen(b);
     const e = rdf(svc.store);
     svc.commit({ ...svc.store, seqs: svc.store.seqs.map(q => ({ ...q, extras: q.extras.map(x => (x.id !== e.id ? x : { ...x, curves: x.curves.map((c, i) => (i ? { ...c, vis: 'dim' as const, shade: 1 } : c)) })) })) });
     await svc.flush();
     const { text } = await exportDataset(svc.store, { project: 'P', settings: {}, src: { read: f => svc.readUpload(f), meta: f => svc.fileMeta(f) } });
-    expect(JSON.parse(text).version).toBe(6);
+    expect(JSON.parse(text).version).toBe(EXPORT_VERSION);
     const prep = await importAsProject(text);
     expect(display(prep.store)).toEqual([['Protein', null, null], ['second sugar', 'dim', 1]]);
   });

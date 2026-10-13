@@ -16,10 +16,10 @@ import { cellNoteKey, curveKey, filesById, rowNoteKey, slotNumber, storeFrom, ty
 import { parseNote } from './notes';
 import { NOTE_FILE, nameKey, basename, conflictName, dirname, isConflictCopy, isInside, join, rebase, recordPaths, settingsPaths, stamp, visiblePaths } from './path';
 import { makePlan, type Upload } from './plan';
-import type { AnalysisRec, ColumnRecord, FileMeta, PageRecord, ProjectRecord, RowRecord } from './records';
+import type { AnalysisRec, ColumnRecord, FileMeta, PageRecord, ProjectRecord, RowRecord, ScriptRec } from './records';
 import { readSettings, settingsFiles } from './settings';
 import { cachedScan, findConflicts, scanProject, writeIndex, type Conflict, type Scan } from './index';
-import { readHeaderCache, readPmfCache, readTableCache, writeHeaderCache, writePmfCache, writeTableCache, pmfKey, type PmfEntry } from './cache';
+import { readHeaderCache, readPmfCache, readScriptCache, readTableCache, readValuesCache, writeHeaderCache, writePmfCache, writeScriptCache, writeTableCache, writeValuesCache, pmfKey, type PmfEntry } from './cache';
 import { parseGmxHeader, type GmxHeader } from '../gmxHeader';
 import { contentPath, deleteTrashItem, listTrash, type TrashItem } from './trash';
 import { describeUpload, namesIn, newFileId } from './files';
@@ -111,6 +111,7 @@ export class ProjectService {
     const project = await io.readJson<ProjectRecord>(recordPaths.project(pid));
     if (!project) throw new Error('project ' + pid + ' has no record');
     if (!Array.isArray(project.imports)) project.imports = [];
+    if (project.scripts !== undefined) project.scripts = (Array.isArray(project.scripts) ? project.scripts : []).filter(k => typeof k?.id === 'string' && typeof k.file?.path === 'string');
     const columns = new Map<string, ColumnRecord>(), pages = new Map<string, PageRecord>(), rows = new Map<string, RowRecord>();
     const unreadable = new Set<string>();
     const readAll = async <T extends { id: string }>(dir: string, into: Map<string, T>, onBad?: (id: string) => void) => {
@@ -191,7 +192,7 @@ export class ProjectService {
     {
       const known = new Set<string>();
       for (const r of state.rows.values()) for (const f of r.files) known.add(f.path);
-      for (const f of state.project.imports) known.add(f.path);
+      for (const f of [...state.project.imports, ...(state.project.scripts || []).map(k => k.file)]) known.add(f.path);
       const ign = new Set(state.ignored), byName = new Map<string, string[]>();
       for (const p of Object.keys(scan.files)) {
         if (known.has(p) || ign.has(p) || basename(p) === NOTE_FILE || isConflictCopy(basename(p))) continue;
@@ -219,10 +220,11 @@ export class ProjectService {
     const missing: MissingFile[] = [];
     this.data.missing = new Set();
     for (const r of state.rows.values()) for (const f of r.files) if (!scan.files[f.path]) { missing.push({ fileId: f.id, path: f.path, owner: f.owner, kind: f.kind, row: r.id }); this.data.missing.add(f.id); }
+    for (const { file: f } of state.project.scripts || []) if (!scan.files[f.path]) { missing.push({ fileId: f.id, path: f.path, owner: f.owner, kind: f.kind, row: '' }); this.data.missing.add(f.id); }
     // Untracked files: in the visible tree, referenced by nothing, not notes, not ignored.
     const tracked = new Set<string>();
     for (const r of state.rows.values()) for (const f of r.files) tracked.add(f.path);
-    for (const f of state.project.imports) tracked.add(f.path);
+    for (const f of [...state.project.imports, ...(state.project.scripts || []).map(k => k.file)]) tracked.add(f.path);
     const ignored = new Set(state.ignored);
     const untracked: string[] = [], copies: string[] = [];
     for (const p of Object.keys(scan.files).sort()) {
@@ -341,13 +343,20 @@ export class ProjectService {
           ...e, curves: e.curves.map(c => {
             if (!c.src || c.state === 'missing') return c;
             const d = this.data.curves.get(curveKey(c.src));
-            return d ? { ...c, x: d.x, y: d.y, state: undefined } : c;
+            return d ? { ...c, ...d, state: undefined } : c;
           }),
         })),
       })),
     });
     this.store = fill(this.store);
     this.emit(fill);
+  }
+
+  /** What saving `next` would do, without doing it: the moves and what goes to the trash (R7's preview). */
+  async previewPlan(next: Store): Promise<{ moves: { from: string; to: string }[]; trashed: string[] }> {
+    await this.flush();
+    const plan = await makePlan({ backend: this.io.backend, pid: this.pid, prev: this.state, next: this.patchIncoming(next), uploads: this.uploads, missing: this.data.missing });
+    return { moves: plan.content.flatMap(op => (op.kind === 'move' ? [{ from: op.from, to: op.to }] : [])), trashed: plan.trashed };
   }
 
   /** An original file's bytes (structures, downloads). */
@@ -368,6 +377,26 @@ export class ProjectService {
     return h;
   }
   fileMeta(fileId: string): FileMeta | undefined { return filesById(this.state).get(fileId) || this.state.project.imports.find(x => x.id === fileId); }
+  /**
+   * A script's source, the SHA-256 of the bytes on disk now (trust and runs compare it with the record's), and its
+   * functions (R3b): from the cache by that SHA-256, else read by `discover` and cached.
+   */
+  async scriptInfo<T>(fileId: string, discover: (source: string) => Promise<T>): Promise<{ source: string; size: number; sha256: string; fns: T }> {
+    // A script just added is on disk once the pending save is.
+    if (!this.fileMeta(fileId)) await this.flush();
+    const f = this.fileMeta(fileId), b = this.io.backend;
+    if (!f) throw new StorageError('not-found', fileId, 'no such file in this project');
+    const bytes = await b.readBytes(f.path), sha256 = await sha256Hex(bytes), source = new TextDecoder().decode(bytes);
+    let fns = (await readScriptCache(b, sha256)) as T | undefined;
+    if (fns === undefined) {
+      fns = await discover(source);
+      if (!this.io.readOnly) await writeScriptCache(b, sha256, fns);
+    }
+    return { source, size: bytes.byteLength, sha256, fns };
+  }
+  /** Script results kept between sessions (R3c). */
+  scriptValues() { return readValuesCache(this.io.backend, this.pid); }
+  async saveScriptValues(entries: Record<string, unknown>) { if (!this.io.readOnly) await writeValuesCache(this.io.backend, this.pid, entries); }
 
   // --- writing ----------------------------------------------------------------------------------
   /** Queue the next Store. `uploads` maps new file IDs (already referenced in `next`) to their bytes. */
@@ -376,7 +405,7 @@ export class ProjectService {
     const prevTarget = this.pending || this.store;
     this.pending = this.patchIncoming(next);
     const notesOnly = !uploads?.size && prevTarget.seqs === next.seqs && prevTarget.cols === next.cols && prevTarget.pages === next.pages
-      && prevTarget.vis === next.vis && prevTarget.lit === next.lit && prevTarget.settings === next.settings;
+      && prevTarget.vis === next.vis && prevTarget.lit === next.lit && prevTarget.settings === next.settings && prevTarget.scripts === next.scripts;
     if (this.readOnly) { this.setStatus({ save: 'read-only' }); return; }
     this.setStatus({ save: 'pending' });
     this.schedule(notesOnly ? NOTE_DEBOUNCE_MS : 0);
@@ -475,7 +504,7 @@ export class ProjectService {
       }
       for (const e of s.extras) for (const c of e.curves) {
         const src = c.src || plan.newSrc.curves.get(c.id);
-        if (src && c.x.length) this.data.curves.set(curveKey(src), { x: c.x, y: c.y });
+        if (src && c.x.length) this.data.curves.set(curveKey(src), { x: c.x, y: c.y, axis: c.axis, names: c.names });
       }
     }
     this.store = this.patchIncoming(target);
@@ -599,6 +628,7 @@ export class ProjectService {
       }
       for (const c of this.state.columns.values()) { const nc = { ...c, dir: c.dir && rebase(c.dir, p.dir, to) }; cols.set(c.id, nc); records.push({ path: recordPaths.column(this.pid, c.id), text: stableStringify(nc) }); }
       nextProject.imports = p.imports.map(f => ({ ...f, path: rebase(f.path, p.dir, to) }));
+      if (p.scripts) nextProject.scripts = p.scripts.map(k => ({ ...k, file: { ...k.file, path: rebase(k.file.path, p.dir, to) } }));
     }
     records.push({ path: recordPaths.project(this.pid), text: stableStringify(nextProject) });
     const e = newEntry('rename-project');
@@ -734,6 +764,14 @@ export class ProjectService {
         }
         ok = true;
       }
+    } else if (m.type === 'script') {
+      // An older version restored beside the current one becomes its own record, at the end.
+      const k = clone(records.script as ScriptRec), list = (project.scripts = project.scripts || []);
+      if (await free(m.originalPaths)) {
+        back();
+        if (list.some(x => x.id === k.id)) list.push({ ...k, id: uid('k') }); else list.splice(Math.min(Number(parents.index) || 0, list.length), 0, k);
+        ok = true;
+      }
     } else if (['run', 'analysis', 'structure', 'curve', 'note', 'literature'].includes(m.type)) {
       const r0 = row(parents.row);
       const colOk = parents.column == null || st.columns.has(String(parents.column));
@@ -742,12 +780,14 @@ export class ProjectService {
         const file = records.file as FileMeta | null | undefined;
         const files = (records.files as FileMeta[] | undefined) || (file ? [file] : []);
         const addFiles = () => r.files.push(...files.filter(f => !r.files.some(x => x.id === f.id)));
+        // A run or analysis kept as a record only (its file went on to something else, e.g. after a type change, R7) can't come back.
+        const owned = (fid: string) => r.runs.some(x => x.file === fid) || r.analyses.some(a => a.curves.some(c => c.file === fid));
         if (m.type === 'run') {
           const run = records.run as RowRecord['runs'][number];
-          if (!r.runs.some(x => x.id === run.id || (x.column === run.column && x.slot === run.slot))) { r.runs.push(run); addFiles(); if (!r.dirs.cells[run.column] && file) r.dirs.cells[run.column] = dirname(file.path); ok = true; }
+          if (!owned(run.file) && !r.runs.some(x => x.id === run.id || (x.column === run.column && x.slot === run.slot))) { r.runs.push(run); addFiles(); if (!r.dirs.cells[run.column] && file) r.dirs.cells[run.column] = dirname(file.path); ok = true; }
         } else if (m.type === 'analysis') {
           const a = records.analysis as AnalysisRec;
-          if (!r.analyses.some(x => x.id === a.id || (x.type === a.type && x.column === a.column && x.slot === a.slot))) { r.analyses.push(a); addFiles(); if (!r.dirs.cells[a.column] && a.dir) r.dirs.cells[a.column] = dirname(a.dir); ok = true; }
+          if (!a.curves.some(c => owned(c.file)) && !r.analyses.some(x => x.id === a.id || (x.type === a.type && x.column === a.column && x.slot === a.slot))) { r.analyses.push(a); addFiles(); if (!r.dirs.cells[a.column] && a.dir) r.dirs.cells[a.column] = dirname(a.dir); ok = true; }
         } else if (m.type === 'structure') {
           const s = records.structure as RowRecord['structures'][number];
           if (!r.structures.some(x => x.id === s.id)) { r.structures.push(s); addFiles(); if (!r.dirs.row && file) r.dirs.row = dirname(file.path); ok = true; }

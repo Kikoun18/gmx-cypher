@@ -60,3 +60,39 @@ describe('frozen batch-2 fixtures (schema 2, export v5)', () => {
     expect(curvesOf(prep.store.seqs)).toEqual(curvesOf(svc.store.seqs));
   });
 });
+
+// Third frozen set (batch 3, F-0): made once with the code at 3de24e2, never regenerated.
+const looksOf = (seqs: { extras: { type: string; curves: { vis?: string; shade?: number }[] }[] }[]) =>
+  seqs.flatMap(s => s.extras).flatMap(e => e.curves.map((c, j) => [e.type, j, c.vis, c.shade]).filter(r => r[2] || r[3]));
+
+describe('frozen batch-3 fixtures (schema 3, export v6)', () => {
+  it('the schema-3 vault opens with its runs, curve looks, page, notes and reference', async () => {
+    const { vault, svc } = await reopen(await vaultFixture('formats/schema-3-vault'));
+    expect(vault.manifest.schemaVersion).toBe(SCHEMA_VERSION);
+    const s = svc.store;
+    expect(runTags(s.seqs)).toEqual([
+      ['KRWYCR', 'ha', 'a', ['prosecco75']],
+      ['KRWYCR', 'pg', 'a', []],
+      ['WRWYCR', 'ha', 'a', ['add', 'hmr']],
+      ['WRWYCR', 'ha', 'b', ['fast', 'long']],
+      ['WRWYCR', 'pg', 'a', []],
+    ]);
+    expect(curvesOf(s.seqs)).toEqual([['dist', 1, []], ['hist', 21, []], ['rdf', 2, ['second sugar']]]);
+    expect(looksOf(s.seqs)).toEqual([['rdf', 0, undefined, 2], ['hist', 0, undefined, -1], ['hist', 3, 'off', undefined], ['hist', 5, 'dim', undefined]]);
+    expect(Object.values(s.vis).sort()).toEqual(['dim', 'off']);
+    expect(s.pages.map(p => [p.name, p.rows.length, p.cols])).toEqual([['Favourites', 2, ['ha', 'pg']]]);
+    expect(Object.values(s.lit).flat().map(r => r.title)).toEqual(['A frozen reference']);
+    expect(Object.keys(s.notes.cell)).toHaveLength(1);
+    expect(s.seqs.find(q => q.name === 'KRWYCR')!.runs.find(r => r.sacch === 'pg')!.x[0]).toBe(-7.479);
+    expect([s.settings?.rowAll, s.settings?.hiddenOut, s.settings?.analyses?.find(a => a.k === 'hist')?.smooth]).toEqual([true, true, 2]);
+  });
+  it('export-v6.json imports with the same rows, curves and looks', async () => {
+    const prep = await importAsProject(frozen('export-v6.json'));
+    expect(prep.version).toBe(6);
+    const { svc } = await reopen(await vaultFixture('formats/schema-3-vault'));
+    expect(runTags(prep.store.seqs)).toEqual(runTags(svc.store.seqs));
+    expect(curvesOf(prep.store.seqs)).toEqual(curvesOf(svc.store.seqs));
+    expect(looksOf(prep.store.seqs)).toEqual(looksOf(svc.store.seqs));
+    expect(prep.store.pages.map(p => p.name)).toEqual(['Favourites']);
+  });
+});

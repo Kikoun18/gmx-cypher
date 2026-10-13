@@ -27,8 +27,7 @@ function smooth(ps: Pt[]): Pt[] {
 }
 
 /** "k" → "K", " " → "Space"; how a key is written in the UI. */
-export const keyLabel = (k: string) => (k === ' ' ? 'Space' : k.length === 1 ? k.toUpperCase() : k);
-export const sameKey = (a: string, b: string) => (a.length === 1 ? a.toLowerCase() : a) === (b.length === 1 ? b.toLowerCase() : b);
+export { keyLabel, sameKey } from '../lib/keys';
 
 function rgba(hex: string, a: number) {
   const h = hex.replace('#', ''), n = parseInt(h.length === 3 ? h.split('').map(x => x + x).join('') : h, 16);

@@ -122,8 +122,8 @@ describe('schema 1 → 2: methods become tags (R2b)', () => {
     const v = await Vault.open(b);
     expect(v.manifest.schemaVersion).toBe(SCHEMA_VERSION);
     expect(await snapshotVault(b)).toEqual(await snapshotVault(clean));
-    // A rolled-back backup leaves no empty trash folder behind: exactly one backup item per step (1 → 2, 2 → 3; F79).
-    expect((await v.listTrash()).map(t => t.manifest?.type)).toEqual(['schema-backup', 'schema-backup']);
+    // A rolled-back backup leaves no empty trash folder behind: exactly one backup item per step from 1 (F79; version-relative since F119).
+    expect((await v.listTrash()).map(t => t.manifest?.type)).toEqual(Array(SCHEMA_VERSION - 1).fill('schema-backup'));
   });
 
   it('a vault newer than this app opens read-only and is not changed', async () => {

@@ -259,7 +259,7 @@ export function makeApi(ctx: Ctx): Api {
         if (v != null && (typeof v !== 'string' || !(v === name || (isAbsolute(v) && /^[\w./+-]+$/.test(v) && executable(v)))))
           throw new HttpError(400, k + ': ' + name + ' (found on PATH), or the absolute path of a program that exists');
       }
-      // A vault is checked before it is kept: PMF Sequences' manifest, schema 1–3 (T32).
+      // A vault is checked before it is kept: PMF Sequences' manifest, schemas 1–4 (T32, T142).
       if (patch.vault) patch.vault = (await openVault(patch.vault).catch(e => { throw new HttpError(400, (e as Error).message); })).path;
       ctx.config = { ...ctx.config, ...patch };
       saveConfig(ctx.home, ctx.config);

@@ -8,14 +8,14 @@
 import { importAsStore, importJSON } from '../seq';
 import type { Settings, Store } from '../types';
 import { newFileId } from './files';
-import { sha256Hex } from './json';
+import { sha256Hex, uid } from './json';
 import type { Upload } from './plan';
 import type { FileOrigin } from './records';
 import { isSafeId } from './path';
 import { sanitizeIds } from './ids';
 
 export const EXPORT_FORMAT = 'pmf-sequences';
-export const EXPORT_VERSION = 6;
+export const EXPORT_VERSION = 7;
 
 export interface ExportedFile { name: string; sha256: string; size: number; mime: string; origin: string; base64: string }
 
@@ -38,6 +38,7 @@ export function fileIdsOf(store: Store): string[] {
     for (const e of s.extras) for (const c of e.curves) if (c.src) ids.add(c.src.fileId);
     for (const m of s.structures) if (m.fileId) ids.add(m.fileId);
   }
+  for (const k of store.scripts || []) ids.add(k.fileId);
   return [...ids];
 }
 
@@ -48,7 +49,7 @@ function clean(store: Store): Store {
     seqs: store.seqs.map(s => ({
       ...s,
       runs: s.runs.map(({ state: _s, ...r }) => r),
-      extras: s.extras.map(e => ({ ...e, curves: e.curves.map(({ state: _c, ...c }) => c) })),
+      extras: s.extras.map(e => ({ ...e, curves: e.curves.map(({ state: _c, axis: _a, names: _n, ...c }) => c) })),
       structures: s.structures.map(({ state: _m, ...m }) => m),
     })),
   };
@@ -87,6 +88,7 @@ const ORIGINS: FileOrigin[] = ['upload', 'migrated-from-indexeddb', 'reconstruct
 type RawRun = { src?: { fileId: string } };
 type RawCurve = { src?: { fileId: string } };
 type RawStruct = { id: string; name?: string; fileId?: string };
+type RawScript = { id: string; name?: string; fileId: string };
 type RawSeq = { runs?: RawRun[]; extras?: { curves?: RawCurve[] }[]; structures?: RawStruct[] };
 
 /**
@@ -125,6 +127,22 @@ async function rekey(raw: Record<string, unknown>, taken: Set<string>): Promise<
     }
     s.structures = keep;
   }
+  // Scripts always arrive as new records, so each asks for trust again (F96); metrics follow them.
+  const scriptIds = new Map<string, string>(), scripts: RawScript[] = [];
+  for (const k of (Array.isArray(raw.scripts) ? raw.scripts : []) as RawScript[]) {
+    const id = k && typeof k.fileId === 'string' ? await take(k.fileId) : null;
+    if (!id) { dropped.push('script ' + (k?.name || '?') + ' (no file in the export)'); continue; }
+    scriptIds.set(k.id, uid('k'));
+    scripts.push({ ...k, id: scriptIds.get(k.id)!, fileId: id });
+  }
+  raw.scripts = scripts;
+  type Ref = { kind?: string; script?: string } | undefined;
+  const st = raw.settings as { metrics?: { fn?: Ref; transform?: Ref }[]; pmfTransform?: Ref; analyses?: { transform?: Ref }[] } | undefined;
+  const follow = (r: Ref) => { if (r && r.kind === 'script' && r.script) r.script = scriptIds.get(r.script) ?? r.script; };
+  // A metric's function and its own transform (F138) both follow.
+  for (const m of Array.isArray(st?.metrics) ? st.metrics : []) { follow(m?.fn); follow(m?.transform); }
+  follow(st?.pmfTransform);
+  for (const a of Array.isArray(st?.analyses) ? st.analyses : []) follow(a?.transform);
   delete raw.files; delete raw.structData;
   return { uploads, dropped };
 }

@@ -73,5 +73,11 @@ const methodsToTags: SchemaMigration = {
  */
 const curveDisplayStep: SchemaMigration = { from: 2, to: 3, describe: 'Curves keep their visibility and shade', run: async () => [] };
 
+/**
+ * 3 → 4 (batch 3, F-1): records may carry dashes, type sources, marks, lines, page metrics and scripts,
+ * and settings a metrics.json. No record changes; the version moves so an older app opens the vault read-only.
+ */
+const batch3Fields: SchemaMigration = { from: 3, to: 4, describe: 'Dashes, type sources, marks, lines, metrics and scripts', run: async () => [] };
+
 /** Real upgrade steps, in order. Tests may inject their own. */
-export const MIGRATIONS: SchemaMigration[] = [methodsToTags, curveDisplayStep];
+export const MIGRATIONS: SchemaMigration[] = [methodsToTags, curveDisplayStep, batch3Fields];

@@ -9,7 +9,7 @@ import type { GmxHeader } from '../gmxHeader';
 
 export const CACHE_SCHEMA = 1;
 /** Bump when parseTable/pickXY/pickCurves/parseGmxHeader change, so old cache entries are not used. */
-export const PARSER = { table: 'xvg-table@1', pmf: 'pmf-xy@1', gmxHeader: 'gmx-header@1' } as const;
+export const PARSER = { table: 'xvg-table@2', pmf: 'pmf-xy@1', gmxHeader: 'gmx-header@1', scriptFns: 'py-discover@1' } as const;
 
 export interface PmfEntry { source: { sha256: string; parser: string; xCol: number; yCol: number }; x: number[]; y: number[] }
 interface PmfFile { schema: number; kind: 'pmf-series'; entries: Record<string, PmfEntry> }
@@ -65,4 +65,25 @@ export async function readHeaderCache(b: StorageBackend, sha: string): Promise<G
 
 export async function writeHeaderCache(b: StorageBackend, sha: string, header: GmxHeader | null) {
   await writeJson(b, parsedPath(sha, PARSER.gmxHeader), { schema: CACHE_SCHEMA, source: { sha256: sha, parser: PARSER.gmxHeader }, header });
+}
+
+/** A script's functions as discovery read them (R3b), by the script's SHA-256; undefined = not cached. */
+export async function readScriptCache(b: StorageBackend, sha: string): Promise<unknown> {
+  const f = await readJson<{ schema: number; source?: { sha256: string; parser: string }; fns?: unknown }>(b, parsedPath(sha, PARSER.scriptFns));
+  return f && f.schema === CACHE_SCHEMA && f.source?.sha256 === sha && f.source.parser === PARSER.scriptFns ? f.fns : undefined;
+}
+
+export async function writeScriptCache(b: StorageBackend, sha: string, fns: unknown) {
+  await writeJson(b, parsedPath(sha, PARSER.scriptFns), { schema: CACHE_SCHEMA, source: { sha256: sha, parser: PARSER.scriptFns }, fns });
+}
+
+const valuesPath = (pid: string) => join(vaultPaths.cache, pid, 'values.json');
+/** Script results (R3c), by their content key (scriptRuns.ts); disposable like the rest of the cache. */
+export async function readValuesCache(b: StorageBackend, pid: string): Promise<Record<string, unknown>> {
+  const f = await readJson<{ schema: number; kind: string; entries: Record<string, unknown> }>(b, valuesPath(pid));
+  return f && f.schema === CACHE_SCHEMA && f.kind === 'script-values' && f.entries && typeof f.entries === 'object' ? f.entries : {};
+}
+
+export async function writeValuesCache(b: StorageBackend, pid: string, entries: Record<string, unknown>) {
+  await writeJson(b, valuesPath(pid), { schema: CACHE_SCHEMA, kind: 'script-values', entries });
 }

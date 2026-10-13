@@ -4,7 +4,7 @@ import { NodeBackend } from '../../app/scripts/node-backend';
 import { addColumn, DEFAULT_ANALYSES } from '../../app/src/lib/seq';
 import type { Store } from '../../app/src/lib/types';
 import { fixture, newVault, withPmf } from '../../app/test/helpers';
-import { landing, mismatch, nameFromPattern } from '../src/lib/landing';
+import { landing, mismatch, nameFromPattern, typeSource } from '../src/lib/landing';
 import { listProjects, openVault, readProject } from '../server/vault';
 import { tmp } from './helpers';
 
@@ -113,5 +113,22 @@ describe('POST /api/landing', () => {
     const typed = await s.call('/api/landing', { job: job.id, project, fields: { name: 'NA2SO4', col: 'SO4', group: 'hmr+fast+6', run: 3, time: '10' }, name: 'nvt.xvg' });
     expect(typed.json).toMatchObject({ name: 'nvt.xvg', preview: { run: 1 }, reasons: ['run 1, not 3'] });
     await s.close();
+  });
+});
+
+describe('a file PMF Sequences has no type for (batch 3: filed as general Data, not refused)', () => {
+  // gmx mindist's contacts: titled "Number of Contacts < 0.6 nm", which no PMF Sequences type recognises.
+  const contacts = readFileSync(new URL('./fixtures/r9/mindist/mindist_nvt_numcont.xvg', import.meta.url), 'utf8')
+    .replace(/^# Working dir:.*$/m, '# Working dir:  /home/user/sim/hmr+fast+6/so4/NA2SO4/9.multiwalker/2');
+
+  it('lands as Data from "no known type", with no problem to block it', () => {
+    const l = landing(using({ pathPattern: FOLDERS }), 'mindist_nvt_contacts.xvg', contacts);
+    expect(l).toMatchObject({ ok: true, row: 'NA2SO4', type: { k: 'data', how: 'generic' }, problems: [] });
+  });
+
+  it('where a type came from, in words', () => {
+    expect(['file', 'form', 'header', 'name', 'generic', 'other'].map(typeSource)).toEqual([
+      'from the name pattern', 'as chosen', 'from the header', 'from words in the file name', 'no known type: filed as general data', 'other',
+    ]);
   });
 });

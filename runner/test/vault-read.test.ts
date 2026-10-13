@@ -14,7 +14,7 @@ function listing(root: string): string[] {
   return out;
 }
 
-/** A schema-3 vault made by PMF Sequences itself: WRWYCR with a PMF run and an RDF on HA. */
+/** A vault made by PMF Sequences itself (schema 4, batch 3): WRWYCR with a PMF run and an RDF on HA. */
 async function madeVault() {
   const dir = tmp('vault');
   const { svc, vault } = await newVault(new NodeBackend(dir));
@@ -27,10 +27,10 @@ async function madeVault() {
 }
 
 describe('the vault, read-only with PMF Sequences\' own code (T32)', () => {
-  it('a schema-3 vault: projects, columns, rows with runs and analyses, the patterns; nothing written', async () => {
+  it('a schema-4 vault: projects, columns, rows with runs and analyses, the patterns; nothing written', async () => {
     const dir = await madeVault(), before = listing(dir);
     const v = await openVault(dir);
-    expect(v).toMatchObject({ schema: 3, compat: 'ok' });
+    expect(v).toMatchObject({ schema: 4, compat: 'ok' });
     const projects = await listProjects(v);
     expect(projects.map(p => p.name)).toEqual(['Sugar PMFs']);
     const s = projectSummary(await readProject(v, projects[0].id));
@@ -41,8 +41,8 @@ describe('the vault, read-only with PMF Sequences\' own code (T32)', () => {
     expect(listing(dir)).toEqual(before);
   });
 
-  it('the schema-1 and schema-2 fixtures (copies), which PMF Sequences would upgrade; nothing written', async () => {
-    for (const [name, rows] of [['schema-1-vault', ['WRWYCR', 'KRWYCR']], ['schema-2-vault', ['WRWYCR', 'KRWYCR']]] as const) {
+  it('the schema-1, 2 and 3 fixtures (copies), which PMF Sequences would upgrade; nothing written', async () => {
+    for (const [name, rows] of [['schema-1-vault', ['WRWYCR', 'KRWYCR']], ['schema-2-vault', ['WRWYCR', 'KRWYCR']], ['schema-3-vault', ['WRWYCR', 'KRWYCR']]] as const) {
       const dir = tmp(name);
       cpSync(APP + 'test/fixtures/formats/' + name, dir, { recursive: true });
       const before = listing(dir), v = await openVault(dir);
@@ -57,8 +57,8 @@ describe('the vault, read-only with PMF Sequences\' own code (T32)', () => {
 
   it('refuses a newer, a foreign, and a missing vault, in words', async () => {
     const dir = await madeVault(), m = join(dir, '.matrix/manifest.json'), manifest = JSON.parse(readFileSync(m, 'utf8'));
-    writeFileSync(m, JSON.stringify({ ...manifest, schemaVersion: 4 }));
-    await expect(openVault(dir)).rejects.toThrow('made by a newer PMF Sequences (schema 4); gmx-cypher reads schemas 1–3');
+    writeFileSync(m, JSON.stringify({ ...manifest, schemaVersion: 5 }));
+    await expect(openVault(dir)).rejects.toThrow('made by a newer PMF Sequences (schema 5); gmx-cypher reads schemas 1–4');
     writeFileSync(m, JSON.stringify({ ...manifest, format: 'other' }));
     await expect(openVault(dir)).rejects.toThrow('not a PMF Sequences vault');
     await expect(openVault(tmp('empty'))).rejects.toThrow('not a PMF Sequences vault (no .matrix/manifest.json)');
@@ -79,7 +79,7 @@ describe('the vault over HTTP', () => {
     expect((await s.call('/api/config', { vault: tmp('not-a-vault') })).json.error).toContain('is not a PMF Sequences vault');
     expect((await s.call('/api/config', { vault: dir })).json.config.vault).toBe(dir);
     const v = await s.call('/api/vault');
-    expect(v.json).toMatchObject({ path: dir, schema: 3, compat: 'ok', projects: [{ name: 'Sugar PMFs' }] });
+    expect(v.json).toMatchObject({ path: dir, schema: 4, compat: 'ok', projects: [{ name: 'Sugar PMFs' }] });
     const p = await s.call('/api/vault/project?id=' + v.json.projects[0].id);
     expect(p.json.rows[0]).toMatchObject({ name: 'WRWYCR', runs: { ha: ['a'] } });
     expect((await s.call('/api/vault/project?id=nope')).status).toBe(404);

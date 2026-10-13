@@ -377,7 +377,7 @@ describe('load states', () => {
     const { svc: again } = await reopen(b);
     const run = again.store.seqs[0].runs[0];
     expect(run.state).toBe('missing');
-    expect(lib.cellValue(again.store.seqs[0], 'ha', 'area', null)).toBeNull();
+    expect(lib.cellValue(again.store.seqs[0], 'ha', 'area', null, lib.ENTROPY)).toBeNull(); // R2: takes the transform
   });
 
   it('a file dropped into the folder by hand is listed as untracked, and can be ignored', async () => {

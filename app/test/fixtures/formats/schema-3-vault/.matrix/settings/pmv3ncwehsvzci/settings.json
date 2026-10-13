@@ -1,0 +1,12 @@
+{
+  "hiddenOut": true,
+  "parse": true,
+  "pathPattern": "",
+  "pattern": "{method}_{column}_{seq}_t{time}.xvg",
+  "rowAll": true,
+  "temp": "310.15",
+  "xCol": 1,
+  "xLabel": "Distance (nm)",
+  "yCol": 2,
+  "yLabel": "PMF (kJ/mol)"
+}

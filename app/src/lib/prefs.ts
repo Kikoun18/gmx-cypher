@@ -1,4 +1,4 @@
-// Browser-wide UI preferences (theme, laser pointer). They belong to this browser,
+// Browser-wide UI preferences (theme, laser pointer, export settings). They belong to this browser,
 // not to a vault, and live under their own key; the legacy settings key is only
 // ever read by the migration (decision D37).
 
@@ -6,7 +6,7 @@ import { splitSettings } from './seq';
 import type { Settings } from './types';
 
 const KEY = 'pmf-ui-prefs-v1';
-const PREF_KEYS = ['dark', 'bw', 'laserKey', 'laserMode', 'laserColor', 'laserSize', 'laserTrail', 'compareKey'] as const;
+const PREF_KEYS = ['dark', 'bw', 'laserKey', 'laserMode', 'laserColor', 'laserSize', 'laserTrail', 'compareKey', 'exportKey', 'recentMetrics', 'exportPrefs'] as const;
 
 function pick(s: Partial<Settings>): Partial<Settings> {
   const app = splitSettings(s).app as Record<string, unknown>, out: Record<string, unknown> = {};

@@ -134,7 +134,7 @@ export const energyCommand: CommandDef = {
   options: ENERGY_FORM,
   outputNames: stem => ({ xvg: stem + '.xvg', record: stem + '.run.json' }),
   // Typed Energy by its name only: its title "GROMACS Energies" misses PMF Sequences' keyword (T103).
-  outputs: [{ file: 'xvg', type: 'energy', vault: true, why: 'typed from its file name, which must contain "energy"' }],
+  outputs: [{ file: 'xvg', type: 'energy', vault: true, why: 'typed Energy from its header ("GROMACS Energies"; before PMF Sequences batch 3, only from a file name containing "energy")' }],
   io: (p, outDir, stem) => {
     const edr = p.edr ?? '', cwd = edr.slice(0, edr.lastIndexOf('/')) || '/';
     return { cwd, io: { edr: relPath(cwd, edr), ...(p.runInput ? { tpr: relPath(cwd, p.runInput) } : {}), output: relPath(cwd, outDir + '/' + stem + '.xvg') } };
@@ -391,7 +391,7 @@ export const mindistCommand: CommandDef = {
   suffixes: MINDIST_SUFFIXES,
   outputs: [
     { file: 'xvg', type: 'dist', vault: true, why: 'PMF Sequences reads its first curve: the reference to the first group' },
-    { file: 'contacts', type: null, vault: false, why: 'titled "Number of Contacts < d nm": PMF Sequences gives it no type (section 3)' },
+    { file: 'contacts', type: null, vault: false, why: 'titled "Number of Contacts < d nm": PMF Sequences has no type for it and files it as general Data (batch 3)' },
   ],
   io: (p, outDir, stem) => {
     const { cwd, io } = trajectoryIo(p, outDir, stem);

@@ -12,9 +12,11 @@ describe('detectAna: header evidence beats file-name keywords (R4)', () => {
     // file name, header from, expected type, expected source
     ['pmf_distance_ha.xvg', AWH, 'pmf', 'header'],
     ['awh_rg-scan.xvg', AWH, 'pmf', 'header'],
-    ['pmf_distance_ha.xvg', null, 'dist', 'auto'],
-    ['awh_rg-scan.xvg', null, 'rg', 'auto'],
-    ['plain.xvg', null, 'pmf', 'auto'],
+    // F114: whole words of the name, PMF's own keywords count, ties by list order; no match is Data (F83).
+    ['pmf_distance_ha.xvg', null, 'pmf', 'name'],
+    ['awh_rg-scan.xvg', null, 'pmf', 'name'],
+    ['rg-scan.xvg', null, 'rg', 'name'],
+    ['plain.xvg', null, 'data', 'generic'],
     ['pmf_awh_ha.xvg', RDF, 'rdf', 'header'],
     ['pmf_distance.xvg', RDF, 'rdf', 'header'],
     ['x.xvg', 'gmx/hist_500000.xvg', 'hist', 'header'],
@@ -24,13 +26,13 @@ describe('detectAna: header evidence beats file-name keywords (R4)', () => {
   });
 });
 
-describe('detectAna: the GROMACS tool as evidence (R1b, F32)', () => {
+describe('detectAna: the GROMACS tool as evidence (R1b, F32; F83: no match is Data)', () => {
   const gmxOf = (f: string) => parseGmxHeader(text(fixture(f)));
   it.each([
     // file name, header and tool from, expected type, expected source
     ['rdf_scan.xvg', AWH, 'pmf', 'header'],
-    ['x.xvg', 'gmx/07.md_numcont_protein_sugar.xvg', '', 'header'],
-    ['numcont_rg.xvg', 'gmx/07.md_numcont_protein_sugar.xvg', 'rg', 'auto'],
+    ['x.xvg', 'gmx/07.md_numcont_protein_sugar.xvg', 'data', 'generic'],
+    ['numcont_rg.xvg', 'gmx/07.md_numcont_protein_sugar.xvg', 'rg', 'name'],
     ['x.xvg', 'gmx/07.md_rdf_protein_sugar.xvg', 'rdf', 'header'],
   ])('%s with %s → %s (%s)', (name, from, k, how) => {
     expect(lib.detectAna(types, name, head(from), gmxOf(from)?.tool)).toEqual({ k, from: how });
@@ -38,8 +40,8 @@ describe('detectAna: the GROMACS tool as evidence (R1b, F32)', () => {
   it('a title AWH without the gmx awh banner is still PMF', () => {
     expect(lib.detectAna(types, 'x.xvg', { title: 'AWH', xLabel: '', yLabel: '', legends: [] }, null)).toEqual({ k: 'pmf', from: 'header' });
   });
-  it('no GROMACS banner keeps the PMF fallback', () => {
-    expect(lib.detectAna(types, 'x.xvg', { title: 'Number of Contacts', xLabel: '', yLabel: '', legends: [] }, null)).toEqual({ k: 'pmf', from: 'auto' });
+  it('no match is Data, never the PMF fallback (F83)', () => {
+    expect(lib.detectAna(types, 'x.xvg', { title: 'Number of Contacts', xLabel: '', yLabel: '', legends: [] }, null)).toEqual({ k: 'data', from: 'generic' });
   });
 });
 
@@ -57,23 +59,21 @@ describe('planBatch: where the analysis came from', () => {
     const [p] = lib.planBatch(lib.emptyStore(), form('pmf_distance_ha.xvg', AWH), types, st);
     expect([p.ana.k, p.anaHow]).toEqual(['pmf', 'header']);
   });
-  it('an unknown GROMACS analysis is not uploaded until one is chosen (F32)', () => {
+  it('an unrecognised GROMACS analysis arrives as Data, ready to add (F83 replaces F32)', () => {
     const NC = 'gmx/07.md_numcont_protein_sugar.xvg';
     const f = form('x.xvg', NC);
     f.files[0].gmx = parseGmxHeader(text(fixture(NC)));
     const [p] = lib.planBatch(lib.emptyStore(), f, types, st);
-    expect([p.ok, p.unknown]).toEqual([false, 'gmx mindist']);
+    expect([p.ok, p.ana.k, p.anaHow]).toEqual([true, 'data', 'generic']);
     const [q] = lib.planBatch(lib.emptyStore(), { ...f, ana: 'dist' }, types, st);
-    expect([q.ok, q.unknown, q.ana.k, q.anaHow]).toEqual([true, undefined, 'dist', 'form']);
-    const [r] = lib.planBatch(lib.emptyStore(), { ...f, anaOf: { f1: 'dist' } }, types, st);
-    expect([r.ok, r.ana.k]).toEqual([true, 'dist']);
+    expect([q.ok, q.ana.k, q.anaHow]).toEqual([true, 'dist', 'form']);
   });
-  it('an unknown file takes no slot and no +1 suffix from the PMF next to it', () => {
+  it('a Data file next to a PMF shares its row and slot, with no +1 suffix', () => {
     const NC = 'gmx/07.md_numcont_protein_sugar.xvg';
     const f = form('x.xvg', NC), a = form('pmf.xvg', AWH);
     f.files[0].gmx = parseGmxHeader(text(fixture(NC)));
     const plan = lib.planBatch(lib.emptyStore(), { ...f, files: [f.files[0], { ...a.files[0], id: 'f2' }] }, types, st);
-    expect(plan.map(p => [p.name, p.run, p.ok])).toEqual([['WRWYCR', 'a', false], ['WRWYCR', 'a', true]]);
+    expect(plan.map(p => [p.name, p.run, p.ok, p.ana.k])).toEqual([['WRWYCR', 'a', true, 'data'], ['WRWYCR', 'a', true, 'pmf']]);
   });
   it('an explicit {analysis} token beats the header', () => {
     const [p] = lib.planBatch(lib.emptyStore(), form('rdf_WRWYCR.xvg', AWH, true), types, st);

@@ -1,13 +1,14 @@
 import { useState, type ReactNode } from 'react';
 import * as lib from '../lib/seq';
-import { fmt, inkOn, norm, ramp } from '../lib/pmf';
 import type { Seq } from '../lib/types';
+import { tileProvenance, tileText, type Tile } from '../lib/metrics';
+import type { Scale } from '../lib/scales';
 import { pickKey, useApp, type Sel } from '../ctx';
 import { pad2, plural } from './ui';
-import type { Group } from '../App';
+import type { Group } from '../lib/matrix';
 
-export function Matrix({ glist, anyGroup, sel, max, onHover, onOpenCol, onOpenColumns, footer }: {
-  glist: Group[]; anyGroup: boolean; sel: Sel | null; max: number;
+export function Matrix({ glist, anyGroup, sel, scale, tiles, onHover, onOpenCol, onOpenColumns, footer }: {
+  glist: Group[]; anyGroup: boolean; sel: Sel | null; scale: Scale; tiles: Map<string, Tile>;
   onHover: (h: { k: string; x: number; y: number } | null) => void; onOpenCol: (k: string) => void; onOpenColumns: () => void; footer: ReactNode;
 }) {
   const { cols, hue } = useApp();
@@ -39,7 +40,7 @@ export function Matrix({ glist, anyGroup, sel, max, onHover, onOpenCol, onOpenCo
             </div>
           )}
           <div style={{ paddingTop: 8 }}>
-            {rs.map(s => <Row key={s.id} s={s} sel={sel} max={max} gridCols={gridCols} />)}
+            {rs.map(s => <Row key={s.id} s={s} sel={sel} scale={scale} tiles={tiles} gridCols={gridCols} />)}
           </div>
         </div>
       ))}
@@ -48,8 +49,9 @@ export function Matrix({ glist, anyGroup, sel, max, onHover, onOpenCol, onOpenCo
   );
 }
 
-function Row({ s, sel, max, gridCols }: { s: Seq; sel: Sel | null; max: number; gridCols: string }) {
-  const { store, cols, metric, skip, dark, setSel, openForm, compare, readOnly, dropOnCell } = useApp();
+function Row({ s, sel, scale, tiles, gridCols }: { s: Seq; sel: Sel | null; scale: Scale; tiles: Map<string, Tile>; gridCols: string }) {
+  const { store, cols, metricDef, types, settings, skip, dark, setSel, openForm, compare, readOnly, dropOnCell } = useApp();
+  const pmfM = metricDef.type === 'pmf', tLabel = pmfM ? 'PMF' : types.find(t => t.k === metricDef.type)?.label || metricDef.type;
   // Files dragged over a cell: that cell is the drop target (not the app's other drags, not read-only, not while comparing).
   const [hot, setHot] = useState<string | null>(null);
   const fileDrag = (e: React.DragEvent) => !readOnly && !compare.held && e.dataTransfer.types.includes('Files');
@@ -65,37 +67,47 @@ function Row({ s, sel, max, gridCols }: { s: Seq; sel: Sel | null; max: number; 
         <span style={{ fontSize: 10, letterSpacing: '0.06em', color: 'var(--mut)' }}>{meta}</span>
       </button>
       {cols.map(sc => {
-        const v = lib.cellValue(s, sc.k, metric, skip);
+        const tile = tiles.get(s.id + '|' + sc.k) ?? { kind: 'empty', hidden: false };
         const runs = s.runs.filter(r => r.sacch === sc.k).sort((a, b) => lib.SLOTS.indexOf(a.run) - lib.SLOTS.indexOf(b.run));
         const nEx = s.extras.filter(e => e.sacch === sc.k).length;
         const nLit = (store.lit[lib.litKey(sc.k, s.id)] || []).length;
-        const picked = compare.picked.has(pickKey({ id: s.id, col: sc.k })) || (rowPicked && runs.length > 0);
+        // Compare shows PMF runs; an export also takes a cell with analyses only (its first analysis, F134).
+        const pickable = runs.length > 0 || (compare.forExport && nEx > 0);
+        const picked = compare.picked.has(pickKey({ id: s.id, col: sc.k })) || (rowPicked && pickable);
         const isSel = picked || (!!sel && sel.mode === 'cell' && sel.id === s.id && sel.s === sc.k);
         const note = !!store.notes.cell[sc.k + '_' + s.id];
         const open = () => setSel({ mode: 'cell', id: s.id, s: sc.k });
         const bars = runs.length > 1 ? runs.map(r => { const vv = store.vis[lib.slotKey(s.id, r.sacch, r.run)]; return { k: r.id, op: vv === 'off' ? 0.15 : vv === 'dim' ? 0.4 : 0.8 }; }) : [];
         const litT = nLit ? ' · ' + plural(nLit, 'reference') : '';
-        let c: { text: string; fill: string; ink: string; border: string; title: string; onClick: () => void; empty?: boolean };
-        if (v == null && (runs.length || nEx || nLit)) {
-          c = { text: runs.length ? 'off' : '—', fill: 'transparent', ink: 'var(--mut)', border: '1px solid var(--line)', onClick: open,
-            title: s.name + ' × ' + sc.label + ' · ' + (runs.length ? 'every run is hidden and left out of the value' : nEx ? plural(nEx, 'analysis curve') + ', no PMF yet' : 'no PMF yet') + litT };
-        } else if (v == null) {
+        let c: { text: string; fill: string; ink: string; border: string; title: string; onClick: () => void; empty?: boolean; spread?: string };
+        const prov = () => tileProvenance(s, sc.k, metricDef, tile, { st: settings, skip, scripts: store.scripts }) + (nEx && pmfM ? ' · ' + plural(nEx, 'analysis curve') : '') + litT;
+        const who = s.name + ' × ' + sc.label + ' · ';
+        if (tile.kind === 'pending') {
+          c = { text: '…', fill: 'transparent', ink: 'var(--mut)', border: '1px solid var(--line)', onClick: open, title: who + 'computing ' + metricDef.label + '…' };
+        } else if (tile.kind === 'none') {
+          c = { text: '—', spread: 'error', fill: 'transparent', ink: 'var(--accInk)', border: '1px solid var(--line)', onClick: open, title: who + metricDef.label + ' · ' + prov() };
+        } else if (tile.kind === 'empty' && (runs.length || nEx || nLit)) {
+          c = { text: (pmfM ? runs.length : tile.hidden) ? 'off' : '—', fill: 'transparent', ink: 'var(--mut)', border: '1px solid var(--line)', onClick: open,
+            title: who + (tile.hidden || (pmfM && runs.length) ? 'every run is hidden and left out of the value' : pmfM ? (nEx ? plural(nEx, 'analysis curve') + ', no PMF yet' : 'no PMF yet') : 'no ' + tLabel + ' analysis here') + litT };
+        } else if (tile.kind === 'empty') {
           c = { text: '+', fill: 'transparent', ink: 'var(--mut)', border: '1px dashed var(--line)', empty: true,
             title: 'No ' + sc.label + ' run for ' + s.name + ' — click to upload one',
             onClick: () => openForm(lib.cellForm(s, sc.k)) };
         } else {
-          const t = norm(v, max);
-          c = { text: fmt(v), fill: ramp(t, dark), ink: inkOn(t, dark), border: '0', onClick: open,
-            title: s.name + ' × ' + sc.label + ' · ' + plural(runs.length, 'run') + (nEx ? ' · ' + plural(nEx, 'analysis curve') : '') + litT };
+          const v = tile.v, tx = tileText(tile, metricDef);
+          c = { text: tx.main, spread: tx.spread, fill: scale.color(v, dark), ink: scale.ink(v, dark), border: '0', onClick: open, title: who + metricDef.label + ' = ' + prov() };
         }
         return (
-          <button key={sc.k} className="h-cell" title={c.title}
-            onClick={() => { if (!compare.held) c.onClick(); else if (runs.length) compare.toggle({ id: s.id, col: sc.k }); }}
+          <button key={sc.k} className="h-cell" title={c.title} aria-label={c.title}
+            onClick={() => { if (!compare.held) c.onClick(); else if (pickable) compare.toggle({ id: s.id, col: sc.k }); }}
             onDragOver={e => { if (!fileDrag(e)) return; e.preventDefault(); e.stopPropagation(); if (hot !== sc.k) setHot(sc.k); }}
             onDragLeave={() => { if (hot === sc.k) setHot(null); }}
             onDrop={e => { if (!fileDrag(e)) return; e.preventDefault(); e.stopPropagation(); setHot(null); dropOnCell(s.id, sc.k, e.dataTransfer); }}
-            style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', aspectRatio: '1', padding: 0, border: c.border, borderRadius: 13, background: c.fill, color: c.ink, fontWeight: 700, fontSize: 13, outline: hot === sc.k ? '2px dashed var(--acc)' : isSel ? '2px solid var(--acc)' : 'none', outlineOffset: 2, cursor: compare.held ? (runs.length ? 'copy' : 'not-allowed') : undefined }}>
-            <span>{hot === sc.k ? 'drop' : c.text}</span>
+            style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', aspectRatio: '1', padding: 0, border: c.border, borderRadius: 13, background: c.fill, color: c.ink, fontWeight: 700, fontSize: 13, outline: hot === sc.k ? '2px dashed var(--acc)' : isSel ? '2px solid var(--acc)' : 'none', outlineOffset: 2, cursor: compare.held ? (pickable ? 'copy' : 'not-allowed') : undefined }}>
+            <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+              <span>{hot === sc.k ? 'drop' : c.text}</span>
+              {c.spread && hot !== sc.k && <span style={{ fontSize: 9, fontWeight: 400, letterSpacing: '0.02em', whiteSpace: 'nowrap' }}>{c.spread}</span>}
+            </span>
             {!c.empty && note && <span style={{ position: 'absolute', top: 5, right: 5, width: 5, height: 5, borderRadius: 99, background: 'currentColor' }} />}
             {!c.empty && nLit > 0 && <span style={{ position: 'absolute', top: 5, left: 5, width: 5, height: 5, borderRadius: 1.5, border: '1px solid currentColor', opacity: 0.8 }} />}
             {!c.empty && bars.length > 0 && (

@@ -2,11 +2,11 @@
 // (decision D7): rows carry their runs, analyses, curves, structures, file
 // metadata, literature and run visibility. All paths are vault-relative.
 
-import type { LitRef, Slot } from '../types';
+import type { LitRef, ScriptFnSettings, Slot, TypeFrom } from '../types';
 
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 
-export type FileKind = 'pmf-xvg' | 'analysis-xvg' | 'structure' | 'import-json' | 'other';
+export type FileKind = 'pmf-xvg' | 'analysis-xvg' | 'structure' | 'import-json' | 'script' | 'other';
 export type FileOrigin = 'upload' | 'migrated-from-indexeddb' | 'reconstructed';
 
 /** An original file in the visible tree (spec §4). */
@@ -40,6 +40,9 @@ export interface RunRec {
   file: string;
   /** Parse parameters used at upload, so the derived curve never changes. */
   parse: { xCol: number; yCol: number };
+  /** Schema 4 (batch 3): a chosen dash pattern 0–9 (R6), and where its type came from (R1b, R7). */
+  dash?: number;
+  typeFrom?: TypeFrom;
 }
 
 export interface CurveRec {
@@ -49,8 +52,39 @@ export interface CurveRec {
   /** Schema 3 (batch 2, R4e): dimmed or hidden within its run, and steps lighter (+) or darker (−). */
   vis?: 'dim' | 'off';
   shade?: number;
+  /** Schema 4 (batch 3, R6): a chosen dash pattern 0–9. */
+  dash?: number;
   file: string;
   parse: { xCol: number; yCol: number; xScale: number };
+}
+
+const TYPE_FROM: TypeFrom[] = ['pattern', 'form', 'header', 'name', 'generic', 'changed'];
+/** Schema-4 fields as stored: a whole dash 0–9 and a known type source; anything else is left out. */
+export const dashOf = (v: unknown): { dash?: number } => (typeof v === 'number' && Number.isInteger(v) && v >= 0 && v <= 9 ? { dash: v } : {});
+export const typeFromOf = (v: unknown): { typeFrom?: TypeFrom } => (TYPE_FROM.includes(v as TypeFrom) ? { typeFrom: v as TypeFrom } : {});
+/** A row's marks and lines as stored: finite x and values, x or y axes; empty lists left out. */
+export function pinsOf(r: { marks?: unknown; lines?: unknown }): Pick<RowRecord, 'marks' | 'lines'> {
+  const fin = (v: unknown): v is number => typeof v === 'number' && isFinite(v);
+  const marks = (Array.isArray(r.marks) ? r.marks : []).filter(m => m && typeof m.curve === 'string' && fin(m.x)).map(m => ({ curve: m.curve as string, x: m.x as number }));
+  const lines: NonNullable<RowRecord['lines']> = {};
+  for (const [k, ls] of Object.entries(r.lines && typeof r.lines === 'object' ? r.lines : {})) {
+    const ok = (Array.isArray(ls) ? ls : []).filter(l => l && (l.axis === 'x' || l.axis === 'y') && fin(l.v)).map(l => ({ axis: l.axis as 'x' | 'y', v: l.v as number }));
+    if (ok.length) lines[k] = ok;
+  }
+  return { ...(marks.length ? { marks } : {}), ...(Object.keys(lines).length ? { lines } : {}) };
+}
+
+/** A script's per-function settings as stored (R3b): a known role and non-empty texts; functions with nothing set are left out. */
+export function scriptFnsOf(v: unknown): Record<string, ScriptFnSettings> {
+  const out: Record<string, ScriptFnSettings> = {};
+  for (const [name, f] of Object.entries(v && typeof v === 'object' ? v : {})) {
+    if (!f || typeof f !== 'object') continue;
+    const o: ScriptFnSettings = {};
+    if (f.role === 'metric' || f.role === 'transform') o.role = f.role;
+    for (const k of ['label', 'unit', 'desc'] as const) if (typeof f[k] === 'string' && f[k].trim()) o[k] = f[k];
+    if (Object.keys(o).length) out[name] = o;
+  }
+  return out;
 }
 
 /** A curve's display fields as stored: only known visibility values, and a whole shade step in −3…3 other than 0. */
@@ -68,6 +102,8 @@ export interface AnalysisRec {
   added: string;
   dir: string | null;
   curves: CurveRec[];
+  /** Schema 4 (batch 3, R1b/R7). */
+  typeFrom?: TypeFrom;
 }
 
 export interface StructureRec {
@@ -94,6 +130,9 @@ export interface RowRecord {
   files: FileMeta[];
   literature: Record<string, LitRef[]>;
   visibility: Record<string, Partial<Record<Slot, 'dim' | 'off'>>>;
+  /** Schema 4 (batch 3, R5): marked points and reference lines (see Seq). */
+  marks?: { curve: string; x: number }[];
+  lines?: Record<string, { axis: 'x' | 'y'; v: number }[]>;
 }
 
 export interface ColumnRecord {
@@ -114,6 +153,8 @@ export interface PageRecord {
   desc: string;
   rows: string[];
   cols: string[] | null;
+  /** Schema 4 (batch 3, R4): the metric this page shows. */
+  metric?: string;
 }
 
 export interface ProjectRecord {
@@ -128,6 +169,14 @@ export interface ProjectRecord {
   rowOrder: string[];
   /** Imported dataset JSON files kept as originals (decision D13). */
   imports: FileMeta[];
+  /** Schema 4 (batch 3, R3): uploaded Python scripts, kept as originals in `{project}/_scripts/`, with per-function settings. */
+  scripts?: ScriptRec[];
+}
+
+export interface ScriptRec {
+  id: string;
+  file: FileMeta;
+  fns: Record<string, ScriptFnSettings>;
 }
 
 export interface WorkspaceRecord { type: 'workspace'; projectOrder: string[] }

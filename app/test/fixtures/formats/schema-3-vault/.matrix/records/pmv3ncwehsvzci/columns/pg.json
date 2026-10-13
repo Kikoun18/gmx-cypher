@@ -1,0 +1,10 @@
+{
+  "dark": "#6aa9ff",
+  "dir": "sugar-pmfs--pmv3ncwehsvzci/pg--pg",
+  "id": "pg",
+  "label": "PG",
+  "light": "#1a5fb4",
+  "name": "Peptidoglycan",
+  "short": "Peptidoglycan",
+  "type": "column"
+}

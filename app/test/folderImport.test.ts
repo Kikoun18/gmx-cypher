@@ -36,6 +36,20 @@ describe('folder walking (R1d)', () => {
     const r = await filesFromEntries([tree]);
     expect([r.files.map(f => f.path), r.skipped]).toEqual([['run/a.xvg'], ['run/notes.pdf', 'run/sub/conf.mdp']]);
   });
+  it('the unzipped example archive offers exactly its six data files; __MACOSX/ and ._* are clutter (R1a)', async () => {
+    const at = new URL('./fixtures/examples/', import.meta.url), names = readdirSync(at).filter(n => n !== 'README.md');
+    const apple = '\0\u0005\u0016\u0007\0\u0002\0\0Mac OS X';
+    const tree = dir('unzipped', {
+      for_krystof: Object.fromEntries(names.map(n => [n, readFileSync(new URL(n, at), 'latin1')])),
+      __MACOSX: { for_krystof: Object.fromEntries(names.filter(n => n !== 'functions.py').map(n => ['._' + n, apple])) },
+    });
+    const r = await filesFromEntries([tree]);
+    expect([r.files.map(f => f.path.split('/').pop()), r.skipped]).toEqual([
+      ['membrane_thickness.dat', 'order_POPE.xvg', 'phosphorus.xvg', 'pressure.xvg', 'temperature.xvg', 'translocation_free_energy.dat'],
+      ['unzipped/for_krystof/functions.py'],
+    ]);
+    expect(filesFromInput([Object.assign(new File([apple], '._a.xvg'), { webkitRelativePath: 'x/__MACOSX/x/._a.xvg' })]).files).toEqual([]);
+  });
   it('loose files dropped next to a folder keep their own name as the path', async () => {
     const r = await filesFromEntries([file('loose.xvg', '1 2'), dir('d', { 'x.xvg': '1 2' })]);
     expect(r.files.map(f => f.path)).toEqual(['d/x.xvg', 'loose.xvg']);

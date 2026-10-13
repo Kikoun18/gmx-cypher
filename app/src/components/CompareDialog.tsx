@@ -1,23 +1,27 @@
 import { useState } from 'react';
 import * as lib from '../lib/seq';
 import { fmt } from '../lib/pmf';
-import { download, fileBase, graphScene, graphXvg, toPDF, toPNG, type GraphData } from '../lib/export';
+import { graphName, renderExport, themeColor, type GraphData } from '../lib/export';
+import { formatHints, type ExportPrefs } from '../lib/exportPrefs';
 import type { Column, Run } from '../lib/types';
-import { DASH, pickKey, useApp, type ComparePick } from '../ctx';
-import { ExportMenu, DownloadIcon, Seg, plural, stop } from './ui';
+import { pickKey, useApp, type ComparePick } from '../ctx';
+import { DASH, marksOn, scriptNote } from '../lib/graph';
+import { ExportMenu, DownloadIcon, Seg, plural, stop, type ExportFormat } from './ui';
 import { Plot, type PlotLine, type PlotMarker } from './Plot';
 import { keyLabel } from './Laser';
+import { ExportKeyTarget } from './DetailDialog';
 
 const W = 720, H = 450;
 
-interface Line { key: string; pick: ComparePick; label: string; col: Column; run: Run; color: string; dash: string; y: number[] }
+interface Line { key: string; pick: ComparePick; label: string; col: Column; run: Run; color: string; dash: string; x: (number | null)[]; y: number[] }
 
 /**
- * Picked sequences on one graph: run 1 of each (or every run), corrected or raw,
+ * Picked sequences on one graph: run 1 of each (or every run), with the PMF transform or raw,
  * with each curve's well and area, exportable like any other graph.
  */
 export function CompareDialog({ picks, setPicks, onClose }: { picks: ComparePick[]; setPicks: (p: ComparePick[]) => void; onClose: () => void }) {
-  const { store, allCols, colOf, corrected, setCorrected, dark, settings: st } = useApp();
+  const { store, allCols, colOf, raw: rawView, setRaw, pmfT, dark, settings: st, projectName, page, exportPrefs, exportFiles, valueLines } = useApp();
+  const tName = lib.TRANSFORMS[pmfT.kind], raw = rawView && pmfT.kind !== 'none';
   const [allRuns, setAllRuns] = useState(false);
   const [menu, setMenu] = useState(false);
 
@@ -36,16 +40,19 @@ export function CompareDialog({ picks, setPicks, onClose }: { picks: ComparePick
         lines.push({
           key: pickKey(pick) + '|' + k + '|' + run.id, pick, col, run,
           label: col.label + ' × ' + (row.name || '(unnamed)') + (allRuns && runs.length > 1 ? ' · ' + lib.runLabel(run.run) : ''),
-          color: dark ? pal.dark : pal.light, dash: DASH[j % DASH.length], y: lib.runCurve(run, corrected),
+          color: dark ? pal.dark : pal.light, dash: DASH[(run.dash ?? j) % DASH.length], ...lib.runXY(run, raw ? lib.NONE : pmfT),
         });
       });
     }
   }
 
-  const g = lib.buildPlotMulti(lines.length ? lines.map(l => ({ x: l.run.x, y: l.y })) : [{ x: [0, 1], y: [0, 0] }], { w: W, h: H, domain: null, yStep: null, pad: { l: 58, r: 14, t: 14, b: 36 } });
+  const g = lib.buildPlotMulti(lines.length ? lines.map(l => ({ x: l.x, y: l.y })) : [{ x: [0, 1], y: [0, 0] }], { w: W, h: H, domain: null, yStep: null, pad: { l: 58, r: 14, t: 14, b: 36 } });
   const plotLines: PlotLine[] = g.paths.slice(0, lines.length).map((d, i) => ({ d, k: lines[i].key, color: lines[i].color, width: 2.2, dash: lines[i].dash, op: 1 }));
-  const marks = lines.map(l => lib.curveMark(l.run.x, l.y, 'min', 'none', false));
-  const markers: PlotMarker[] = lib.plotMarkers(lines.map((l, i) => ({ k: l.key, color: l.color, op: 1, mark: marks[i] })), g);
+  const marks = lines.map(l => lib.curveMark(l.x, l.y, 'min', 'none', false));
+  // Each run's own marks (R5d, F100: marks go wherever their curve is drawn; reference lines stay with their graph).
+  const pins = lines.flatMap(l => { const row = store.seqs.find(s => s.id === l.pick.id); return row ? marksOn(row, l.run.id, l.x, l.y).map(p => ({ ...p, l })) : []; });
+  const markers: PlotMarker[] = lib.plotMarkers(lines.map((l, i) => ({ k: l.key, color: l.color, op: 1, mark: marks[i] })), g)
+    .concat(pins.filter(p => p.y >= g.lo && p.y <= g.hi).map((p, i) => ({ k: 'pin' + i, x: g.sx(p.x), y: g.sy(p.y), color: p.l.color, op: 1, halo: true, label: p.label })));
 
   // Title: one column → "PG × A / B / C"; several → "PG × A · HA × B".
   const byCol = new Map<string, string[]>();
@@ -56,22 +63,23 @@ export function CompareDialog({ picks, setPicks, onClose }: { picks: ComparePick
   }
   const title = [...byCol].map(([k, names]) => colOf(k).label + ' × ' + names.join(' / ')).join(' · ');
   const runNote = allRuns ? 'every run' : 'run 1 of each';
-  const graph: GraphData = {
+  // A line's colour in an export theme: its column's light or dark colour, or that colour's grey (R8a).
+  const exColor = (c: string, theme: ExportPrefs['theme']) => { const pal = lib.PALETTE.find(p => p.dark === c || p.light === c); return pal ? themeColor(pal.light, pal.dark, theme) : c; };
+  const graphOf = (theme: ExportPrefs['theme']): GraphData => ({
     file: 'compare_' + title,
-    kicker: 'Compare · PMF · ' + (corrected ? 'corrected' : 'raw') + ' · ' + runNote,
+    kicker: 'Compare · PMF · ' + (raw ? 'raw' : tName.word) + ' · ' + runNote,
     title,
     sub: plural(lines.length, 'curve') + ' · ' + plural(picks.length, 'pick'),
     xLabel: st.xLabel, yLabel: st.yLabel, domain: null, yStep: null,
-    note: corrected ? 'corrected: + 2kT·ln r, plateau = 0 · autoscaled' : 'raw gmx awh output · autoscaled',
-    series: lines.map((l, i) => {
-      const pal = lib.PALETTE.find(p => p.dark === l.color || p.light === l.color);
-      return { x: l.run.x, y: l.y, rx: l.run.x, ry: l.y, mark: marks[i], label: l.label, color: pal ? pal.light : l.color, width: 2.2, dash: l.dash };
-    }),
-  };
-  const exportGraph = async (f: 'xvg' | 'png' | 'pdf') => {
-    const blob = f === 'xvg' ? new Blob([graphXvg(graph)], { type: 'text/plain' }) : f === 'png' ? await toPNG(graphScene(graph), 2) : toPDF(graphScene(graph));
-    download(blob, fileBase(graph.file) + '.' + f);
-  };
+    // A script transform says how it was made (file, SHA-256, values, Python), as the graph does (F138).
+    note: (raw ? 'raw gmx awh output — not what the matrix uses' : pmfT.kind === 'script' ? scriptNote(pmfT, lines.map(l => l.run)) : tName.note) + ' · autoscaled',
+    series: lines.map((l, i) => ({ x: l.x, y: l.y, rx: l.x, ry: l.y, mark: marks[i], label: l.label, color: exColor(l.color, theme), width: 2.2, dash: l.dash })),
+    ...(pins.length ? { pins: { marks: pins.map(p => ({ x: p.x, y: p.y, label: p.label, curve: p.l.label, color: exColor(p.l.color, theme) })), lines: [] } } : {}),
+  });
+  const exportGraph = (f: ExportFormat) => exportFiles(async p => {
+    const vs = p.legendValue ? picks.flatMap(pk => valueLines(pk.id, pk.col).map(s => pickLabel(pk) + ' · ' + s)) : [], d = { ...graphOf(p.theme), ...(vs.length ? { values: vs } : {}) };
+    return [{ name: graphName(d, p, f, new Set(), { project: projectName, page: page?.name || '' }), blob: await renderExport({ graph: d }, f, p) }];
+  });
 
   const pill = { height: 34, border: '1px solid var(--line)', borderRadius: 99, background: 'transparent', fontSize: 11, whiteSpace: 'nowrap' as const };
   const pickLabel = (p: ComparePick) => {
@@ -81,6 +89,7 @@ export function CompareDialog({ picks, setPicks, onClose }: { picks: ComparePick
 
   return (
     <div className="scrim" onClick={onClose} style={{ zIndex: 11 }}>
+      {lines.length > 0 && <ExportKeyTarget run={() => void exportGraph(exportPrefs.format)} />}
       <div className="card" onClick={stop} style={{ width: 'min(760px, 100%)' }}>
         <div className="card-head">
           <div style={{ minWidth: 0 }}>
@@ -90,9 +99,9 @@ export function CompareDialog({ picks, setPicks, onClose }: { picks: ComparePick
           </div>
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, flex: 'none' }}>
             <ExportMenu open={menu} setOpen={v => setMenu(v && lines.length > 0)} width={270} head="Export comparison" onPick={exportGraph}
-              hints={{ xvg: 'every curve, one set each', png: 'image, 2× resolution', pdf: 'vector, one page' }}
+              hints={formatHints(exportPrefs, 'every curve, one set each')}
               trigger={(open, toggle) => (
-                <button className="h-acc" onClick={toggle} style={{ ...pill, display: 'flex', alignItems: 'center', gap: 6, padding: '0 13px', borderColor: open ? 'var(--acc)' : 'var(--line)', color: 'var(--ink)', opacity: lines.length ? 1 : 0.45 }}>
+                <button className="h-acc" onClick={toggle} title={'Export the comparison · ' + keyLabel(st.exportKey) + ' exports it as ' + exportPrefs.format} style={{ ...pill, display: 'flex', alignItems: 'center', gap: 6, padding: '0 13px', borderColor: open ? 'var(--acc)' : 'var(--line)', color: 'var(--ink)', opacity: lines.length ? 1 : 0.45 }}>
                   <DownloadIcon size={13} />export
                 </button>
               )} />
@@ -105,10 +114,12 @@ export function CompareDialog({ picks, setPicks, onClose }: { picks: ComparePick
             <span className="lbl">Runs</span>
             <Seg value={allRuns} onPick={setAllRuns} opts={[{ v: false, label: 'run 1' }, { v: true, label: 'every run' }]} />
           </span>
-          <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span className="lbl">Curve</span>
-            <Seg value={corrected} onPick={setCorrected} opts={[{ v: true, label: 'corrected' }, { v: false, label: 'raw awh' }]} />
-          </span>
+          {pmfT.kind !== 'none' && (
+            <span style={{ display: 'flex', alignItems: 'center', gap: 8 }} title="The transform is set in Settings → Data & axes; show raw changes these graphs only">
+              <span className="lbl">Curve</span>
+              <Seg value={raw} onPick={setRaw} opts={[{ v: false, label: tName.word }, { v: true, label: 'show raw' }]} />
+            </span>
+          )}
         </div>
 
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', padding: '12px 20px 0' }}>
@@ -131,7 +142,7 @@ export function CompareDialog({ picks, setPicks, onClose }: { picks: ComparePick
             <div style={{ display: 'grid', gridTemplateColumns: '28px minmax(0, 1fr) 90px 80px 100px', gap: '6px 12px', alignItems: 'center', fontSize: 11 }}>
               <span /><span className="lbl">Curve</span><span className="lbl" style={{ textAlign: 'right' }}>Min</span><span className="lbl" style={{ textAlign: 'right' }}>Well at</span><span className="lbl" style={{ textAlign: 'right' }}>Area</span>
               {lines.map(l => {
-                const s = lib.curveStats(l.run);
+                const s = lib.curveStats(l.run, pmfT);
                 return [
                   <svg key={l.key + 'k'} width="24" height="6" viewBox="0 0 24 6"><line x1="1" x2="23" y1="3" y2="3" stroke={l.color} strokeWidth="2.6" strokeDasharray={l.dash === 'none' ? undefined : l.dash} /></svg>,
                   <span key={l.key + 'l'} className="ellip" style={{ fontWeight: 700 }}>{l.label}</span>,
@@ -141,7 +152,7 @@ export function CompareDialog({ picks, setPicks, onClose }: { picks: ComparePick
                 ];
               })}
             </div>
-            <div style={{ fontSize: 10, color: 'var(--mut)', letterSpacing: '0.04em', paddingTop: 10 }}>min, well and area are from the corrected curve at each run’s temperature, as in the matrix</div>
+            <div style={{ fontSize: 10, color: 'var(--mut)', letterSpacing: '0.04em', paddingTop: 10 }}>min, well and area are from the {pmfT.kind === 'entropy' ? 'corrected curve at each run’s temperature' : pmfT.kind === 'script' ? 'curves as ' + pmfT.fn + '() transforms them' : 'curves as uploaded'}, as in the matrix</div>
           </div>
         )}
       </div>

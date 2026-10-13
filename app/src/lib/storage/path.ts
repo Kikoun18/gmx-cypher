@@ -6,6 +6,8 @@ export const NOTE_FILE = 'note.md';
 export const SEQUENCES_DIR = '_sequences';
 export const IMPORTS_DIR = '_imports';
 export const RESTORED_DIR = '_restored';
+/** Uploaded Python scripts (batch 3, R3b), kept byte for byte. */
+export const SCRIPTS_DIR = '_scripts';
 export const SLUG_MAX = 20;
 export const FILE_NAME_MAX = 64;
 
@@ -96,8 +98,8 @@ export function conflictName(name: string, d: Date = new Date()): string {
 export const isConflictCopy = (name: string) => /\.conflict-\d{8}T\d{6}Z(\.[^.]*)?$/.test(name);
 /** Chromium's in-progress write files; never user data. */
 export const isSwapFile = (name: string) => /\.crswap$/i.test(name);
-/** OS clutter that doesn't make a folder "non-empty". */
-export const isOsClutter = (name: string) => ['.ds_store', 'thumbs.db', 'desktop.ini', '.git'].includes(name.toLowerCase());
+/** OS clutter that doesn't make a folder "non-empty", including macOS's `__MACOSX/` and `._*` resource forks. */
+export const isOsClutter = (name: string) => ['.ds_store', 'thumbs.db', 'desktop.ini', '.git', '__macosx'].includes(name.toLowerCase()) || name.startsWith('._');
 
 // --- joining ---------------------------------------------------------------
 
@@ -143,6 +145,7 @@ export const settingsPaths = {
   settings: (pid: string) => join(vaultPaths.settings, assertId(pid), 'settings.json'),
   analyses: (pid: string) => join(vaultPaths.settings, assertId(pid), 'analyses.json'),
   tags: (pid: string) => join(vaultPaths.settings, assertId(pid), 'tags.json'),
+  metrics: (pid: string) => join(vaultPaths.settings, assertId(pid), 'metrics.json'),
   ignored: (pid: string) => join(vaultPaths.settings, assertId(pid), 'ignored.json'),
 };
 
@@ -155,6 +158,7 @@ export const visiblePaths = {
   /** e.g. `rdf-run-1--x123`; the type key (not its editable label) keeps names stable. */
   analysis: (cellDir: string, typeKey: string, runNumber: number, id: string) => join(cellDir, idDirName(typeKey + '-run-' + runNumber, id)),
   imports: (projDir: string) => join(projDir, IMPORTS_DIR),
+  scripts: (projDir: string) => join(projDir, SCRIPTS_DIR),
   restored: (projDir: string) => join(projDir, RESTORED_DIR),
   note: (dir: string) => join(dir, NOTE_FILE),
 };

@@ -1,0 +1,14 @@
+# Exported from PMF Sequences · 2026-10-11 09:58:00
+# PMF · corrected
+# hmr+fast+6 · Peptidoglycan — 1 run
+# every run is hidden
+@    title "PG × KRWYCR"
+@    xaxis  label "Distance (nm)"
+@    yaxis  label "PMF (kJ/mol)"
+@TYPE xy
+@ view 0.15, 0.15, 0.75, 0.85
+@ legend on
+@ legend box on
+@ legend loctype view
+@ legend 0.78, 0.8
+@ legend length 2

@@ -1,21 +1,28 @@
 import { useEffect, useRef, useState } from 'react';
 import * as lib from '../lib/seq';
-import type { AnalysisType, Store, TagDef } from '../lib/types';
+import type { AnalysisType, Store, TagDef, Transform } from '../lib/types';
 import { useApp } from '../ctx';
+import { FunctionsPanel } from './FunctionsPanel';
+import { TransformPicker } from './TransformPicker';
+import { scriptResult } from '../lib/scriptRuns';
 import { Seg, pad2, plural, stop, useConfirm } from './ui';
-import { LASER_COLORS, keyLabel, sameKey } from './Laser';
+import { LASER_COLORS, keyLabel } from './Laser';
+import { keyTaken, type KeyName } from '../lib/keys';
+import { Rich } from './Plot';
+import { ExportSettings } from './ExportSettings';
 
+const STYLES: { v: AnalysisType['style']; label: string }[] = ['line', 'step', 'points', 'bars', 'auto'].map(v => ({ v: v as AnalysisType['style'], label: v }));
 const LBL: Record<string, string> = { group: 'group', col: 'column', name: 'name', seq: 'seq', time: 'time', run: 'run', temp: 'temp', ana: 'analysis' };
 
 export function SettingsDialog({ onClose, focusAnalysis, sorted, useManual, onNewAnalysisForForm, onColumnRemoved, onRowRemoved, onLaserTry }: {
   onClose: () => void; focusAnalysis: string | null; sorted: boolean; useManual: () => void;
   onNewAnalysisForForm: (k: string) => void; onColumnRemoved: (k: string) => void; onRowRemoved: (id: string) => void; onLaserTry: () => void;
 }) {
-  const { store, settings: st, setSetting, allCols: cols, types, hue, dark, commit, mutate, page, projectName } = useApp();
-  const [capturing, setCapturingKey] = useState<null | 'laserKey' | 'compareKey'>(null);
-  const setCapturing = (on: boolean, which: 'laserKey' | 'compareKey' = 'laserKey') => setCapturingKey(on ? which : null);
+  const { store, settings: st, setSetting, allCols: cols, types, hue, dark, commit, mutate, page, projectName, metric, skip, pmfT } = useApp();
+  const [capturing, setCapturingKey] = useState<null | KeyName>(null);
+  const setCapturing = (on: boolean, which: KeyName = 'laserKey') => setCapturingKey(on ? which : null);
   const [keyMsg, setKeyMsg] = useState('');
-  const keyButton = (which: 'laserKey' | 'compareKey', def: string) => (
+  const keyButton = (which: KeyName, def: string) => (
     <>
       <button className="h-accb" onClick={() => { setCapturing(capturing !== which, which); setKeyMsg(''); }} title="Click, then press the key you want"
         style={{ minWidth: 44, padding: '5px 12px', border: '1px solid ' + (capturing === which ? 'var(--acc)' : 'var(--line)'), borderRadius: 8, background: capturing === which ? 'var(--surf)' : 'var(--field)', fontWeight: 700, fontSize: 12, color: capturing === which ? 'var(--acc)' : 'var(--ink)', boxShadow: 'inset 0 -2px 0 var(--line)' }}>
@@ -25,22 +32,21 @@ export function SettingsDialog({ onClose, focusAnalysis, sorted, useManual, onNe
     </>
   );
 
-  // Choosing the laser or compare key: the next key press (outside the arrows, Tab and Enter) becomes it.
+  // Choosing the laser, compare or export key: the next key press becomes it, unless it's taken (keyTaken).
   useEffect(() => {
     if (!capturing) return;
     const onKey = (e: KeyboardEvent) => {
       e.preventDefault(); e.stopImmediatePropagation();
       if (e.key === 'Escape') { setCapturingKey(null); setKeyMsg(''); return; }
       if (['Shift', 'Control', 'Alt', 'Meta', 'CapsLock', 'Dead'].includes(e.key)) return;
-      if (/^Arrow|^Tab$|^Enter$/.test(e.key)) { setKeyMsg(keyLabel(e.key) + ' is taken — it moves between cells or fields'); return; }
-      const other = capturing === 'laserKey' ? st.compareKey : st.laserKey;
-      if (sameKey(e.key, other)) { setKeyMsg(keyLabel(e.key) + ' is already the ' + (capturing === 'laserKey' ? 'compare' : 'laser pointer') + ' key'); return; }
+      const taken = keyTaken(e.key, capturing, st);
+      if (taken) { setKeyMsg(taken); return; }
       setSetting({ [capturing]: e.key.length === 1 ? e.key.toLowerCase() : e.key });
       setCapturingKey(null); setKeyMsg('');
     };
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);
-  }, [capturing, setSetting, st.compareKey, st.laserKey]);
+  }, [capturing, setSetting, st]);
   // Drag and drop (Modify): a grip starts the drag; rows of the same kind (and the same
   // method, for sequences) accept it; a line shows where it lands.
   type DragKind = 'col' | 'group' | 'row';
@@ -91,6 +97,8 @@ export function SettingsDialog({ onClose, focusAnalysis, sorted, useManual, onNe
   const [testName, setTestName] = useState('prosecco75_o26_WRWYCR_t200.xvg');
   const [testPath, setTestPath] = useState('hmr+fast+6/ha/WRWYCR/9.multiwalker/1');
   const [newTag, setNewTag] = useState('');
+  /** A PMF correction picked but not applied yet: the tiles it would change are shown first (R2). */
+  const [nextT, setNextT] = useState<Transform | null>(null);
   const [anaOpen, setAnaOpen] = useState<string | null>(focusAnalysis);
   const [newCol, setNewCol] = useState({ label: '', name: '' });
   const [armed, confirm] = useConfirm();
@@ -105,7 +113,7 @@ export function SettingsDialog({ onClose, focusAnalysis, sorted, useManual, onNe
     return () => clearTimeout(t);
   }, [focusAnalysis]);
 
-  const anaList: AnalysisType[] = Array.isArray(st.analyses) ? st.analyses : lib.DEFAULT_ANALYSES;
+  const anaList: AnalysisType[] = lib.projectAnalyses(st);
   const updA = (k: string, patch: Partial<AnalysisType>) => setSetting({ analyses: anaList.map(a => (a.k === k ? { ...a, ...patch } : a)) });
   const countA = (k: string) => store.seqs.reduce((n, s) => n + s.extras.filter(e => e.type === k).length, 0);
   const setNum = (k: 'xCol' | 'yCol') => (e: React.ChangeEvent<HTMLInputElement>) => setSetting({ [k]: Math.max(1, parseInt(e.target.value, 10) || 1) });
@@ -152,7 +160,7 @@ export function SettingsDialog({ onClose, focusAnalysis, sorted, useManual, onNe
           <div>
             <div className="title22">Settings</div>
             <div style={{ ...small, letterSpacing: '0.06em', marginTop: 4, lineHeight: 1.6 }}>
-              <strong style={{ color: 'var(--ink)' }}>{projectName}</strong> keeps its own file names, axes, analyses, columns and rows · theme and the laser pointer apply to every project
+              <strong style={{ color: 'var(--ink)' }}>{projectName}</strong> keeps its own file names, axes, analyses, functions, columns and rows · trust in scripts is kept in this browser · theme and the laser pointer apply to every project
             </div>
           </div>
           <button className="x-btn h-surf" onClick={onClose}>×</button>
@@ -223,6 +231,27 @@ export function SettingsDialog({ onClose, focusAnalysis, sorted, useManual, onNe
             <label className="fld"><span className="lbl">y-axis label</span><input value={st.yLabel} onChange={e => setSetting({ yLabel: e.target.value })} className="inp" style={{ padding: '9px 11px' }} /></label>
           </div>
           <div style={{ ...small, marginTop: 8 }}>Column numbers apply to files uploaded from now on.</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginTop: 14 }}>
+            <TransformPicker label="PMF correction" value={nextT ?? pmfT} builtIns={['entropy', 'none']} onChange={t => setNextT(JSON.stringify(t) === JSON.stringify(pmfT) ? null : t)} />
+            <span style={{ ...small, flex: '1 1 220px', lineHeight: 1.5 }}>{lib.TRANSFORMS[(nextT ?? pmfT).kind].note} · the matrix, wells, areas, graphs and exports all use it</span>
+          </div>
+          {nextT && (nextT.kind !== 'script' || lib.cleanTransform(nextT)) && (() => {
+            const d = lib.tileDiff(store.seqs, cols, metric, skip, pmfT, nextT);
+            // A script's answers may still be coming, or wait for trust: then the count would mislead.
+            const probe = nextT.kind === 'script' ? store.seqs.flatMap(q => q.runs).filter(r => r.state !== 'missing').map(r => scriptResult({ script: nextT.script, fn: nextT.fn, role: 'transform', params: nextT.params, x: r.x, y: r.y })) : [];
+            const failed = probe.find(r => r.state === 'done' && !r.ok);
+            return (
+              <div role="status" aria-live="polite" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginTop: 10, padding: '10px 12px', border: '1px solid var(--acc)', borderRadius: 10, fontSize: 12 }}>
+                <span style={{ flex: '1 1 260px', lineHeight: 1.6 }}>
+                  {probe.some(r => r.state === 'untrusted') ? 'Nothing runs until the script is trusted.'
+                    : probe.some(r => r.state === 'pending') ? 'Computing ' + (nextT.kind === 'script' ? nextT.fn + '()' : '') + ' on ' + plural(probe.length, 'run') + '…'
+                    : <>{nextT.kind === 'script' ? nextT.fn + '()' : lib.TRANSFORMS[nextT.kind].label} changes {plural(d.changed, 'tile')}{d.added ? ', adds ' + d.added : ''}{d.removed ? ', removes ' + d.removed : ''} of the {lib.METRIC_META[metric].label} matrix (every page).{failed && failed.state === 'done' && !failed.ok ? ' Some runs fail: ' + failed.error : ''}</>}
+                </span>
+                <button className="h-bright" onClick={() => { setSetting({ pmfTransform: nextT }); setNextT(null); }} style={{ padding: '6px 12px', border: 0, borderRadius: 8, background: 'var(--acc)', color: '#fff', fontWeight: 700, fontSize: 11 }}>apply</button>
+                <button className="h-acc ob" onClick={() => setNextT(null)}>cancel</button>
+              </div>
+            );
+          })()}
         </div>
 
         {/* Analyses */}
@@ -233,7 +262,7 @@ export function SettingsDialog({ onClose, focusAnalysis, sorted, useManual, onNe
               setSetting({ analyses: d.map(x => ({ ...x })).concat(anaList.filter(c => !d.some(x => x.k === c.k))) });
             }} style={{ padding: '4px 10px', border: '1px solid var(--line)', borderRadius: 8, background: 'transparent', ...small, whiteSpace: 'nowrap' }}>reset built-ins</button>
           ), 10)}
-          <div style={{ ...small, lineHeight: 1.6, marginBottom: 10 }}>Each analysis becomes a graph tab on its cell, attached to a run slot. Auto-detect on upload looks for the keywords in the file name and the xvg title; {'{analysis}'} in the file-name pattern sets it per file. Several files can share one analysis as separate curves, each with its own legend.</div>
+          <div style={{ ...small, lineHeight: 1.6, marginBottom: 10 }}>Each analysis becomes a graph tab on its cell, attached to a run slot. On upload, a file’s type comes from its GROMACS tool, then the keywords as whole words in the xvg title, y label and legends, then in the file name; a file nothing matches becomes Data. {'{analysis}'} in the file-name pattern sets it per file. Several files can share one analysis as separate curves, each with its own legend.</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 0.6fr) minmax(0, 1.3fr) minmax(0, 1.5fr) auto', gap: 10, alignItems: 'center', padding: '8px 12px', border: '1px solid var(--line)', borderRadius: 10, background: 'var(--surf)', fontSize: 11 }}>
               <span style={{ fontWeight: 700, fontSize: 12 }}>PMF</span>
@@ -252,7 +281,7 @@ export function SettingsDialog({ onClose, focusAnalysis, sorted, useManual, onNe
                   <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 0.6fr) minmax(0, 1.3fr) minmax(0, 1.5fr) auto auto', gap: 10, alignItems: 'center', padding: '7px 8px 7px 12px', fontSize: 11 }}>
                     <span className="ellip" style={{ fontWeight: 700, fontSize: 12 }}>{a.label || '(unnamed)'}</span>
                     <span className="ellip" style={{ color: 'var(--mut)' }}>{a.name || '—'}</span>
-                    <span className="ellip" style={{ color: 'var(--mut)' }}>{(a.xLabel || 'x') + ' → ' + (a.yLabel || 'y') + ' · y ' + (a.yCols || '2')}</span>
+                    <span className="ellip" style={{ color: 'var(--mut)' }}><Rich s={(a.xLabel || 'x') + ' → ' + (a.yLabel || 'y') + ' · y ' + (a.yCols || '2')} /></span>
                     <span style={{ color: 'var(--mut)', whiteSpace: 'nowrap' }}>{n ? plural(n, 'curve set') : ''}</span>
                     <button className="h-acc" onClick={() => setAnaOpen(open ? null : a.k)} style={{ padding: '5px 10px', border: '1px solid var(--line)', borderRadius: 8, background: 'transparent', fontSize: 11, color: open ? 'var(--acc)' : 'var(--mut)', whiteSpace: 'nowrap' }}>{open ? 'done' : 'edit'}</button>
                   </div>
@@ -266,11 +295,19 @@ export function SettingsDialog({ onClose, focusAnalysis, sorted, useManual, onNe
                         {inp('x-axis label', a.xLabel, set('xLabel'))}
                         {inp('y-axis label', a.yLabel, set('yLabel'))}
                       </div>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 0.7fr) minmax(0, 1fr) minmax(0, 0.8fr) auto', gap: 10, alignItems: 'end' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 0.7fr) minmax(0, 1fr) minmax(0, 0.8fr)', gap: 10, alignItems: 'end' }}>
                         {inp('x column', String(a.xCol || 1), e => updA(a.k, { xCol: Math.max(1, parseInt(e.target.value, 10) || 1) }), { type: 'number', min: 1 })}
                         {inp('y columns', a.yCols == null ? '2' : a.yCols, set('yCols'), { placeholder: '2 · 2-5 · all' }, false, '2 · 2,4 · 2-5 · 3- · all')}
                         {inp('x multiplier', String(a.xScale == null ? 1 : a.xScale), set('xScale'), undefined, false, 'Multiplies x on upload — 0.001 turns ps into ns')}
-                        <Seg<'line' | 'step'> value={a.style === 'step' ? 'step' : 'line'} onPick={v => updA(a.k, { style: v })} bg="var(--bg)" opts={[{ v: 'line', label: 'line' }, { v: 'step', label: 'step' }]} style={{ alignSelf: 'end' }} />
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                        <span className="lbl">Drawn as</span>
+                        <Seg<AnalysisType['style']> value={a.style || 'line'} onPick={v => updA(a.k, { style: v })} bg="var(--bg)" opts={STYLES} />
+                        <span style={{ ...small, flex: '1 1 200px' }}>{a.style === 'auto' ? 'points when every x is a consecutive whole number, else a line' : a.style === 'points' || a.style === 'bars' ? 'never joined by a line' : ''}</span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                        <TransformPicker label="Transform" value={lib.transformOf(a, st)} builtIns={['none', 'entropy']} onChange={t => updA(a.k, { transform: t.kind === 'none' ? undefined : t })} />
+                        <span style={{ ...small, flex: '1 1 200px' }}>applied before drawing · a signed coordinate (z) needs none</span>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                         <span className="lbl">Smoothing</span>
@@ -287,17 +324,20 @@ export function SettingsDialog({ onClose, focusAnalysis, sorted, useManual, onNe
                           </>
                         )}
                       </div>
-                      {inp('Auto-detect keywords · comma-separated', a.match || '', set('match'), { placeholder: 'e.g. rdf, radial' })}
+                      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.4fr) minmax(0, 1fr)', gap: 10 }}>
+                        {inp('Keywords · whole words, comma-separated', a.match || '', set('match'), { placeholder: 'e.g. rdf, radial' })}
+                        {inp('GROMACS tools', a.tools || '', set('tools'), { placeholder: 'e.g. gmx energy' }, false, 'Output of these tools is this type, whatever its keywords')}
+                      </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                        <span style={{ flex: '1 1 240px', ...small, lineHeight: 1.5 }}>Column and multiplier changes apply to files uploaded from now on.</span>
-                        <button className="h-acc" onClick={() => {
+                        <span style={{ flex: '1 1 240px', ...small, lineHeight: 1.5 }}>Column and multiplier changes apply to files uploaded from now on.{a.k === lib.DATA_TYPE.k ? ' Data is where unrecognised files go, so it stays.' : ''}</span>
+                        {a.k !== lib.DATA_TYPE.k && <button className="h-acc" onClick={() => {
                           if (!confirm('ana:' + a.k)) return;
                           setSetting({ analyses: anaList.filter(q => q.k !== a.k) });
                           if (n) commit(lib.removeAnalysisData(store, a.k));
                           setAnaOpen(null);
                         }} style={{ padding: '6px 10px', border: '1px solid var(--line)', borderRadius: 8, background: 'transparent', fontSize: 11, color: cf ? 'var(--acc)' : 'var(--mut)', whiteSpace: 'nowrap' }}>
                           {cf ? (n ? 'delete ' + plural(n, 'curve set') + '?' : 'click again') : 'remove analysis'}
-                        </button>
+                        </button>}
                       </div>
                     </div>
                   )}
@@ -337,6 +377,8 @@ export function SettingsDialog({ onClose, focusAnalysis, sorted, useManual, onNe
             <button className="h-acc" onClick={addTag} disabled={!newTag.trim()} style={{ padding: '7px 14px', border: '1px solid var(--line)', borderRadius: 8, background: 'transparent', color: 'var(--ink)', fontWeight: 700, fontSize: 11, whiteSpace: 'nowrap', opacity: newTag.trim() ? 1 : 0.5 }}>+ Add tag</button>
           </div>
         </div>
+
+        <FunctionsPanel head={sect('Functions', undefined, 10)} />
 
         {/* Modify */}
         <div style={{ padding: '22px 20px 0' }}>
@@ -476,8 +518,8 @@ export function SettingsDialog({ onClose, focusAnalysis, sorted, useManual, onNe
             </span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 12, flexWrap: 'wrap' }}>
-            <span style={{ ...small, flex: '1 1 260px', lineHeight: 1.6, color: keyMsg ? 'var(--acc)' : 'var(--mut)' }}>
-              {(capturing !== 'compareKey' && keyMsg) || (capturing === 'laserKey' ? 'Press the key to use · Esc keeps ' + keyLabel(st.laserKey) + '.'
+            <span style={{ ...small, flex: '1 1 260px', lineHeight: 1.6, color: capturing === 'laserKey' && keyMsg ? 'var(--acc)' : 'var(--mut)' }}>
+              {(capturing === 'laserKey' && keyMsg) || (capturing === 'laserKey' ? 'Press the key to use · Esc keeps ' + keyLabel(st.laserKey) + '.'
                 : 'Press ' + keyLabel(st.laserKey) + ' anywhere outside a text field' + (st.laserMode === 'hold' ? ' and hold it' : '') + ' — the pointer draws over dialogs too and never blocks a click.')}
             </span>
             <button className="h-acc ob" onClick={onLaserTry} style={{ padding: '6px 12px' }}>try it</button>
@@ -498,6 +540,13 @@ export function SettingsDialog({ onClose, focusAnalysis, sorted, useManual, onNe
             </span>
           </div>
         </div>
+
+        <ExportSettings sect={sect} keyRow={<>
+          {keyButton('exportKey', 'e')}
+          <span style={{ ...small, lineHeight: 1.6, color: capturing === 'exportKey' && keyMsg ? 'var(--acc)' : 'var(--mut)' }}>
+            {(capturing === 'exportKey' && keyMsg) || (capturing === 'exportKey' ? 'Press the key to use · Esc keeps ' + keyLabel(st.exportKey) + '.' : 'In a graph or Compare: export it as shown. On the matrix: hold it, click cells, release to export them · with Shift, every analysis.')}
+          </span>
+        </>} />
       </div>
     </div>
   );

@@ -5,7 +5,7 @@
 import type { Column, Curve, Extra, LitRef, Page, Run, Seq, Slot, Store, StructMeta, Vis } from '../types';
 import { SLOTS } from '../seq';
 import type { ColumnRecord, FileMeta, PageRecord, ProjectRecord, RowRecord } from './records';
-import { curveDisplay } from './records';
+import { curveDisplay, dashOf, pinsOf, scriptFnsOf, typeFromOf } from './records';
 import type { ProjectSettings } from './settings';
 import { tagsOf } from '../seq';
 
@@ -30,7 +30,8 @@ export const cellNoteKey = (col: string, rowId: string) => 'cell:' + col + ':' +
 
 export interface DerivedData {
   pmf: Map<string, { x: number[]; y: number[] }>;
-  curves: Map<string, { x: (number | null)[]; y: (number | null)[] }>;
+  /** Curve data by source, with the file's labels and row names (derived, never written). */
+  curves: Map<string, Pick<Curve, 'x' | 'y' | 'axis' | 'names'>>;
   missing: Set<string>;
 }
 
@@ -39,6 +40,7 @@ export const curveKey = (src: { fileId: string; xCol: number; yCol: number; xSca
 export function filesById(state: ProjectState): Map<string, FileMeta> {
   const m = new Map<string, FileMeta>();
   for (const r of state.rows.values()) for (const f of r.files) m.set(f.id, f);
+  for (const k of state.project.scripts || []) m.set(k.file.id, k.file);
   return m;
 }
 
@@ -49,7 +51,7 @@ function rowToSeq(r: RowRecord, files: Map<string, FileMeta>, d: DerivedData): S
     const run: Run = {
       id: x.id, sacch: x.column, run: x.slot, time: x.time, temp: x.temp, tags: tagsOf(x), file: name(x.file), added: x.added,
       x: data && !missing ? data.x : [], y: data && !missing ? data.y : [],
-      src: { fileId: x.file, xCol: x.parse.xCol, yCol: x.parse.yCol },
+      src: { fileId: x.file, xCol: x.parse.xCol, yCol: x.parse.yCol }, ...dashOf(x.dash), ...typeFromOf(x.typeFrom),
     };
     if (missing || !data) run.state = 'missing';
     return run;
@@ -58,13 +60,13 @@ function rowToSeq(r: RowRecord, files: Map<string, FileMeta>, d: DerivedData): S
     const curves: Curve[] = a.curves.map(c => {
       const src = { fileId: c.file, xCol: c.parse.xCol, yCol: c.parse.yCol, xScale: c.parse.xScale };
       const data = d.curves.get(curveKey(src)), missing = d.missing.has(c.file) || !files.has(c.file);
-      const curve: Curve = { id: c.id, x: data ? data.x : [], y: data ? data.y : [], label: c.label, file: name(c.file), src };
+      const curve: Curve = { id: c.id, x: [], y: [], ...data, label: c.label, file: name(c.file), src };
       if (c.custom) curve.custom = true;
-      Object.assign(curve, curveDisplay(c));
+      Object.assign(curve, curveDisplay(c), dashOf(c.dash));
       if (missing) curve.state = 'missing'; else if (!data) curve.state = 'pending';
       return curve;
     });
-    return { id: a.id, type: a.type, sacch: a.column, run: a.slot, time: a.time, file: curves[0] ? curves[0].file || '' : '', added: a.added, curves };
+    return { id: a.id, type: a.type, sacch: a.column, run: a.slot, time: a.time, file: curves[0] ? curves[0].file || '' : '', added: a.added, curves, ...typeFromOf(a.typeFrom) };
   });
   const structures: StructMeta[] = r.structures.map(s => {
     const f = files.get(s.file);
@@ -72,11 +74,11 @@ function rowToSeq(r: RowRecord, files: Map<string, FileMeta>, d: DerivedData): S
     if (!f || d.missing.has(s.file)) st.state = 'missing';
     return st;
   });
-  return { id: r.id, group: r.group, name: r.name, seq: r.seq, desc: r.desc, runs, extras, structures };
+  return { id: r.id, group: r.group, name: r.name, seq: r.seq, desc: r.desc, runs, extras, structures, ...pinsOf(r) };
 }
 
 const colToColumn = (c: ColumnRecord): Column => ({ k: c.id, label: c.label, short: c.short, name: c.name, light: c.light, dark: c.dark });
-const pageToPage = (p: PageRecord): Page => ({ id: p.id, name: p.name, desc: p.desc, rows: p.rows.slice(), cols: p.cols ? p.cols.slice() : null });
+const pageToPage = (p: PageRecord): Page => ({ id: p.id, name: p.name, desc: p.desc, rows: p.rows.slice(), cols: p.cols ? p.cols.slice() : null, ...(typeof p.metric === 'string' && p.metric ? { metric: p.metric } : {}) });
 
 /** In declared order; records missing from the order are appended (sorted), order entries without a record are skipped. */
 function ordered<T>(order: string[], all: Map<string, T>): T[] {
@@ -108,6 +110,8 @@ export function storeFrom(state: ProjectState, d: DerivedData): Store {
     pages: ordered(state.project.pageOrder, state.pages).map(pageToPage),
   };
   if (Object.keys(state.settings).length) store.settings = { ...state.settings };
+  const scripts = (state.project.scripts || []).map(k => ({ id: k.id, name: k.file.name, fileId: k.file.id, ...(k.file.sha256 ? { sha256: k.file.sha256 } : {}), fns: scriptFnsOf(k.fns) }));
+  if (scripts.length) store.scripts = scripts;
   return store;
 }
 

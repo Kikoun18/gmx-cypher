@@ -1,49 +1,46 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import * as lib from '../lib/seq';
 import { fmt } from '../lib/pmf';
-import { download, fileBase, graphScene, graphXvg, toPDF, toPNG, type GraphData } from '../lib/export';
-import type { AnalysisType, Curve, Extra, Run, Seq, Slot, Vis } from '../lib/types';
-import { DASH, useApp, type Sel } from '../ctx';
-import { graphShades, nextShade, SHADE_STEPS } from '../lib/shade';
-import { ColPicker, DownloadIcon, ExportMenu, SlidersIcon, plural, stop, useConfirm } from './ui';
-import { Plot, type PlotLine, type PlotMarker } from './Plot';
+import { graphName, renderExport } from '../lib/export';
+import { keyLabel } from '../lib/keys';
+import { formatHints } from '../lib/exportPrefs';
+import type { AnalysisType, Curve, Extra, Seq, Slot, Store, Table, Vis } from '../lib/types';
+import { useApp, type Sel } from '../ctx';
+import { buildGraph, DASH, DASH_NAMES, GRAPH_H as H, GRAPH_W as W, sharedDomain, type Series } from '../lib/graph';
+import { nextShade, SHADE_STEPS } from '../lib/shade';
+import { ColPicker, DownloadIcon, ExportMenu, Seg, SlidersIcon, plural, stop, useConfirm, type ExportFormat } from './ui';
+import { Plot, Rich } from './Plot';
+import { PinList } from './PinList';
+import { snapX } from '../lib/interact';
 import { StructurePanel } from './StructurePanel';
 import { TagPicker } from './TagPicker';
 import { newFileId, readLocal } from '../lib/storage/files';
 import { LiteraturePanel } from './LiteraturePanel';
 import type { GmxHeader } from '../lib/gmxHeader';
 
-interface SlotRec { sacch: string; run: Slot; pmf: Run | null; ex: Record<string, Extra>; key: string; vis: Vis; i: number }
 interface EditState {
   rowId: string; group: string; name: string; seq: string; desc: string; col: string; msg: string;
   order?: (Slot | null)[] | null; pick?: number | null; dropAt?: number | null; dropCol?: string | null;
 }
 interface RunEditState { id: string; time: string; temp: string; tags: string[]; sacch: string; run: Slot }
-interface Series {
-  k: string; label: string; color: string; ex: string; width: number; dash: string; op: number; dim?: boolean;
-  x: (number | null)[]; y: (number | null)[]; rx: (number | null)[]; ry: (number | null)[]; mark?: lib.Mark;
-}
-
 const { nextVis, VIS } = lib;
-const W = 720, H = 450;
-
-function stepXY(x: (number | null)[], y: (number | null)[]) {
-  const X: (number | null)[] = [], Y: (number | null)[] = [];
-  for (let i = 0; i < x.length; i++) {
-    const xi = x[i] ?? 0, prev = i ? (x[i - 1] ?? xi) : xi;
-    const nx = i + 1 < x.length ? x[i + 1] : xi + (xi - prev);
-    X.push(x[i], nx); Y.push(y[i], y[i]);
-  }
-  return { x: X, y: Y };
+/** While mounted, the export key (R8b) runs `run`: the open graph or comparison, exported as shown. */
+export function ExportKeyTarget({ run }: { run: () => void }) {
+  const { setExportShown } = useApp();
+  useEffect(() => { setExportShown(run); return () => setExportShown(null); });
+  return null;
 }
 
 export function DetailDialog({ sel }: { sel: Sel }) {
-  const { store, settings: st, cols, types, metric, corrected, fitWell, skip, hue, colOf, dark, commit, mutate, setSel, openForm, setVis, order, setCorrected, setFitWell, setSetting, page, loadAnalysis, notesReady, readOnly, findSame } = useApp();
+  const { store, settings: st, cols, types, metric, raw, pmfT, scriptsV, laser, fitWell, skip, hue, colOf, dark, commit, mutate, setSel, openForm, setVis, order, setRaw, setFitWell, setSetting, page, loadAnalysis, notesReady, readOnly, findSame, projectName, exportPrefs, exportFiles, valueLines } = useApp();
+  const exportKey = keyLabel(st.exportKey);
   const [tab, setTab] = useState('pmf');
   const [gset, setGset] = useState(false);
   const [focus, setFocus] = useState<{ sig: string; ks: string[] } | null>(null);
   const [edit, setEdit] = useState<EditState | null>(null);
   const [runEdit, setRunEdit] = useState<RunEditState | null>(null);
+  /** The run or analysis whose type is being changed (R7). */
+  const [retypeOf, setRetypeOf] = useState<{ kind: 'run' | 'analysis'; id: string } | null>(null);
   const [exDrop, setExDrop] = useState<string | null>(null);
   const [exDragId, setExDragId] = useState<string | null>(null);
   const exDrag = useRef<{ id: string; sacch: string; run: Slot } | null>(null);
@@ -68,19 +65,19 @@ export function DetailDialog({ sel }: { sel: Sel }) {
   useEffect(() => { for (const id of pendingEx) void loadAnalysis(id); }, [pendingEx, loadAnalysis]);
 
   // One y-axis across every PMF in the store, so wells compare between cells.
-  const domain = useMemo(() => {
-    let lo = Infinity, hi = -Infinity;
-    for (const s of store.seqs) for (const r of s.runs) {
-      for (const v of lib.runCurve(r, corrected)) { if (v < lo) lo = v; if (v > hi) hi = v; }
-    }
-    if (!isFinite(lo)) return { lo: -15, hi: 15 };
-    const round = (v: number, s: number) => Math.sign(v) * Math.ceil(Math.abs(v) / s) * s;
-    if (!corrected) return { lo: round(lo, 2), hi: round(hi, 2) };
-    return { lo: Math.min(-15, round(lo, 5)), hi: Math.max(15, round(Math.min(hi, 40), 5)) };
-  }, [store.seqs, corrected]);
+  // Recomputed when script answers arrive (scriptsV, R3c).
+  const domain = useMemo(() => { void scriptsV; return sharedDomain(store.seqs, raw ? lib.NONE : pmfT); }, [store.seqs, raw, pmfT, scriptsV]);
+
+  // Row view: the clicked stat tiles keep their colour, the rest go grey.
+  const sig = JSON.stringify(sel);
+  const fk = useMemo(() => (focus && sel.mode === 'row' && focus.sig === sig && focus.ks.length ? focus.ks : null), [focus, sel.mode, sig]);
+  // The graph model is rebuilt only when what it draws changes, not on every render (a note typed, a hover; F110).
+  const gStore = useMemo(() => ({ seqs: store.seqs, vis: store.vis, cols: store.cols, notes: { cell: {}, row: {} }, lit: {}, pages: [] }) as Store, [store.seqs, store.vis, store.cols]);
+  const built = useMemo(() => { void scriptsV; return gStore.seqs.some(s => s.id === sel.id) ? buildGraph({ store: gStore, sel, cols, st, tab, raw, fitWell, dark, domain, focus: fk }) : null; },
+    [gStore, sel, cols, st, tab, raw, fitWell, dark, domain, fk, scriptsV]);
 
   const row = store.seqs.find(s => s.id === sel.id);
-  if (!row) return null;
+  if (!row || !built) return null;
 
   const close = () => setSel(null);
   const stepRow = (dir: number) => {
@@ -92,43 +89,16 @@ export function DetailDialog({ sel }: { sel: Sel }) {
   };
 
   const meta = lib.METRIC_META[metric];
-  const vis = store.vis;
   const scope = sel.mode === 'row' ? 'row' : 'cell';
   const nkey = sel.mode === 'row' ? row.id : sel.s + '_' + row.id;
-  const sc = colOf(sel.s);
-  const shown = sel.mode === 'row' ? row.runs : row.runs.filter(r => r.sacch === sel.s);
   const ed = edit && edit.rowId === row.id ? edit : null;
   const re = runEdit && row.runs.some(r => r.id === runEdit.id) ? runEdit : null;
 
-  const tOf = (k: string): AnalysisType => types.find(t => t.k === k) || { k, label: k, name: 'analysis no longer defined', xLabel: 'x', yLabel: 'y', style: 'line', match: '' };
-  const scopeEx = row.extras.filter(e => sel.mode === 'row' || e.sacch === sel.s);
-  const tabKeys = ['pmf'].concat(types.filter(t => t.k !== 'pmf' && scopeEx.some(e => e.type === t.k)).map(t => t.k));
-  for (const e of scopeEx) if (!tabKeys.includes(e.type)) tabKeys.push(e.type);
-  const curTab = tabKeys.includes(tab) && (tab !== 'pmf' || shown.length || tabKeys.length === 1) ? tab : (shown.length || tabKeys.length === 1 ? 'pmf' : tabKeys[1]);
-  const T = tOf(curTab), isPmf = curTab === 'pmf';
-  const colIdx = (k: string) => cols.findIndex(c => c.k === k);
-
-  const sm = new Map<string, SlotRec>();
-  const slotOf = (sacch: string, run: Slot) => {
-    const k = sacch + '|' + run;
-    if (!sm.has(k)) sm.set(k, { sacch, run, pmf: null, ex: {}, key: lib.slotKey(row.id, sacch, run), vis: vis[lib.slotKey(row.id, sacch, run)] || 'on', i: Math.max(0, lib.SLOTS.indexOf(run)) });
-    return sm.get(k)!;
-  };
-  for (const r of shown) slotOf(r.sacch, r.run).pmf = r;
-  for (const e of scopeEx) slotOf(e.sacch, e.run).ex[e.type] = e;
-  const slots = [...sm.values()].sort((a, b) => colIdx(a.sacch) - colIdx(b.sacch) || lib.SLOTS.indexOf(a.run) - lib.SLOTS.indexOf(b.run));
-  const dataOf = (q: SlotRec) => (isPmf ? q.pmf : q.ex[curTab]);
-  const withData = slots.filter(dataOf);
-  // Curve shades (R4): each column's curves in run, then curve order, hidden ones included so hiding never recolours the rest.
-  const curveIds = (q: SlotRec) => (isPmf ? [q.key] : q.ex[curTab].curves.map(c => c.id));
-  const adjust = new Map(isPmf ? [] : withData.flatMap(q => q.ex[curTab].curves.map(c => [c.id, c.shade || 0] as const)));
-  const shades = graphShades([...new Set(withData.map(q => q.sacch))].map(k => ({ base: colOf(k), ids: withData.filter(q => q.sacch === k).flatMap(curveIds) })), dark, !!st.bw, id => adjust.get(id) || 0);
-  // An analysis without curves (only from a hand-edited file) gets a plain swatch rather than a crash.
-  const look = (id?: string) => { const s = id ? shades.get(id) : undefined; return s ? { color: s.color, ex: s.ex, dash: DASH[s.i % DASH.length] } : { color: 'var(--mut)', ex: '#b8b3b0', dash: 'none' }; };
+  const m = built;
+  const { sc, shown, scopeEx, tabKeys, curTab, T, tOf, isPmf, smooth, shownXY, slots, withData, curveIds, look, series, g, lines, markers, legend, sub } = m;
   const ck0 = sel.mode === 'row' ? cols[0].k : sel.s;
   const formFor = (ck: string, run: Slot | 'auto', ana: string, append = false) => openForm(lib.cellForm(row, ck, { run, ana, onClash: append ? 'append' : 'replace' }));
   const nextFree = (ck: string): Slot | 'auto' => { const used = row.runs.filter(r => r.sacch === ck).map(r => r.run); return lib.SLOTS.find(k => !used.includes(k)) || 'auto'; };
-  const nEx = scopeEx.length;
   const moveEx = (id: string, c: string, rn: Slot) => commit(lib.moveExtra(store, row.id, id, { sacch: c, run: rn }).store);
   const moveTargets: { sacch: string; run: Slot; label: string }[] = [];
   for (const c of (sel.mode === 'row' ? cols : [sc])) {
@@ -138,57 +108,11 @@ export function DetailDialog({ sel }: { sel: Sel }) {
     if (free) moveTargets.push({ sacch: c.k, run: free, label: (sel.mode === 'row' ? c.label + ' · ' : '') + lib.runLabel(free) + ' (empty)' });
   }
 
-  // --- series ----------------------------------------------------------------
-  const smooth = isPmf ? 0 : lib.smoothOf(T);
-  const shownY = (y: (number | null)[]) => (smooth ? lib.smoothY(y, smooth) : y);
   const setAna = (patch: Partial<AnalysisType>) => {
-    const list = Array.isArray(st.analyses) ? st.analyses : lib.DEFAULT_ANALYSES;
+    const list = lib.projectAnalyses(st);
     setSetting({ analyses: list.some(a => a.k === T.k) ? list.map(a => (a.k === T.k ? { ...a, ...patch } : a)) : list.concat({ ...T, ...patch }) });
   };
-  const series: Series[] = [];
-  const pushData = (q: SlotRec, base: Omit<Series, 'x' | 'y' | 'rx' | 'ry' | 'color' | 'ex' | 'dash'>) => {
-    if (isPmf) {
-      const r = q.pmf!;
-      if (r.state === 'missing') return;
-      const y = lib.runCurve(r, corrected);
-      series.push({ ...base, ...look(q.key), x: r.x, y, rx: r.x, ry: y, mark: lib.curveMark(r.x, y, 'min', 'none', false) });
-      return;
-    }
-    const d = q.ex[curTab], many = d.curves.length > 1;
-    for (const { c, vis: v } of lib.shownCurves(d, q.vis)) {
-      const j = d.curves.indexOf(c);
-      // Smoothed curves are drawn as lines (a smoothed staircase reads as noise).
-      const y = shownY(c.y);
-      const xy = T.style === 'step' && !smooth ? stepXY(c.x, y) : { x: c.x, y };
-      // The mark sits on the drawn curve at the stored x (a histogram bin, not a staircase corner).
-      series.push({
-        ...base, ...look(c.id), ...xy, rx: c.x, ry: y, mark: lib.curveMark(c.x, y, lib.markerOf(T), lib.markerLabelOf(T)),
-        width: many ? 1.3 : base.width, op: v === 'dim' ? 0.3 : 1, dim: v === 'dim',
-        label: base.label + (many || c.custom ? ' · ' + (c.label || 'col ' + (j + 2)) : ''),
-      });
-    }
-  };
-  if (sel.mode === 'row') {
-    for (const c of cols) {
-      let ss = withData.filter(q => q.sacch === c.k && q.vis !== 'off');
-      if (!st.rowAll) ss = ss.slice(0, 1);
-      for (const q of ss) pushData(q, {
-        k: c.k, label: c.label + ' · ' + c.name + (st.rowAll ? ' · ' + lib.runLabel(q.run) : ''),
-        width: st.rowAll && q.i > 0 ? 1.6 : 2.2,
-        op: q.vis === 'dim' ? 0.3 : 1, dim: q.vis === 'dim',
-      });
-    }
-  } else {
-    const vs = withData.filter(q => q.vis !== 'off');
-    for (const q of vs) pushData(q, {
-      k: q.sacch, label: lib.runLabel(q.run) + (isPmf ? ' · ' + lib.tagLabel(q.pmf!.tags, lib.getTags(st)) : ''),
-      width: q.i === 0 ? 2.4 : 1.8, op: q.vis === 'dim' ? 0.3 : 1, dim: q.vis === 'dim',
-    });
-  }
 
-  // --- sugar focus (row view): clicked stat tiles keep their colour, the rest go grey ---
-  const sig = JSON.stringify(sel);
-  const fk = focus && sel.mode === 'row' && focus.sig === sig && focus.ks.length ? focus.ks : null;
   const plainStat = { bg: 'var(--surf)', bd: 'var(--line)', valC: 'var(--ink)', op: 1, cur: 'default', lift: 'none', shadow: 'none', click: () => {} };
   const statSacch = (k: string, col: string) => {
     const on = !!fk && fk.includes(k), dim = !!fk && !on;
@@ -206,17 +130,17 @@ export function DetailDialog({ sel }: { sel: Sel }) {
   let stats: Stat[] = [];
   if (isPmf && sel.mode === 'row') {
     stats = cols.map(c => {
-      const v = lib.cellValue(row, c.k, metric, skip);
+      const v = lib.cellValue(row, c.k, metric, skip, pmfT);
       return { ...statSacch(c.k, hue(c)), label: c.label + ' ' + meta.label, value: v == null ? '—' : fmt(v), unit: v == null ? 'no run' : meta.unit };
     });
   } else if (isPmf) {
     const incl = withData.filter(q => !(st.hiddenOut && q.vis === 'off') && q.pmf!.state !== 'missing').map(q => q.pmf!);
-    const sts = incl.map(r => lib.curveStats(r)), nOut = shown.length - incl.length;
+    const sts = incl.map(r => lib.curveStats(r, pmfT)), nOut = shown.length - incl.length;
     const of = 'mean of ' + plural(sts.length, 'run') + (nOut ? ' · ' + nOut + ' left out' : '');
     stats = sts.length ? [
       { label: 'Cell area', value: fmt(mean(sts.map(x => x.area))), unit: 'kJ·nm/mol · ' + of },
       { label: 'Cell min', value: fmt(mean(sts.map(x => x.min))), unit: 'kJ/mol · ' + of },
-      { label: 'Well at', value: sts[0].at.toFixed(2), unit: 'nm · corrected curve' },
+      { label: 'Well at', value: sts[0].at.toFixed(2), unit: 'nm · ' + (pmfT.kind === 'entropy' ? 'corrected curve' : pmfT.kind === 'script' ? 'transformed curve' : 'curve as uploaded') },
       { label: 'Run spread', value: sts.length > 1 ? (Math.max(...sts.map(x => x.min)) - Math.min(...sts.map(x => x.min))).toFixed(2) : 'single run', unit: sts.length > 1 ? 'kJ/mol · range of ' + sts.length + ' run minima' : 'add runs to compare' },
     ] : shown.length ? [{ label: 'Cell', value: 'off', unit: 'every run is hidden and left out' }] : [];
   } else {
@@ -226,68 +150,34 @@ export function DetailDialog({ sel }: { sel: Sel }) {
     for (const q of on) {
       const cs = lib.shownCurves(q.ex[curTab], q.vis).map(s => s.c);
       nc += cs.length; if (cs.length) nr++;
-      for (const c of cs) shownY(c.y).forEach((v, k) => {
-        const xv = c.x[k];
+      for (const c of cs) { const t = shownXY(c); t.y.forEach((v, k) => {
+        const xv = t.x[k];
         if (xv != null) { x0 = Math.min(x0, xv); x1 = Math.max(x1, xv); }
         if (v == null || !isFinite(v) || xv == null) return;
         sum += v; n++;
         if (!pk || v > pk.v) pk = { v, x: xv };
-      });
+      }); }
     }
     const p = pk as { v: number; x: number } | null;
     // With a marker, the first tile reports the marked extreme across the shown curves, from the same marks the plot draws.
     const kind = lib.markerOf(T), marked = series.filter(s => s.mark).reduce<Series | null>((b, s) => (!b || (kind === 'max' ? s.mark!.y > b.mark!.y : s.mark!.y < b.mark!.y) ? s : b), null);
     stats = n && p ? [
       marked && kind !== 'none'
-        ? { label: (kind === 'max' ? 'Maximum' : 'Minimum') + (smooth ? ' · smoothed' : ''), value: g3(marked.mark!.y), unit: T.yLabel + ' at x = ' + g3(marked.mark!.x) + ' · ' + marked.label }
-        : { label: 'Peak', value: g3(p.v), unit: T.yLabel + ' at x = ' + g3(p.x) },
-      { label: 'Mean', value: g3(sum / n), unit: T.yLabel + ' · every point shown' },
+        ? { label: (kind === 'max' ? 'Maximum' : 'Minimum') + (smooth ? ' · smoothed' : ''), value: g3(marked.mark!.y), unit: m.yLabel + ' at x = ' + g3(marked.mark!.x) + ' · ' + marked.label }
+        : { label: 'Peak', value: g3(p.v), unit: m.yLabel + ' at x = ' + g3(p.x) },
+      { label: 'Mean', value: g3(sum / n), unit: m.yLabel + ' · every point shown' },
       { label: 'Curves', value: String(nc), unit: 'from ' + plural(nr, 'run') },
-      { label: 'x range', value: g3(x0) + ' – ' + g3(x1), unit: T.xLabel },
+      { label: 'x range', value: g3(x0) + ' – ' + g3(x1), unit: m.xLabel },
     ] : [];
   }
 
-  // --- plot ----------------------------------------------------------------------
-  const dom = isPmf && fitWell ? domain : null;
-  const yStep = isPmf && fitWell && corrected ? 5 : null;
-  const xL = isPmf ? st.xLabel : T.xLabel, yL = isPmf ? st.yLabel : T.yLabel;
-  const g = lib.buildPlotMulti(series.length ? series : [{ x: [0, 1], y: [0, 0] }], { w: W, h: H, domain: dom, yStep, pad: { l: 58, r: 14, t: 14, b: 36 } });
-  const dimF = (k: string) => !!fk && !fk.includes(k);
-  const lines: PlotLine[] = g.paths.slice(0, series.length).map((d, i) => {
-    const s = series[i];
-    return dimF(s.k) ? { d, k: s.k, color: 'var(--mut)', width: 1.4, dash: '4 4', op: 0.45 } : { d, k: s.k, color: s.color, width: s.width, dash: s.dash, op: s.op };
-  });
-  const markers: PlotMarker[] = lib.plotMarkers(series.map(x => (dimF(x.k) ? { ...x, color: 'var(--mut)', op: 0.45 } : x)), g);
-  let axisNote = isPmf
-    ? (corrected ? 'corrected: + 2kT·ln r, plateau = 0' : 'raw gmx awh output') + (dom ? ' · shared scale ' + dom.lo + ' to ' + dom.hi : ' · autoscaled')
-    : (T.name || T.label) + ' · autoscaled' + (smooth ? ' · smoothed (' + lib.smoothLabel(smooth) + ')' : '');
-  if (series.length > 1) axisNote += st.bw ? ' · black and white' : ' · shade and dash: run, then curve';
-  const anyPending = !isPmf && withData.some(q => q.ex[curTab].curves.some(c => c.state === 'pending'));
-  const anyMissing = withData.some(q => (isPmf ? q.pmf!.state === 'missing' : q.ex[curTab].curves.some(c => c.state === 'missing')));
-  if (!series.length) axisNote = anyPending ? 'loading curves…' : anyMissing ? 'original file missing — see Vault' : withData.length ? (withData.some(q => q.vis !== 'off') ? 'every curve is hidden' : 'every run is hidden') : 'no curve for this cell yet';
-  else if (anyMissing) axisNote += ' · some originals are missing';
-  const legend = sel.mode === 'row' || (!isPmf && series.length > 1) ? series.map(s => ({ label: s.label, color: s.color, dash: s.dash })) : [];
-
   const title = sel.mode === 'row' ? row.name : row.name + ' × ' + sc.label;
-  const sub = (row.group ? row.group + ' · ' : '') + (sel.mode === 'row'
-    ? row.runs.length + ' runs across ' + new Set(row.runs.map(r => r.sacch)).size + ' column(s)'
-    : sc.name + ' — ' + plural(shown.length, 'run')) + (nEx ? ' · ' + plural(nEx, 'analysis curve') : '');
-
-  const graph: GraphData = {
-    file: (sel.mode === 'row' ? 'all-columns' : sc.label) + '_' + row.name + '_' + (isPmf ? (corrected ? 'corrected' : 'raw') : T.label),
-    // Column first, then the sequence: "PG × WRWYCR".
-    kicker: (isPmf ? 'PMF · ' + (corrected ? 'corrected' : 'raw') : T.label + (T.name ? ' · ' + T.name : '')) + (row.seq && row.seq !== row.name ? ' · ' + row.seq : ''),
-    title: sel.mode === 'row' ? row.name + ' · all columns' : sc.label + ' × ' + row.name, sub,
-    xLabel: xL, yLabel: yL, domain: dom, yStep, note: axisNote,
-    series: series.map(x => {
-      const fd = dimF(x.k), dim = fd || x.dim;
-      return { x: x.x, y: x.y, rx: x.rx, ry: x.ry, mark: x.mark && dim ? { ...x.mark, dim: true } : x.mark, label: x.label, color: dim ? '#b8b3b0' : x.ex, width: dim ? 1.4 : x.width, dash: fd ? '4 4' : x.dash };
-    }),
-  };
-  const exportGraph = async (f: 'xvg' | 'png' | 'pdf') => {
-    const blob = f === 'xvg' ? new Blob([graphXvg(graph)], { type: 'text/plain' }) : f === 'png' ? await toPNG(graphScene(graph), 2) : toPDF(graphScene(graph));
-    download(blob, fileBase(graph.file) + '.' + f);
-  };
+  // As shown, in the export settings' theme (a dark or print export redraws the graph in its colours; R8a).
+  const exportGraph = (f: ExportFormat) => exportFiles(async p => {
+    const base = p.theme === 'light' ? m.data : buildGraph({ store: gStore, sel, cols, st, tab, raw, fitWell, dark, domain, focus: fk, theme: p.theme })!.data;
+    const vs = p.legendValue ? valueLines(row.id, sel.mode === 'cell' ? sel.s : null) : [], d = vs.length ? { ...base, values: vs } : base;
+    return [{ name: graphName(d, p, f, new Set(), { project: projectName, page: page?.name || '' }), blob: await renderExport({ graph: d }, f, p) }];
+  });
 
   const setNote = (text: string) => {
     const notes = { cell: { ...store.notes.cell }, row: { ...store.notes.row } };
@@ -320,6 +210,7 @@ export function DetailDialog({ sel }: { sel: Sel }) {
 
   return (
     <div className="scrim" onClick={close} style={{ zIndex: 10 }}>
+      <ExportKeyTarget run={() => void exportGraph(exportPrefs.format)} />
       <div className="card" onClick={stop} style={{ width: 'min(760px, 100%)' }}>
         <div className="card-head">
           <div style={{ minWidth: 0 }}>
@@ -329,9 +220,9 @@ export function DetailDialog({ sel }: { sel: Sel }) {
           </div>
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, flex: 'none' }}>
             <ExportMenu open={menu} setOpen={setMenu} width={270} head="Export graph · as shown" onPick={exportGraph}
-              hints={{ xvg: 'every curve shown, one set each', png: 'image, 2× resolution', pdf: 'vector, one page' }}
+              hints={formatHints(exportPrefs, 'every curve shown, one set each')}
               trigger={(open, toggle) => (
-                <button className="h-acc" onClick={toggle} title="Export this graph as xvg, png or pdf" style={{ ...pill, display: 'flex', alignItems: 'center', gap: 6, padding: '0 13px', borderColor: open ? 'var(--acc)' : 'var(--line)', color: 'var(--ink)' }}>
+                <button className="h-acc" onClick={toggle} title={'Export this graph as xvg, png, svg or pdf (laid out by Settings → Export) · ' + exportKey + ' exports it as ' + exportPrefs.format} style={{ ...pill, display: 'flex', alignItems: 'center', gap: 6, padding: '0 13px', borderColor: open ? 'var(--acc)' : 'var(--line)', color: 'var(--ink)' }}>
                   <DownloadIcon size={13} />export
                 </button>
               )} />
@@ -382,13 +273,13 @@ export function DetailDialog({ sel }: { sel: Sel }) {
 
         {gset && (
           <div style={{ margin: '14px 20px 0', padding: '12px 14px', border: '1px solid var(--line)', borderRadius: 14, background: 'var(--surf)', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '12px 24px', animation: 'dlgIn 140ms ease-out' }}>
+            {m.tSet.kind !== 'none' && (
+              <GsRow label="Curve" title={'The transform is set in Settings → ' + (isPmf ? 'Data & axes' : 'Analyses') + ' and is what the matrix uses. "show raw" draws the curves as uploaded, on this graph only, until you switch back.'}
+                value={raw} onPick={setRaw} opts={[{ v: false, label: lib.TRANSFORMS[m.tSet.kind].word }, { v: true, label: 'show raw' }]} />
+            )}
             {isPmf && (
-              <>
-                <GsRow label="Curve" title="Raw gmx awh output, or the same curve with the r² shell entropy removed and the plateau set to zero"
-                  value={corrected} onPick={setCorrected} opts={[{ v: true, label: 'corrected' }, { v: false, label: 'raw awh' }]} />
-                <GsRow label="Y-axis" title="One y-axis across every cell, or autoscale to the curve on screen"
-                  value={fitWell} onPick={setFitWell} opts={[{ v: true, label: 'shared' }, { v: false, label: 'this cell' }]} />
-              </>
+              <GsRow label="Y-axis" title="One y-axis across every cell, or autoscale to the curve on screen"
+                value={fitWell} onPick={setFitWell} opts={[{ v: true, label: 'shared' }, { v: false, label: 'this cell' }]} />
             )}
             {sel.mode === 'row' && (
               <GsRow label="Row graph" title="One curve per column, or every run in each column (dash pattern = run number)"
@@ -421,27 +312,40 @@ export function DetailDialog({ sel }: { sel: Sel }) {
                 style={{ flex: '1 1 150px', padding: '10px 14px', border: '1px solid ' + s.bd, borderRadius: 12, background: s.bg, opacity: s.op, cursor: s.cur, textAlign: 'left', ['--lift' as string]: s.lift, ['--shadow' as string]: s.shadow }}>
                 <div style={{ fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--mut)' }}>{s.label}</div>
                 <div style={{ fontFamily: 'var(--arch)', fontWeight: 800, fontSize: 20, marginTop: 3, color: s.valC }}>{s.value}</div>
-                <div style={{ fontSize: 10, color: 'var(--mut)' }}>{s.unit}</div>
+                <div style={{ fontSize: 10, color: 'var(--mut)' }}><Rich s={s.unit} /></div>
               </button>
             );
           })}
         </div>
 
         <div style={{ padding: '14px 20px 4px' }}>
-          <Plot g={g} W={W} H={H} lines={lines} markers={markers} yLabel={yL} xLabel={xL} />
+          <Plot g={g} W={W} H={H} lines={lines} markers={markers} yLabel={m.yLabel} xLabel={m.xLabel} series={series}
+            onMark={readOnly || laser ? undefined : (k, i) => mutate(st0 => lib.addMark(st0, row.id, series[k].src, series[k].rx[i]!))}
+            refLines={m.refLines} onLine={readOnly || laser ? undefined : (axis, v) => mutate(st0 => lib.addLine(st0, row.id, m.lineKey, axis, v))} exportKey={{ key: exportKey, format: exportPrefs.format }} />
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, padding: '8px 0 10px', flexWrap: 'wrap' }}>
             <div style={{ display: 'flex', gap: '6px 16px', flexWrap: 'wrap' }}>
               {legend.map((l, i) => (
                 <span key={i} style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 11, color: 'var(--mut)' }}>
-                  {l.dash === 'none'
+                  {l.style === 'points' ? <svg width="18" height="10" viewBox="0 0 18 10"><path d={lib.shapePath(l.shape || 0, 9, 5)} fill={l.color} /></svg>
+                    : l.style === 'bars' ? <span style={{ width: 12, height: 8, background: l.color }} />
+                    : l.dash === 'none'
                     ? <span style={{ width: 18, height: 3, background: l.color }} />
                     : <svg width="18" height="4" viewBox="0 0 18 4"><line x1="0" x2="18" y1="2" y2="2" stroke={l.color} strokeWidth="3" strokeDasharray={l.dash} /></svg>}
-                  {l.label}
+                  <span><Rich s={l.label} /></span>
                 </span>
               ))}
             </div>
-            <span style={{ fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--mut)' }}>{axisNote}</span>
+            <span style={{ fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--mut)' }}>{m.note}</span>
+            {m.dupDash.length > 0 && <span role="status" aria-live="polite" style={{ flexBasis: '100%', fontSize: 11, color: 'var(--accInk)' }}>{m.dupDash.join(' and ')} share a line style</span>}
           </div>
+          <PinList marks={m.marks} lines={m.refLines} series={series} xLabel={m.xLabel} yLabel={m.yLabel} readOnly={readOnly} ops={{
+            moveMark: (at, x) => { const mk = row.marks?.[at], q = series.find(z => z.src === mk?.curve); if (mk && q) mutate(st0 => lib.moveMark(st0, row.id, at, snapX(q.rx, q.ry, x))); },
+            removeMark: at => mutate(st0 => lib.removeMark(st0, row.id, at)),
+            addMark: (k, x) => mutate(st0 => lib.addMark(st0, row.id, series[k].src, snapX(series[k].rx, series[k].ry, x))),
+            moveLine: (at, v) => mutate(st0 => lib.moveLine(st0, row.id, m.lineKey, at, v)),
+            removeLine: at => mutate(st0 => lib.removeLine(st0, row.id, m.lineKey, at)),
+            addLine: (axis, v) => mutate(st0 => lib.addLine(st0, row.id, m.lineKey, axis, v)),
+          }} />
           {sel.mode === 'cell' && withData.length > 0 && (
             <>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', paddingBottom: 6 }}>
@@ -485,12 +389,16 @@ export function DetailDialog({ sel }: { sel: Sel }) {
                       <span style={{ fontSize: 11, color: 'var(--mut)' }}>{plural(e.curves.length, 'curve')}</span>
                       <button className="h-acc ob" style={{ marginLeft: 'auto' }} title="Add another xvg to this analysis as more curves"
                         onClick={() => { curveTarget.current = e; curveFile.current?.click(); }}>+ curve from file</button>
+                      <button className="h-acc ob" aria-expanded={retypeOf?.id === e.id} title="Make this analysis another type, or a PMF run"
+                        onClick={() => setRetypeOf(retypeOf?.id === e.id ? null : { kind: 'analysis', id: e.id })}>change type…</button>
                     </div>
+                    {retypeOf?.id === e.id && <RetypePanel row={row} target={retypeOf} onClose={to => { setRetypeOf(null); if (to) setTab(to); }} />}
                     {e.curves.map((c, j) => (
                       <CurveRow key={c.id} c={c} j={j} n={e.curves.length} {...look(c.id)}
                         armed={armed === 'curve:' + c.id} vis={c.vis || 'on'} shade={c.shade || 0}
                         onShade={step => { const v = nextShade(c.shade, step); commit(lib.updateCurve(store, row.id, e.id, c.id, { shade: v })); say((c.label || 'curve ' + (j + 1)) + ': ' + (v ? Math.abs(v) + (v > 0 ? ' lighter' : ' darker') : 'default shade')); }}
                         onVis={() => { const v = nextVis(c.vis || 'on'); commit(lib.updateCurve(store, row.id, e.id, c.id, { vis: v === 'on' ? undefined : v })); say((c.label || 'curve ' + (j + 1)) + ' ' + VIS[v]); }}
+                        onDash={d => { commit(lib.updateCurve(store, row.id, e.id, c.id, { dash: d ?? undefined })); say((c.label || 'curve ' + (j + 1)) + ': ' + (d == null ? 'automatic line style' : DASH_NAMES[d])); }}
                         onLabel={label => commit(lib.updateCurve(store, row.id, e.id, c.id, { label, custom: true }))}
                         onMove={dir => commit(lib.moveCurve(store, row.id, e.id, c.id, dir))}
                         onRemove={() => { if (confirm('curve:' + c.id)) commit(lib.deleteCurve(store, row.id, e.id, c.id)); }} />
@@ -512,7 +420,7 @@ export function DetailDialog({ sel }: { sel: Sel }) {
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {slots.map(q => {
-              const rsc = colOf(q.sacch), r = q.pmf, rs = r && r.state !== 'missing' ? lib.curveStats(r) : null;
+              const rsc = colOf(q.sacch), r = q.pmf, rs = r && r.state !== 'missing' ? lib.curveStats(r, pmfT) : null;
               const isEd = !!re && !!r && re.id === r.id;
               const exs = Object.values(q.ex);
               const armedRun = !!r && armed === 'run:' + r.id;
@@ -521,8 +429,9 @@ export function DetailDialog({ sel }: { sel: Sel }) {
                   onDragOver={e => { const d = exDrag.current; if (!d || (d.sacch === q.sacch && d.run === q.run)) return; e.preventDefault(); if (exDrop !== q.key) setExDrop(q.key); }}
                   onDragLeave={() => { if (exDrop === q.key) setExDrop(null); }}
                   onDrop={e => { e.preventDefault(); const d = exDrag.current; exDrag.current = null; setExDragId(null); setExDrop(null); if (d) moveEx(d.id, q.sacch, q.run); }}
-                  style={{ border: '1px solid ' + (isEd ? 'var(--acc)' : 'var(--line)'), outline: exDrop === q.key ? '2px dashed var(--acc)' : 'none', outlineOffset: -1, borderRadius: 11, background: 'var(--surf)', overflow: 'hidden', opacity: q.vis === 'off' ? 0.62 : 1 }}>
+                  style={{ border: '1px solid ' + (isEd ? 'var(--acc)' : 'var(--line)'), outline: exDrop === q.key ? '2px dashed var(--acc)' : 'none', outlineOffset: -1, borderRadius: 11, background: 'var(--surf)', opacity: q.vis === 'off' ? 0.62 : 1 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '9px 13px', flexWrap: 'wrap' }}>
+                    {r && <DashPicker value={r.dash} {...look(q.key, r.dash)} label={rsc.label + ' ' + lib.runLabel(q.run)} onPick={d => commit(lib.updateRun(store, row.id, r.id, { dash: d }))} />}
                     <span style={{ fontWeight: 700, fontSize: 12, color: hue(rsc) }}>{rsc.label + ' · ' + lib.runLabel(q.run)}</span>
                     <span style={{ fontSize: 11, color: 'var(--mut)' }}>
                       {r && rs ? 'min ' + fmt(rs.min) + ' kJ/mol at ' + rs.at.toFixed(2) + ' nm · area ' + fmt(rs.area) + ' · ' + r.temp + ' K' + (r.time ? ' · t = ' + r.time : '') + (r.file ? ' · ' + r.file : '')
@@ -536,6 +445,7 @@ export function DetailDialog({ sel }: { sel: Sel }) {
                       {r && (
                         <>
                           <button className="h-acc ob" onClick={() => { setEdit(null); setRunEdit(isEd ? null : { id: r.id, time: r.time || '', temp: String(r.temp), tags: r.tags, sacch: r.sacch, run: r.run }); }}>{isEd ? 'editing' : 'edit'}</button>
+                          <button className="h-acc ob" aria-expanded={retypeOf?.id === r.id} title="Make this PMF run an analysis of another type" onClick={() => setRetypeOf(retypeOf?.id === r.id ? null : { kind: 'run', id: r.id })}>change type…</button>
                           <button className="h-acc ob" onClick={() => {
                             if (!confirm('run:' + r.id)) return;
                             const next = lib.deleteRun(store, row.id, r.id);
@@ -581,6 +491,7 @@ export function DetailDialog({ sel }: { sel: Sel }) {
                     </div>
                   )}
                   {isEd && re && <RunEditor row={row} re={re} setRunEdit={setRunEdit} />}
+                  {r && retypeOf?.id === r.id && <RetypePanel row={row} target={retypeOf} onClose={to => { setRetypeOf(null); if (to) setTab(to); }} />}
                 </div>
               );
             })}
@@ -637,14 +548,42 @@ function Swatch({ color, dash, w, op = 1 }: { color: string; dash: string; w: nu
   return <svg width={w} height="6" viewBox={'0 0 ' + w + ' 6'} style={{ flex: 'none', opacity: op }}><line x1="1" x2={w - 1} y1="3" y2="3" stroke={color} strokeWidth="2.4" strokeDasharray={dash === 'none' ? undefined : dash} /></svg>;
 }
 
-function CurveRow({ c, j, n, color, dash, armed, vis, shade, onVis, onShade, onLabel, onMove, onRemove }: {
+/** Line style (R6): a swatch button opening "automatic" and the ten patterns; Esc closes the list, not the dialog. */
+function DashPicker({ value, color, dash, label, op = 1, onPick }: { value?: number; color: string; dash: string; label: string; op?: number; onPick: (d: number | null) => void }) {
+  const [open, setOpen] = useState(false);
+  const name = value == null ? 'automatic' : DASH_NAMES[value];
+  return (
+    <span style={{ position: 'relative', display: 'inline-flex' }} onKeyDown={e => { if (e.key === 'Escape' && open) { e.stopPropagation(); setOpen(false); } }}>
+      <button className="h-acc" aria-haspopup="menu" aria-expanded={open} aria-label={'Line style of ' + label + ': ' + name} title={'Line style: ' + name}
+        onClick={() => setOpen(!open)} style={{ display: 'grid', placeItems: 'center', width: 32, height: 24, padding: 0, border: '1px solid ' + (open ? 'var(--acc)' : 'var(--line)'), borderRadius: 7, background: 'transparent' }}>
+        <Swatch color={color} dash={dash} w={22} op={op} />
+      </button>
+      {open && (
+        <>
+          <div onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 19 }} />
+          <div className="menu" role="menu" aria-label={'Line style of ' + label} style={{ left: 0, right: 'auto', width: 180 }}>
+            {[null, ...DASH.map((_, i) => i)].map(d => (
+              <button key={String(d)} role="menuitemradio" aria-checked={(value ?? null) === d} className="h-surf" onClick={() => { onPick(d); setOpen(false); }}
+                style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 8px', border: 0, borderRadius: 7, background: (value ?? null) === d ? 'var(--surf)' : 'transparent', fontSize: 11, textAlign: 'left' }}>
+                {d == null ? <span style={{ width: 26, fontSize: 10, color: 'var(--mut)' }}>auto</span> : <Swatch color="var(--ink)" dash={DASH[d]} w={26} />}
+                <span style={{ fontWeight: (value ?? null) === d ? 700 : 400 }}>{d == null ? 'automatic · by its place' : DASH_NAMES[d]}</span>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </span>
+  );
+}
+
+function CurveRow({ c, j, n, color, dash, armed, vis, shade, onVis, onShade, onDash, onLabel, onMove, onRemove }: {
   c: Curve; j: number; n: number; color: string; dash: string; armed: boolean; vis: Vis; shade: number;
-  onVis: () => void; onShade: (step: number) => void; onLabel: (s: string) => void; onMove: (dir: number) => void; onRemove: () => void;
+  onVis: () => void; onShade: (step: number) => void; onDash: (d: number | null) => void; onLabel: (s: string) => void; onMove: (dir: number) => void; onRemove: () => void;
 }) {
   const arrow = { width: 24, height: 26, padding: 0, border: '1px solid var(--line)', borderRadius: 7, background: 'transparent', color: 'var(--mut)', fontSize: 11, lineHeight: 1 } as const;
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '26px auto minmax(0, 1fr) minmax(0, 0.6fr) auto 24px 24px auto', gap: 8, alignItems: 'center', marginTop: 4 }}>
-      <Swatch color={color} dash={dash} w={24} op={vis === 'on' ? 1 : vis === 'dim' ? 0.35 : 0.2} />
+    <div style={{ display: 'grid', gridTemplateColumns: '32px auto minmax(0, 1fr) minmax(0, 0.6fr) auto 24px 24px auto', gap: 8, alignItems: 'center', marginTop: 4 }}>
+      <DashPicker value={c.dash} color={color} dash={dash} label={c.label || 'curve ' + (j + 1)} op={vis === 'on' ? 1 : vis === 'dim' ? 0.35 : 0.2} onPick={onDash} />
       {/* aria-disabled, not disabled: keyboard focus stays on the button at the end of the range. */}
       <span role="group" aria-label={'Shade of ' + (c.label || 'curve ' + (j + 1)) + (shade ? ': ' + Math.abs(shade) + ' ' + (shade > 0 ? 'lighter' : 'darker') : ': default')} style={{ display: 'flex', gap: 2 }}>
         <button className="h-acc" title="Darker" aria-label="Darker" aria-disabled={shade <= -SHADE_STEPS} onClick={() => shade > -SHADE_STEPS && onShade(-1)} style={{ ...arrow, width: 22, opacity: shade <= -SHADE_STEPS ? 0.3 : 1 }}>−</button>
@@ -658,6 +597,86 @@ function CurveRow({ c, j, n, color, dash, armed, vis, shade, onVis, onShade, onL
       <button className="h-acc" title="Move up" onClick={() => onMove(-1)} style={{ ...arrow, opacity: j === 0 ? 0.3 : 1 }}>↑</button>
       <button className="h-acc" title="Move down" onClick={() => onMove(1)} style={{ ...arrow, opacity: j === n - 1 ? 0.3 : 1 }}>↓</button>
       <button className="h-acc ob" onClick={onRemove} style={{ padding: '4px 9px', color: armed ? 'var(--acc)' : 'var(--mut)' }}>{armed ? 'remove?' : '×'}</button>
+    </div>
+  );
+}
+
+/**
+ * Change type (R7): pick the type; the originals are read once and re-read with its columns; the preview lists every
+ * consequence (retype) and the files the save moves and trashes (the planner's dry run) before anything is saved.
+ */
+function RetypePanel({ row, target, onClose }: { row: Seq; target: { kind: 'run' | 'analysis'; id: string }; onClose: (to?: string) => void }) {
+  const { store, settings: st, types, metric, skip, commit, readFile, previewSave, readOnly } = useApp();
+  const run = target.kind === 'run' ? row.runs.find(r => r.id === target.id) : undefined, ex = target.kind === 'analysis' ? row.extras.find(e => e.id === target.id) : undefined;
+  const from = run ? 'pmf' : ex?.type || '', item = run || ex;
+  const [to, setTo] = useState('');
+  const [onClash, setOnClash] = useState<'replace' | 'append'>('replace');
+  const [temp, setTemp] = useState(String(st.temp || lib.DEFAULT_TEMP));
+  const [tables, setTables] = useState<Map<string, Table | null> | null>(null);
+  const [dry, setDry] = useState<{ of: object; moves: { from: string; to: string }[]; trashed: string[] } | null>(null);
+  const fileIds = useMemo(() => [...new Set(run ? (run.src ? [run.src.fileId] : []) : (ex?.curves || []).flatMap(c => (c.src ? [c.src.fileId] : [])))], [run, ex]);
+  useEffect(() => {
+    let live = true;
+    (async () => {
+      const m = new Map<string, Table | null>();
+      for (const id of fileIds) { try { m.set(id, lib.parseTable(await (await readFile(id)).text())); } catch { m.set(id, null); } }
+      if (live) setTables(m);
+    })();
+    return () => { live = false; };
+  }, [fileIds, readFile]);
+  const res = useMemo(() => (to && tables ? lib.retype(store, st, row.id, target, to, tables, { onClash, temp: Number(temp) || lib.DEFAULT_TEMP, metric, skip }) : null), [to, tables, store, st, row.id, target, onClash, temp, metric, skip]);
+  useEffect(() => {
+    let live = true;
+    if (res && !res.preview.problem) previewSave(res.store).then(p => { if (live) setDry({ of: res, ...p }); }).catch(() => {});
+    return () => { live = false; };
+  }, [res, previewSave]);
+  // The planner's dry run for the choice on screen (an older one is never shown).
+  const plan = dry && dry.of === res ? dry : null;
+  if (!item) return null;
+  const slotHas = (k: string) => (k === 'pmf' ? row.runs.some(r => r !== run && r.sacch === item.sacch && r.run === item.run) : row.extras.some(e => e !== ex && e.type === k && e.sacch === item.sacch && e.run === item.run));
+  const p = res?.preview, rel = (path: string) => path.split('/').slice(1).join('/');
+  const lab = { fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: 'var(--mut)' };
+  const list = (title: string, lines: string[]) => lines.length > 0 && (
+    <div><div style={lab}>{title}</div><ul style={{ margin: '4px 0 0', paddingLeft: 18, fontSize: 11, lineHeight: 1.7 }}>{lines.map((l, i) => <li key={i}>{l}</li>)}</ul></div>
+  );
+  return (
+    <div role="group" aria-label={'Change the type of ' + (run ? 'PMF run' : (types.find(t => t.k === from)?.label || from)) + ' · ' + lib.runLabel(item.run)}
+      style={{ display: 'flex', flexDirection: 'column', gap: 10, margin: '8px 0 4px', padding: '12px 13px', border: '1px solid var(--acc)', borderRadius: 10, background: 'var(--bg)' }}
+      onKeyDown={e => { if (e.key === 'Escape') { e.stopPropagation(); onClose(); } }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <label className="fld" style={{ gap: 4 }}><span style={lab}>New type</span>
+          <select className="inp" value={to} onChange={e => setTo(e.target.value)} autoFocus style={{ padding: '6px 9px' }}>
+            <option value="" disabled>choose…</option>
+            {types.filter(t => t.k !== from).map(t => <option key={t.k} value={t.k}>{t.label}{t.k === 'pmf' ? ' run (the matrix value)' : ''}</option>)}
+          </select>
+        </label>
+        {to === 'pmf' && <label className="fld" style={{ gap: 4 }}><span style={lab}>Temperature (K)</span><input className="inp" value={temp} onChange={e => setTemp(e.target.value)} style={{ width: 100, padding: '6px 9px' }} /></label>}
+        {to && to !== 'pmf' && slotHas(to) && (
+          <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span style={lab}>Slot has one</span>
+            <Seg<'replace' | 'append'> value={onClash} onPick={setOnClash} bg="var(--surf)" opts={[{ v: 'replace', label: 'replace it' }, { v: 'append', label: 'add as curves' }]} />
+          </span>
+        )}
+      </div>
+      <div aria-live="polite" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {!to ? <span style={{ fontSize: 11, color: 'var(--mut)' }}>The originals stay as they are; nothing is uploaded again. Pick a type to see every consequence before saving.</span>
+          : !tables ? <span style={{ fontSize: 11, color: 'var(--mut)' }}>reading the originals…</span>
+          : p?.problem ? <span style={{ fontSize: 12, color: 'var(--accInk)' }}>{p.problem}</span>
+          : p && (
+            <>
+              {list('What changes', p.changes)}
+              {list('Curves, re-read with its columns', p.curves.map(c => c.label + ' · ' + plural(c.points, 'point')))}
+              {list('Originals missing — curves kept as they are', p.kept)}
+              {list('Matrix values', p.values.map(v => v.label + ': ' + (v.before == null ? 'none' : fmt(v.before)) + ' → ' + (v.after == null ? 'none' : fmt(v.after))))}
+              {list('No longer applies', p.lost)}
+              {plan ? <>{list('Files moved', plan.moves.map(m => rel(m.from) + ' → ' + rel(m.to)))}{list('To the trash', plan.trashed)}</> : <span style={{ fontSize: 11, color: 'var(--mut)' }}>working out the files…</span>}
+            </>
+          )}
+      </div>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button className="h-bright" disabled={readOnly || !res || !!p?.problem || !plan} onClick={() => { if (res) { commit(res.store); onClose(to); } }}
+          style={{ padding: '7px 13px', border: 0, borderRadius: 8, background: 'var(--acc)', color: '#fff', fontWeight: 700, fontSize: 11, opacity: !res || p?.problem || !plan ? 0.5 : 1 }}>change type</button>
+        <button className="h-acc ob" onClick={() => onClose()}>cancel</button>
+      </div>
     </div>
   );
 }

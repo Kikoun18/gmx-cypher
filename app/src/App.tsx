@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import * as lib from './lib/seq';
-import { ramp } from './lib/pmf';
-import { download, fileBase, matrixScene, matrixXvg, toPDF, toPNG, type MatrixData } from './lib/export';
+import { download, fileBase, graphName, legendSwatches, renderBatch, renderExport, type MatrixData } from './lib/export';
+import { cleanExport, formatHints, type ExportPrefs } from './lib/exportPrefs';
+import { deliver, openDest } from './lib/folders';
 import { loadPrefs, savePrefs } from './lib/prefs';
 import { setLastProject } from './lib/vaultHandles';
 import type { Vault } from './lib/storage/vault';
@@ -13,9 +14,17 @@ import { exportDataset, importAsProject, importInto } from './lib/storage/exchan
 import { parseGmxHeader } from './lib/gmxHeader';
 import { filesFromDrop, mapLimit, type PickedFile } from './lib/folderFiles';
 import { addStructureFiles } from './lib/structFile';
-import type { Column, Metric, Page, Seq, Settings, Store, Vis } from './lib/types';
+import { discoverScript, type Discovery } from './lib/scripts';
+import { trustFor } from './lib/trust';
+import { retryScripts, scriptsIdle, scriptsVersion, setScriptHost, subscribeScripts } from './lib/scriptRuns';
+import { batchGraphs, buildGraph, sharedDomain } from './lib/graph';
+import { metricUnit, resolveMetric, tileProvenance } from './lib/metrics';
+import { groupRows, matrixData as matrixDataOf, matrixTiles, scaleOf, tileKey } from './lib/matrix';
+import { MetricPicker } from './components/MetricPicker';
+import { pythonReady, runPython } from './lib/py';
+import type { Column, Metric, Page, Settings, Store, Vis } from './lib/types';
 import { Ctx, pickKey, type App as AppT, type ComparePick, type Sel } from './ctx';
-import { DownloadIcon, ExportMenu, GearIcon, Seg, pad2, plural, type ExportFormat } from './components/ui';
+import { DownloadIcon, ExportMenu, GearIcon, pad2, plural, type ExportFormat } from './components/ui';
 import { Matrix } from './components/Matrix';
 import { UploadDialog } from './components/UploadDialog';
 import { SettingsDialog } from './components/SettingsDialog';
@@ -24,11 +33,11 @@ import { ColumnDialog, HoverCard, type SacchData } from './components/ColumnDial
 import { PageBar, PageDialog } from './components/Pages';
 import { ProjectMenu, ProjectsDialog, type ProjectOps, type ProjectStats } from './components/Projects';
 import { Laser, keyLabel, sameKey } from './components/Laser';
+import { exportKeyAction } from './lib/keys';
 import { VaultBanner, SaveBadge } from './components/VaultBanner';
 import { VaultDialog } from './components/VaultDialog';
 import { CompareDialog } from './components/CompareDialog';
 
-export type Group = [string, Seq[]];
 
 // Address bar: #/p/<project>/<page>, so pages behave like web pages — back,
 // forward, bookmarks and reloads all land on the same view.
@@ -77,8 +86,7 @@ export default function App({ vault, reconnect, onLeave, startProject, viewer }:
   const [appSet, setAppSet] = useState<Partial<Settings>>(loadPrefs);
   const appSetRef = useRef(appSet);
   useEffect(() => { appSetRef.current = appSet; }, [appSet]);
-  const [metric, setMetric] = useState<Metric>('area');
-  const [corrected, setCorrected] = useState(true);
+  const [raw, setRaw] = useState(false);
   const [fitWell, setFitWell] = useState(true);
   const [sorted, setSorted] = useState(false);
   const [sel, setSel] = useState<Sel | null>(null);
@@ -99,6 +107,8 @@ export default function App({ vault, reconnect, onLeave, startProject, viewer }:
   const [toast, setToast] = useState<string | null>(null);
   // Compare: hold the key, click cells / sequence names, release to see them on one graph.
   const [compareHeld, setCompareHeld] = useState(false);
+  // The export key held on the matrix (R8c): clicks pick cells as with compare; `all` while Shift is down too.
+  const [exportHold, setExportHold] = useState<{ all: boolean } | null>(null);
   const [picks, setPicks] = useState<ComparePick[]>([]);
   const [compareOpen, setCompareOpen] = useState(false);
   const picked = useMemo(() => new Set(picks.map(pickKey)), [picks]);
@@ -112,9 +122,17 @@ export default function App({ vault, reconnect, onLeave, startProject, viewer }:
   // A page id that isn't in this project (deleted, or a stale link) shows All sequences.
   const page = lib.findPage(store, pageId);
   const viewId = page ? page.id : lib.ALL_PAGE;
-  const allCols = lib.getCols(store);
-  const cols = lib.pageCols(store, page);
+  // Kept as the same arrays between renders, so memos keyed on them hold (F110).
+  const allCols = useMemo(() => lib.getCols({ cols: store.cols }), [store.cols]);
+  const cols = useMemo(() => lib.pageCols({ cols: store.cols } as Store, page), [store.cols, page]);
   const types = useMemo(() => lib.getAnalyses(settings), [settings]);
+  const pmfT = useMemo(() => lib.pmfTransform(settings), [settings]);
+  // Script answers arriving (R3c) redraw whatever used them.
+  const scriptsV = useSyncExternalStore(subscribeScripts, scriptsVersion);
+  // The matrix metric (R4a, F97): Area, Min or one of the project's definitions, remembered per page; "all sequences"
+  // keeps its own in the project settings. Places that only know PMF's built-ins get Area or Min.
+  const metricDef = useMemo(() => resolveMetric(page ? page.metric ?? settings.metric : settings.metric, settings), [page, settings]);
+  const metric: Metric = metricDef.id === 'min' ? 'min' : 'area';
   const hue = useCallback((c: { light: string; dark: string }) => (dark ? c.dark : c.light), [dark]);
   const colOf = useCallback((k: string): Column => allCols.find(c => c.k === k) || { k, label: k, name: k, short: k, light: '#5c5550', dark: '#b0a79f' }, [allCols]);
   const skip: lib.SkipFn = useMemo(() => (settings.hiddenOut ? (s, r) => store.vis[lib.slotKey(s.id, r.sacch, r.run)] === 'off' : null), [settings.hiddenOut, store.vis]);
@@ -146,7 +164,30 @@ export default function App({ vault, reconnect, onLeave, startProject, viewer }:
   }, []);
   const findSame = useCallback(async (sha: string) => (svcRef.current ? svcRef.current.findSame(sha) : null), []);
   const provenance = useCallback(async (fileId: string) => (svcRef.current ? svcRef.current.provenance(fileId) : null), []);
+  const previewSave = useCallback(async (next: Store) => (svcRef.current ? svcRef.current.previewPlan(next) : { moves: [], trashed: [] }), []);
   const loadAnalysis = useCallback(async (id: string) => { const s = svcRef.current; if (s) await s.loadAnalysis(id); }, []);
+  const scriptInfo = useCallback((fileId: string) => {
+    const s = svcRef.current;
+    return s ? s.scriptInfo<Discovery>(fileId, discoverScript) : Promise.reject(new Error('no project open'));
+  }, []);
+  // A new object whenever trust is given, so every place that shows trust asks again (F138).
+  const [trustV, setTrustV] = useState(0);
+  const trust = useMemo(() => {
+    void trustV;
+    const { trust: t, folder } = trustFor(vault.backend), key = (scriptId: string, sha256: string) => ({ scriptId, sha256, vaultId: vault.manifest.vaultId, folder });
+    return { has: (id: string, sha: string) => t.has(key(id, sha)), add: async (id: string, sha: string) => { await t.add(key(id, sha)); retryScripts(); setTrustV(v => v + 1); } };
+  }, [vault, trustV]);
+  // Script calls for the open project (R3c): trusted scripts only, answers kept in the vault's cache.
+  useEffect(() => {
+    if (!svc) return;
+    setScriptHost({
+      scripts: () => storeRef.current.scripts || [],
+      info: fileId => svc.scriptInfo<Discovery>(fileId, discoverScript),
+      trusted: trust.has, run: runPython, python: pythonReady,
+      load: () => svc.scriptValues(), save: e => svc.saveScriptValues(e),
+    });
+    return () => setScriptHost(null);
+  }, [svc, trust]);
 
   // --- projects & pages navigation -------------------------------------------------
   const resetView = useCallback(() => { setSel(null); setForm(null); setSacchSel(null); setHover(null); setPageDlg(null); setMenu(false); }, []);
@@ -277,21 +318,62 @@ export default function App({ vault, reconnect, onLeave, startProject, viewer }:
 
   // Rows in display order: ranked by mean value, or the page's own order; grouped by method.
   const shownSeqs = useMemo(() => lib.pageSeqs(store, page), [store, page]);
-  const { glist, anyGroup, order } = useMemo(() => {
-    const meanOf = (s: Seq) => {
-      const vs = cols.map(sc => lib.cellValue(s, sc.k, metric, skip)).filter((v): v is number => v != null);
-      return vs.length ? vs.reduce((a, b) => a + b, 0) / vs.length : 0;
-    };
-    const ordered = sorted ? shownSeqs.slice().sort((a, b) => meanOf(a) - meanOf(b)) : shownSeqs;
-    const gm = new Map<string, Seq[]>();
-    for (const s of ordered) { const g = (s.group || '').trim(); if (!gm.has(g)) gm.set(g, []); gm.get(g)!.push(s); }
-    const glist: Group[] = [...gm.entries()].sort((a, b) => (a[0] === '' ? 1 : 0) - (b[0] === '' ? 1 : 0));
-    return { glist, anyGroup: glist.some(([g]) => g), order: glist.flatMap(([, rs]) => rs.map(s => s.id)) };
-  }, [shownSeqs, cols, metric, skip, sorted]);
+  // One tile per shown cell for the page's metric (R4a); recomputed when script answers arrive (scriptsV, R3c).
+  const tiles = useMemo(() => { void scriptsV; return matrixTiles(shownSeqs, cols, metricDef, settings, skip); }, [shownSeqs, cols, metricDef, settings, skip, scriptsV]);
+  const { glist, anyGroup, order } = useMemo(() => groupRows(shownSeqs, cols, tiles, sorted), [shownSeqs, cols, tiles, sorted]);
+  // Picking a metric remembers it for this page (or for all sequences) and among this browser's recent ones.
+  const setMetricId = useCallback((id: string) => {
+    if (page) mutate(s => ({ ...s, pages: s.pages.map(p => (p.id === page.id ? { ...p, metric: id } : p)) }));
+    setSetting({ ...(page ? {} : { metric: id }), recentMetrics: [id, ...(appSetRef.current.recentMetrics || []).filter(x => x !== id)].slice(0, 6) });
+  }, [page, mutate, setSetting]);
+  // A metric over another analysis type needs its curves, which otherwise load when a cell opens.
+  useEffect(() => {
+    if (!svc || metricDef.type === 'pmf') return;
+    let live = true;
+    void (async () => { for (const r of svc.store.seqs) for (const e of r.extras) if (live && e.type === metricDef.type && e.curves.some(c => c.state === 'pending')) await svc.loadAnalysis(e.id); })();
+    return () => { live = false; };
+  }, [svc, metricDef.type]);
 
   // --- keyboard: Esc closes, arrows walk cells / rows / columns, the laser key toggles the pointer ---
-  const kb = useRef({ sel, sacchSel, form, setOpen, menu, order, cols, settings, picks, compareHeld });
-  useEffect(() => { kb.current = { sel, sacchSel, form, setOpen, menu, order, cols, settings, picks, compareHeld }; });
+  // Exports (R8a): the folder's permission is asked inside the key press or click, then the files are made and sent.
+  const exportPrefs = cleanExport(settings.exportPrefs), vaultFolder = (vault.backend as { root?: FileSystemDirectoryHandle }).root ?? null;
+  const matrixHints = formatHints(exportPrefs, 'one xmgrace set per column');
+  const exportFiles = async (make: (p: ExportPrefs) => Promise<{ name: string; blob: Blob }[]>) => {
+    try { const d = await openDest(exportPrefs.dest, vaultFolder); setToast(await deliver(await make(exportPrefs), d)); } catch (e) { setToast(errText(e)); }
+  };
+  // The matrix value for an export's legend (R8d): the cell's, or each column's for a sequence, with how it was made.
+  const valueLines = (id: string, col: string | null): string[] => {
+    const s = store.seqs.find(q => q.id === id);
+    return !s ? [] : (col ? [col] : cols.map(c => c.k)).flatMap(k => {
+      const t = tiles.get(tileKey(id, k));
+      return t?.kind === 'value' ? [(col ? '' : colOf(k).label + ' · ') + tileProvenance(s, k, metricDef, t, { st: settings, skip, scripts: store.scripts, short: true })] : [];
+    });
+  };
+  // Released after picking (R8c): each pick's graph with its stored view (visibility, dashes, marks, lines) and today's
+  // graph settings (raw view, shared scale, smoothing, colours), its analyses' curves loaded and script answers awaited.
+  const exportPicks = async (ps: ComparePick[], all: boolean) => {
+    const s = svcRef.current, jobs = s ? batchGraphs(s.store, ps, all, types) : [];
+    if (!s || !jobs.length) { setToast(ps.length ? 'nothing to export in the picked cells' : 'no cells picked · hold ' + keyLabel(settings.exportKey) + ', click cells, then release'); return; }
+    await exportFiles(async p => {
+      for (const q of ps) for (const e of s.store.seqs.find(r => r.id === q.id)?.extras || []) if ((q.col == null || e.sacch === q.col) && e.curves.some(c => c.state === 'pending')) await s.loadAnalysis(e.id);
+      const domain = sharedDomain(s.store.seqs, raw ? lib.NONE : pmfT);
+      const build = () => jobs.map(j => buildGraph({ store: s.store, sel: j.sel, cols, st: settings, tab: j.tab, raw, fitWell, dark, domain, theme: p.theme }));
+      if (s.store.scripts?.length) { build(); await scriptsIdle(); }
+      // One file each, one multi-page PDF or one grid figure (R8d), each graph with its legend's matrix value.
+      const taken = new Set<string>(), gs = build().flatMap((m, i) => {
+        if (!m) return [];
+        const sel = jobs[i].sel, vs = p.legendValue ? valueLines(sel.id, sel.mode === 'cell' ? sel.s : null) : [], data = vs.length ? { ...m.data, values: vs } : m.data;
+        return [{ data, name: graphName(data, p, p.format, taken, { project: projectName, page: page?.name || '' }) }];
+      });
+      return renderBatch(gs, p, fileBase((page?.name || projectName) + '-figures'));
+    });
+  };
+
+  const other = !!(pageDlg || projDlg || vaultDlg);
+  const kb = useRef({ sel, sacchSel, form, setOpen, menu, order, cols, settings, picks, compareHeld, compareOpen, exportHold, other });
+  const exportPicksRef = useRef(exportPicks);
+  useEffect(() => { kb.current = { sel, sacchSel, form, setOpen, menu, order, cols, settings, picks, compareHeld, compareOpen, exportHold, other }; exportPicksRef.current = exportPicks; });
+  const exportShown = useRef<(() => void) | null>(null), setExportShown = useCallback((run: (() => void) | null) => { exportShown.current = run; }, []);
   useEffect(() => {
     const typing = (t: EventTarget | null) => !!t && (/TEXTAREA|INPUT|SELECT/.test((t as HTMLElement).tagName) || (t as HTMLElement).isContentEditable);
     const onKey = (e: KeyboardEvent) => {
@@ -299,9 +381,16 @@ export default function App({ vault, reconnect, onLeave, startProject, viewer }:
       if (e.key === 'Escape') {
         if (k.menu) { setMenu(false); return; }
         setSel(null); setForm(null); setSacchSel(null); setSetOpen(false); setPageDlg(null); setProjDlg(null); setVaultDlg(false);
-        setCompareOpen(false); setCompareHeld(false); setPicks([]);
+        setCompareOpen(false); setCompareHeld(false); setExportHold(null); setPicks([]);
         return;
       }
+      // The export key in a graph or Compare (not under Settings or the upload form): export it as shown (R8b);
+      // held on the bare matrix: pick cells, then release (R8c).
+      const inGraph = (k.sel || k.compareOpen) && !k.form && !k.setOpen, onMatrix = !k.sel && !k.compareOpen && !k.form && !k.setOpen && !k.sacchSel && !k.menu && !k.other;
+      const act = exportKeyAction(e, typing(e.target), k.settings, inGraph ? 'graph' : onMatrix ? 'matrix' : 'other');
+      if (act === 'export') { e.preventDefault(); exportShown.current?.(); return; }
+      if (act === 'pick' && !k.compareHeld) { e.preventDefault(); if (!k.exportHold) { setPicks([]); setHover(null); setExportHold({ all: e.shiftKey }); } return; }
+      if (k.exportHold && (e.key === 'Shift' || sameKey(e.key, k.settings.exportKey))) { e.preventDefault(); if (e.key === 'Shift') setExportHold({ all: true }); return; }
       if (typing(e.target)) return;
       if (!e.ctrlKey && !e.metaKey && !e.altKey && sameKey(e.key, k.settings.laserKey)) {
         e.preventDefault();
@@ -337,18 +426,26 @@ export default function App({ vault, reconnect, onLeave, startProject, viewer }:
       setCompareHeld(false);
       if (kb.current.picks.length) setCompareOpen(true);
     };
+    const releaseExport = () => {
+      const h = kb.current.exportHold, ps = kb.current.picks;
+      if (!h) return;
+      setExportHold(null); setPicks([]);
+      void exportPicksRef.current(ps, h.all);
+    };
     const onUp = (e: KeyboardEvent) => {
       const st = kb.current.settings;
+      if (kb.current.exportHold && e.key === 'Shift') setExportHold({ all: false });
+      if (sameKey(e.key, st.exportKey)) releaseExport();
       if (st.laserMode === 'hold' && sameKey(e.key, st.laserKey)) setLaser(false);
       if (sameKey(e.key, st.compareKey)) releaseCompare();
     };
-    const onBlur = () => { if (kb.current.settings.laserMode === 'hold') setLaser(false); releaseCompare(); };
+    const onBlur = () => { if (kb.current.settings.laserMode === 'hold') setLaser(false); releaseCompare(); if (kb.current.exportHold) { setExportHold(null); setPicks([]); } };
     window.addEventListener('keydown', onKey);
     window.addEventListener('keyup', onUp);
     window.addEventListener('blur', onBlur);
     return () => { window.removeEventListener('keydown', onKey); window.removeEventListener('keyup', onUp); window.removeEventListener('blur', onBlur); };
   }, []);
-  useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(null), 1600); return () => clearTimeout(t); }, [toast]);
+  useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(null), Math.max(1600, toast.length * 50)); return () => clearTimeout(t); }, [toast]);
 
   const dropOnCell = (rowId: string, col: string, dt: DataTransfer) => {
     setDrag(false);
@@ -367,10 +464,10 @@ export default function App({ vault, reconnect, onLeave, startProject, viewer }:
   };
 
   const app: AppT = {
-    store, settings, dark, cols, allCols, page, projectName, types, metric, corrected, fitWell, skip, hue, colOf,
-    commit, mutate, setSetting, setVis, setCorrected, setFitWell, setSel, openForm, openSettings, order,
-    readFile, findSame, provenance, loadAnalysis, notesReady, readOnly,
-    compare: { held: compareHeld, picked, toggle: togglePick }, dropOnCell,
+    store, settings, dark, cols, allCols, page, projectName, types, metric, metricDef, setMetricId, raw, pmfT, scriptsV, laser, fitWell, skip, hue, colOf,
+    commit, mutate, setSetting, setVis, setRaw, setFitWell, setSel, openForm, openSettings, order,
+    readFile, previewSave, findSame, provenance, loadAnalysis, scriptInfo, trust, notesReady, readOnly,
+    compare: { held: compareHeld || !!exportHold, picked, toggle: togglePick, forExport: !!exportHold }, dropOnCell, exportPrefs, exportFiles, setExportShown, vaultFolder, valueLines,
   };
 
   // --- project operations ------------------------------------------------------------
@@ -450,31 +547,11 @@ export default function App({ vault, reconnect, onLeave, startProject, viewer }:
   };
 
   // --- matrix export --------------------------------------------------------------------
-  const max = lib.maxMag(shownSeqs, metric, cols, skip);
-  const meta2 = lib.METRIC_META[metric];
-  const matrixData = (): MatrixData | null => {
-    if (!shownSeqs.length) return null;
-    return {
-      file: 'pmf-matrix-' + (page ? page.name + '-' : '') + metric,
-      kicker: 'PMF Sequences · ' + projectName,
-      title: (page ? page.name : 'All sequences') + ' · ' + meta2.label,
-      sub: projectName + ' · ' + meta2.desc + ' · ' + meta2.unit + ' · cell = mean of runs · ' + plural(shownSeqs.length, 'sequence'),
-      metricLabel: meta2.label, unit: meta2.unit, max,
-      cols: cols.map(c => ({ label: c.label, name: c.name, short: c.short, color: c.light })),
-      groups: glist.map(([g, rs]) => ({
-        label: g || 'no group', hasLabel: anyGroup,
-        rows: rs.map(s => ({
-          name: s.name || '(unnamed)', seq: s.seq || '', group: g,
-          cells: cols.map(c => { const v = lib.cellValue(s, c.k, metric, skip); return v == null ? null : { v, n: s.runs.filter(r => r.sacch === c.k).length }; }),
-        })),
-      })),
-    };
-  };
-  const exportMatrix = async (f: ExportFormat) => {
+  const scale = useMemo(() => scaleOf(metricDef, tiles), [metricDef, tiles]), mUnit = metricUnit(metricDef, settings), legend = scale.legend(mUnit);
+  const matrixData = (): MatrixData | null => (shownSeqs.length ? matrixDataOf({ project: projectName, page, def: metricDef, st: settings, pmfT, cols, glist, anyGroup, tiles, scripts: store.scripts }) : null);
+  const exportMatrix = (f: ExportFormat) => {
     const d = matrixData();
-    if (!d) return;
-    const blob = f === 'xvg' ? new Blob([matrixXvg(d)], { type: 'text/plain' }) : f === 'png' ? await toPNG(matrixScene(d), 2) : toPDF(matrixScene(d));
-    download(blob, fileBase(d.file) + '.' + f);
+    if (d) void exportFiles(async p => [{ name: fileBase(d.file) + '.' + f, blob: await renderExport({ matrix: d }, f, p) }]);
   };
 
   // --- dataset JSON (this project) ------------------------------------------------------------
@@ -576,15 +653,15 @@ export default function App({ vault, reconnect, onLeave, startProject, viewer }:
             </div>
           </div>
           <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-            <Seg size="l" value={metric} onPick={setMetric} opts={[{ v: 'area', label: 'Area' }, { v: 'min', label: 'Min' }]} />
+            <MetricPicker />
             <button className="h-surf" onClick={() => setSorted(!sorted)} title="Keep your own order (Settings → Modify), or rank sequences by mean binding strength within each group"
               style={{ padding: '8px 13px', border: '1px solid var(--line)', borderRadius: 9, background: sorted ? 'var(--surf)' : 'transparent', fontSize: 12, whiteSpace: 'nowrap' }}>
               {sorted ? 'order: ranked' : 'order: manual'}
             </button>
-            <ExportMenu open={menu} setOpen={v => setMenu(v && shownSeqs.length > 0)} width={260} head={'Export ' + (page ? 'this page' : 'matrix') + ' · ' + meta2.label}
-              hints={{ xvg: 'one xmgrace set per column', png: 'image, 2× resolution', pdf: 'vector, one page' }} onPick={exportMatrix}
+            <ExportMenu open={menu} setOpen={v => setMenu(v && shownSeqs.length > 0)} width={260} head={'Export ' + (page ? 'this page' : 'matrix') + ' · ' + metricDef.label}
+              hints={matrixHints} onPick={exportMatrix}
               trigger={(open, toggle) => (
-                <button className="h-surf" onClick={toggle} title="Export the matrix on this page as xvg, png or pdf"
+                <button className="h-surf" onClick={toggle} title="Export the matrix on this page as xvg, png, svg or pdf (laid out by Settings → Export)"
                   style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '8px 13px', border: '1px solid ' + (open ? 'var(--acc)' : 'var(--line)'), borderRadius: 9, background: 'transparent', fontSize: 12, whiteSpace: 'nowrap', opacity: shownSeqs.length ? 1 : 0.45 }}>
                   <DownloadIcon />Export
                 </button>
@@ -627,15 +704,15 @@ export default function App({ vault, reconnect, onLeave, startProject, viewer }:
             ) : (
               <>
                 {page && page.desc && <p style={{ margin: 0, padding: '14px 18px 2px', maxWidth: 760, fontSize: 12, lineHeight: 1.7, color: 'var(--mut)', textWrap: 'pretty' }}>{page.desc}</p>}
-                <Matrix glist={glist} anyGroup={anyGroup} sel={sel} max={max}
+                <Matrix glist={glist} anyGroup={anyGroup} sel={sel} scale={scale} tiles={tiles}
                   onHover={setHover} onOpenCol={k => { setSacchSel(k); setHover(null); }} onOpenColumns={() => { setSacchSel(null); openSettings(); }}
                   footer={(
                     <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '20px 18px 28px', flexWrap: 'wrap' }}>
-                      <span className="lbl">{meta2.label} magnitude</span>
+                      <span className="lbl">{legend.title}</span>
                       <span style={{ display: 'flex', height: 10, width: 200, borderRadius: 99, overflow: 'hidden' }}>
-                        {Array.from({ length: 14 }, (_, i) => <span key={i} style={{ flex: 1, background: ramp(i / 13, dark) }} />)}
+                        {legendSwatches(scale.kind, dark).map((c, i) => <span key={i} style={{ flex: 1, background: c }} />)}
                       </span>
-                      <span style={{ fontSize: 11, color: 'var(--mut)' }}>0 → {max.toFixed(1)} {meta2.unit}</span>
+                      <span style={{ fontSize: 11, color: 'var(--mut)' }}>{legend.range}</span>
                       <span style={{ flexBasis: '100%', height: 0 }} />
                       {cols.map(s => <span key={s.k} style={{ fontSize: 11, color: 'var(--mut)' }}><strong style={{ color: hue(s) }}>{s.label}</strong> {s.name}</span>)}
                       <span style={{ fontSize: 11, color: 'var(--mut)' }}>cell = mean of the runs present · bars = runs uploaded, up to 10</span>
@@ -688,16 +765,19 @@ export default function App({ vault, reconnect, onLeave, startProject, viewer }:
         {vaultDlg && <VaultDialog vault={vault} svc={svc} readOnly={readOnly} onClose={() => setVaultDlg(false)} onAttachData={p => attachData(p).catch(showErr)}
           onChanged={() => { bump(); void refreshProjects(); }} onLeave={() => void leave()} />}
         {compareOpen && !compareHeld && picks.length > 0 && <CompareDialog picks={picks} setPicks={setPicks} onClose={() => { setCompareOpen(false); setPicks([]); }} />}
-        {compareHeld && (
-          <div style={{ position: 'fixed', left: '50%', top: 18, transform: 'translateX(-50%)', zIndex: 1001, display: 'flex', alignItems: 'center', gap: 10, padding: '9px 16px', borderRadius: 99, background: 'var(--ink)', color: 'var(--bg)', fontSize: 12, letterSpacing: '0.03em', boxShadow: '0 10px 28px rgba(0,0,0,0.28)', pointerEvents: 'none', animation: 'toastIn 140ms ease-out' }}>
-            <span style={{ fontWeight: 700, color: 'var(--acc)' }}>COMPARE</span>
-            <span>{picks.length ? plural(picks.length, 'pick') + ' · release ' + keyLabel(settings.compareKey) + ' to see them together' : 'click cells or sequence names'}</span>
+        {(compareHeld || exportHold) && (
+          <div role="status" style={{ position: 'fixed', left: '50%', top: 18, transform: 'translateX(-50%)', zIndex: 1001, display: 'flex', alignItems: 'center', gap: 10, padding: '9px 16px', borderRadius: 99, background: 'var(--ink)', color: 'var(--bg)', fontSize: 12, letterSpacing: '0.03em', boxShadow: '0 10px 28px rgba(0,0,0,0.28)', pointerEvents: 'none', animation: 'toastIn 140ms ease-out' }}>
+            <span style={{ fontWeight: 700, color: 'var(--acc)' }}>{exportHold ? 'EXPORT' : 'COMPARE'}</span>
+            {exportHold
+              ? <span>{picks.length ? plural(picks.length, 'pick') : 'click cells or sequence names'}{exportHold.all ? ' · every analysis with the PMF' : ''} · release <kbd>{keyLabel(settings.exportKey)}</kbd> to export{exportHold.all ? '' : <> · <kbd>Shift</kbd> too: every analysis</>}</span>
+              : <span>{picks.length ? plural(picks.length, 'pick') + ' · release ' + keyLabel(settings.compareKey) + ' to see them together' : 'click cells or sequence names'}</span>}
           </div>
         )}
         <Laser on={laser} color={settings.laserColor} size={settings.laserSize} trail={settings.laserTrail} />
-        {toast && (
+        {/* Always present, so screen readers announce each toast (an export names its file, R8a). */}
+        <div role="status" aria-live="polite">{toast && (
           <div style={{ position: 'fixed', left: '50%', bottom: 22, transform: 'translateX(-50%)', zIndex: 1001, padding: '7px 14px', borderRadius: 99, background: 'var(--ink)', color: 'var(--bg)', fontSize: 11, letterSpacing: '0.04em', boxShadow: '0 8px 24px rgba(0,0,0,0.25)', pointerEvents: 'none', animation: 'toastIn 140ms ease-out' }}>{toast}</div>
-        )}
+        )}</div>
       </div>
     </Ctx.Provider>
   );

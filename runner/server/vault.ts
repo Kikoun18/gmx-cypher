@@ -8,6 +8,7 @@ import { DEFAULT_ANALYSES, DEFAULT_SETTINGS } from '../../app/src/lib/seq';
 import { StorageError, type StorageBackend } from '../../app/src/lib/storage/backend/types';
 import { VaultIO } from '../../app/src/lib/storage/io';
 import { APP_ID, compatibility, readManifest } from '../../app/src/lib/storage/manifest';
+import { SCHEMA_VERSION } from '../../app/src/lib/storage/records';
 import { storeFrom, type ProjectState } from '../../app/src/lib/storage/model';
 import { join, recordPaths, vaultPaths } from '../../app/src/lib/storage/path';
 import type { ColumnRecord, PageRecord, ProjectRecord, RowRecord } from '../../app/src/lib/storage/records';
@@ -35,7 +36,7 @@ export class ReadOnlyBackend implements StorageBackend {
 
 export interface VaultView { path: string; io: VaultIO; schema: number; compat: 'ok' | 'upgrade' }
 
-/** Schemas 1–3 (T32): PMF Sequences upgrades older ones itself when it opens them. */
+/** Schemas 1 to the current one, 4 with batch 3 (T32, T142): PMF Sequences upgrades older ones itself when it opens them. */
 export async function openVault(path: string): Promise<VaultView> {
   const root = realpathSync(path), io = new VaultIO(new ReadOnlyBackend(new NodeBackend(root)));
   io.readOnly = true;
@@ -43,7 +44,7 @@ export async function openVault(path: string): Promise<VaultView> {
   if (!m) throw new Error(path + ' is not a PMF Sequences vault (no .matrix/manifest.json)');
   const compat = m.app === APP_ID ? compatibility(m) : 'foreign';
   if (compat === 'foreign') throw new Error(path + ' is not a PMF Sequences vault (its manifest names ' + (m.app || '?') + ' / ' + (m.format || '?') + ')');
-  if (compat === 'newer') throw new Error(path + ' was made by a newer PMF Sequences (schema ' + m.schemaVersion + '); gmx-cypher reads schemas 1–3');
+  if (compat === 'newer') throw new Error(path + ' was made by a newer PMF Sequences (schema ' + m.schemaVersion + '); gmx-cypher reads schemas 1–' + SCHEMA_VERSION);
   return { path: root, io, schema: m.schemaVersion, compat };
 }
 

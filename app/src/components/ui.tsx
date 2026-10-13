@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 
 export const stop = (e: { stopPropagation(): void }) => e.stopPropagation();
-export const plural = (n: number, one: string, many = one + 's') => n + ' ' + (n === 1 ? one : many);
+export { plural } from '../lib/seq';
 export const pad2 = (n: number) => String(n).padStart(2, '0');
 
 /** Section header: small caps label, hairline, optional trailing content. */
@@ -60,9 +60,9 @@ export const SlidersIcon = () => (
   <svg width="15" height="15" viewBox="0 0 24 24" {...svg}><line x1="21" x2="14" y1="4" y2="4" /><line x1="10" x2="3" y1="4" y2="4" /><line x1="21" x2="12" y1="12" y2="12" /><line x1="8" x2="3" y1="12" y2="12" /><line x1="21" x2="16" y1="20" y2="20" /><line x1="12" x2="3" y1="20" y2="20" /><line x1="14" x2="14" y1="2" y2="6" /><line x1="8" x2="8" y1="10" y2="14" /><line x1="16" x2="16" y1="18" y2="22" /></svg>
 );
 
-export type ExportFormat = 'xvg' | 'png' | 'pdf';
+export type ExportFormat = 'xvg' | 'png' | 'svg' | 'pdf';
 
-/** Dropdown with xvg / png / pdf. `trigger` renders the button given open state + toggle. */
+/** Dropdown with xvg / png / svg / pdf (laid out by Settings → Export, R8a). `trigger` renders the button given open state + toggle. */
 export function ExportMenu({ open, setOpen, head, hints, width, onPick, trigger }: {
   open: boolean; setOpen: (v: boolean) => void; head: string; hints: Record<ExportFormat, string>; width: number;
   onPick: (f: ExportFormat) => void; trigger: (open: boolean, toggle: () => void) => ReactNode;
@@ -75,7 +75,7 @@ export function ExportMenu({ open, setOpen, head, hints, width, onPick, trigger 
           <div onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 19 }} />
           <div className="menu" style={{ width }}>
             <div className="lbl" style={{ padding: '6px 8px 4px' }}>{head}</div>
-            {(['xvg', 'png', 'pdf'] as ExportFormat[]).map(f => (
+            {(['xvg', 'png', 'svg', 'pdf'] as ExportFormat[]).map(f => (
               <button key={f} className="h-surf" onClick={() => { setOpen(false); onPick(f); }}
                 style={{ display: 'flex', alignItems: 'baseline', gap: 10, padding: '8px 10px', border: 0, borderRadius: 8, background: 'transparent', textAlign: 'left' }}>
                 <span style={{ fontWeight: 700, fontSize: 12, width: 30, flex: 'none' }}>{f}</span>

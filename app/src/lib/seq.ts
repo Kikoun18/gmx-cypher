@@ -3,9 +3,11 @@
 
 import { SACCH, correctCurve, runStats, wellArea } from './pmf';
 import type { GmxHeader } from './gmxHeader';
-import { curveDisplay } from './storage/records';
+import { curveDisplay, dashOf, pinsOf, scriptFnsOf, typeFromOf } from './storage/records';
+import { scriptResult, transformKey } from './scriptRuns';
+import { finitePoints } from './scripts';
 import type {
-  AnalysisType, Column, Curve, Extra, LitRef, Metric, Page, Run, Seq, Settings, Slot, Store, StructMeta, Table, TagDef, Vis, XvgHead,
+  Transform, TypeFrom, AnalysisType, Column, Curve, Extra, LitRef, Metric, Page, Run, ScriptFnSettings, ScriptRef, Seq, Settings, Slot, Store, StructMeta, Table, TagDef, Vis, XvgHead,
 } from './types';
 
 export const METRIC_META: Record<Metric, { label: string; unit: string; desc: string }> = {
@@ -56,6 +58,8 @@ export function tagLabel(tags: string[], list: TagDef[]): string {
 }
 
 export const DEFAULT_TEMP = 310.15;
+
+export const plural = (n: number, one: string, many = one + 's') => n + ' ' + (n === 1 ? one : many);
 
 // Up to ten runs per cell. Slot keys stay letters so older data ('a', 'b') still reads.
 export const SLOTS: Slot[] = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'];
@@ -280,8 +284,17 @@ export const DEFAULT_ANALYSES: AnalysisType[] = [
   { k: 'rg', label: 'Rg', name: 'Radius of gyration', xLabel: 'Time (ps)', yLabel: 'Rg (nm)', xCol: 1, yCols: '2', xScale: 1, style: 'line', match: 'gyrate, gyration, rg' },
   { k: 'hbond', label: 'H-bonds', name: 'Hydrogen bonds', xLabel: 'Time (ps)', yLabel: 'Number', xCol: 1, yCols: '2', xScale: 1, style: 'line', match: 'hbond, hbnum, hydrogen' },
   { k: 'dist', label: 'Distance', name: 'COM distance', xLabel: 'Time (ps)', yLabel: 'Distance (nm)', xCol: 1, yCols: '2', xScale: 1, style: 'line', match: 'distance, pullx' },
-  { k: 'energy', label: 'Energy', name: 'Energy terms', xLabel: 'Time (ps)', yLabel: 'kJ/mol', xCol: 1, yCols: 'all', xScale: 1, style: 'line', match: 'energy' },
+  { k: 'energy', label: 'Energy', name: 'Energy terms', xLabel: 'Time (ps)', yLabel: 'kJ/mol', xCol: 1, yCols: 'all', xScale: 1, style: 'line', match: 'energy', tools: 'gmx energy' },
+  // Batch 3 (F84). Data comes last: the type of a file nothing else matches (F83).
+  { k: 'free-energy', label: 'Free energy (z)', name: 'Free-energy profile along a signed coordinate', xLabel: 'z (nm)', yLabel: 'Free energy (kJ/mol)', xCol: 1, yCols: '2', xScale: 1, style: 'line', match: 'free energy, translocation' },
+  { k: 'density', label: 'Density', name: 'Density profile', xLabel: 'Position (nm)', yLabel: 'Density (kg m^{-3})', xCol: 1, yCols: 'all', xScale: 1, style: 'line', match: 'density', tools: 'gmx density' },
+  { k: 'order', label: 'Order parameters', name: 'Lipid order parameters per carbon', xLabel: 'Atom', yLabel: 'Order parameter', xCol: 1, yCols: 'all', xScale: 1, style: 'points', match: 'order parameter, order parameters' },
+  { k: 'temperature', label: 'Temperature', name: 'Temperature over time', xLabel: 'Time (ps)', yLabel: 'Temperature (K)', xCol: 1, yCols: 'all', xScale: 1, style: 'line', match: 'temperature', tools: 'gmx energy' },
+  { k: 'pressure', label: 'Pressure', name: 'Pressure over time', xLabel: 'Time (ps)', yLabel: 'Pressure (bar)', xCol: 1, yCols: 'all', xScale: 1, style: 'line', match: 'pressure', tools: 'gmx energy' },
+  { k: 'data', label: 'Data', name: 'Data no other type matches', xLabel: 'x', yLabel: 'y', xCol: 1, yCols: 'all', xScale: 1, style: 'auto', match: '' },
 ];
+export const DATA_TYPE = DEFAULT_ANALYSES[DEFAULT_ANALYSES.length - 1];
+const ADDED_B3 = ['free-energy', 'density', 'order', 'temperature', 'pressure', DATA_TYPE.k];
 
 // --- display smoothing ---------------------------------------------------------
 // Only what is drawn (and exported as shown) is smoothed; stored curves never change.
@@ -344,11 +357,19 @@ export function smoothY(y: (number | null)[], r: number): (number | null)[] {
   });
 }
 
+/**
+ * PMF, then the project's types. A list saved before batch 3 has no Data type, so it gains the
+ * types added since, after its own (F114); a built-in that never had `tools` gets the built-in's.
+ */
 export function getAnalyses(st: Partial<Settings> | null): AnalysisType[] {
-  const s = st || {};
+  const s = st || {}, saved = Array.isArray(s.analyses) ? s.analyses : null;
   const pmf: AnalysisType = { k: 'pmf', label: 'PMF', name: 'AWH free-energy profile', xLabel: s.xLabel || 'Distance (nm)', yLabel: s.yLabel || 'PMF (kJ/mol)', style: 'line', match: 'pmf, awh' };
-  return [pmf].concat(Array.isArray(s.analyses) ? s.analyses : DEFAULT_ANALYSES);
+  const list = !saved ? DEFAULT_ANALYSES : saved.some(a => a.k === DATA_TYPE.k) ? saved : saved.concat(DEFAULT_ANALYSES.filter(d => ADDED_B3.includes(d.k) && !saved.some(a => a.k === d.k)));
+  return [pmf].concat(list.map(a => { const d = a.tools == null && DEFAULT_ANALYSES.find(x => x.k === a.k); return d && d.tools ? { ...a, tools: d.tools } : a; }));
 }
+
+/** The project's own types (no PMF), upgraded as getAnalyses does: what Settings lists and edits save. */
+export const projectAnalyses = (st: Partial<Settings> | null) => getAnalyses(st).slice(1);
 
 export function newAnalysis(list: { k: string }[], label: string): AnalysisType {
   let k = slug(label), n = 2;
@@ -356,7 +377,9 @@ export function newAnalysis(list: { k: string }[], label: string): AnalysisType 
   return { k, label, name: '', xLabel: 'x', yLabel: 'y', xCol: 1, yCols: '2', xScale: 1, style: 'line', match: '' };
 }
 
-const kws = (t: AnalysisType) => String(t.match || '').split(',').map(w => w.trim().toLowerCase()).filter(Boolean);
+const words = (s: string) => ' ' + s.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean).join(' ') + ' ';
+const commaList = (s?: string) => String(s || '').split(',').map(w => w.trim().toLowerCase()).filter(Boolean);
+const kws = (t: AnalysisType) => commaList(t.match);
 
 export function matchAna(types: AnalysisType[], token: string): AnalysisType | null {
   const t = String(token || '').trim().toLowerCase();
@@ -365,24 +388,26 @@ export function matchAna(types: AnalysisType[], token: string): AnalysisType | n
     || types.find(a => kws(a).includes(t)) || null;
 }
 
-// The file's own header is better evidence than its name: a gmx awh title
-// means PMF, then keywords in the xvg title / y label, then in the file name.
 /**
- * Header evidence first (the tool `gmx awh` or title AWH = PMF; then keywords in the
- * title and y label), then file-name keywords. No match: PMF, except for a file from
- * another GROMACS tool, which is unknown (k '') and has to be chosen (F32).
+ * Evidence in order (F114): the header — the tool `gmx awh` or the title AWH is PMF; then a type's GROMACS
+ * tool, then its keywords as whole words or phrases in the title, y label and legends — then whole words of
+ * the file name. The most matched words win, a tool outranks words, ties go by list order. No match: Data
+ * (F83). The x label is never evidence: "distance" doesn't make a coordinate radial.
  */
-export function detectAna(types: AnalysisType[], filename: string, head: XvgHead | null, tool: string | null = null): { k: string; from: 'header' | 'auto' } {
-  const match = (hay: string) => {
-    const toks = new Set(hay.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean));
-    const hit = (w: string) => toks.has(w) || (w.length >= 4 && hay.toLowerCase().includes(w));
-    return types.find(t => t.k !== 'pmf' && kws(t).some(hit));
+export function detectAna(types: AnalysisType[], filename: string, head: XvgHead | null, tool: string | null = null): { k: string; from: 'header' | 'name' | 'generic' } {
+  const best = (hay: string, byTool: boolean) => {
+    let top: AnalysisType | null = null, score = 0;
+    for (const t of types) {
+      const n = (byTool && tool && commaList(t.tools).includes(tool) ? 1000 : 0) + kws(t).reduce((m, w) => m + (hay.includes(words(w)) ? words(w).trim().split(' ').length : 0), 0);
+      if (n > score) { top = t; score = n; }
+    }
+    return top;
   };
   if (tool === 'gmx awh' || (head && head.title.trim().toLowerCase() === 'awh')) return { k: 'pmf', from: 'header' };
-  const h = head && match([head.title, head.yLabel].join(' '));
+  const h = head && best(words([head.title, head.yLabel, ...head.legends].join(' ')), true);
   if (h) return { k: h.k, from: 'header' };
-  const n = match(stripExt(filename));
-  return n ? { k: n.k, from: 'auto' } : tool ? { k: '', from: 'header' } : { k: 'pmf', from: 'auto' };
+  const n = best(words(stripExt(filename)), false);
+  return n ? { k: n.k, from: 'name' } : { k: DATA_TYPE.k, from: 'generic' };
 }
 
 // "2", "2,4", "2-5", "3-" or "all" → 1-based column numbers, x excluded.
@@ -398,27 +423,87 @@ export function ySpecCols(spec: string | undefined, n: number, xCol: number): nu
   return [...new Set(out)];
 }
 
-const cleanLabel = (t: string) => String(t || '').replace(/\\f\{[^}]*\}/g, '').replace(/\\[A-Za-z]/g, '').trim();
+// Label markup → text: Grace (\S…\N, \s…\N, \x Symbol font, \f{…}) and LaTeX math ($^{…}$, $_{…}$, \Delta, \AA)
+// become ^{…} / _{…} and Unicode letters. Unknown codes are dropped; nothing is added.
+const SYM = 'abcdefghiklmnopqrstuwxyz', GREEK = 'αβχδεφγηικλμνοπθρστυωξψζ';
+const TEX: Record<string, string> = { AA: 'Å', circ: '°', cdot: '·', times: '×', pm: '±' };
+'alpha beta gamma delta epsilon zeta eta theta iota kappa lambda mu nu xi omicron pi rho sigma tau upsilon phi chi psi omega'.split(' ')
+  .forEach((n, i) => { TEX[n] = 'αβγδεζηθικλμνξοπρστυφχψω'[i]; TEX[n[0].toUpperCase() + n.slice(1)] = TEX[n].toUpperCase(); });
+const texMath = (m: string) => m
+  .replace(/\\([A-Za-z]+|.) ?/g, (_, n: string) => (/[A-Za-z]/.test(n) ? TEX[n] ?? '' : ',;: '.includes(n) ? ' ' : n))
+  .split(/([\^_](?:\{[^{}]*\}|.))/)
+  .map((p, i) => (i % 2 ? p[0] + '{' + p.slice(1).replace(/^\{|\}$/g, '') + '}' : p.replace(/[{}]/g, '')))
+  .join('');
+function cleanLabel(raw: string): string {
+  const s = String(raw || '').replace(/\$([^$]*)\$/g, (_, m: string) => texMath(m));
+  let out = '', sh = '', sym = false;
+  const to = (m: string) => { if (sh) out += '}'; sh = m; if (m) out += m + '{'; };
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (c !== '\\') { const k = sym ? SYM.indexOf(c.toLowerCase()) : -1; out += k < 0 ? c : c === c.toLowerCase() ? GREEK[k] : GREEK[k].toUpperCase(); continue; }
+    const n = s[++i];
+    if (n === 'S' || n === 's') to(n === 'S' ? '^' : '_');
+    else if (n === 'N') to('');
+    else if (n === 'x') sym = true;
+    else if (n === 'f') { const e = s[i + 1] === '{' ? s.indexOf('}', i) : -1; sym = e > 0 && /^symbol$/i.test(s.slice(i + 2, e)); if (e > 0) i = e; }
+    else if (n === '\\') out += '\\';
+  }
+  to('');
+  return out.trim();
+}
 
-// Whole numeric table plus the grace header (title, axis labels, legends).
+/** A label's runs of normal (0), superscript (1) and subscript (−1) text, from ^{…} and _{…}. */
+export function labelParts(s: string): { t: string; v: 0 | 1 | -1 }[] {
+  const out: { t: string; v: 0 | 1 | -1 }[] = [];
+  String(s || '').split(/([\^_]\{[^{}]*\})/).forEach((p, i) => {
+    if (i % 2) out.push({ t: p.slice(2, -1), v: p[0] === '^' ? 1 : -1 });
+    else if (p) out.push({ t: p, v: 0 });
+  });
+  return out.length ? out : [{ t: '', v: 0 }];
+}
+
+/** [name, unit]: the unit is a last (…) or […] that starts the label or follows a space (F109: it keeps its case). */
+export function splitUnit(s: string): [string, string] {
+  const m = /(^|\s)(\([^()]*\)|\[[^[\]]*\])\s*$/.exec(s);
+  return m ? [s.slice(0, m.index + m[1].length), m[2]] : [s, ''];
+}
+
+/** The Symbol-font letter that draws a Greek one (as Grace's \\x and PDF's Symbol font do), or null. */
+export const symbolLetter = (c: string) => { const k = GREEK.indexOf(c.toLowerCase()); return k < 0 ? null : c === c.toLowerCase() ? SYM[k] : SYM[k].toUpperCase(); };
+
+/** A label written back as Grace markup, the inverse of what the parser reads. */
+export const toGrace = (s: string) => labelParts(s).map(p => (p.v ? (p.v > 0 ? '\\S' : '\\s') + p.t + '\\N' : p.t)).join('')
+  .replace(/[α-ωΑ-Ω]+/g, g => '\\x' + [...g].map(c => symbolLetter(c) ?? c).join('') + '\\f{}');
+
+// Whole numeric table plus the header: Grace (title, axis labels, legends) or `@ xlabel`/`@ ylabel`,
+// and row names from a comment directly above every row. Values split on whitespace or commas;
+// nan, inf or an empty field is a missing value (NaN); rows without a finite x are skipped.
 export function parseTable(text: string): Table {
-  const rows: number[][] = [], head: XvgHead = { title: '', xLabel: '', yLabel: '', legends: [] };
-  const q = (l: string) => { const m = /"([^"]*)"/.exec(l); return m ? cleanLabel(m[1]) : ''; };
+  const rows: number[][] = [], names: (string | undefined)[] = [], head: XvgHead = { title: '', xLabel: '', yLabel: '', legends: [] };
+  const q = (l: string) => { const m = /"([^"]*)"/.exec(l); return m ? cleanLabel(m[1]) : null; };
+  let name: string | undefined;
   for (const raw of text.split(/\r?\n/)) {
     const line = raw.trim();
-    if (!line || line[0] === '#' || line[0] === '&') continue;
+    if (!line || line[0] === '&') continue;
+    if (line[0] === '#') { name = line.slice(1).trim().replace(/:$/, ''); continue; }
     if (line[0] === '@') {
-      const l = line.slice(1).trim();
-      if (/^title\b/i.test(l)) head.title = q(l);
-      else if (/^xaxis\s+label/i.test(l)) head.xLabel = q(l);
-      else if (/^yaxis\s+label/i.test(l)) head.yLabel = q(l);
-      else { const m = /^s(\d+)\s+legend/i.exec(l); if (m) head.legends[+m[1]] = q(l); }
+      name = undefined;
+      const l = line.slice(1).trim(), dat = /^([xy])label\s+(.*)$/i.exec(l), v = q(l);
+      if (dat) head[dat[1].toLowerCase() === 'x' ? 'xLabel' : 'yLabel'] = q(dat[2]) ?? cleanLabel(dat[2]);
+      else if (v == null) continue;
+      else if (/^title\b/i.test(l)) head.title = v;
+      else if (/^xaxis\s+label/i.test(l)) head.xLabel = v;
+      else if (/^yaxis\s+label/i.test(l)) head.yLabel = v;
+      else { const m = /^s(\d+)\s+legend/i.exec(l); if (m) head.legends[+m[1]] = v; }
       continue;
     }
-    const parts = line.split(/\s+/).map(Number);
-    if (!isFinite(parts[0])) continue;
+    const parts = line.replace(/,\s*$/, '').split(/\s*,\s*|\s+/).map(p => (p ? Number(p) : NaN));
+    if (!isFinite(parts[0])) { name = undefined; continue; }
     rows.push(parts);
+    names.push(name);
+    name = undefined;
   }
+  if (rows.length > 1 && names.every(Boolean)) head.rowLabels = names as string[];
   const n = rows.reduce((m, r) => Math.max(m, r.length), 0);
   const cols = Array.from({ length: n }, (_, j) => rows.map(r => (r[j] === undefined ? NaN : r[j])));
   return { cols, n: rows.length, head };
@@ -435,10 +520,10 @@ export function pickXY(table: Table, xCol: number, yCol: number) {
 
 /**
  * One curve from a table: rows where x is finite, x multiplied by xScale, both
- * kept to 6 significant digits (non-finite y → null). pickCurves is built on it,
- * and the vault re-derives stored curves with it.
+ * kept to 6 significant digits (non-finite y → null), with the file's axis labels
+ * and row names. pickCurves is built on it, and the vault re-derives stored curves with it.
  */
-export function curveFromTable(table: Table, xCol: number, yCol: number, xScale: number): { x: (number | null)[]; y: (number | null)[] } {
+export function curveFromTable(table: Table, xCol: number, yCol: number, xScale: number): Pick<Curve, 'x' | 'y' | 'axis' | 'names'> {
   const X = table.cols[xCol - 1], Y = table.cols[yCol - 1];
   if (!X) throw new Error('no column ' + xCol);
   if (!Y) throw new Error('no column ' + yCol);
@@ -446,8 +531,12 @@ export function curveFromTable(table: Table, xCol: number, yCol: number, xScale:
   const keep: number[] = [];
   X.forEach((v, i) => { if (isFinite(v)) keep.push(i); });
   if (keep.length < 2) throw new Error('fewer than 2 rows');
-  const r = (v: number) => (isFinite(v) ? Number(v.toPrecision(6)) : null);
-  return { x: keep.map(i => r(X[i] * sc)), y: keep.map(i => r(Y[i])) };
+  const r = (v: number) => (isFinite(v) ? Number(v.toPrecision(6)) : null), h = table.head;
+  return {
+    x: keep.map(i => r(X[i] * sc)), y: keep.map(i => r(Y[i])),
+    ...(h.xLabel || h.yLabel ? { axis: { x: h.xLabel, y: h.yLabel } } : {}),
+    ...(h.rowLabels ? { names: keep.map(i => h.rowLabels![i] ?? null) } : {}),
+  };
 }
 
 /** A PMF run's arrays from a table: pickXY, rounded to 4 decimals exactly as addRun stores them. */
@@ -475,42 +564,104 @@ export const slotKey = (rowId: string, sacch: string, run: string) => rowId + '|
 
 // --- xvg -------------------------------------------------------------------
 
-// Curve stats on the corrected curve, at this run's own temperature.
-const statsCache = new WeakMap<Run, { corrected: number[]; min: number; at: number; area: number }>();
-export function curveStats(run: Run) {
-  let s = statsCache.get(run);
+// --- transforms (R2) -------------------------------------------------------------
+
+export const ENTROPY: Transform = { kind: 'entropy' }, NONE: Transform = { kind: 'none' };
+/** How each transform is named: in file names, kickers, notes and Settings. */
+export const TRANSFORMS: Record<Transform['kind'], { file: string; word: string; note: string; label: string }> = {
+  entropy: { file: 'corrected', word: 'corrected', note: 'corrected: + 2kT·ln r, plateau = 0', label: 'entropy correction' },
+  none: { file: 'no-correction', word: 'no correction', note: 'no correction', label: 'none' },
+  script: { file: 'transformed', word: 'transformed', note: 'transformed by a script', label: 'script function' },
+};
+/** A transform as stored: a known kind; a script's needs its script and function, and keeps only plain parameter values (R3c). */
+export function cleanTransform(v: unknown): Transform | undefined {
+  const t = v as { kind?: unknown; script?: unknown; fn?: unknown; params?: unknown } | null | undefined;
+  if (t?.kind === 'none') return NONE;
+  if (t?.kind === 'entropy') return ENTROPY;
+  if (t?.kind !== 'script' || typeof t.script !== 'string' || !t.script || typeof t.fn !== 'string' || !t.fn) return undefined;
+  const params = Object.fromEntries(Object.entries(t.params && typeof t.params === 'object' ? t.params : {}).filter(([, p]) => ['string', 'number', 'boolean'].includes(typeof p)).sort(([a], [b]) => (a < b ? -1 : 1)));
+  return { kind: 'script', script: t.script, fn: t.fn, ...(Object.keys(params).length ? { params } : {}) };
+}
+/** PMF's transform: the project's choice, else the entropy correction (F87). */
+export const pmfTransform = (st: Partial<Settings>): Transform => cleanTransform(st.pmfTransform) ?? ENTROPY;
+/** A type's transform: PMF's setting, else the type's own (none unless chosen). */
+export const transformOf = (t: AnalysisType, st: Partial<Settings>): Transform => (t.k === 'pmf' ? pmfTransform(st) : cleanTransform(t.transform) ?? NONE);
+
+/**
+ * x and y after a transform. Missing points are left out of it and stay missing (F86); none returns y itself. A script's
+ * answer comes from scriptResult (R3c): until it is known, or if it failed, every point is missing; an (x, y) answer
+ * brings its own x.
+ */
+export function transformXY(t: Transform, x: (number | null)[], y: (number | null)[], temp: number): { x: (number | null)[]; y: (number | null)[] } {
+  if (t.kind === 'none') return { x, y };
+  const out: (number | null)[] = y.map(() => null);
+  if (t.kind === 'script') {
+    const r = scriptResult({ script: t.script, fn: t.fn, role: 'transform', params: t.params, x, y });
+    if (r.state !== 'done' || !r.ok || !('y' in r)) return { x, y: out };
+    if (r.x) return { x: r.x, y: r.y };
+    finitePoints(x, y).keep.forEach((i, k) => { out[i] = r.y[k]; });
+    return { x, y: out };
+  }
+  const keep = y.flatMap((v, i) => (v != null && isFinite(v) && x[i] != null ? [i] : []));
+  const c = correctCurve(keep.map(i => x[i]!), keep.map(i => y[i]!), { temperature: temp });
+  keep.forEach((i, k) => { out[i] = c[k]; });
+  return { x, y: out };
+}
+export const applyTransform = (t: Transform, x: (number | null)[], y: (number | null)[], temp: number) => transformXY(t, x, y, temp).y;
+
+// Curve stats after the run's transform, at its own temperature; cached per run and transform (a script's by its
+// version and values). A script transform's answer that isn't there yet is never cached: its stats are NaN.
+const statsCache = new WeakMap<Run, Map<string, { x: (number | null)[]; curve: number[]; min: number; at: number; area: number }>>();
+export function curveStats(run: Run, t: Transform) {
+  let m = statsCache.get(run);
+  if (!m) statsCache.set(run, (m = new Map()));
+  const key = transformKey(t);
+  let s = m.get(key);
   if (!s) {
-    const c = correctCurve(run.x, run.y, { temperature: run.temp || DEFAULT_TEMP });
+    const { x, y } = transformXY(t, run.x, run.y, run.temp || DEFAULT_TEMP), c = y as number[];
+    if (t.kind === 'script' && !y.some(v => v != null)) return { x, curve: c, min: NaN, at: NaN, area: NaN };
     const rs = runStats(c);
-    s = { corrected: c, min: rs.min, at: run.x[rs.at], area: wellArea(run.x, c) };
-    statsCache.set(run, s);
+    s = { x, curve: c, min: rs.min, at: x[rs.at] as number, area: wellArea(x as number[], c) };
+    m.set(key, s);
   }
   return s;
 }
 
-export function runCurve(run: Run, corrected: boolean): number[] {
-  return corrected ? curveStats(run).corrected : run.y;
-}
+export const runCurve = (run: Run, t: Transform): number[] => curveStats(run, t).curve;
+/** A run's points after its transform, with the x they belong to (a script may return its own). */
+export const runXY = (run: Run, t: Transform) => { const s = curveStats(run, t); return { x: s.x, y: s.curve }; };
 
 export type SkipFn = ((seq: Seq, run: Run) => boolean) | null;
 
 // Cell value = mean of the metric over whichever runs are present.
-export function cellValue(seq: Seq, sacchKey: string, metric: Metric, skip: SkipFn): number | null {
+export function cellValue(seq: Seq, sacchKey: string, metric: Metric, skip: SkipFn, t: Transform): number | null {
   const runs = seq.runs.filter(r => r.sacch === sacchKey && r.state !== 'missing' && !(skip && skip(seq, r)));
   if (!runs.length) return null;
-  const vs = runs.map(r => curveStats(r)[metric]);
+  const vs = runs.map(r => curveStats(r, t)[metric]);
+  // A script transform's answer that isn't there (yet) gives no value rather than a wrong one.
+  if (vs.some(v => !isFinite(v))) return null;
   return vs.reduce((a, b) => a + b, 0) / vs.length;
 }
 
-export function maxMag(seqs: Seq[], metric: Metric, cols: Column[], skip: SkipFn): number {
+export function maxMag(seqs: Seq[], metric: Metric, cols: Column[], skip: SkipFn, t: Transform): number {
   let m = 0;
   for (const s of seqs) for (const sc of cols) {
-    const v = cellValue(s, sc.k, metric, skip);
+    const v = cellValue(s, sc.k, metric, skip, t);
     if (v != null) m = Math.max(m, Math.abs(v));
   }
   return m || 1;
 }
 
+
+/** How many matrix tiles changing the transform from a to b would alter, add or remove (R2). */
+export function tileDiff(seqs: Seq[], cols: Column[], metric: Metric, skip: SkipFn, a: Transform, b: Transform) {
+  const n = { changed: 0, added: 0, removed: 0 };
+  for (const s of seqs) for (const c of cols) {
+    const u = cellValue(s, c.k, metric, skip, a), v = cellValue(s, c.k, metric, skip, b);
+    if (u == null && v != null) n.added++; else if (u != null && v == null) n.removed++; else if (u !== v) n.changed++;
+  }
+  return n;
+}
 
 // --- store -----------------------------------------------------------------
 
@@ -518,12 +669,12 @@ export function emptyStore(): Store { return { seqs: [], cols: getCols(null), no
 
 export const DEFAULT_SETTINGS: Settings = {
   parse: true, pattern: DEFAULT_PATTERN, pathPattern: '', xCol: 1, yCol: 2, xLabel: 'Distance (nm)', yLabel: 'PMF (kJ/mol)', temp: '310.15', dark: null, bw: false, rowAll: false, hiddenOut: false,
-  laserKey: 'k', laserMode: 'toggle', laserColor: '#ff2a1a', laserSize: 'm', laserTrail: true, compareKey: 'c',
+  laserKey: 'k', laserMode: 'toggle', laserColor: '#ff2a1a', laserSize: 'm', laserTrail: true, compareKey: 'c', exportKey: 'e',
 };
 
 // Settings that describe a dataset travel with the project; the rest (theme,
 // laser pointer) belong to this browser and apply to every project.
-export const PROJECT_KEYS = ['parse', 'pattern', 'pathPattern', 'xCol', 'yCol', 'xLabel', 'yLabel', 'temp', 'rowAll', 'hiddenOut', 'analyses', 'tags'] as const;
+export const PROJECT_KEYS = ['parse', 'pattern', 'pathPattern', 'xCol', 'yCol', 'xLabel', 'yLabel', 'temp', 'rowAll', 'hiddenOut', 'analyses', 'tags', 'pmfTransform', 'metrics', 'metric'] as const;
 const isProjectKey = (k: string) => (PROJECT_KEYS as readonly string[]).includes(k);
 
 export function splitSettings(patch: Partial<Settings>): { project: Partial<Settings>; app: Partial<Settings> } {
@@ -539,24 +690,24 @@ export function mergeSettings(app: Partial<Settings>, project: Partial<Settings>
 /** Older extras kept one shared x and a `ys` array; newer ones keep a list of curves. */
 type LegacyExtra = Partial<Extra> & { x?: (number | null)[]; ys?: (number | null)[][]; legends?: string[] };
 function normExtra(e: LegacyExtra): Extra {
-  // Visibility and shade from a file are cleaned like the vault does (curveDisplay).
-  const curves = Array.isArray(e.curves) ? e.curves.map(({ vis: _v, shade: _s, ...c }) => ({ ...c, ...curveDisplay({ vis: _v, shade: _s }) }))
+  // Visibility, shade and dash from a file are cleaned like the vault does.
+  const curves = Array.isArray(e.curves) ? e.curves.map(({ vis: _v, shade: _s, dash: _d, ...c }) => ({ ...c, ...curveDisplay({ vis: _v, shade: _s }), ...dashOf(_d) }))
     : (e.ys || []).map((y, j) => ({ id: uid('c'), x: e.x || [], y, label: (e.legends && e.legends[j]) || (e.ys!.length > 1 ? 'col ' + (j + 2) : 'col 2'), file: e.file || '' }));
-  return { id: e.id || uid('x'), type: e.type || 'pmf', sacch: e.sacch || '', run: (e.run || 'a') as Slot, time: e.time || '', file: e.file || '', added: e.added || today(), curves };
+  return { id: e.id || uid('x'), type: e.type || 'pmf', sacch: e.sacch || '', run: (e.run || 'a') as Slot, time: e.time || '', file: e.file || '', added: e.added || today(), curves, ...typeFromOf(e.typeFrom) };
 }
 
 function normSeq(s: Partial<Seq>): Seq {
   return {
     id: s.id || uid('s'), group: s.group || '', name: s.name || '', seq: s.seq || '', desc: s.desc || '',
     // Runs from before R2 carry `methods`; they load as tags.
-    runs: Array.isArray(s.runs) ? s.runs.map(r => { const { methods: _m, ...rest } = r as Run & { methods?: unknown }; return { ...rest, tags: tagsOf(r) }; }) : [],
+    runs: Array.isArray(s.runs) ? s.runs.map(r => { const { methods: _m, dash: _d, typeFrom: _t, ...rest } = r as Run & { methods?: unknown }; return { ...rest, tags: tagsOf(r), ...dashOf(_d), ...typeFromOf(_t) }; }) : [],
     extras: Array.isArray(s.extras) ? s.extras.map(normExtra) : [],
-    structures: Array.isArray(s.structures) ? s.structures : [],
+    structures: Array.isArray(s.structures) ? s.structures : [], ...pinsOf(s),
   };
 }
 
 function normPage(p: Partial<Page>): Page {
-  return { id: p.id || uid('pg'), name: (p.name || 'Untitled page').trim() || 'Untitled page', desc: p.desc || '', rows: Array.isArray(p.rows) ? [...new Set(p.rows)] : [], cols: Array.isArray(p.cols) && p.cols.length ? p.cols : null };
+  return { id: p.id || uid('pg'), name: (p.name || 'Untitled page').trim() || 'Untitled page', desc: p.desc || '', rows: Array.isArray(p.rows) ? [...new Set(p.rows)] : [], cols: Array.isArray(p.cols) && p.cols.length ? p.cols : null, ...(typeof p.metric === 'string' && p.metric ? { metric: p.metric } : {}) };
 }
 
 export function normStore(v: Partial<Store> | null): Store {
@@ -570,7 +721,51 @@ export function normStore(v: Partial<Store> | null): Store {
     pages: Array.isArray(v.pages) ? v.pages.map(normPage) : [],
   };
   if (v.settings && typeof v.settings === 'object') store.settings = splitSettings(v.settings).project;
+  const scripts = (Array.isArray(v.scripts) ? v.scripts : []).filter(k => k && typeof k.id === 'string' && typeof k.fileId === 'string' && typeof k.name === 'string')
+    .map(k => ({ id: k.id, name: k.name, fileId: k.fileId, ...(typeof k.sha256 === 'string' && k.sha256 ? { sha256: k.sha256 } : {}), fns: scriptFnsOf(k.fns) }));
+  if (scripts.length) store.scripts = scripts;
   return pruneCells(store);
+}
+
+// --- marks (R5b): a curve (run or curve ID) and an x; the y always comes from the data -----------
+const withMarks = (store: Store, rowId: string, f: (m: NonNullable<Seq['marks']>) => NonNullable<Seq['marks']>): Store => ({
+  ...store, seqs: store.seqs.map(s => { if (s.id !== rowId) return s; const { marks: _m, ...rest } = s, next = f(s.marks || []); return next.length ? { ...rest, marks: next } : rest; }),
+});
+export const addMark = (store: Store, rowId: string, curve: string, x: number): Store => withMarks(store, rowId, ms => (ms.some(m => m.curve === curve && m.x === x) ? ms : ms.concat({ curve, x })));
+export const moveMark = (store: Store, rowId: string, at: number, x: number): Store => withMarks(store, rowId, ms => ms.map((m, i) => (i === at ? { ...m, x } : m)));
+export const removeMark = (store: Store, rowId: string, at: number): Store => withMarks(store, rowId, ms => ms.filter((_, i) => i !== at));
+
+// --- reference lines (R5c): per graph ("<column>|<type>", or "*|<type>" for the row view), F100 -------------
+type RefLine = { axis: 'x' | 'y'; v: number };
+const withLines = (store: Store, rowId: string, key: string, f: (ls: RefLine[]) => RefLine[]): Store => ({
+  ...store, seqs: store.seqs.map(s => {
+    if (s.id !== rowId) return s;
+    const { [key]: old, ...others } = s.lines || {}, next = f(old || []), lines = next.length ? { ...others, [key]: next } : others;
+    const { lines: _l, ...rest } = s;
+    return Object.keys(lines).length ? { ...rest, lines } : rest;
+  }),
+});
+export const addLine = (store: Store, rowId: string, key: string, axis: 'x' | 'y', v: number): Store => withLines(store, rowId, key, ls => (ls.some(l => l.axis === axis && l.v === v) ? ls : ls.concat({ axis, v })));
+export const moveLine = (store: Store, rowId: string, key: string, at: number, v: number): Store => withLines(store, rowId, key, ls => ls.map((l, i) => (i === at ? { ...l, v } : l)));
+export const removeLine = (store: Store, rowId: string, key: string, at: number): Store => withLines(store, rowId, key, ls => ls.filter((_, i) => i !== at));
+
+// --- scripts (R3b) ------------------------------------------------------------------------
+const withScripts = (store: Store, list: ScriptRef[]): Store => {
+  const { scripts: _k, ...rest } = store;
+  return list.length ? { ...rest, scripts: list } : rest;
+};
+export const addScript = (store: Store, ref: ScriptRef): Store => withScripts(store, (store.scripts || []).concat(ref));
+export const removeScript = (store: Store, id: string): Store => withScripts(store, (store.scripts || []).filter(k => k.id !== id));
+/** A new version of a script: the same record and settings, a new original (the old one goes to the trash). Trust is asked again, since the SHA-256 changed. */
+export const replaceScript = (store: Store, id: string, file: Pick<ScriptRef, 'name' | 'fileId' | 'sha256'>): Store =>
+  withScripts(store, (store.scripts || []).map(({ sha256: _s, ...k }) => (k.id === id ? { ...k, name: file.name, fileId: file.fileId, ...(file.sha256 ? { sha256: file.sha256 } : {}) } : { ...k, ...(_s ? { sha256: _s } : {}) })));
+/** Sets (or, with empty values, clears) what you chose for one function. */
+export function setScriptFn(store: Store, id: string, fn: string, patch: Partial<ScriptFnSettings>): Store {
+  return withScripts(store, (store.scripts || []).map(k => {
+    if (k.id !== id) return k;
+    const one = scriptFnsOf({ [fn]: { ...k.fns[fn], ...patch } })[fn], { [fn]: _f, ...fns } = k.fns;
+    return { ...k, fns: one ? { ...fns, [fn]: one } : fns };
+  }));
 }
 
 export const seqKey = (name: string, seq: string, group: string) => (group || '').trim().toLowerCase() + '|' + (name || '').trim().toLowerCase() + '|' + (seq || '').trim().toUpperCase();
@@ -592,7 +787,7 @@ function ensureRow(seqs: Seq[], form: RowForm): Seq {
   return row;
 }
 
-export interface ExtraForm extends RowForm { type: string; sacch: string; run: Slot; time: string; file: string; curves: Curve[]; append?: boolean }
+export interface ExtraForm extends RowForm { type: string; sacch: string; run: Slot; time: string; file: string; curves: Curve[]; append?: boolean; typeFrom?: TypeFrom }
 
 // An analysis attached to a run slot. Same type + column + slot replaces it,
 // or — with append — gains the new curves alongside the ones already there.
@@ -603,7 +798,7 @@ export function addExtra(store: Store, form: ExtraForm) {
   if (i >= 0 && form.append) {
     row.extras[i] = { ...row.extras[i], curves: row.extras[i].curves.concat(form.curves) };
   } else {
-    const e: Extra = { id: uid('x'), type: form.type, sacch: form.sacch, run: form.run, time: form.time || '', file: form.file || '', added: today(), curves: form.curves };
+    const e: Extra = { id: uid('x'), type: form.type, sacch: form.sacch, run: form.run, time: form.time || '', file: form.file || '', added: today(), curves: form.curves, ...(form.typeFrom ? { typeFrom: form.typeFrom } : {}) };
     if (i >= 0) row.extras[i] = e; else row.extras.push(e);
   }
   return { store: { ...store, seqs }, rowId: row.id, replaced: i >= 0 && !form.append };
@@ -665,7 +860,7 @@ export function removeAnalysisData(store: Store, type: string): Store {
   return pruneCells({ ...store, seqs: cloneSeqs(store).map(s => ({ ...s, extras: s.extras.filter(e => e.type !== type) })).filter(alive) });
 }
 
-export interface RunForm extends RowForm { sacch: string; run: Slot; time: string; temp: string | number; tags: string[]; file: string; x: number[]; y: number[]; src?: Run['src'] }
+export interface RunForm extends RowForm { sacch: string; run: Slot; time: string; temp: string | number; tags: string[]; file: string; x: number[]; y: number[]; src?: Run['src']; typeFrom?: TypeFrom }
 
 export function addRun(store: Store, form: RunForm) {
   const seqs = cloneSeqs(store);
@@ -675,7 +870,7 @@ export function addRun(store: Store, form: RunForm) {
     time: form.time, temp: Number(form.temp) || DEFAULT_TEMP,
     tags: tagsOf(form), file: form.file || '', added: today(),
     x: form.x.map(v => +v.toFixed(4)), y: form.y.map(v => +v.toFixed(4)),
-    ...(form.src ? { src: form.src } : {}),
+    ...(form.src ? { src: form.src } : {}), ...(form.typeFrom ? { typeFrom: form.typeFrom } : {}),
   };
   const i = row.runs.findIndex(r => r.sacch === run.sacch && r.run === run.run);
   if (i >= 0) row.runs[i] = run; else row.runs.push(run);
@@ -725,8 +920,6 @@ export interface UploadForm extends RowForm {
   include?: Record<string, boolean>;
   /** Files in a chosen or dropped folder that were not read (not xvg, dat or txt). */
   skipped?: string[];
-  /** Analysis chosen for one file (an unknown one, F32), by file id. */
-  anaOf?: Record<string, string>;
 }
 
 /** The upload form pre-filled for one cell: that row (name kept, so several files become its next runs) and column. */
@@ -745,7 +938,8 @@ export interface PlanItem {
   yCol?: number;
   curves?: Curve[];
   ana: AnalysisType;
-  anaHow: 'file' | 'form' | 'header' | 'auto';
+  /** Where the type came from: the name pattern's {analysis}, the form, the header, file-name words, or no match (Data). */
+  anaHow: 'file' | 'form' | 'header' | 'name' | 'generic';
   err: string;
   group: string;
   name: string;
@@ -761,8 +955,6 @@ export interface PlanItem {
   dup: boolean;
   /** Identical content: already in the project or trash, or earlier in this batch. Not the same as `dup` (slot taken twice). */
   sameAs?: string;
-  /** The GROMACS tool of a file whose analysis couldn't be told (F32); not uploaded until one is chosen. */
-  unknown?: string;
   path?: string;
   /** Where each field read from the file came from. */
   from: Partial<Record<Field, FieldSource>>;
@@ -810,37 +1002,33 @@ export function planBatch(store: Store, form: UploadForm, types: AnalysisType[],
     return [f.id, { ...mergeFields(form.parse ? [['name', f.parsed], ...(path ? [path] : [])] : [], norm), matched: !!(f.parsed?.matched || path?.[1].matched) }];
   }));
   const pf = (f: UploadFile) => merged.get(f.id)!.fields;
-  const resolve = (f: UploadFile): { ana: AnalysisType; anaHow: PlanItem['anaHow']; unknown?: string } => {
+  const resolve = (f: UploadFile): { ana: AnalysisType; anaHow: PlanItem['anaHow'] } => {
     const p = pf(f);
     if (p.ana) { const a = matchAna(types, p.ana); if (a) return { ana: a, anaHow: 'file' }; }
-    const own = form.anaOf && types.find(t => t.k === form.anaOf![f.id]);
-    if (own) return { ana: own, anaHow: 'form' };
     if (form.ana && form.ana !== 'auto') { const a = types.find(t => t.k === form.ana); if (a) return { ana: a, anaHow: 'form' }; }
     const d = detectAna(types, f.file, f.head || null, f.gmx?.tool);
-    if (!d.k) return { ana: types.find(t => t.k === 'pmf') || types[0], anaHow: d.from, unknown: f.gmx!.tool! };
-    return { ana: types.find(t => t.k === d.k) || types[0], anaHow: d.from };
+    return { ana: types.find(t => t.k === d.k) || DATA_TYPE, anaHow: d.from };
   };
   const res = files.map(resolve);
   const sharedBy: Record<string, number> = {}, kBy: Record<string, number> = {};
   files.forEach((f, i) => {
     const k = res[i].ana.k;
-    if (!res[i].unknown && !pf(f).name && !pf(f).seq && !(append && k !== 'pmf')) sharedBy[k] = (sharedBy[k] || 0) + 1;
+    if (!pf(f).name && !pf(f).seq && !(append && k !== 'pmf')) sharedBy[k] = (sharedBy[k] || 0) + 1;
   });
   const taken: Record<string, Set<Slot>> = {}, hashed = new Map<string, string>();
   return files.map((f, fi) => {
     const sameAs = f.sameAs || (f.sha256 && hashed.has(f.sha256) ? 'Identical to ' + hashed.get(f.sha256) + ' in this upload' : undefined);
     if (f.sha256 && !hashed.has(f.sha256)) hashed.set(f.sha256, f.file);
     const p = pf(f);
-    const { ana, anaHow, unknown } = res[fi];
+    const { ana, anaHow } = res[fi];
     const isPmf = ana.k === 'pmf';
     let data: { x?: number[]; y?: number[]; xCol?: number; yCol?: number; curves?: Curve[] } | null = null, err = '';
     const xc = +st.xCol || 1, yc = +st.yCol || 2;
-    if (!unknown) try { data = isPmf ? picked(f.table!, 'xy:' + xc + ':' + yc, () => ({ ...pickXY(f.table!, xc, yc), xCol: xc, yCol: yc }))
+    try { data = isPmf ? picked(f.table!, 'xy:' + xc + ':' + yc, () => ({ ...pickXY(f.table!, xc, yc), xCol: xc, yCol: yc }))
       : picked(f.table!, JSON.stringify([ana, f.file, f.fileId]), () => ({ curves: pickCurves(f.table!, f.head || null, ana, f.file, f.fileId) })); }
     catch (e) { err = String((e as Error).message || e); }
     // A parsed sequence doubles as the row name when the pattern has no {name}.
     let name = (p.name || p.seq || '').trim();
-    if (!name && unknown) name = (form.name || '').trim();
     if (!name) {
       const k = (kBy[ana.k] = (kBy[ana.k] || 0) + 1);
       name = (form.name || '').trim() + (!form.keepName && sharedBy[ana.k] > 1 && form.name.trim() ? '+' + k : '');
@@ -864,14 +1052,14 @@ export function planBatch(store: Store, form: UploadForm, types: AnalysisType[],
     if (!run) run = SLOTS.find(s => !have.includes(s) && !batch.has(s)) || 'a';
     const dup = batch.has(run) && !joins;
     const inBatch = batch.has(run);
-    if (!unknown) batch.add(run);
+    batch.add(run);
     const fills = have.includes(run) || (joins && inBatch);
     return {
       id: f.id, file: f.file, fileId: f.fileId, ...(data || {}), ana, anaHow, err, group, name, seq, col, colNew, run,
       time: p.time != null ? p.time : form.time, temp: p.temp || form.temp,
       matched: merged.get(f.id)!.matched, path: f.path, from: merged.get(f.id)!.from, conflicts: merged.get(f.id)!.conflicts,
       replaces: have.includes(run) && !joins, appends: fills && joins,
-      dup, sameAs, unknown, ok: !!name && !dup && !err && !!data && !merged.get(f.id)!.conflicts.length && (!sameAs || !!(form.include && form.include[f.id])),
+      dup, sameAs, ok: !!name && !dup && !err && !!data && !merged.get(f.id)!.conflicts.length && (!sameAs || !!(form.include && form.include[f.id])),
     };
   });
 }
@@ -883,7 +1071,8 @@ export function addBatch(store: Store, form: UploadForm, plan: PlanItem[]) {
     if (!it.ok) continue;
     const cols = getCols(next);
     if (!cols.some(c => c.k === it.col.k)) next = { ...next, cols: cols.concat(it.col) };
-    const common = { name: it.name, seq: it.seq, group: it.group, desc: form.desc, file: it.file, sacch: it.col.k, run: it.run, time: it.time };
+    // Where the type came from is kept with it (F114, schema 4); the name pattern's {analysis} is stored as 'pattern'.
+    const common = { name: it.name, seq: it.seq, group: it.group, desc: form.desc, file: it.file, sacch: it.col.k, run: it.run, time: it.time, typeFrom: it.anaHow === 'file' ? 'pattern' as const : it.anaHow };
     const r = it.ana.k === 'pmf'
       ? addRun(next, { ...common, tags: form.tags, x: it.x!, y: it.y!, temp: it.temp, ...(it.fileId ? { src: { fileId: it.fileId, xCol: it.xCol!, yCol: it.yCol! } } : {}) })
       : addExtra(next, { ...common, type: it.ana.k, curves: it.curves!, append: form.onClash === 'append' });
@@ -891,6 +1080,101 @@ export function addBatch(store: Store, form: UploadForm, plan: PlanItem[]) {
     touched.add(r.rowId); usedCols.add(it.col.k);
   }
   return { store: next, last, count: n, touched: [...touched], cols: [...usedCols] };
+}
+
+// --- change type (R7) -------------------------------------------------------------
+
+export interface RetypeOptions { onClash: 'replace' | 'append'; /** For a new PMF run: its temperature. */ temp?: number; metric: Metric; skip: SkipFn }
+export interface RetypePreview {
+  /** Why it can't be done; nothing else is filled in. */
+  problem?: string;
+  /** What the save changes, in order. */
+  changes: string[];
+  /** The curves after the change, re-read from the originals with the new type's columns. */
+  curves: { label: string; points: number }[];
+  /** Originals that are missing: their curves are kept as they are. */
+  kept: string[];
+  /** Matrix values that change (the current metric). */
+  values: { label: string; before: number | null; after: number | null }[];
+  /** What no longer applies: tags, legends, looks, marks. */
+  lost: string[];
+}
+
+/**
+ * A run's or analysis's type changed to `toType` (another type, or 'pmf'), in the same slot (F104). Curves are re-read
+ * from `tables` (the parsed originals, by file ID) with the new type's columns, keeping each old curve's ID, typed legend
+ * and looks by file and position; a missing original keeps its curves. One pure function: the dialog shows its preview
+ * and the save commits its store.
+ */
+export function retype(store: Store, st: Settings, rowId: string, target: { kind: 'run' | 'analysis'; id: string }, toType: string, tables: Map<string, Table | null>, o: RetypeOptions): { store: Store; preview: RetypePreview } {
+  const types = getAnalyses(st), q = store.seqs.find(s => s.id === rowId);
+  const run = target.kind === 'run' ? q?.runs.find(r => r.id === target.id) : undefined;
+  const ex = target.kind === 'analysis' ? q?.extras.find(e => e.id === target.id) : undefined;
+  const fail = (problem: string) => ({ store, preview: { problem, changes: [], curves: [], kept: [], values: [], lost: [] } });
+  const T = types.find(t => t.k === toType);
+  if (!q || !(run || ex)) return fail('It is no longer there.');
+  if (!T) return fail('There is no type ' + toType + '.');
+  const from = run ? 'pmf' : ex!.type, it = (run || ex)!, sacch = it.sacch, slot = it.run;
+  if (from === toType) return fail('It is already ' + T.label + '.');
+  const where = (getCols(store).find(c => c.k === sacch)?.label || sacch) + ' × ' + q.name + ' ' + runLabel(slot);
+  const changes = [(types.find(t => t.k === from)?.label || from) + ' → ' + T.label + ' · ' + where], kept: string[] = [], lost: string[] = [];
+  const removed = new Set<string>([it.id]), moved = new Map<string, string>();
+  let runs = q.runs.filter(r => r !== run), extras = q.extras.filter(e => e !== ex), curves: Curve[] = [];
+  if (toType === 'pmf') {
+    const cs = ex!.curves, c = cs[0];
+    if (cs.length !== 1) return fail('An analysis with ' + plural(cs.length, 'curve') + ' can’t become a PMF run: only one curve can.');
+    const t = c.src && tables.get(c.src.fileId), xc = +st.xCol || 1, yc = +st.yCol || 2;
+    let xy: { x: number[]; y: number[] }, src = c.src && { fileId: c.src.fileId, xCol: xc, yCol: yc };
+    if (t) { try { xy = runFromTable(t, xc, yc); } catch (e) { return fail(String((e as Error).message || e)); } }
+    else {
+      kept.push(c.file || c.label);
+      const keep = c.x.flatMap((x, i) => (x != null && c.y[i] != null ? [i] : []));
+      xy = { x: keep.map(i => c.x[i]!), y: keep.map(i => c.y[i]!) };
+      src = c.src && { fileId: c.src.fileId, xCol: c.src.xCol, yCol: c.src.yCol };
+    }
+    if (c.custom) lost.push('the legend “' + c.label + '”');
+    if (c.vis || c.shade) lost.push('the curve’s shade or visibility');
+    const clash = runs.find(r => r.sacch === sacch && r.run === slot);
+    if (clash) { changes.push('replaces PMF · ' + where + ' — it goes to the trash'); runs = runs.filter(r => r !== clash); removed.add(clash.id); }
+    cs.forEach(x => removed.add(x.id));
+    const made: Run = { id: uid('r'), sacch, run: slot, time: ex!.time, temp: o.temp || DEFAULT_TEMP, tags: [], file: c.file || '', added: ex!.added, ...xy, ...(src ? { src } : {}), ...(c.dash != null ? { dash: c.dash } : {}), typeFrom: 'changed' };
+    runs = runs.concat(made); moved.set(c.id, made.id);
+    curves = [{ ...c, x: xy.x, y: xy.y }];
+  } else {
+    // A run reads as one curve (its legend the file name); an analysis keeps its curves' order by file.
+    const old: Curve[] = run ? [{ id: uid('c'), x: run.x, y: run.y, label: stripExt(run.file) || 'col 2', file: run.file, ...(run.src ? { src: { ...run.src, xScale: 1 } } : {}), ...(run.dash != null ? { dash: run.dash } : {}) }] : ex!.curves;
+    if (run) moved.set(run.id, old[0].id);
+    for (const fid of [...new Set(old.map(c => c.src?.fileId ?? c.id))]) {
+      const mine = old.filter(c => (c.src?.fileId ?? c.id) === fid), t = mine[0].src && tables.get(mine[0].src.fileId);
+      let fresh: Curve[] | null = null;
+      try { if (t) fresh = pickCurves(t, t.head, T, mine[0].file || '', mine[0].src!.fileId); } catch { fresh = null; }
+      if (!fresh) { kept.push(mine[0].file || mine[0].label); curves.push(...mine); continue; }
+      curves.push(...fresh.map((c, j) => { const was = mine[j]; return was ? { ...c, id: was.id, ...(was.custom ? { label: was.label, custom: true } : {}), ...curveDisplay(was), ...(was.dash != null ? { dash: was.dash } : {}) } : c; }));
+      mine.slice(fresh.length).forEach(c => removed.add(c.id));
+    }
+    if (run && run.tags.length) lost.push('tags: ' + tagLabel(run.tags, getTags(st)));
+    const clash = extras.find(e => e.type === toType && e.sacch === sacch && e.run === slot);
+    const made: Extra = { id: ex ? ex.id : uid('x'), type: toType, sacch, run: slot, time: it.time, file: curves[0]?.file || it.file, added: it.added, curves, typeFrom: 'changed' };
+    if (clash && o.onClash === 'append') {
+      changes.push('adds ' + plural(curves.length, 'curve') + ' to ' + T.label + ' · ' + where);
+      extras = extras.map(e => (e === clash ? { ...e, curves: e.curves.concat(curves) } : e));
+    } else {
+      if (clash) { changes.push('replaces ' + T.label + ' · ' + where + ' (' + plural(clash.curves.length, 'curve') + ') — it goes to the trash'); extras = extras.filter(e => e !== clash); removed.add(clash.id); clash.curves.forEach(c => removed.add(c.id)); }
+      if (ex) { removed.delete(ex.id); extras = q.extras.map(e => (e === ex ? made : e)).filter(e => e !== clash); } else extras = extras.concat(made);
+    }
+    if (ex) for (const c of ex.curves) if (!curves.some(d => d.id === c.id)) removed.add(c.id);
+  }
+  // A mark is about its data, so it follows it into the run or curve it becomes (F137).
+  const marks = (q.marks || []).map(m => (moved.has(m.curve) ? { ...m, curve: moved.get(m.curve)! } : m)).filter(m => !removed.has(m.curve) || curves.some(c => c.id === m.curve));
+  if (marks.length < (q.marks || []).length) lost.push(plural((q.marks || []).length - marks.length, 'mark'));
+  const { marks: _m, ...rest } = q;
+  const nq: Seq = { ...rest, runs, extras, ...(marks.length ? { marks } : {}) };
+  const t = pmfTransform(st), before = cellValue(q, sacch, o.metric, o.skip, t), after = cellValue(nq, sacch, o.metric, o.skip, t);
+  const values = before === after ? [] : [{ label: where.slice(0, where.lastIndexOf(' run ')) + ' · ' + METRIC_META[o.metric].label, before, after }];
+  return {
+    store: { ...store, seqs: store.seqs.map(s => (s === q ? nq : s)) },
+    preview: { changes, curves: curves.map(c => ({ label: c.label, points: c.x.length })), kept, values, lost },
+  };
 }
 
 // --- cells and rows --------------------------------------------------------
@@ -1020,7 +1304,7 @@ export function editRow(store: Store, rowId: string, edit: RowEdit): { store: St
   return { store: res.store, rowId: res.rowId, col: to, dropped };
 }
 
-export interface RunPatch { time?: string; temp?: string | number; tags?: string[]; sacch?: string; run?: Slot }
+export interface RunPatch { time?: string; temp?: string | number; tags?: string[]; sacch?: string; run?: Slot; /** A chosen dash 0–9 (R6); null = automatic. */ dash?: number | null }
 
 // Per-run metadata: simulation time, temperature, tags, column, run slot.
 export function updateRun(store: Store, rowId: string, runId: string, patch: RunPatch): Store {
@@ -1036,6 +1320,7 @@ export function updateRun(store: Store, rowId: string, runId: string, patch: Run
   if (patch.tags) next.tags = tagsOf(patch);
   if (patch.sacch) next.sacch = patch.sacch;
   if (patch.run) next.run = patch.run;
+  if (patch.dash === null) delete next.dash; else if (patch.dash != null) next.dash = patch.dash;
   if (old.sacch !== next.sacch || old.run !== next.run) {
     const moving = row.extras.filter(e => e.sacch === old.sacch && e.run === old.run);
     const kinds = new Set(moving.map(e => e.type));
@@ -1239,7 +1524,11 @@ export function importJSON(text: string, store: Store): { store: Store } {
         if (i >= 0) extras[i] = e; else extras.push(e);
       }
       const structures = hit.structures.concat(s.structures.filter(m => !hit.structures.some(o => o.id === m.id)));
-      seqs[seqs.indexOf(hit)] = { ...hit, runs, extras, structures };
+      // Marks and reference lines from the file join the row's own (F137), as its runs and curves do.
+      const marks = (hit.marks || []).concat((s.marks || []).filter(m => !(hit.marks || []).some(o => o.curve === m.curve && o.x === m.x)));
+      const lines = { ...hit.lines };
+      for (const [k, ls] of Object.entries(s.lines || {})) lines[k] = (lines[k] || []).concat(ls.filter(l => !(lines[k] || []).some(o => o.axis === l.axis && o.v === l.v)));
+      seqs[seqs.indexOf(hit)] = { ...hit, runs, extras, structures, ...(marks.length ? { marks } : {}), ...(Object.keys(lines).length ? { lines } : {}) };
     } else { idMap[s.id] = s.id; seqs.push(s); }
   }
   // Cell-keyed data from the file is re-keyed onto the rows it merged into.
@@ -1260,12 +1549,30 @@ export function importJSON(text: string, store: Store): { store: Store } {
     if (i >= 0) pages[i] = { ...pages[i], rows: [...new Set(pages[i].rows.concat(rows))] };
     else pages.push({ ...p, rows });
   }
-  return { store: pruneCells({ ...store, seqs, cols, notes: { cell, row }, vis, lit, pages }) };
+  const scripts = (store.scripts || []).concat(v.scripts || []);
+  return { store: pruneCells({ ...store, seqs, cols, notes: { cell, row }, vis, lit, pages, ...(scripts.length ? { scripts } : {}) }) };
 }
 
 // --- plot geometry (per-series x grids) ------------------------------------
 
-export interface PlotSeries { x: (number | null)[]; y: (number | null)[] }
+export interface PlotSeries { x: (number | null)[]; y: (number | null)[]; style?: 'line' | 'step' | 'points' | 'bars' }
+
+/** Filled marker shapes for points, one per curve so colour is never the only difference; 0 is a circle (null). */
+export function shapeAt(k: number, x: number, y: number, r = 3.2): number[][] | null {
+  const q = r * 1.3, P = (pts: number[][]) => pts.map(([a, b]) => [+(x + a).toFixed(1), +(y + b).toFixed(1)]);
+  switch (k % 5) {
+    case 1: return P([[-r, -r], [r, -r], [r, r], [-r, r]]);
+    case 2: return P([[0, -q], [q, 0], [0, q], [-q, 0]]);
+    case 3: return P([[0, -q], [q, r * 0.8], [-q, r * 0.8]]);
+    case 4: return P([[0, q], [q, -r * 0.8], [-q, -r * 0.8]]);
+    default: return null;
+  }
+}
+/** SVG path of one marker shape (a circle for shape 0). */
+export const shapePath = (k: number, x: number, y: number, r = 3.2) => {
+  const pts = shapeAt(k, x, y, r);
+  return pts ? 'M' + pts.map(p => p.join(' ')).join('L') + 'Z' : 'M' + (x - r) + ' ' + y + 'a' + r + ' ' + r + ' 0 1 0 ' + 2 * r + ' 0a' + r + ' ' + r + ' 0 1 0 ' + -2 * r + ' 0Z';
+};
 export interface PlotOpts {
   w: number; h: number;
   pad?: { l: number; r: number; t: number; b: number };
@@ -1298,16 +1605,45 @@ export function buildPlotMulti(series: PlotSeries[], opts: PlotOpts) {
   if (!isFinite(x0)) { x0 = 0; x1 = 1; }
   const sx = (v: number) => pad.l + (v - x0) / (x1 - x0 || 1) * (w - pad.l - pad.r);
   const sy = (v: number) => pad.t + (hi - v) / (hi - lo || 1) * (h - pad.t - pad.b);
-  const path = (s: PlotSeries) => {
-    let d = '', open = false;
+  // Drawing only (never computing): a curve with more points than four per half-pixel column keeps the
+  // first, lowest, highest and last point of each column (M4), so nothing visible is lost at 2×.
+  const cols = Math.round((w - pad.l - pad.r) * 2);
+  const visible = (s: PlotSeries) => {
+    const segs: number[][][] = [];
+    let cur: number[][] | null = null;
     for (let i = 0; i < s.y.length; i++) {
       const v = s.y[i], xv = s.x[i];
-      if (v == null || xv == null || !(v >= lo && v <= hi)) { open = false; continue; }
-      d += (open ? 'L' : 'M') + sx(xv).toFixed(1) + ' ' + sy(v).toFixed(1);
-      open = true;
+      if (v == null || xv == null || !(v >= lo && v <= hi)) { cur = null; continue; }
+      if (!cur) segs.push((cur = []));
+      cur.push([sx(xv), sy(v)]);
     }
-    return d;
+    if (segs.reduce((n, g) => n + g.length, 0) <= 4 * cols) return segs;
+    return segs.map(g => {
+      const out: number[][] = [];
+      for (let i = 0; i < g.length;) {
+        const c = Math.floor((g[i][0] - pad.l) * 2);
+        let j = i, mn = i, mx = i;
+        while (j + 1 < g.length && Math.floor((g[j + 1][0] - pad.l) * 2) === c) { j++; if (g[j][1] < g[mn][1]) mn = j; if (g[j][1] > g[mx][1]) mx = j; }
+        for (const k of [...new Set([i, mn, mx, j])].sort((a, b) => a - b)) out.push(g[k]);
+        i = j + 1;
+      }
+      return out;
+    });
   };
+  const r1 = (v: number) => v.toFixed(1);
+  const segsOf = series.map(s => (s.style === 'bars' ? [] : visible(s)));
+  const path = (i: number) => (series[i].style === 'points' ? '' : segsOf[i].map(g => g.map((p, k) => (k ? 'L' : 'M') + r1(p[0]) + ' ' + r1(p[1])).join('')).join(''));
+  // Bars: grouped side by side at each x, from zero, or from the axis bottom when zero is off the axis.
+  const barIdx = series.flatMap((s, i) => (s.style === 'bars' ? [i] : []));
+  const xs = [...new Set(barIdx.flatMap(i => series[i].x.filter((v): v is number => v != null)))].sort((a, b) => a - b);
+  const gap = xs.length > 1 ? Math.min(...xs.slice(1).map((v, i) => sx(v) - sx(xs[i]))) : (w - pad.l - pad.r) / 10;
+  const bw = (gap * 0.8) / (barIdx.length || 1), base = 0 >= lo && 0 <= hi ? sy(0) : h - pad.b;
+  const bars = series.map((s, i) => (s.style !== 'bars' ? [] : s.x.flatMap((xv, k) => {
+    const v = s.y[k];
+    if (xv == null || v == null) return [];
+    const top = sy(Math.min(hi, Math.max(lo, v))), x = sx(xv) - (bw * barIdx.length) / 2 + barIdx.indexOf(i) * bw;
+    return [{ x: +r1(x), y: +r1(Math.min(top, base)), w: +r1(bw), h: +r1(Math.abs(top - base)) }];
+  })));
   const ticks = (a: number, b: number, step: number) => {
     const out: number[] = [];
     for (let v = Math.ceil(a / step) * step; v <= b + 1e-9; v += step) out.push(+v.toFixed(6));
@@ -1319,11 +1655,13 @@ export function buildPlotMulti(series: PlotSeries[], opts: PlotOpts) {
   };
   const yt = opts.yStep ? ticks(lo, hi, opts.yStep) : nice(lo, hi, 5), xt = nice(x0, x1, 6);
   return {
-    paths: series.map(path), lo, hi,
+    paths: series.map((_, i) => path(i)), lo, hi,
+    points: series.map((s, i) => (s.style === 'points' ? segsOf[i].flat().map(p => [+r1(p[0]), +r1(p[1])]) : [])),
+    bars,
     zeroY: sy(0), inRangeZero: 0 >= lo && 0 <= hi,
     xticks: xt.vals.map(v => ({ x: sx(v), label: tickLabel(v, xt.step) })),
     yticks: yt.vals.map(v => ({ y: sy(v), label: tickLabel(v, yt.step) })),
     plotL: pad.l, plotR: w - pad.r, plotT: pad.t, plotB: h - pad.b,
-    sx, sy,
+    sx, sy, x0, x1,
   };
 }

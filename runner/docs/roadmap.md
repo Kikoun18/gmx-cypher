@@ -122,9 +122,13 @@ Spec: [`batch-2.md`](batch-2.md). Phase 0 report: [`batch-2-phase0.md`](batch-2-
 - [x] Atoms keep their element colours when grouped or clicked; a group shows as a halo (group hues kept as an option)
 - [x] C + click sets the centre of rotation to the clicked atom's whole group
 
+### After batch 3 of PMF Sequences (your request, T142–T144)
+- [x] `app/` replaced by PMF Sequences batch 3, as its source came; Cypher follows it (schema 4, general data, energy typed from its header; T142)
+- [x] The `app/` check compares a hash of the whole tree, so a commit can carry its own baseline (T144)
+
 ### Backlog (Batch 2: add to it, don't do it)
 - Job submission (`qq submit`), and running Cypher's analyses as cluster jobs. (Moved here from the backlog above.)
 - Morpheus: a Table and a Combobox component, and an error band for `LineChart` (built locally in this batch). Morpheus's `DropdownMenu` checkbox items are a non-searchable multi-select option.
-- PMF Sequences (read-only in this batch): `GROMACS Energies` is not matched by its `energy` keyword, so an energy file is typed only from its file name; distance and H-bond distribution histograms (titles with "Histogram") are typed as Histogram, with an umbrella axis; a gmx wham profile ("Umbrella potential") is typed as Histogram too, by its keyword "umbrella" (T118). The backlog for a later PMF Sequences batch.
+- PMF Sequences: distance and H-bond distribution histograms (titles with "Histogram") are typed as Histogram, with an umbrella axis; a gmx wham profile ("Umbrella potential") is typed as Histogram too, by its keyword "umbrella" (T118). The backlog for a later PMF Sequences batch. (`GROMACS Energies` is now typed from its header: PMF Sequences batch 3, T142.)
 - Trajectory preparation (`trjconv`) is an R9 candidate; it stays out unless chosen.
 

@@ -18,8 +18,8 @@ import { stableStringify, uid } from './json';
 import { cellNoteKey, filesById, litOf, rowNoteKey, slotNumber, visOf, type NoteState, type ProjectState } from './model';
 import { formatNote, type NoteType } from './notes';
 import { basename, dirname, join, recordPaths, rebase, uniqueName, visiblePaths, NOTE_FILE } from './path';
-import type { AnalysisRec, ColumnRecord, CurveRec, FileKind, FileMeta, PageRecord, ProjectRecord, RowRecord, RunRec, StructureRec } from './records';
-import { curveDisplay } from './records';
+import type { AnalysisRec, ColumnRecord, CurveRec, FileKind, FileMeta, PageRecord, ProjectRecord, RowRecord, RunRec, ScriptRec, StructureRec } from './records';
+import { curveDisplay, dashOf, pinsOf, scriptFnsOf, typeFromOf } from './records';
 import { curvesXvg, groupCurves, reconstructedName, runXvg } from './reconstruct';
 import { settingsFiles } from './settings';
 import { trashSteps, type TrashManifest } from './trash';
@@ -121,8 +121,9 @@ export async function makePlan(inp: PlanInput): Promise<Plan> {
   const rowNeeded = (s: Seq) => s.structures.length > 0 || !!noteText(rowNoteKey(s.id));
 
   // Files referenced next, with their owners.
-  interface Ref { fileId: string; kind: FileKind; owner: string; row: Seq; dir: () => string }
+  interface Ref { fileId: string; kind: FileKind; owner: string; row: Seq | null; dir: () => string }
   const refs = new Map<string, Ref>();
+  for (const k of next.scripts || []) refs.set(k.fileId, { fileId: k.fileId, kind: 'script', owner: pid, row: null, dir: () => visiblePaths.scripts(projDir) });
   for (const s of seqs) {
     for (const r of s.runs) refs.set(r.src!.fileId, { fileId: r.src!.fileId, kind: 'pmf-xvg', owner: r.id, row: s, dir: () => cellDir(s, r.sacch) });
     for (const e of s.extras) for (const c of e.curves) if (c.src) refs.set(c.src.fileId, { fileId: c.src.fileId, kind: 'analysis-xvg', owner: e.id, row: s, dir: () => anaDir(s, e) });
@@ -208,7 +209,7 @@ export async function makePlan(inp: PlanInput): Promise<Plan> {
         path = join(want, name);
         move(p, path);
       }
-      metas.set(ref.fileId, { ...old, path, owner: ref.owner, kind: old.kind });
+      metas.set(ref.fileId, { ...old, path, owner: ref.owner, kind: ref.kind });
     } else if (up) {
       const names = await takenIn(want);
       if (up.existingPath) {
@@ -263,25 +264,27 @@ export async function makePlan(inp: PlanInput): Promise<Plan> {
     for (const [key, v] of keepCell) { const [rid, k] = key.split('|'); if (rid === s.id && v) cells[k] = cellDir(s, k); }
     for (const k of colsNext.keys()) { const n = notes.get(cellNoteKey(k, s.id)); if (n) noteCells[k] = n.id; }
     const rowNote = notes.get(rowNoteKey(s.id));
-    const runs: RunRec[] = s.runs.map(r => ({ id: r.id, column: r.sacch, slot: r.run, time: r.time, temp: r.temp, tags: [...new Set(r.tags)].sort(), added: r.added, file: r.src!.fileId, parse: { xCol: r.src!.xCol, yCol: r.src!.yCol } }));
+    const runs: RunRec[] = s.runs.map(r => ({ id: r.id, column: r.sacch, slot: r.run, time: r.time, temp: r.temp, tags: [...new Set(r.tags)].sort(), added: r.added, file: r.src!.fileId, parse: { xCol: r.src!.xCol, yCol: r.src!.yCol }, ...dashOf(r.dash), ...typeFromOf(r.typeFrom) }));
     const analyses: AnalysisRec[] = s.extras.map(e => ({
-      id: e.id, type: e.type, column: e.sacch, slot: e.run, time: e.time, added: e.added, dir: anaDir(s, e),
-      curves: e.curves.filter(c => c.src).map<CurveRec>(c => ({ id: c.id, label: c.label, ...(c.custom ? { custom: true } : {}), ...curveDisplay(c), file: c.src!.fileId, parse: { xCol: c.src!.xCol, yCol: c.src!.yCol, xScale: c.src!.xScale } })),
+      id: e.id, type: e.type, column: e.sacch, slot: e.run, time: e.time, added: e.added, dir: anaDir(s, e), ...typeFromOf(e.typeFrom),
+      curves: e.curves.filter(c => c.src).map<CurveRec>(c => ({ id: c.id, label: c.label, ...(c.custom ? { custom: true } : {}), ...curveDisplay(c), ...dashOf(c.dash), file: c.src!.fileId, parse: { xCol: c.src!.xCol, yCol: c.src!.yCol, xScale: c.src!.xScale } })),
     }));
     const structures: StructureRec[] = s.structures.filter(x => x.fileId).map(x => ({ id: x.id, file: x.fileId!, format: x.format, atoms: x.atoms, title: x.note || '', added: x.added }));
-    const owned = [...refs.values()].filter(r => r.row.id === s.id).map(r => metas.get(r.fileId)).filter((m): m is FileMeta => !!m).sort((a, c) => a.id.localeCompare(c.id));
+    const owned = [...refs.values()].filter(r => r.row?.id === s.id).map(r => metas.get(r.fileId)).filter((m): m is FileMeta => !!m).sort((a, c) => a.id.localeCompare(c.id));
     rows.set(s.id, {
       id: s.id, type: 'row', name: s.name, seq: s.seq, group: s.group || '', desc: s.desc || '',
       dirs: { row: keepRowDir.get(s.id) ? rowDir(s) : null, cells },
       notes: { ...(rowNote ? { row: rowNote.id } : {}), cells: noteCells },
       runs, analyses, structures, files: owned,
-      literature: litOf(next, s.id), visibility: visOf(next, s.id),
+      literature: litOf(next, s.id), visibility: visOf(next, s.id), ...pinsOf(s),
     });
   }
   const columns = new Map<string, ColumnRecord>(next.cols.map(c => [c.k, { id: c.k, type: 'column', label: c.label, short: c.short, name: c.name, light: c.light, dark: c.dark, dir: keepCol.get(c.k) ? colDir(c.k) : null }]));
-  const pages = new Map<string, PageRecord>(next.pages.map(p => [p.id, { id: p.id, type: 'page', name: p.name, desc: p.desc || '', rows: p.rows.slice(), cols: p.cols ? p.cols.slice() : null }]));
+  const pages = new Map<string, PageRecord>(next.pages.map(p => [p.id, { id: p.id, type: 'page', name: p.name, desc: p.desc || '', rows: p.rows.slice(), cols: p.cols ? p.cols.slice() : null, ...(p.metric ? { metric: p.metric } : {}) }]));
   const rowOrder = seqs.map(s => s.id).concat([...prev.unreadable].filter(id => !rowsNext.has(id)));
-  const project: ProjectRecord = { ...prev.project, columnOrder: next.cols.map(c => c.k), pageOrder: next.pages.map(p => p.id), rowOrder };
+  const { scripts: _k, ...prevProject } = prev.project;
+  const scripts: ScriptRec[] = (next.scripts || []).flatMap(k => { const file = metas.get(k.fileId); return file ? [{ id: k.id, file, fns: scriptFnsOf(k.fns) }] : []; });
+  const project: ProjectRecord = { ...prevProject, columnOrder: next.cols.map(c => c.k), pageOrder: next.pages.map(p => p.id), rowOrder, ...(scripts.length ? { scripts } : {}) };
   const settings = splitSettings(next.settings || {}).project;
 
   const recordWrites: { path: string; text: string | null }[] = [];
@@ -311,6 +314,11 @@ export async function makePlan(inp: PlanInput): Promise<Plan> {
   const stillUsed = (fileId: string) => refs.has(fileId);
   const metaPath = (f: FileMeta | undefined) => (f && !missing.has(f.id) ? cur(f.path) : '');
 
+  // A script whose original nothing uses any more (removed, or replaced by a new version).
+  (prev.project.scripts || []).forEach((k, index) => {
+    if (stillUsed(k.file.id)) return;
+    toTrash({ type: 'script', id: k.id, label: 'Script ' + k.file.name, originalPaths: [metaPath(k.file)], records: { script: k }, parents: { index } });
+  });
   for (const [id, p] of prev.pages) if (!pages.has(id)) {
     toTrash({ type: 'page', id, label: 'Page ' + p.name, originalPaths: [], records: { page: p }, parents: { index: prev.project.pageOrder.indexOf(id) } });
   }
@@ -385,6 +393,7 @@ export async function makePlan(inp: PlanInput): Promise<Plan> {
   // Folders left empty (no longer needed, or emptied by a move): deepest first, never the project folder.
   const empties = new Set<string>(unneeded.map(cur));
   for (const m of moves) empties.add(cur(dirname(m.from)));
+  if (!scripts.length && prev.project.scripts?.length) empties.add(visiblePaths.scripts(projDir));
   for (const d of [...empties].filter(d => d && d !== projDir && d.startsWith(projDir + '/')).sort((x, y) => y.split('/').length - x.split('/').length)) after.push({ kind: 'rmdirIfEmpty', path: d });
 
   // --- 8. the journal entry ------------------------------------------------------------------

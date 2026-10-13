@@ -1,0 +1,74 @@
+# This file was created Thu Oct  8 12:51:01 2026
+# Created by:
+#                     :-) GROMACS - gmx density, 2021.4 (-:
+# 
+# Executable:   /software/ncbr/softrepo/rova/gromacs/2021.4-plumed/m64-deb9/para/bin/gmx_mpi_sse4.1
+# Data prefix:  /software/ncbr/softrepo/rova/gromacs/2021.4-plumed/m64-deb9/para
+# Working dir:  /mnt/storage-brno12-cerit/nfs4/home/ladme/all-atom/membranes/POPC/3_md
+# Command line:
+#   gmx_mpi_sse4.1 density -f storage/md0001.xtc -n index_phosphorus.ndx -s storage/md0001.tpr -center
+# gmx density is part of G R O M A C S:
+#
+# Good ROcking Metal Altar for Chronical Sinners
+#
+@    title "Partial density"
+@    xaxis  label "Relative position from center (nm)"
+@    yaxis  label "Density (kg m\S-3\N)"
+@TYPE xy
+@ view 0.15, 0.15, 0.75, 0.85
+@ legend on
+@ legend box on
+@ legend loctype view
+@ legend 0.78, 0.8
+@ legend length 2
+@ s0 legend "P"
+    -3.61827                0
+    -3.47059                0
+    -3.32291                0
+    -3.17522                0
+    -3.02754       0.00331575
+    -2.87985        0.0796595
+    -2.73217         0.526009
+    -2.58448           3.0101
+     -2.4368          12.8602
+    -2.28911          41.0041
+    -2.14143          86.6531
+    -1.99374          120.789
+    -1.84606          120.028
+    -1.69837           84.412
+    -1.55069          41.9988
+      -1.403          15.0164
+    -1.25532          4.07574
+    -1.10764          0.72361
+    -0.95995         0.048128
+   -0.812266       0.00166878
+   -0.664581                0
+   -0.516896                0
+   -0.369212                0
+   -0.221527                0
+  -0.0738423                0
+   0.0738423                0
+    0.221527                0
+    0.369212                0
+    0.516896                0
+    0.664581                0
+    0.812266        0.0116106
+     0.95995        0.0879384
+     1.10764         0.809941
+     1.25532          4.75919
+       1.403          16.7008
+     1.55069          42.5011
+     1.69837          80.7102
+     1.84606          116.466
+     1.99374          120.539
+     2.14143          88.1197
+     2.28911          42.6373
+      2.4368           14.268
+     2.58448          2.99524
+     2.73217         0.512599
+     2.87985         0.106223
+     3.02754       0.00498645
+     3.17522                0
+     3.32291                0
+     3.47059                0
+     3.61827                0

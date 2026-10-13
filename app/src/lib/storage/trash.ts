@@ -7,7 +7,7 @@ import { join, stamp, vaultPaths } from './path';
 import { stableStringify } from './json';
 import { SCHEMA_VERSION } from './records';
 
-export type TrashType = 'project' | 'page' | 'column' | 'row' | 'run' | 'analysis' | 'structure' | 'curve' | 'file' | 'literature' | 'note' | 'cell' | 'schema-backup';
+export type TrashType = 'project' | 'page' | 'column' | 'row' | 'run' | 'analysis' | 'structure' | 'curve' | 'file' | 'literature' | 'note' | 'cell' | 'script' | 'schema-backup';
 
 export interface TrashManifest {
   type: TrashType;

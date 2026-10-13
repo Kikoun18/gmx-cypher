@@ -10,6 +10,14 @@ import type { Store } from '../../../app/src/lib/types';
 export interface Fields { name: string; col: string; group: string; run: number; time: string }
 export type Source = 'name' | 'path' | 'header';
 
+/**
+ * Where PMF Sequences took a file's type from, in words (`anaHow` of its plan, batch 3): the project's name pattern,
+ * the form, the file's GROMACS header, words in the file name, or nothing known, in which case it is filed as Data.
+ */
+export function typeSource(how: string): string {
+  return ({ file: 'from the name pattern', form: 'as chosen', header: 'from the header', name: 'from words in the file name', generic: 'no known type: filed as general data' } as Record<string, string>)[how] ?? how;
+}
+
 export interface Landing {
   ok: boolean;
   row: string; seq: string; rowNew: boolean; group: string;
@@ -35,7 +43,7 @@ export function landing(store: Store, fileName: string, text: string): Landing {
   const row = store.seqs.find(s => seqKey(s.name, s.seq, s.group) === seqKey(p.name, p.seq, p.group));
   const twin = !row && p.name ? store.seqs.find(s => s.name.trim().toLowerCase() === p.name.trim().toLowerCase()) : undefined;
   const problems = [
-    ...(p.err ? [p.err] : []), ...p.conflicts, ...(p.unknown ? ['PMF Sequences has no analysis type for ' + p.unknown] : []),
+    ...(p.err ? [p.err] : []), ...p.conflicts,
     ...(!p.name ? ['no row: neither the file name nor the folder gave a sequence or name'] : []),
   ];
   return {

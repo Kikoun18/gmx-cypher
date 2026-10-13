@@ -12,6 +12,8 @@ const sourcesText = (from: lib.PlanItem['from']) => (Object.keys(SRC) as (keyof 
   .map(src => [src, Object.entries(from).filter(([, v]) => v === src).map(([k]) => lib.FIELD_LABEL[k as keyof typeof lib.FIELD_LABEL])] as const)
   .filter(([, ks]) => ks.length).map(([src, ks]) => SRC[src] + ': ' + ks.join(', ')).join(' · ');
 
+/** Where each file's type came from (F114). */
+const HOW = { file: 'file name', header: 'header', name: 'name keyword', generic: 'no match' } as const;
 const PAGE = 200;
 const GRID = 'minmax(0, 1.5fr) minmax(0, 0.8fr) minmax(0, 0.6fr) minmax(0, 0.8fr) minmax(0, 1fr) minmax(0, 0.5fr) minmax(0, 1fr) 26px';
 
@@ -37,7 +39,7 @@ export function UploadDialog({ form: f, setForm, readFiles, reading, onDragOver,
   const from = (k: Parameters<typeof pf.has>[0]) => f.parse && pf.has(k);
   const nOk = plan.filter(p => p.ok).length, nRep = plan.filter(p => p.ok && p.replaces).length, nApp = plan.filter(p => p.ok && p.appends).length;
   const nBad = f.files.filter(x => !x.table).length;
-  const nSame = plan.filter(p => p.sameAs && !p.ok).length, nUnknown = plan.filter(p => p.unknown).length, nConflict = plan.filter(p => p.conflicts.length).length;
+  const nSame = plan.filter(p => p.sameAs && !p.ok).length, nConflict = plan.filter(p => p.conflicts.length).length;
   const nAna = plan.some(p => p.ok && p.ana.k !== 'pmf');
   const unmatched = f.parse ? plan.filter(p => !p.matched).length : 0;
   const sharedName = plan.filter(p => { const fl = lib.parseName(p.file, st.pattern).fields; return !(f.parse && p.matched && (fl.name || fl.seq)); }).length;
@@ -46,16 +48,16 @@ export function UploadDialog({ form: f, setForm, readFiles, reading, onDragOver,
 
   const anaNote = (() => {
     const t = types.find(q => q.k === f.ana);
-    const base = !t ? 'the xvg header first (gmx awh = PMF, then keywords in title and y label), then the file name · no match = PMF, or unknown for other GROMACS tools'
+    const base = !t ? 'the xvg header first (gmx awh = PMF, then a type’s GROMACS tool, then its keywords as whole words in the title, y label and legends), then in the file name · no match = Data'
       : t.k === 'pmf' ? 'x col ' + st.xCol + ', y col ' + st.yCol + ' · goes into the matrix'
       : 'x col ' + (t.xCol || 1) + ', y cols ' + (t.yCols || '2') + ' · ' + t.xLabel + ' → ' + t.yLabel + ' · attached to the run slot';
     return (from('ana') ? '{analysis} in the file name wins · ' : '') + base;
   })();
 
   const msg = f.msg || (!f.files.length ? 'Pick one or more files to continue.'
-    : !nOk ? (nConflict ? 'Fix the conflicting fields, or remove those files.' : nUnknown ? 'Choose an analysis for the files marked unknown, or remove them.' : plan.some(p => !p.name) ? 'Give the files a name, or turn on reading from the file name.' : 'No readable curves yet.')
+    : !nOk ? (nConflict ? 'Fix the conflicting fields, or remove those files.' : plan.some(p => !p.name) ? 'Give the files a name, or turn on reading from the file name.' : 'No readable curves yet.')
     : [plural(nOk, nAna ? 'file' : 'run') + ' ready', nRep ? nRep + ' replace existing runs' : '', nApp ? plural(nApp, 'file') + ' add curves to an analysis' : '',
-      unmatched ? plural(unmatched, 'name') + ' did not match — form values used' : '', nUnknown ? plural(nUnknown, 'file') + ' with an unknown analysis left out' : '', nConflict ? plural(nConflict, 'file') + ' with conflicting fields left out' : '', nSame ? plural(nSame, 'identical file') + ' left out' : '', nBad ? nBad + ' unreadable' : ''].filter(Boolean).join(' · '));
+      unmatched ? plural(unmatched, 'name') + ' did not match — form values used' : '', nConflict ? plural(nConflict, 'file') + ' with conflicting fields left out' : '', nSame ? plural(nSame, 'identical file') + ' left out' : '', nBad ? nBad + ' unreadable' : ''].filter(Boolean).join(' · '));
 
   const save = () => {
     if (!plan.some(p => p.ok)) { setF({ msg: !f.files.length ? 'No curve loaded yet.' : 'Nothing to add — every file needs a name.', err: true }); return; }
@@ -73,7 +75,7 @@ export function UploadDialog({ form: f, setForm, readFiles, reading, onDragOver,
   };
 
   const newAna = () => {
-    const list = Array.isArray(st.analyses) ? st.analyses : lib.DEFAULT_ANALYSES;
+    const list = lib.projectAnalyses(st);
     const t = lib.newAnalysis(list.concat([{ k: 'pmf' } as never]), 'New analysis');
     setSetting({ analyses: list.concat(t) });
     setF({ ana: t.k });
@@ -93,7 +95,7 @@ export function UploadDialog({ form: f, setForm, readFiles, reading, onDragOver,
       <div className="card" onClick={stop} onDragOver={onDragOver} onDrop={onDrop} style={{ width: 'min(860px, 100%)' }}>
         <div className="card-head">
           <div>
-            <div className="title22">Upload AWH curves</div>
+            <div className="title22">Upload files</div>
             <div style={{ fontSize: 11, color: 'var(--mut)', letterSpacing: '0.06em', marginTop: 4 }}>
               {(f.files.length ? plural(f.files.length, 'file') + ' · col ' + st.xCol + ' = x, col ' + st.yCol + ' = y' : 'Column ' + st.xCol + ' is read as x, column ' + st.yCol + ' as y · change in Settings') + (page ? ' · rows join ' + page.name : '')}
             </div>
@@ -165,14 +167,14 @@ export function UploadDialog({ form: f, setForm, readFiles, reading, onDragOver,
                 const remove = () => setF({ files: f.files.filter(q => q.id !== x.id) });
                 const nc = p && p.curves ? p.curves.length : 0;
                 const r = !p
-                  ? { group: '—', col: '—', colHue: 'var(--mut)', ana: '—', name: '—', time: '—', status: x.err || 'unreadable', statusC: 'var(--acc)' }
+                  ? { group: '—', col: '—', colHue: 'var(--mut)', ana: '—', anaC: undefined, name: '—', time: '—', status: x.err || 'unreadable', statusC: 'var(--acc)' }
                   : {
                     group: p.group || '—', col: p.col.label + (p.colNew ? ' · new' : ''), colHue: hue(p.col),
-                    ana: p.unknown ? 'unknown · ' + p.unknown : p.ana.label + (p.anaHow === 'form' ? '' : ' · ' + (p.anaHow === 'file' ? 'file name' : p.anaHow)),
+                    ana: p.ana.label + (p.anaHow === 'form' ? '' : ' · ' + HOW[p.anaHow]), anaC: p.anaHow === 'generic' ? 'var(--accInk)' : undefined,
                     name: p.name || '—', time: p.time || '—',
-                    status: p.err ? p.err : p.conflicts.length ? 'conflict · not added' : p.unknown ? 'unknown analysis — choose one' : !p.name ? 'needs a name' : p.sameAs ? '≡ ' + p.sameAs + (p.ok ? ' · included' : ' · left out') : p.dup ? 'duplicate slot · skipped'
+                    status: p.err ? p.err : p.conflicts.length ? 'conflict · not added' : !p.name ? 'needs a name' : p.sameAs ? '≡ ' + p.sameAs + (p.ok ? ' · included' : ' · left out') : p.dup ? 'duplicate slot · skipped'
                       : lib.runLabel(p.run) + (nc > 1 ? ' · ' + nc + ' curves' : '') + (p.appends ? ' · adds curves' : '') + (p.replaces ? ' · replaces' : '') + (f.parse && !p.matched ? ' · no match' : ''),
-                    statusC: p.conflicts.length || p.unknown ? 'var(--accInk)' : !p.ok ? 'var(--acc)' : p.replaces || (f.parse && !p.matched) ? 'var(--accInk)' : 'var(--mut)',
+                    statusC: p.conflicts.length ? 'var(--accInk)' : !p.ok ? 'var(--acc)' : p.replaces || (f.parse && !p.matched) ? 'var(--accInk)' : 'var(--mut)',
                   };
                 return (
                   <div key={x.id} style={{ display: 'grid', gridTemplateColumns: GRID, gap: 10, alignItems: 'center', padding: '7px 12px', borderBottom: '1px solid var(--line)', fontSize: 11 }}>
@@ -185,7 +187,7 @@ export function UploadDialog({ form: f, setForm, readFiles, reading, onDragOver,
                     </span>
                     <span className="ellip" style={{ color: 'var(--mut)' }}>{r.group}</span>
                     <span className="ellip" style={{ fontWeight: 700, color: r.colHue }}>{r.col}</span>
-                    <span className="ellip" title={r.ana}>{r.ana}</span>
+                    <span className="ellip" title={r.ana} style={{ color: r.anaC }}>{r.ana}</span>
                     <span className="ellip" style={{ fontWeight: 700 }}>{r.name}</span>
                     <span className="ellip" style={{ color: 'var(--mut)' }}>{r.time}</span>
                     <span className="ellip" style={{ color: p && p.sameAs ? 'var(--accInk)' : r.statusC }} title={r.status}>{r.status}</span>
@@ -194,15 +196,6 @@ export function UploadDialog({ form: f, setForm, readFiles, reading, onDragOver,
                       <span style={{ gridColumn: '1 / -1', color: 'var(--accInk)', lineHeight: 1.5 }}>
                         {p.conflicts.map(c => c.replace('(path)', '(folder)').replace('(name)', '(file name)')).join(' · ')} — fix the file name, folder or pattern, or remove the file
                       </span>
-                    )}
-                    {p && p.unknown && (
-                      <label style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', gap: 8, color: 'var(--accInk)' }}>
-                        <span>{p.unknown} output that matches no analysis. Analysis for this file:</span>
-                        <select className="inp" value="" onChange={e => setF({ anaOf: { ...(f.anaOf || {}), [x.id]: e.target.value } })} style={{ width: 'auto', padding: '4px 8px' }}>
-                          <option value="" disabled>choose…</option>
-                          {types.map(t => <option key={t.k} value={t.k}>{t.label}</option>)}
-                        </select>
-                      </label>
                     )}
                     {p && p.sameAs && (
                       <label style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', gap: 8, color: 'var(--accInk)', lineHeight: 1.5 }}>

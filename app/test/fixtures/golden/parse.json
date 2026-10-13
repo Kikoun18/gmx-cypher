@@ -1,0 +1,493 @@
+{
+ "hmrfast6_ha_a_t200000.xvg": {
+  "n": 419,
+  "ncols": 2,
+  "head": {
+   "title": "AWH",
+   "xLabel": "(nm, deg or lambda state)",
+   "yLabel": "(kJ/mol)",
+   "legends": [
+    "PMF"
+   ]
+  },
+  "finite": [
+   419,
+   419
+  ],
+  "first": [
+   "0.25",
+   "19.2858"
+  ],
+  "last": [
+   "3.25",
+   "0.00714172"
+  ],
+  "cols": "6b6ec9028825a1e505b084c7bb9da6bec4219437ca958f2c0deacdb2b06cf11a",
+  "gmx": {
+   "version": "2025.4-PLUMED_spack",
+   "tool": "gmx awh",
+   "command": "gmx_mpi awh -f 9.multiwalker.edr -s 9.multiwalker.tpr -o 9.multiwalker.xvg -skip 5",
+   "workdir": "/mnt/storage-brno14-ceitec/shared/softmatter/SHARED/forKrystof/walkers_for_denys/hmr+fast+6/ha/a/9.multiwalker/1",
+   "created": "Mon Sep 21 12:27:52 2026",
+   "executable": "/cvmfs/software.metacentrum.cz/spack23/software/linux-debian12-x86_64_v4/gcc-12.2.0/gromacs-2025.4-zy3xd7m7jk6bq4lrkbhtrymiidwpbjlf/bin/gmx_mpi"
+  },
+  "detect": {
+   "k": "pmf",
+   "from": "header"
+  }
+ },
+ "gmx/07.md_hbdist_protein_sugar.xvg": {
+  "n": 70,
+  "ncols": 2,
+  "head": {
+   "title": "Hydrogen Bond Distribution",
+   "xLabel": "Donor - Acceptor Distance (nm)",
+   "yLabel": "",
+   "legends": []
+  },
+  "finite": [
+   70,
+   70
+  ],
+  "first": [
+   "0.0025",
+   "0"
+  ],
+  "last": [
+   "0.3475",
+   "0"
+  ],
+  "cols": "17abdb2ad3845b10ab12658f63ca88d7b50c611db8c8bbc925e823b7b3ea6e59",
+  "gmx": {
+   "version": "2021.4-PLUMED-spack",
+   "tool": "gmx hbond",
+   "command": "gmx_mpi hbond -f 07_md.xtc -s 07_md.tpr -n ../index.ndx -num 07.md_hbnum_protein_sugar.xvg -life 07.md_hblife_protein_sugar.xvg -dist 07.md_hbdist_protein_sugar.xvg -ang 07.md_hbang_protein_sugar.xvg -hbn 07.md_hbindex_protein_sugar.ndx",
+   "workdir": "/mnt/storage-brno14-ceitec/shared/softmatter/kucerak/01.ecoli_O127/solutions/tArg+O127/simulations/07_md",
+   "created": "Tue Aug 26 15:51:08 2025",
+   "executable": "/cvmfs/software.metacentrum.cz/spack1/software/gromacs/linux-debian10-zen/2021.4-gcc-nx4pcn/bin/gmx_mpi"
+  },
+  "detect": {
+   "k": "hbond",
+   "from": "header"
+  }
+ },
+ "gmx/07.md_mindist_protein_sugar.xvg": {
+  "n": 5001,
+  "ncols": 2,
+  "head": {
+   "title": "Minimum Distance",
+   "xLabel": "Time (ps)",
+   "yLabel": "Distance (nm)",
+   "legends": [
+    "Protein-CARB"
+   ]
+  },
+  "finite": [
+   5001,
+   5001
+  ],
+  "first": [
+   "0",
+   "1.627273"
+  ],
+  "last": [
+   "500000",
+   "3.16075"
+  ],
+  "cols": "117763c5fad3296012d44082a8ae6cca059343b705006e26ccea8ae773641c94",
+  "gmx": {
+   "version": "2021.4",
+   "tool": "gmx mindist",
+   "command": "gmx_mpi_sse4.1 mindist -f 07_md.xtc -s 07_md.tpr -n ../index.ndx -od 07.md_mindist_protein_sugar.xvg -on 07.md_numcont_protein_sugar.xvg -d 0.6",
+   "workdir": "/mnt/storage-brno14-ceitec/shared/softmatter/kucerak/01.ecoli_O127/solutions/tArg+O127/simulations/07_md",
+   "created": "Tue Aug 26 13:30:32 2025",
+   "executable": "/software/ncbr/softrepo/rova/gromacs/2021.4-plumed/m64-deb9/para/bin/gmx_mpi_sse4.1"
+  },
+  "detect": {
+   "k": "dist",
+   "from": "header"
+  }
+ },
+ "gmx/07.md_numcont_protein_sugar.xvg": {
+  "n": 5001,
+  "ncols": 2,
+  "head": {
+   "title": "Number of Contacts < 0.6 nm",
+   "xLabel": "Time (ps)",
+   "yLabel": "Number",
+   "legends": [
+    "Protein-CARB"
+   ]
+  },
+  "finite": [
+   5001,
+   5001
+  ],
+  "first": [
+   "0",
+   "0"
+  ],
+  "last": [
+   "500000",
+   "0"
+  ],
+  "cols": "57cfd71be4c838989a9fc5dca26ecd11fb4fe842ba5f197769f35915f38ab16c",
+  "gmx": {
+   "version": "2021.4",
+   "tool": "gmx mindist",
+   "command": "gmx_mpi_sse4.1 mindist -f 07_md.xtc -s 07_md.tpr -n ../index.ndx -od 07.md_mindist_protein_sugar.xvg -on 07.md_numcont_protein_sugar.xvg -d 0.6",
+   "workdir": "/mnt/storage-brno14-ceitec/shared/softmatter/kucerak/01.ecoli_O127/solutions/tArg+O127/simulations/07_md",
+   "created": "Tue Aug 26 13:30:32 2025",
+   "executable": "/software/ncbr/softrepo/rova/gromacs/2021.4-plumed/m64-deb9/para/bin/gmx_mpi_sse4.1"
+  },
+  "detect": {
+   "k": "",
+   "from": "header"
+  }
+ },
+ "gmx/07.md_rdf_protein_sugar.xvg": {
+  "n": 1485,
+  "ncols": 2,
+  "head": {
+   "title": "Radial distribution",
+   "xLabel": "r (nm)",
+   "yLabel": "g(r)",
+   "legends": [
+    "Protein"
+   ]
+  },
+  "finite": [
+   1485,
+   1485
+  ],
+  "first": [
+   "0",
+   "0"
+  ],
+  "last": [
+   "2.968",
+   "1.004"
+  ],
+  "cols": "483e98c20a2b755a9598109019fc9fb282468767fa1e5408a8c8b8f262d44f89",
+  "gmx": {
+   "version": "2021.4",
+   "tool": "gmx rdf",
+   "command": "gmx_mpi_sse4.1 rdf -f 07_md.xtc -s 07_md.tpr -n ../index.ndx -ref 'group 28' -sel 'group 1' -o 07.md_rdf_protein_sugar.xvg -cn 07.md_cn_protein_sugar.xvg",
+   "workdir": "/mnt/storage-brno14-ceitec/shared/softmatter/kucerak/01.ecoli_O127/solutions/tLys+O127/simulations/07_md",
+   "created": "Tue Aug 26 16:05:53 2025",
+   "executable": "/software/ncbr/softrepo/rova/gromacs/2021.4-plumed/m64-deb9/para/bin/gmx_mpi_sse4.1"
+  },
+  "detect": {
+   "k": "rdf",
+   "from": "header"
+  }
+ },
+ "gmx/hist_500000.xvg": {
+  "n": 200,
+  "ncols": 22,
+  "head": {
+   "title": "Umbrella histograms",
+   "xLabel": "x (nm)",
+   "yLabel": "count",
+   "legends": []
+  },
+  "finite": [
+   200,
+   200,
+   200,
+   200,
+   200,
+   200,
+   200,
+   200,
+   200,
+   200,
+   200,
+   200,
+   200,
+   200,
+   200,
+   200,
+   200,
+   200,
+   200,
+   200,
+   200,
+   200
+  ],
+  "first": [
+   "1.51",
+   "709",
+   "0",
+   "0",
+   "0",
+   "0",
+   "0",
+   "0",
+   "0",
+   "0",
+   "0",
+   "0",
+   "0",
+   "0",
+   "0",
+   "0",
+   "0",
+   "0",
+   "0",
+   "0",
+   "0",
+   "0"
+  ],
+  "last": [
+   "5.49",
+   "0",
+   "0",
+   "0",
+   "0",
+   "0",
+   "0",
+   "0",
+   "0",
+   "1",
+   "0",
+   "8366",
+   "0",
+   "3871",
+   "0",
+   "0",
+   "0",
+   "0",
+   "0",
+   "0",
+   "0",
+   "0"
+  ],
+  "cols": "d84b7b0ff4552dae7359aad983d58502ab118939ae421943da5357b8fc8f395c",
+  "gmx": {
+   "version": "2022.3-plumed_2.8.1",
+   "tool": "gmx wham",
+   "command": "gmx_mpi_sse4.1 wham -it tpr-files.dat -if pullf-files.dat -o pmf.xvg -hist hist.xvg -min 1.5 -max 5.5 -b 0 -e 500000",
+   "workdir": "/home/lindpa/survival_guide/task7/third_try/pulling_4028_vlastni_bins/wham",
+   "created": "Thu Jan 23 09:44:49 2025",
+   "executable": "/software/ncbr/softrepo/rova/gromacs/2022.3-plumed/m64-deb9/para/bin/gmx_mpi_sse4.1"
+  },
+  "detect": {
+   "k": "hist",
+   "from": "header"
+  }
+ },
+ "examples/membrane_thickness.dat": {
+  "n": 86,
+  "ncols": 2,
+  "head": {
+   "title": "",
+   "xLabel": "",
+   "yLabel": "",
+   "legends": []
+  },
+  "finite": [
+   86,
+   74
+  ],
+  "first": [
+   "0",
+   "NaN"
+  ],
+  "last": [
+   "8.5",
+   "3.8832837752525258"
+  ],
+  "cols": "a00d5230df207645e2d3e6970195331815fdbd4dc4b5dd00ac06608b08add739",
+  "gmx": null,
+  "detect": {
+   "k": "pmf",
+   "from": "auto"
+  }
+ },
+ "examples/order_POPE.xvg": {
+  "n": 32,
+  "ncols": 4,
+  "head": {
+   "title": "Atomistic order parameters for molecule type POPE",
+   "xLabel": "Atom",
+   "yLabel": "-Sch",
+   "legends": [
+    "Full membrane",
+    "Upper leaflet",
+    "Lower leaflet"
+   ]
+  },
+  "finite": [
+   32,
+   32,
+   32,
+   32
+  ],
+  "first": [
+   "1",
+   "0.1337",
+   "0.1347",
+   "0.133"
+  ],
+  "last": [
+   "32",
+   "0.0932",
+   "0.0971",
+   "0.0904"
+  ],
+  "cols": "afef665b13eebdb4f8d43ffaf0eaa8de7dce2b71d6e96b7c3995a4ff4ba18cc8",
+  "gmx": null,
+  "detect": {
+   "k": "pmf",
+   "from": "auto"
+  }
+ },
+ "examples/phosphorus.xvg": {
+  "n": 50,
+  "ncols": 2,
+  "head": {
+   "title": "Partial density",
+   "xLabel": "Relative position from center (nm)",
+   "yLabel": "Density (kg m-3)",
+   "legends": [
+    "P"
+   ]
+  },
+  "finite": [
+   50,
+   50
+  ],
+  "first": [
+   "-3.61827",
+   "0"
+  ],
+  "last": [
+   "3.61827",
+   "0"
+  ],
+  "cols": "b046dacff25b9468be955c6c25607d42ab1414672c1af789f64ec50040b8c7b1",
+  "gmx": {
+   "version": "2021.4",
+   "tool": "gmx density",
+   "command": "gmx_mpi_sse4.1 density -f storage/md0001.xtc -n index_phosphorus.ndx -s storage/md0001.tpr -center",
+   "workdir": "/mnt/storage-brno12-cerit/nfs4/home/ladme/all-atom/membranes/POPC/3_md",
+   "created": "Thu Oct  8 12:51:01 2026",
+   "executable": "/software/ncbr/softrepo/rova/gromacs/2021.4-plumed/m64-deb9/para/bin/gmx_mpi_sse4.1"
+  },
+  "detect": {
+   "k": "",
+   "from": "header"
+  }
+ },
+ "examples/pressure.xvg": {
+  "n": 25001,
+  "ncols": 2,
+  "head": {
+   "title": "GROMACS Energies",
+   "xLabel": "Time (ps)",
+   "yLabel": "(bar)",
+   "legends": [
+    "Pressure"
+   ]
+  },
+  "finite": [
+   25001,
+   25001
+  ],
+  "first": [
+   "0",
+   "206.95369"
+  ],
+  "last": [
+   "50000",
+   "219.621948"
+  ],
+  "cols": "deabcdb99f0f25a8e8bd8e2a5ad27090c5ad2ead78eeba07941311af2e17993d",
+  "gmx": {
+   "version": "2021.4",
+   "tool": "gmx energy",
+   "command": "gmx_mpi_sse4.1 energy -f storage/md0001.edr -s storage/md0001.tpr -o pressure.xvg",
+   "workdir": "/mnt/storage-brno12-cerit/nfs4/home/ladme/all-atom/membranes/POPC/3_md",
+   "created": "Thu Oct  8 12:31:49 2026",
+   "executable": "/software/ncbr/softrepo/rova/gromacs/2021.4-plumed/m64-deb9/para/bin/gmx_mpi_sse4.1"
+  },
+  "detect": {
+   "k": "",
+   "from": "header"
+  }
+ },
+ "examples/temperature.xvg": {
+  "n": 25001,
+  "ncols": 4,
+  "head": {
+   "title": "GROMACS Energies",
+   "xLabel": "Time (ps)",
+   "yLabel": "(K)",
+   "legends": [
+    "Temperature",
+    "T-Membrane",
+    "T-W_ION"
+   ]
+  },
+  "finite": [
+   25001,
+   25001,
+   25001,
+   25001
+  ],
+  "first": [
+   "0",
+   "310.923096",
+   "309.290741",
+   "313.135651"
+  ],
+  "last": [
+   "50000",
+   "309.123962",
+   "310.254517",
+   "307.591583"
+  ],
+  "cols": "eb3c100e4857f1181ff8d8ab6b9376d96249cf47a47f23311f2082cc27486465",
+  "gmx": {
+   "version": "2021.4",
+   "tool": "gmx energy",
+   "command": "gmx_mpi_sse4.1 energy -f storage/md0001.edr -s storage/md0001.tpr",
+   "workdir": "/mnt/storage-brno12-cerit/nfs4/home/ladme/all-atom/membranes/POPC/3_md",
+   "created": "Thu Oct  8 12:30:16 2026",
+   "executable": "/software/ncbr/softrepo/rova/gromacs/2021.4-plumed/m64-deb9/para/bin/gmx_mpi_sse4.1"
+  },
+  "detect": {
+   "k": "",
+   "from": "header"
+  }
+ },
+ "examples/translocation_free_energy.dat": {
+  "n": 365,
+  "ncols": 2,
+  "head": {
+   "title": "",
+   "xLabel": "",
+   "yLabel": "",
+   "legends": []
+  },
+  "finite": [
+   365,
+   365
+  ],
+  "first": [
+   "-7.479",
+   "-1.131999999999998"
+  ],
+  "last": [
+   "7.379",
+   "0.017000000000003013"
+  ],
+  "cols": "ed2787688ab0a11ac8d5085562577517651be7b41ead99c4c6fc60ccf032d93b",
+  "gmx": null,
+  "detect": {
+   "k": "energy",
+   "from": "auto"
+  }
+ }
+}

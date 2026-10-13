@@ -16,8 +16,13 @@ function hex2rgb(h: string): number[] {
   return [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
 }
 
-export function ramp(t: number, dark: boolean): string {
-  const stops = (dark ? RAMP_DARK : RAMP_LIGHT).map(hex2rgb);
+const SKY_DARK = ['#1b1918', '#0b2a40', '#123f63', '#1b5a8c'];
+const SKY_LIGHT = ['#f3f2f2', '#d7e8f6', '#acd0ef', '#84b8e6'];
+/** The cool ramp for values below a diverging scale's centre (R4b), from the same page colour. */
+export function rampSky(t: number, dark: boolean): string { return between(dark ? SKY_DARK : SKY_LIGHT, t); }
+export function ramp(t: number, dark: boolean): string { return between(dark ? RAMP_DARK : RAMP_LIGHT, t); }
+function between(hexes: string[], t: number): string {
+  const stops = hexes.map(hex2rgb);
   const u = Math.max(0, Math.min(1, t)) * (stops.length - 1);
   const i = Math.min(stops.length - 2, Math.floor(u));
   const f = u - i;
@@ -30,15 +35,17 @@ function relLum(rgb: number[]): number {
   return 0.2126 * f(rgb[0]) + 0.7152 * f(rgb[1]) + 0.0722 * f(rgb[2]);
 }
 
-function contrast(a: number[], b: number[]): number {
+export function contrast(a: number[], b: number[]): number {
   const l1 = relLum(a), l2 = relLum(b);
   return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
 }
 
 // Pick whichever ink actually clears more contrast on this exact swatch,
 // rather than flipping at a fixed point on the ramp.
-export function inkOn(t: number, dark: boolean): string {
-  const m = /rgb\((\d+),(\d+),(\d+)\)/.exec(ramp(t, dark))!;
+export function inkOn(t: number, dark: boolean): string { return inkFor(ramp(t, dark), dark); }
+/** The ink (near white or near black) with more contrast on a swatch given as rgb(r,g,b). */
+export function inkFor(swatch: string, dark: boolean): string {
+  const m = /rgb\((\d+),(\d+),(\d+)\)/.exec(swatch)!;
   const bg = [+m[1], +m[2], +m[3]];
   const light = dark ? [239, 237, 236] : [255, 242, 239];
   const dk = dark ? [23, 21, 20] : [32, 30, 29];

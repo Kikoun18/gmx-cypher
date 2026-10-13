@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Section } from '../ui/separator'
 import { getJson, postJson } from '../api'
 import type { Job } from '../jobs'
-import type { Fields, Landing, Source } from '../lib/landing'
+import { typeSource, type Fields, type Landing, type Source } from '../lib/landing'
 
 interface VaultInfo { path: string; projects: { id: string; name: string; dir: string }[]; error?: string }
 interface Sent { path: string; name: string; renamed: boolean; next: string[]; link?: string }
@@ -113,7 +113,7 @@ export function SendDialog({ job, open, onOpenChange, returnFocus }: { job: Job;
           {l && (
             <div className="flex flex-col gap-3" aria-live="polite">
               <p className="m-0 text-control">
-                {l.row ? <>PMF Sequences will put it at <b>{l.row} × {l.col.label}</b> · run {l.run} · {l.type.label} (from the {l.type.how === 'header' ? 'header' : l.type.how}){l.rowNew && ' · new row'}{l.col.isNew && ' · new column'}{l.replaces && ' · replaces the RDF there'}</> : 'PMF Sequences would not know where to put it'}
+                {l.row ? <>PMF Sequences will put it at <b>{l.row} × {l.col.label}</b> · run {l.run} · {l.type.label} ({typeSource(l.type.how)}){l.rowNew && ' · new row'}{l.col.isNew && ' · new column'}{l.replaces && ' · replaces the RDF there'}</> : 'PMF Sequences would not know where to put it'}
                 {' · '}{pv.reasons.length ? <span className="text-destructive">✗ not what you chose: {pv.reasons.join(', ')}</span> : <span className="text-mint-strong">✓ matches what you chose</span>}
               </p>
               {(l.problems.length > 0 || pv.reasons.length > 0) && (
