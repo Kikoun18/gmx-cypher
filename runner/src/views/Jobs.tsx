@@ -3,6 +3,9 @@ import { X } from 'lucide-react'
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert'
 import { Badge } from '../ui/badge'
 import { Button } from '../ui/button'
+import { Checkbox } from '../ui/checkbox'
+import type { DecypherSources, SourceRef } from '../decypher/state'
+import { Kbd } from '../ui/kbd'
 import { Section } from '../ui/separator'
 import { postJson } from '../api'
 import { clock, fraction, jobLine, progressText, STATUS, type Job, type useJobs } from '../jobs'
@@ -27,7 +30,10 @@ function useNow(on: boolean) {
   return now
 }
 
-function JobDetail({ job, log, onRunAgain, vault }: { job: Job; log: string | undefined; onRunAgain: (r: RunRecord) => void; vault: string | null }) {
+/** What the jobs tab needs of (de)Cypher: the picked RDFs, a way to open it, and its key. */
+export interface DecypherLink { sources: DecypherSources; open: (add?: SourceRef[]) => void; keyName: string | null }
+
+function JobDetail({ job, log, onRunAgain, vault, decypher }: { job: Job; log: string | undefined; onRunAgain: (r: RunRecord) => void; vault: string | null; decypher: DecypherLink }) {
   const [armed, press] = useArmed()
   const logRef = React.useRef<HTMLDivElement>(null)
   React.useEffect(() => { const el = logRef.current?.querySelector('pre'); if (el) el.scrollTop = el.scrollHeight }, [log])
@@ -40,6 +46,7 @@ function JobDetail({ job, log, onRunAgain, vault }: { job: Job; log: string | un
         <h2 className="m-0 text-title font-bold">{job.title}</h2>
         <Badge tone={job.status === 'running' ? 'butter' : job.status === 'done' ? 'mint' : 'stone'} variant={job.status === 'failed' ? 'destructive' : undefined}>{s.word}</Badge>
         <span className="flex-1" />
+        {job.kind === 'rdf' && job.status === 'done' && <Button variant="outline" onClick={() => decypher.open([{ kind: 'job', id: job.id }])}>open in (de)Cypher</Button>}
         {job.status === 'running' && <Button variant="destructive" onClick={cancel}>{armed ? 'click again to cancel' : 'cancel'}</Button>}
       </div>
       {job.status === 'failed' && job.error && (
@@ -62,23 +69,39 @@ function JobDetail({ job, log, onRunAgain, vault }: { job: Job; log: string | un
   )
 }
 
-export function JobsView({ jobs, logs, loadLog, selected, onSelect, onRunAgain, vault }: ReturnType<typeof useJobs> & { selected: string | null; onSelect: (id: string) => void; onRunAgain: (r: RunRecord) => void; vault: string | null }) {
+export function JobsView({ jobs, logs, loadLog, selected, onSelect, onRunAgain, vault, decypher }: ReturnType<typeof useJobs> & { selected: string | null; onSelect: (id: string) => void; onRunAgain: (r: RunRecord) => void; vault: string | null; decypher: DecypherLink }) {
   const job = jobs.find(j => j.id === selected) || jobs[0]
   React.useEffect(() => { if (job && !(job.id in logs)) loadLog(job.id) }, [job, logs, loadLog])
-  if (!jobs.length) return <p className="m-0 text-control text-muted-foreground">no jobs yet</p>
+  const anyRdf = jobs.some(j => j.kind === 'rdf'), picked = decypher.sources.refs.length
+  if (!jobs.length) return (
+    <div className="flex flex-wrap items-center gap-3">
+      <p className="m-0 text-control text-muted-foreground">no jobs yet</p>
+      <Button variant="outline" size="sm" onClick={() => decypher.open()}>(de)Cypher{decypher.keyName ? ' · ' + decypher.keyName : ''}</Button>
+    </div>
+  )
   return (
     <div className="grid grid-cols-[220px_minmax(0,1fr)] gap-5">
       <nav className="flex flex-col gap-1" aria-label="jobs">
         <Section label={'Jobs ' + String(jobs.length).padStart(2, '0')} />
-        {jobs.map(j => (
-          <button key={j.id} onClick={() => onSelect(j.id)} aria-current={j.id === job?.id ? 'true' : undefined}
-            className={cn('flex flex-col items-start gap-0.5 rounded-lg px-3 py-2 text-left hover:bg-muted', j.id === job?.id && 'bg-muted ring-1 ring-inset ring-border')}>
-            <span className="text-control font-bold">{j.title}</span>
-            <span className="block w-full truncate text-caption"><span className={STATUS[j.status].className}>{STATUS[j.status].word}</span> <span className="text-muted-foreground">· {jobLine(j)}</span></span>
-          </button>
-        ))}
+        {/* (de)Cypher: tick RDF jobs to see them together, with their structures; the button or its key opens it. */}
+        <Button variant="outline" size="sm" className="mb-1 justify-between" onClick={() => decypher.open()} title={decypher.keyName ? decypher.keyName + ' opens it too (settings → keyboard)' : 'set a key in settings → keyboard'}>
+          <span>(de)Cypher{picked ? ' · ' + String(picked).padStart(2, '0') : ''}</span>{decypher.keyName && <Kbd>{decypher.keyName}</Kbd>}
+        </Button>
+        {jobs.map(j => {
+          const rdf = j.kind === 'rdf', ref: SourceRef = { kind: 'job', id: j.id }
+          return (
+            <div key={j.id} className={cn('flex items-start gap-1 rounded-lg hover:bg-muted', j.id === job?.id && 'bg-muted ring-1 ring-inset ring-border')}>
+              {rdf ? <Checkbox className="ml-2.5 mt-[11px]" checked={decypher.sources.has(ref)} onCheckedChange={() => decypher.sources.toggle(ref)} aria-label={'show ' + j.title + ' in (de)Cypher'} disabled={j.status === 'failed' || j.status === 'cancelled' || j.status === 'interrupted'} />
+                : anyRdf && <span className="ml-2.5 w-[13px] shrink-0" />}
+              <button onClick={() => onSelect(j.id)} aria-current={j.id === job?.id ? 'true' : undefined} className={cn('flex min-w-0 flex-1 flex-col items-start gap-0.5 py-2 pr-3 text-left', anyRdf ? 'pl-1.5' : 'pl-3')}>
+                <span className="text-control font-bold">{j.title}</span>
+                <span className="block w-full truncate text-caption"><span className={STATUS[j.status].className}>{STATUS[j.status].word}</span> <span className="text-muted-foreground">· {jobLine(j)}</span></span>
+              </button>
+            </div>
+          )
+        })}
       </nav>
-      {job && <JobDetail key={job.id} job={job} log={logs[job.id]} onRunAgain={onRunAgain} vault={vault} />}
+      {job && <JobDetail key={job.id} job={job} log={logs[job.id]} onRunAgain={onRunAgain} vault={vault} decypher={decypher} />}
     </div>
   )
 }

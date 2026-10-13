@@ -3,8 +3,38 @@ import { Button } from '../ui/button'
 import { Dialog, DialogBody, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogHeading, DialogTitle } from '../ui/dialog'
 import { Input } from '../ui/input'
 import { Field, FieldHint, Label } from '../ui/label'
+import { Kbd } from '../ui/kbd'
 import { Section } from '../ui/separator'
 import { postJson, type AppState } from '../api'
+import { bindingOf, DEFAULT_BINDINGS, keyLabel, keyProblem, useBindings } from '../lib/shortcuts'
+
+/** The key that opens and closes (de)Cypher: change it by pressing the new one; Escape keeps the old one. */
+function KeyField() {
+  const [bindings, setBindings] = useBindings()
+  const [listening, setListening] = React.useState(false)
+  const b = bindings.decypher, problem = keyProblem(b)
+  return (
+    <Field>
+      <Label id="key-decypher-label">open and close (de)Cypher</Label>
+      <div className="flex flex-wrap items-center gap-2">
+        <Kbd className="h-6 min-w-6 text-[11px]">{keyLabel(b)}</Kbd>
+        <Button id="key-decypher" variant="outline" size="sm" aria-pressed={listening} aria-labelledby="key-decypher-label key-decypher"
+          onClick={() => setListening(l => !l)} onBlur={() => setListening(false)}
+          onKeyDown={e => {
+            if (!listening) return
+            e.preventDefault(); e.stopPropagation()
+            if (e.key === 'Escape') { setListening(false); return }
+            const next = bindingOf(e)
+            if (!next) return
+            setBindings({ ...bindings, decypher: next }); setListening(false)
+          }}>{listening ? 'press a key… (Escape keeps ' + keyLabel(b) + ')' : 'change'}</Button>
+        {b && <Button variant="ghost" size="sm" onClick={() => setBindings({ ...bindings, decypher: null })}>no key</Button>}
+        {keyLabel(b) !== keyLabel(DEFAULT_BINDINGS.decypher) && <Button variant="ghost" size="sm" onClick={() => setBindings(DEFAULT_BINDINGS)}>back to {keyLabel(DEFAULT_BINDINGS.decypher)}</Button>}
+      </div>
+      {problem ? <FieldHint error>✗ {problem}</FieldHint> : <FieldHint>{b ? keyLabel(b) + ' anywhere but in a field; the jobs tab has the same as a button.' : 'no key: open (de)Cypher from the jobs tab.'} Inside it, F fits the plotted groups, R resets the view and [ ] step through jobs. Kept in this browser.</FieldHint>}
+    </Field>
+  )
+}
 
 export function Settings({ state, open, onOpenChange, onState, returnFocus }: { state: AppState; open: boolean; onOpenChange: (o: boolean) => void; onState: (s: AppState) => void; returnFocus?: React.RefObject<HTMLElement | null> }) {
   const [gmx, setGmx] = React.useState(state.config.gmx || '')
@@ -33,7 +63,9 @@ export function Settings({ state, open, onOpenChange, onState, returnFocus }: { 
   }
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent onCloseAutoFocus={e => { if (returnFocus?.current) { e.preventDefault(); returnFocus.current.focus() } }}>
+      <DialogContent onCloseAutoFocus={e => { if (returnFocus?.current) { e.preventDefault(); returnFocus.current.focus() } }}
+        // While the key field listens, Escape is its answer (keep the old key), not the dialog's.
+        onEscapeKeyDown={e => { const el = document.activeElement; if (el?.id === 'key-decypher' && el.getAttribute('aria-pressed') === 'true') e.preventDefault() }}>
         <DialogHeader>
           <DialogHeading>
             <DialogTitle>Settings</DialogTitle>
@@ -86,6 +118,8 @@ export function Settings({ state, open, onOpenChange, onState, returnFocus }: { 
             </div>
             {pmfError ? <FieldHint error>✗ {pmfError}</FieldHint> : <FieldHint>Where you open PMF Sequences; after sending, gmx-cypher links to the project there.</FieldHint>}
           </Field>
+          <Section label="Keyboard" />
+          <KeyField />
           <Section label="Cluster" />
           <div className="grid grid-cols-2 gap-x-4 gap-y-2">
             <Field>

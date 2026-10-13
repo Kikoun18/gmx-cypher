@@ -56,3 +56,8 @@ Nothing here is invented. Each file is what GROMACS wrote or printed.
 
 The only edit: the scratch folder these ran in is written as `/home/user/sim/na2so4/nvt`, and the
 GROMACS install as `/opt/gromacs-2025.4`, in the header and banner lines.
+- `decypher/` — your two RDF runs from MetaCentrum, as you sent them with the RDF Explorer design (gmx-cypher 0.1.0,
+  GROMACS 2025.4-PLUMED_spack): `rdf_o111_Methionine_H` and `rdf_o111_Methionine_S` (`.xvg`, `.ndx`, `.run.json`), and
+  `mmmmmmmm.gro` (the peptide alone, 139 atoms). `9.multiwalker.gro` is your 33,513-atom structure cut to its first 279
+  atoms (the 249 atoms of sugars and peptide, then 10 waters), its atom count line set to 279 and its box line kept:
+  the groups reach atom 246, so they read the same atoms as in the whole file.
