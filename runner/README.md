@@ -4,7 +4,9 @@ A local tool that runs GROMACS analyses on your trajectories and energy files: `
 `hbond`, `rms`, `rmsf`, `gyrate`, `mindist`, `energy`, `awh` and `wham`. You pick atom groups in 3D or by
 rule, see the exact command before it runs, get every output with a run record, and hand results to
 **PMF Sequences** through its vault, where they land in the right row, column and run. A *cluster* tab
-shows your cluster jobs (`qq jobs` with `gmx-eta -a`).
+shows your cluster jobs (`qq jobs` with `gmx-eta -a`). **(de)Cypher** shows the RDFs of several jobs at once, each with the
+structure its groups are atoms of, side by side or on one graph, also RDFs from the PMF Sequences vault with their rows'
+structures, and exports them as one interactive HTML file.
 
 It runs on your machine (or the machine that has the trajectories), serves its page on 127.0.0.1 only,
 and never deletes or overwrites a file.
@@ -188,6 +190,54 @@ The 3D view draws the structure file's own box: a `.gro`'s last line (rectangula
 while the view has focus) shows or hides it. A file without a usable box says why instead; a placeholder
 box is drawn as recorded, with its atoms outside said in words.
 
+## (de)Cypher
+
+The RDFs of several runs at once, each beside the structure its groups are atoms of: the RDF Explorer design, in
+Morpheus, as a view of gmx-cypher.
+
+**Opening it.** In *jobs*, tick the RDF jobs you want (the box before each RDF job) and press *(de)Cypher*; a finished
+RDF job also has *open in (de)Cypher*. Or press **D** anywhere but in a field: *settings → keyboard* changes the key
+(press the new one; Escape keeps the old), or takes it away. D, Escape or × closes it; what you picked stays picked.
+
+**Where the RDFs come from** (*add*, on the left):
+
+- *jobs*: this gmx-cypher's RDF runs. A running one waits and opens when it ends.
+- *runs*: RDF runs gmx-cypher wrote before, found by their records (`*.run.json`) under a folder of the allowed ones:
+  another home's, another machine's. Each opens with its groups and the structure it ran on.
+- *vault*: the RDF analyses of your PMF Sequences vault (*settings → vault*), by project and row. Each comes with its
+  **row's structure** (the `.gro` or `.pdb` PMF Sequences keeps with the sequence) when that has the atoms the groups
+  reach; else with the structure the run used, and the note says why (`mmmmmmmm.gro has 139 atoms; the groups reach
+  atom 246`). The groups' atoms come from the gmx-cypher run that wrote the file, found by its SHA-256 among this
+  runner's jobs (PMF Sequences keeps files byte for byte); an RDF no run of this gmx-cypher wrote still shows its curves,
+  without atoms.
+- *files*: gro, pdb, ndx, xvg and run.json files, or a folder of them, dropped anywhere on (de)Cypher or picked. Each
+  .xvg finds its record (by the record's `-o`, else by its name), its index (the record's `-n`, the .xvg's command line,
+  the same name, or the only one) and a structure with enough atoms (the record's first). Files are read in the
+  browser and never kept.
+
+**Each job**: a card per RDF: its structure (water and ions hidden; the molecules laid out side by side, those with
+plotted groups first) beside its g(r), its groups as chips and its curves with their first peaks (gmx-cypher's rule,
+as in the result). Click a group's atom or chip to plot it alone, ⌘, Ctrl or Shift-click to add it; the plotted
+groups glow in their hues, the reference is ringed. *link groups* picks the same group in every job.
+
+**One graph**: every shown RDF on one chart, led by one whose structure and groups are shown (‹ › or [ ] step through
+them). A group you pick is drawn for each RDF that has it: the same atoms of the same structure, else the same name,
+else the same place in a list as long. *color by group*: each group its hue, each RDF its dash; *by job*: each RDF its
+hue, each group its dash. The other RDFs' references on the same structure are ringed dashed.
+
+**The structure view**: drag to rotate, right- or Alt-drag to pan, scroll to zoom, double-click or **F** to fit the
+plotted groups, **R** to reset. *style* (ball & stick, licorice, spacefill), *not plotted* (tinted in their group's hue,
+grey, or ghost), *molecules* (side by side, or as in the frame), *labels*, *hydrogens* and *peaks*. A view keeps up
+to 4000 atoms (the groups' first). The chart shows each curve's value under the pointer.
+
+**Export**: one HTML file that opens in any browser, offline, with nothing to install or fetch: each RDF with its
+structure (rotate, zoom, click a group to plot it), its chart (values under the pointer) and its groups and peaks; and,
+for two or more, the one graph (*color by*, each curve shown → dimmed → hidden). It carries mononoki, both themes
+(with a light/dark switch), the data and the very code (de)Cypher draws with. Paths of this machine stay out of it.
+
+What (de)Cypher remembers (the picked jobs, runs and vault RDFs, the plotted groups, the style, the key) is kept in
+this browser, like the theme; it writes nothing on the server.
+
 ## The cluster view
 
 The *cluster* tab lists your cluster jobs: `qq jobs` (`qq jobs -a` with *show finished*) merged by job
@@ -266,13 +316,16 @@ a version 1 recipe selects exactly the atoms it did.
 ## Safety
 
 gmx-cypher can:
-- read files inside the allowed folders, and read your PMF Sequences vault;
+- read files inside the allowed folders, and read your PMF Sequences vault; (de)Cypher gets only the vault's RDF files
+  and its rows' structures, and run records found in the allowed folders;
 - start `gmx` and the GROMACS tools it knows (never through a shell), in a trajectory's folder;
 - in the cluster view: start `qq jobs` (`qq jobs -a` with *show finished*) and `gmx-eta -a`, on this machine. The
   programs are `qq` and `gmx-eta` from your `PATH`, or the absolute paths set in *settings*; their arguments are
   fixed in the code, one runs at a time, and nothing typed in the page reaches them;
 - write new files: a run's outputs, under names that are free; files in its own state folder; and a result you
   send, into the project's `_inbox` folder.
+
+(de)Cypher writes nothing: an export is a download from your browser.
 
 It cannot, by design:
 - overwrite or delete any of your files (new names are created exclusively; the vault reader's every write throws);
@@ -293,7 +346,7 @@ npm run dev        # server and page with hot reload
 npm test           # checks app/ is as agreed (T144), then the tests (fake gmx)
 npm run lint
 npm run build
-npm run e2e        # the browser smoke test (Playwright, Chromium)
+npm run e2e        # the browser tests: the smoke test and (de)Cypher's (Playwright, Chromium)
 GMX=/path/to/gmx npx vitest run   # also the tests that need a real gmx
 ```
 

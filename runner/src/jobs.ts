@@ -24,8 +24,10 @@ export const STATUS: Record<Job['status'], { word: string; className: string }> 
 export function useJobs() {
   const [jobs, setJobs] = React.useState<Job[]>([])
   const [logs, setLogs] = React.useState<Record<string, string>>({})
+  // Whether the list came: until it does, a job (de)Cypher remembers is not yet missing.
+  const [loaded, setLoaded] = React.useState(false)
   React.useEffect(() => {
-    getJson<Job[]>('/api/jobs').then(setJobs, () => {})
+    getJson<Job[]>('/api/jobs').then(j => { setJobs(j); setLoaded(true) }, () => {})
     const es = new EventSource('/api/events')
     es.addEventListener('job', e => {
       const j = JSON.parse((e as MessageEvent).data) as Job
@@ -38,7 +40,7 @@ export function useJobs() {
     return () => es.close()
   }, [])
   const loadLog = React.useCallback((id: string) => { getJson<Job>('/api/jobs/' + id).then(j => setLogs(l => ({ ...l, [id]: j.log || '' })), () => {}) }, [])
-  return { jobs, logs, loadLog }
+  return { jobs, logs, loadLog, loaded }
 }
 
 type Estimate = { frames: number; start: number; end: number }

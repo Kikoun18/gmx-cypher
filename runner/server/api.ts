@@ -24,6 +24,7 @@ import { cpus } from 'node:os';
 import { planRun, recordWritten, startRun } from './runs';
 import { sendToInbox } from './send';
 import { landingFor, listProjects, openVault, projectSummary, readProject } from './vault';
+import { findRuns, listVault, readRun, vaultFile } from './decypher';
 import type { Fields } from '../src/lib/landing';
 import type { RunRecord } from '../src/lib/record';
 import { saveConfig, type Config } from './state';
@@ -161,6 +162,23 @@ export function makeApi(ctx: Ctx): Api {
       if (!(await listProjects(v)).some(p => p.id === id)) throw new HttpError(404, 'no project ' + id + ' in the vault');
       return { body: projectSummary(await readProject(v, id)) };
     }
+    if (is(req, 'GET', url, '/api/decypher/vault')) {
+      // (de)Cypher: the vault's RDFs with their rows' structures, and the run that wrote each, read only.
+      if (!ctx.config.vault) throw new HttpError(409, 'no vault set: choose the PMF Sequences vault in settings');
+      return { body: await listVault(await openVault(ctx.config.vault), ctx.jobs) };
+    }
+    if (is(req, 'GET', url, '/api/decypher/vault/file')) {
+      if (!ctx.config.vault) throw new HttpError(409, 'no vault set: choose the PMF Sequences vault in settings');
+      const text = await vaultFile(await openVault(ctx.config.vault), ctx.jobs, url.searchParams.get('path') || '');
+      res.writeHead(200, { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' });
+      res.end(text);
+      return 'handled';
+    }
+    if (is(req, 'POST', url, '/api/decypher/runs')) {
+      // (de)Cypher: RDF runs gmx-cypher wrote before, by their records, under a folder of the allowed ones.
+      return { body: findRuns(String((await readJson<{ root: string }>(req)).root || ''), roots()) };
+    }
+    if (is(req, 'GET', url, '/api/decypher/run')) return { body: readRun(url.searchParams.get('path') || '', roots()) };
     if (is(req, 'POST', url, '/api/landing')) {
       const b = await readJson<{ job: string; project: string; fields?: Fields; name?: string }>(req);
       const j = ctx.jobs.get(b.job);
