@@ -401,8 +401,9 @@ export function Decypher({ open, onOpenChange, sources, jobs, jobsLoaded, allow,
   const setFocus = (id: string) => {
     const to = shown.find(a => a.id === id)
     if (!to || !focus || to === focus) return
+    // It keeps the groups picked on it; one never picked on takes the leading one's, matched.
     const names = remap(focus, to, selectedOf(focus))
-    patch(v => ({ focus: id, selected: names.length ? { ...v.selected, [id]: names } : v.selected }))
+    patch(v => ({ focus: id, selected: v.selected[id] || !names.length ? v.selected : { ...v.selected, [id]: names } }))
   }
 
   const onKey = (e: React.KeyboardEvent) => {

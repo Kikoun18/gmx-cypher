@@ -661,14 +661,27 @@ export function decypherKit() {
     xt.ticks.forEach(t => k.push(['text', { key: 'tx' + t, x: sx(t), y: m.t + ih + 16, textAnchor: 'middle', style: cap }, t.toFixed(xt.decimals)]))
     yt.ticks.forEach(t => k.push(['text', { key: 'ty' + t, x: m.l - 8, y: sy(t) + 4, textAnchor: 'end', style: cap }, t.toFixed(yt.decimals)]))
     k.push(['text', { key: 'xl', x: m.l + iw, y: H - 2, textAnchor: 'end', style: lab }, (o.xlabel || 'r (nm)').toUpperCase()])
+    // Peak labels never overlap: one that would is moved up a line or two, else left out (its dot stays, the hover reads it).
+    const placed: { x0: number; x1: number; y0: number; y1: number }[] = []
+    const labelAt = (x: number, y: number, text: string): number | null => {
+      const w = text.length * 6.6 + 2
+      for (let up = 0; up < 3; up++) {
+        const b = { x0: x + 7, x1: x + 9 + w, y0: y - 19 - up * 13, y1: y - 6 - up * 13 }
+        if (b.y0 < 0 || placed.some(q => b.x0 < q.x1 && b.x1 > q.x0 && b.y0 < q.y1 && b.y1 > q.y0)) continue
+        placed.push(b)
+        return -8 - up * 13
+      }
+      return null
+    }
     o.curves.forEach(c => {
       const d = c.y.map((v, j) => (j ? 'L' : 'M') + sx(c.x[j]).toFixed(1) + ',' + sy(v).toFixed(1)).join('')
       const g: VNode[] = [['path', { key: 'p', d, fill: 'none', stroke: c.color, strokeWidth: c.hot ? 2.8 : 2, strokeLinejoin: 'round', strokeLinecap: 'round', strokeDasharray: c.dash === 'none' ? undefined : c.dash, style: o.animate ? { d: 'path("' + d + '")', transition: 'd 360ms ' + ease + ', stroke 200ms ease' } : undefined }]]
       if (o.peaks && c.peak) {
-        const pk = c.peak
-        g.push(['g', { key: 'pk', style: { transform: 'translate(' + sx(pk.r).toFixed(1) + 'px,' + sy(pk.g).toFixed(1) + 'px)', transition: o.animate ? 'transform 360ms ' + ease : undefined } },
-          ['circle', { key: 'c', cx: 0, cy: 0, r: 4, fill: c.color }],
-          ['text', { key: 't', x: 8, y: -8, style: { fontFamily: F, fontSize: '11px', fill: th.fg, stroke: BG, strokeWidth: '3px', paintOrder: 'stroke', strokeLinejoin: 'round' } }, pk.r.toFixed(3)]])
+        const pk = c.peak, px = sx(pk.r), py = sy(pk.g), text = pk.r.toFixed(3), ty = c.dim ? null : labelAt(px, py, text)
+        const mark: VNode = ['g', { key: 'pk', style: { transform: 'translate(' + px.toFixed(1) + 'px,' + py.toFixed(1) + 'px)', transition: o.animate ? 'transform 360ms ' + ease : undefined } },
+          ['circle', { key: 'c', cx: 0, cy: 0, r: 4, fill: c.color }]]
+        if (ty != null) mark.push(['text', { key: 't', x: 8, y: ty, style: { fontFamily: F, fontSize: '11px', fill: th.fg, stroke: BG, strokeWidth: '3px', paintOrder: 'stroke', strokeLinejoin: 'round' } }, text])
+        g.push(mark)
       }
       k.push(['g', { key: 'c' + c.key, opacity: c.dim ? 0.4 : 1, style: { transition: 'opacity 140ms ease' } }, ...g])
     })

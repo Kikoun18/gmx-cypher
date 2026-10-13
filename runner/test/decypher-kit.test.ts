@@ -114,6 +114,16 @@ describe('(de)Cypher reads your runs as the RDF Explorer design does', () => {
     expect(kit.valAt(h.x, h.sels[2].y, h.x[10])).toBe(h.sels[2].y[10])
   })
 
+  it('peak labels never overlap: moved up a line, or left out (the dot stays)', () => {
+    const [h] = files().analyses
+    const one = kit.buildCurves({ focus: h, plotted: [h], selected: ['O5...S'], colorBy: 'group', pal, tones: {} })[0]
+    const curves = [0, 1, 2, 3].map(i => ({ ...one, key: 'k' + i }))
+    const { tree } = kit.chart({ W: 600, H: 360, curves, grid: h.x, xlabel: '', ylabel: '', hover: null, peaks: true, pal })
+    const labels = nodes(tree, 'text').filter(t => t[2] === one.peak!.r.toFixed(3))
+    expect(labels.map(t => t[1].y)).toEqual([-8, -21, -34])
+    expect(nodes(tree, 'circle')).toHaveLength(4)
+  })
+
   it('is self-contained: its source text alone makes the same kit (the HTML export carries it)', () => {
     const src = decypherKit.toString()
     expect(src).not.toMatch(/<\/script/i)
