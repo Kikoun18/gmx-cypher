@@ -218,6 +218,8 @@ export interface Settings {
   dark: boolean | null;
   /** App-wide: draw graph curves in greys with dashes (batch 2, R4). */
   bw: boolean;
+  /** App-wide: matrix tiles show the spread under the value ("± SD · n 3"); off unless switched on. */
+  tileSpread: boolean;
   rowAll: boolean;
   hiddenOut: boolean;
   analyses?: AnalysisType[];

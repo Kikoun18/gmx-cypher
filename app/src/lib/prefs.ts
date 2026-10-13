@@ -6,7 +6,7 @@ import { splitSettings } from './seq';
 import type { Settings } from './types';
 
 const KEY = 'pmf-ui-prefs-v1';
-const PREF_KEYS = ['dark', 'bw', 'laserKey', 'laserMode', 'laserColor', 'laserSize', 'laserTrail', 'compareKey', 'exportKey', 'recentMetrics', 'exportPrefs'] as const;
+const PREF_KEYS = ['dark', 'bw', 'tileSpread', 'laserKey', 'laserMode', 'laserColor', 'laserSize', 'laserTrail', 'compareKey', 'exportKey', 'recentMetrics', 'exportPrefs'] as const;
 
 function pick(s: Partial<Settings>): Partial<Settings> {
   const app = splitSettings(s).app as Record<string, unknown>, out: Record<string, unknown> = {};

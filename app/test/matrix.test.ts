@@ -18,11 +18,14 @@ describe('matrix exports reproduce the golden scenes (Area and Min)', async () =
     const tiles = matrixTiles(seqs, cols, def, st, skip), { glist, anyGroup } = groupRows(seqs, cols, tiles, false);
     const d = matrixData({ project: 'Sugar PMFs', page: null, def, st, pmfT: lib.ENTROPY, cols, glist, anyGroup, tiles });
     // Named changes since the golden scenes. R2 (F118): the subtitle names the PMF correction in use. R8 (F136): a tile
-    // over several runs shows its spread under the value, as on screen.
+    // over several runs shows its spread under the value, as on screen, when the tileSpread setting is on (it is off by
+    // default, so the default export has no spread at all).
     expect(d.sub.endsWith(' · ' + lib.TRANSFORMS.entropy.note)).toBe(true);
-    const cells = d.groups.flatMap(g => g.rows.flatMap(r => r.cells)).filter(c => c != null);
+    expect(d.groups.flatMap(g => g.rows.flatMap(r => r.cells)).every(c => c == null || c.spread === undefined)).toBe(true);
+    const ds = matrixData({ project: 'Sugar PMFs', page: null, def, st: { ...st, tileSpread: true }, pmfT: lib.ENTROPY, cols, glist, anyGroup, tiles });
+    const cells = ds.groups.flatMap(g => g.rows.flatMap(r => r.cells)).filter(c => c != null);
     expect(cells.filter(c => c.n > 1).every(c => /^± \d/.test(c.spread || ''))).toBe(true);
-    const sc = matrixScene(d), spreads = cells.flatMap(c => (c.spread ? [c.spread] : []));
+    const sc = matrixScene(ds), spreads = cells.flatMap(c => (c.spread ? [c.spread] : []));
     expect(spreads.length).toBeGreaterThan(0);
     expect(sc.items.filter(i => i.t === 'text' && spreads.includes(i.s)).length).toBe(spreads.length);
     const was = { ...d, sub: d.sub.slice(0, -(' · ' + lib.TRANSFORMS.entropy.note).length), groups: d.groups.map(g => ({ ...g, rows: g.rows.map(r => ({ ...r, cells: r.cells.map(c => c && { v: c.v, n: c.n }) })) })) };

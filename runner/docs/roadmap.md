@@ -124,6 +124,7 @@ Spec: [`batch-2.md`](batch-2.md). Phase 0 report: [`batch-2-phase0.md`](batch-2-
 
 ### After batch 3 of PMF Sequences (your request, T142–T144)
 - [x] `app/` replaced by PMF Sequences batch 3, as its source came; Cypher follows it (schema 4, general data, energy typed from its header; T142)
+- [x] Matrix tiles show no "±" and no "n" by default; a setting brings them back (T143)
 - [x] The `app/` check compares a hash of the whole tree, so a commit can carry its own baseline (T144)
 
 ### Backlog (Batch 2: add to it, don't do it)

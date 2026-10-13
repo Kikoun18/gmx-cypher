@@ -57,7 +57,7 @@ export function matrixData(o: { project: string; page: Page | null; def: MetricD
         // The value as the tile writes it (F137), and its spread: "± SD" over several runs or "± … block" for one run
         // (R8, F136; n is the bars).
         cells: o.cols.map(c => {
-          const t = o.tiles.get(tileKey(s.id, c.k)), tx = t ? tileText(t, def) : null, sp = tx ? tx.spread.split(' · n ')[0] : '';
+          const t = o.tiles.get(tileKey(s.id, c.k)), tx = t ? tileText(t, def, !!o.st.tileSpread) : null, sp = tx ? tx.spread.split(' · n ')[0] : '';
           return t?.kind === 'value' ? { v: t.v, n: uploaded(s, c.k, def), text: tx!.main, ...(sp ? { spread: sp } : {}) } : null;
         }),
       })),

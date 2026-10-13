@@ -668,7 +668,7 @@ export function tileDiff(seqs: Seq[], cols: Column[], metric: Metric, skip: Skip
 export function emptyStore(): Store { return { seqs: [], cols: getCols(null), notes: { cell: {}, row: {} }, vis: {}, lit: {}, pages: [] }; }
 
 export const DEFAULT_SETTINGS: Settings = {
-  parse: true, pattern: DEFAULT_PATTERN, pathPattern: '', xCol: 1, yCol: 2, xLabel: 'Distance (nm)', yLabel: 'PMF (kJ/mol)', temp: '310.15', dark: null, bw: false, rowAll: false, hiddenOut: false,
+  parse: true, pattern: DEFAULT_PATTERN, pathPattern: '', xCol: 1, yCol: 2, xLabel: 'Distance (nm)', yLabel: 'PMF (kJ/mol)', temp: '310.15', dark: null, bw: false, tileSpread: false, rowAll: false, hiddenOut: false,
   laserKey: 'k', laserMode: 'toggle', laserColor: '#ff2a1a', laserSize: 'm', laserTrail: true, compareKey: 'c', exportKey: 'e',
 };
 

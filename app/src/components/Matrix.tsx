@@ -94,7 +94,7 @@ function Row({ s, sel, scale, tiles, gridCols }: { s: Seq; sel: Sel | null; scal
             title: 'No ' + sc.label + ' run for ' + s.name + ' — click to upload one',
             onClick: () => openForm(lib.cellForm(s, sc.k)) };
         } else {
-          const v = tile.v, tx = tileText(tile, metricDef);
+          const v = tile.v, tx = tileText(tile, metricDef, !!settings.tileSpread);
           c = { text: tx.main, spread: tx.spread, fill: scale.color(v, dark), ink: scale.ink(v, dark), border: '0', onClick: open, title: who + metricDef.label + ' = ' + prov() };
         }
         return (

@@ -7,8 +7,8 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-/** The tree hash of app/ and what it is. History: e8a452c (after batch 2); then the batch 3 source with the matrix tiles' spread off by default. */
-const BASELINE = { tree: '909876e0138ebe09eec6de8a3b5b7fce64cef49d', what: 'PMF Sequences batch 3, as its source came' };
+/** The tree hash of app/ and what it is. History: e8a452c (after batch 2); 909876e (the batch 3 source as it came); then the matrix tiles' spread off by default (T143). */
+const BASELINE = { tree: '2fca8809618e014cfe1502f5504fc4a8b7e3560d', what: 'PMF Sequences batch 3, matrix tiles without their spread by default' };
 
 const root = new URL('../..', import.meta.url).pathname;
 const dir = mkdtempSync(join(tmpdir(), 'gmxc-app-index-'));

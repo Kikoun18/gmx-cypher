@@ -379,7 +379,10 @@ become tags; v6 and older carry no line styles, marks or scripts).
 - **Matrix** of sequences × columns (O26 / PG / HA by default): each tile is the page's matrix
   metric over the cell's runs (by default the area or minimum of the corrected PMF; see
   [Matrix metrics](#matrix-metrics-and-colour-scales)). Upload files singly or in batches,
-  with file-name patterns.
+  with file-name patterns. A tile shows its value only; *Settings → Appearance → Matrix tiles →
+  with ± and n* adds the spread under it (± the standard deviation over runs and the number of
+  runs, or a single run's block error). The tooltip always has it, and a matrix export follows
+  the setting. It is kept in this browser, not in the vault.
 - **Folder import**: *Choose folder…* in the upload dialog, or drop a folder. Every `.xvg`,
   `.dat` and `.txt` is read with its path; other files are listed as skipped (OS clutter is
   ignored). A **folder pattern** in Settings (e.g. `{method}/{column}/{seq}/{*}/{run}`, where

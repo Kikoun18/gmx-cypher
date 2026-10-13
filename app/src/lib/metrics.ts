@@ -217,9 +217,12 @@ const sig2 = (v: number) => String(Number(v.toPrecision(2)));
 export const isPmfBuiltin = (d: MetricDef) => d.type === 'pmf' && d.fn.kind === 'builtin' && !!BUILTINS[d.fn.name]?.pmf;
 const valueText = (v: number, d: MetricDef) => (isPmfBuiltin(d) ? fmt(v) : lib.fmtValue(v));
 
-/** What a tile shows (R4b): the value, and under it the spread over runs ("± SD · n 3") or a single run's block error. */
-export function tileText(t: Tile, d: MetricDef): { main: string; spread: string } {
-  if (t.kind === 'value') return { main: valueText(t.v, d), spread: t.n > 1 && t.sd != null ? '± ' + sig2(t.sd) + ' · n ' + t.n : t.err != null ? '± ' + sig2(t.err) + ' block' : '' };
+/**
+ * What a tile shows (R4b): the value, and under it the spread over runs ("± SD · n 3") or a single run's block error.
+ * The spread is left out when `withSpread` is false (the tileSpread setting, off unless switched on); the tooltip keeps it.
+ */
+export function tileText(t: Tile, d: MetricDef, withSpread = true): { main: string; spread: string } {
+  if (t.kind === 'value') return { main: valueText(t.v, d), spread: !withSpread ? '' : t.n > 1 && t.sd != null ? '± ' + sig2(t.sd) + ' · n ' + t.n : t.err != null ? '± ' + sig2(t.err) + ' block' : '' };
   if (t.kind === 'none') return { main: '—', spread: 'error' };
   return { main: t.kind === 'pending' ? '…' : '', spread: '' };
 }

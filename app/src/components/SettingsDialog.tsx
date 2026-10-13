@@ -483,6 +483,11 @@ export function SettingsDialog({ onClose, focusAnalysis, sorted, useManual, onNe
             <span className="lbl">Theme</span>
             <Seg value={dark} onPick={v => setSetting({ dark: v })} opts={[{ v: false, label: 'light' }, { v: true, label: 'dark' }]} style={{ padding: 3 }} />
           </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 12 }}>
+            <span className="lbl">Matrix tiles</span>
+            <Seg value={!!st.tileSpread} onPick={v => setSetting({ tileSpread: v })}
+              opts={[{ v: false, label: 'value only', title: 'Each tile shows its value; the spread stays in the tooltip' }, { v: true, label: 'with ± and n', title: 'Under the value: ± the standard deviation and the number of runs (a single run: its block error)' }]} />
+          </div>
         </div>
 
         {/* Laser pointer */}

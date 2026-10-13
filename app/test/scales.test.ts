@@ -47,6 +47,10 @@ describe('tiles: the value, its spread or error, or why there is none', () => {
     expect(tileText(val(-0.55, { n: 2, sd: 0.123 }), AREA)).toEqual({ main: '-0.55', spread: '± 0.12 · n 2' });
     expect(tileText({ kind: 'none', reason: 'ValueError: x must contain values on both sides of 0' }, def({}))).toEqual({ main: '—', spread: 'error' });
     expect(tileText({ kind: 'pending' }, def({}))).toEqual({ main: '…', spread: '' });
+    // The tileSpread setting (off by default) leaves the spread out of the tile; its failure note stays, and the tooltip keeps the spread.
+    expect(tileText(val(0.292503, { n: 3, sd: 0.00211 }), def({}), false)).toEqual({ main: '0.293', spread: '' });
+    expect(tileText(val(310.0434, { err: 0.011461 }), def({ type: 'temperature' }), false)).toEqual({ main: '310.04', spread: '' });
+    expect(tileText({ kind: 'none', reason: 'ValueError' }, def({}), false)).toEqual({ main: '—', spread: 'error' });
   });
   it('the tooltip says how the number was made (section 1.3)', () => {
     const cs = (ys: number[]) => [{ id: 'c', label: 'Full membrane', file: '', x: ys.map((_, i) => i + 1), y: ys }];
@@ -58,5 +62,20 @@ describe('tiles: the value, its spread or error, or why there is none', () => {
     expect(tileProvenance(s, 'c', def({ unit: 'nm' }), t, { st, skip: null })).toMatch(/^0\.283 ± 0\.029 nm \(SD, n = 3\) · /);
     expect(tileProvenance(s, 'c', def({ fn: { kind: 'builtin', name: 'at' }, params: { x: 9 } }), metricCell(s, 'c', def({ fn: { kind: 'builtin', name: 'at' }, params: { x: 9 } }), { st, skip: null }), { st, skip: null }))
       .toBe('no value: x = 9 is outside the data (1 to 2) · value at x · x = 9 · no transform · Order parameters · Full membrane · runs 1–3');
+  });
+});
+
+describe('matrix tiles show no spread unless switched on', () => {
+  it('off in the defaults, a browser preference (not the project’s), and a project cannot turn it on', async () => {
+    const lib = await import('../src/lib/seq');
+    expect(lib.DEFAULT_SETTINGS.tileSpread).toBe(false);
+    expect(lib.mergeSettings({}, undefined).tileSpread).toBe(false);
+    expect(lib.splitSettings({ tileSpread: true, rowAll: true })).toEqual({ project: { rowAll: true }, app: { tileSpread: true } });
+    expect(lib.mergeSettings({ tileSpread: true }, { rowAll: true }).tileSpread).toBe(true);
+    const kept = new Map<string, string>();
+    Object.assign(globalThis, { localStorage: { getItem: (k: string) => kept.get(k) ?? null, setItem: (k: string, v: string) => kept.set(k, v) } });
+    const { loadPrefs, savePrefs } = await import('../src/lib/prefs');
+    savePrefs({ tileSpread: true, rowAll: true });
+    expect(loadPrefs()).toEqual({ tileSpread: true });
   });
 });
