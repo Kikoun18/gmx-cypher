@@ -18,6 +18,11 @@ import { Analysis } from './views/Analysis'
 import { commandOf, withCommand } from './lib/commands'
 import { JobsView } from './views/Jobs'
 import { Settings } from './views/Settings'
+import { useDecypherSources, type SourceRef } from './decypher/state'
+import { keyLabel, matches, typing, useBindings } from './lib/shortcuts'
+
+// (de)Cypher is loaded the first time it opens, as 3Dmol is: the page starts without it.
+const Decypher = React.lazy(() => import('./decypher/Decypher').then(m => ({ default: m.Decypher })))
 
 const TABS = ['inputs', 'groups', 'analysis', 'jobs', 'batch', 'cluster'] as const
 type Tab = (typeof TABS)[number]
@@ -77,6 +82,25 @@ export function App() {
   const settingsButton = React.useRef<HTMLButtonElement>(null)
   const running = jobs.jobs.filter(j => j.status === 'running').length
   React.useEffect(() => { getJson<AppState>('/api/state').then(setState, e => setError(String(e.message || e))) }, [])
+  // (de)Cypher: the RDFs picked in the jobs tab (or in it), opened and closed by its key or the jobs tab's button.
+  const sources = useDecypherSources()
+  const [decypher, setDecypher] = React.useState(false), [decypherUsed, setDecypherUsed] = React.useState(false)
+  if (decypher && !decypherUsed) setDecypherUsed(true)
+  const [bindings] = useBindings()
+  const openDecypher = (add: SourceRef[] = []) => { sources.add(add); setDecypher(true) }
+  React.useEffect(() => {
+    const on = (e: KeyboardEvent) => {
+      if (e.repeat || typing(e.target) || !matches(bindings.decypher, e)) return
+      // A list or menu that is open, or a select that has the focus, types its own letters.
+      if ((e.target as HTMLElement | null)?.closest?.('[role=listbox],[role=menu],[role=combobox]')) return
+      // Not over another dialog (settings, send…): the key belongs to it.
+      if ([...document.querySelectorAll('[data-slot=dialog-content]')].some(d => !d.hasAttribute('data-decypher'))) return
+      e.preventDefault()
+      setDecypher(o => !o)
+    }
+    window.addEventListener('keydown', on)
+    return () => window.removeEventListener('keydown', on)
+  }, [bindings])
 
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground">
@@ -115,13 +139,20 @@ export function App() {
         <TabsContent value="inputs">{state && <Inputs state={state} draft={draft} setDraft={setDraft} onSettings={() => setSettings(true)} onNext={() => setTab(groupsStep ? 'groups' : 'analysis')} />}</TabsContent>
         <TabsContent value="groups"><Groups draft={draft} setDraft={setDraft} /></TabsContent>
         <TabsContent value="analysis">{state && <Analysis gmx={state.gmx} draft={draft} setDraft={setDraft} onStarted={id => { setSelectedJob(id); setTab('jobs') }} />}</TabsContent>
-        <TabsContent value="jobs"><JobsView {...jobs} selected={selectedJob} onSelect={setSelectedJob} vault={state?.config.vault ?? null} onRunAgain={r => { setDraft(d => ({ ...withCommand(d, r.analysis ?? 'rdf'), ...recipeFromRecord(r) })); setTab('analysis') }} /></TabsContent>
+        <TabsContent value="jobs"><JobsView {...jobs} selected={selectedJob} onSelect={setSelectedJob} vault={state?.config.vault ?? null} onRunAgain={r => { setDraft(d => ({ ...withCommand(d, r.analysis ?? 'rdf'), ...recipeFromRecord(r) })); setTab('analysis') }}
+          decypher={{ sources, open: openDecypher, keyName: bindings.decypher ? keyLabel(bindings.decypher) : null }} /></TabsContent>
         <TabsContent value="cluster"><ClusterView /></TabsContent>
         <TabsContent value="batch">{state && <BatchView state={state} draft={draft} jobs={jobs.jobs} onOpenJob={id => { setSelectedJob(id); setTab('jobs') }} />}</TabsContent>
       </main>
       </Tabs>
       <Toaster />
       {state && <Settings state={state} open={settings} onOpenChange={setSettings} onState={setState} returnFocus={settingsButton} />}
+      {decypherUsed && (
+        <React.Suspense fallback={null}>
+          <Decypher open={decypher} onOpenChange={setDecypher} sources={sources} jobs={jobs.jobs} jobsLoaded={jobs.loaded} allow={state?.config.allow ?? []} vaultPath={state?.config.vault ?? null} version={state?.version ?? ''}
+            keyName={bindings.decypher ? keyLabel(bindings.decypher) : null} />
+        </React.Suspense>
+      )}
     </div>
   )
 }

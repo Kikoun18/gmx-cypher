@@ -1,0 +1,540 @@
+{
+  "format": "gmx-cypher run",
+  "version": 3,
+  "analysis": "rdf",
+  "record": "rdf_o111_Methionine_S.run.json",
+  "runner": {
+    "name": "gmx-cypher",
+    "version": "0.1.0"
+  },
+  "gmx": {
+    "path": "/cvmfs/software.metacentrum.cz/spack23/software/linux-debian12-x86_64_v4/gcc-12.2.0/gromacs-2025.4-zy3xd7m7jk6bq4lrkbhtrymiidwpbjlf/bin/gmx_mpi",
+    "version": "2025.4-PLUMED_spack"
+  },
+  "job": "jmv5ikr5a4jzz",
+  "command": {
+    "cwd": "/mnt/storage-brno14-ceitec/shared/softmatter/SHARED/forKrystof/walkers_for_denys/hmr+fast+6/o111/m/9.multiwalker/3",
+    "file": "/cvmfs/software.metacentrum.cz/spack23/software/linux-debian12-x86_64_v4/gcc-12.2.0/gromacs-2025.4-zy3xd7m7jk6bq4lrkbhtrymiidwpbjlf/bin/gmx_mpi",
+    "args": [
+      "rdf",
+      "-f",
+      "9.multiwalker.xtc",
+      "-s",
+      "9.multiwalker.tpr",
+      "-n",
+      "rdf/rdf_o111_Methionine_S.ndx",
+      "-o",
+      "rdf/rdf_o111_Methionine_S.xvg",
+      "-bin",
+      "0.03",
+      "-ref",
+      "group 0",
+      "-sel",
+      "group 1",
+      "group 2",
+      "group 3",
+      "group 4",
+      "group 5",
+      "group 6",
+      "group 7",
+      "group 8",
+      "group 9",
+      "group 10",
+      "group 11",
+      "group 12",
+      "group 13"
+    ]
+  },
+  "env": {
+    "GMX_MAXBACKUP": "99"
+  },
+  "started": "2026-10-12T17:16:34.801Z",
+  "ended": "2026-10-12T17:16:38.776Z",
+  "status": "done",
+  "exit": {
+    "code": 0,
+    "signal": null
+  },
+  "frames": {
+    "analysed": 51,
+    "lastTime": 200000
+  },
+  "log": "                 :-) GROMACS - gmx rdf, 2025.4-PLUMED_spack (-:\n\nExecutable:   /cvmfs/software.metacentrum.cz/spack23/software/linux-debian12-x86_64_v4/gcc-12.2.0/gromacs-2025.4-zy3xd7m7jk6bq4lrkbhtrymiidwpbjlf/bin/gmx_mpi\nData prefix:  /cvmfs/software.metacentrum.cz/spack23/software/linux-debian12-x86_64_v4/gcc-12.2.0/gromacs-2025.4-zy3xd7m7jk6bq4lrkbhtrymiidwpbjlf\nWorking dir:  /mnt/storage-brno14-ceitec/shared/softmatter/SHARED/forKrystof/walkers_for_denys/hmr+fast+6/o111/m/9.multiwalker/3\nCommand line:\n  gmx_mpi rdf -f 9.multiwalker.xtc -s 9.multiwalker.tpr -n rdf/rdf_o111_Methionine_S.ndx -o rdf/rdf_o111_Methionine_S.xvg -bin 0.03 -ref 'group 0' -sel 'group 1' 'group 2' 'group 3' 'group 4' 'group 5' 'group 6' 'group 7' 'group 8' 'group 9' 'group 10' 'group 11' 'group 12' 'group 13'\n\nReading file 9.multiwalker.tpr, VERSION 2025.4-PLUMED_spack (single precision)\nReading file 9.multiwalker.tpr, VERSION 2025.4-PLUMED_spack (single precision)\n\rReading frame       0 time    0.000   \rReading frame       1 time 4000.000   \rReading frame       2 time 8000.000   \rReading frame       3 time 12000.000   \rReading frame       4 time 16000.000   \rReading frame       5 time 20000.000   \rReading frame       6 time 24000.000   \rReading frame       7 time 28000.000   \rReading frame       8 time 32000.000   \rReading frame       9 time 36000.000   \rReading frame      10 time 40000.000   \rReading frame      11 time 44000.000   \rReading frame      12 time 48000.000   \rReading frame      13 time 52000.000   \rReading frame      14 time 56000.000   \rReading frame      15 time 60000.000   \rReading frame      16 time 64000.000   \rReading frame      17 time 68000.000   \rReading frame      18 time 72000.000   \rReading frame      19 time 76000.000   \rReading frame      20 time 80000.000   \rReading frame      30 time 120000.000   \rReading frame      40 time 160000.000   \rReading frame      50 time 200000.000   \rLast frame         50 time 200000.000   \nAnalyzed 51 frames, last time 200000.000\n\nGROMACS reminds you: \"Don't waste pure thoughts on dirty enzymes.\" (Efraim Racker)\n\n",
+  "inputs": {
+    "trajectory": {
+      "path": "/mnt/storage-brno14-ceitec/shared/softmatter/SHARED/forKrystof/walkers_for_denys/hmr+fast+6/o111/m/9.multiwalker/3/9.multiwalker.xtc",
+      "size": 6238384,
+      "mtime": "2026-09-27T21:08:14.000Z"
+    },
+    "runInput": {
+      "path": "/mnt/storage-brno14-ceitec/shared/softmatter/SHARED/forKrystof/walkers_for_denys/hmr+fast+6/o111/m/9.multiwalker/3/9.multiwalker.tpr",
+      "size": 1102792,
+      "mtime": "2026-09-25T21:34:29.889Z",
+      "sha256": "4a5edc9a2e76e260437a90cc69b0ae10e2a842eb3d1bff399d517ddbd964961e"
+    },
+    "structure": {
+      "path": "/mnt/storage-brno14-ceitec/shared/softmatter/SHARED/forKrystof/walkers_for_denys/hmr+fast+6/o111/m/9.multiwalker/3/9.multiwalker.gro",
+      "size": 2312469,
+      "mtime": "2026-09-27T21:08:14.000Z",
+      "sha256": "226a087ae2bf1d376571753a0731cc0b810dd37bc30126f147594f389f51f54e"
+    }
+  },
+  "groups": [
+    {
+      "index": 0,
+      "role": "reference",
+      "name": "H_Met",
+      "tone": "coral",
+      "steps": [
+        {
+          "op": "add",
+          "rule": {
+            "kind": "name",
+            "value": "SD",
+            "resn": "MET"
+          }
+        }
+      ],
+      "atoms": "123-242:17",
+      "count": 8,
+      "gmxCount": 8
+    },
+    {
+      "index": 1,
+      "role": "selection",
+      "name": "NH_N...S",
+      "tone": "aqua",
+      "steps": [
+        {
+          "op": "add",
+          "rule": {
+            "kind": "name",
+            "value": "HN",
+            "resn": "BGLCN"
+          }
+        },
+        {
+          "op": "add",
+          "rule": {
+            "kind": "name",
+            "value": "N",
+            "resn": "BGLCN"
+          }
+        },
+        {
+          "op": "remove",
+          "rule": {
+            "kind": "atoms",
+            "atoms": "11"
+          },
+          "note": "clicked"
+        }
+      ],
+      "atoms": "10",
+      "count": 1,
+      "gmxCount": 1
+    },
+    {
+      "index": 2,
+      "role": "selection",
+      "name": "NH_H...S",
+      "tone": "mint",
+      "steps": [
+        {
+          "op": "add",
+          "rule": {
+            "kind": "name",
+            "value": "HN",
+            "resn": "BGLCN"
+          }
+        }
+      ],
+      "atoms": "11",
+      "count": 1,
+      "gmxCount": 1
+    },
+    {
+      "index": 3,
+      "role": "selection",
+      "name": "O5...S",
+      "tone": "butter",
+      "steps": [
+        {
+          "op": "add",
+          "rule": {
+            "kind": "names",
+            "values": [
+              "O5"
+            ]
+          }
+        }
+      ],
+      "atoms": "7, 34, 55-95:20",
+      "count": 5,
+      "gmxCount": 5
+    },
+    {
+      "index": 4,
+      "role": "selection",
+      "name": "O...S",
+      "tone": "lilac",
+      "steps": [
+        {
+          "op": "add",
+          "rule": {
+            "kind": "names",
+            "values": [
+              "O4"
+            ]
+          }
+        },
+        {
+          "op": "remove",
+          "rule": {
+            "kind": "atoms",
+            "atoms": "23, 65-105:20"
+          },
+          "note": "clicked"
+        },
+        {
+          "op": "add",
+          "rule": {
+            "kind": "atoms",
+            "atoms": "20, 62, 70"
+          },
+          "note": "clicked"
+        }
+      ],
+      "atoms": "20, 45, 62, 70",
+      "count": 4,
+      "gmxCount": 4
+    },
+    {
+      "index": 5,
+      "role": "selection",
+      "name": "OH_O...S",
+      "tone": "aqua",
+      "steps": [
+        {
+          "op": "add",
+          "rule": {
+            "kind": "atoms",
+            "atoms": "3, 23, 37, 41, 58, 65, 78, 85, 98, 105"
+          },
+          "note": "clicked"
+        }
+      ],
+      "atoms": "3, 23, 37, 41, 58, 65, 78, 85, 98, 105",
+      "count": 10,
+      "gmxCount": 10
+    },
+    {
+      "index": 6,
+      "role": "selection",
+      "name": "OH_H...S",
+      "tone": "rose",
+      "steps": [
+        {
+          "op": "add",
+          "rule": {
+            "kind": "names",
+            "values": [
+              "HO1",
+              "HO2",
+              "HO4",
+              "HO3"
+            ]
+          }
+        }
+      ],
+      "atoms": "4, 24, 38, 42, 59, 66, 79, 86, 99, 106",
+      "count": 10,
+      "gmxCount": 10
+    },
+    {
+      "index": 7,
+      "role": "selection",
+      "name": "CH...S",
+      "tone": "stone",
+      "steps": [
+        {
+          "op": "add",
+          "rule": {
+            "kind": "names",
+            "values": [
+              "H1",
+              "H2",
+              "H3",
+              "H4",
+              "H5"
+            ]
+          }
+        },
+        {
+          "op": "remove",
+          "rule": {
+            "kind": "atoms",
+            "atoms": "112-114"
+          },
+          "note": "clicked"
+        }
+      ],
+      "atoms": "2, 6, 9, 19, 22, 31, 33, 36-44:4, 52, 54, 57, 61, 64, 72, 74, 77, 84, 92, 94, 97, 104",
+      "count": 23,
+      "gmxCount": 23
+    },
+    {
+      "index": 8,
+      "role": "selection",
+      "name": "CH2...S",
+      "tone": "coral",
+      "steps": [
+        {
+          "op": "add",
+          "rule": {
+            "kind": "names",
+            "values": [
+              "H31",
+              "H32"
+            ]
+          }
+        }
+      ],
+      "atoms": "81, 82, 101, 102",
+      "count": 4,
+      "gmxCount": 4
+    },
+    {
+      "index": 9,
+      "role": "selection",
+      "name": "CH3_C...S",
+      "tone": "sky",
+      "steps": [
+        {
+          "op": "add",
+          "rule": {
+            "kind": "names",
+            "values": [
+              "CT"
+            ]
+          }
+        },
+        {
+          "op": "add",
+          "rule": {
+            "kind": "atoms",
+            "atoms": "87, 107"
+          },
+          "note": "clicked"
+        }
+      ],
+      "atoms": "14, 87, 107",
+      "count": 3,
+      "gmxCount": 3
+    },
+    {
+      "index": 10,
+      "role": "selection",
+      "name": "CH3_H...S",
+      "tone": "mint",
+      "steps": [
+        {
+          "op": "add",
+          "rule": {
+            "kind": "names",
+            "values": [
+              "HT1",
+              "HT2",
+              "HT3",
+              "H61",
+              "H63",
+              "H62"
+            ]
+          }
+        },
+        {
+          "op": "remove",
+          "rule": {
+            "kind": "atoms",
+            "atoms": "26, 27, 47, 48, 68, 69"
+          },
+          "note": "clicked"
+        }
+      ],
+      "atoms": "15-17, 88-90, 108-110",
+      "count": 9,
+      "gmxCount": 9
+    },
+    {
+      "index": 11,
+      "role": "selection",
+      "name": "CH2OH_CH2...S",
+      "tone": "butter",
+      "steps": [
+        {
+          "op": "add",
+          "rule": {
+            "kind": "atoms",
+            "atoms": "26, 27, 47, 48, 68, 69"
+          },
+          "note": "clicked"
+        }
+      ],
+      "atoms": "26, 27, 47, 48, 68, 69",
+      "count": 6,
+      "gmxCount": 6
+    },
+    {
+      "index": 12,
+      "role": "selection",
+      "name": "CH2OH_O...S",
+      "tone": "lilac",
+      "steps": [
+        {
+          "op": "add",
+          "rule": {
+            "kind": "atoms",
+            "atoms": "28, 49"
+          },
+          "note": "clicked"
+        }
+      ],
+      "atoms": "28, 49",
+      "count": 2,
+      "gmxCount": 2
+    },
+    {
+      "index": 13,
+      "role": "selection",
+      "name": "CH2OH_H...S",
+      "tone": "aqua",
+      "steps": [
+        {
+          "op": "add",
+          "rule": {
+            "kind": "atoms",
+            "atoms": "29, 50"
+          },
+          "note": "clicked"
+        }
+      ],
+      "atoms": "29, 50",
+      "count": 2,
+      "gmxCount": 2
+    }
+  ],
+  "options": [
+    {
+      "flag": "b",
+      "value": "0",
+      "default": "0",
+      "isDefault": true
+    },
+    {
+      "flag": "e",
+      "value": "0",
+      "default": "0",
+      "isDefault": true
+    },
+    {
+      "flag": "dt",
+      "value": "0",
+      "default": "0",
+      "isDefault": true
+    },
+    {
+      "flag": "bin",
+      "value": "0.03",
+      "default": "0.002",
+      "isDefault": false
+    },
+    {
+      "flag": "rmax",
+      "value": "0",
+      "default": "0",
+      "isDefault": true
+    },
+    {
+      "flag": "norm",
+      "value": "rdf",
+      "default": "rdf",
+      "isDefault": true
+    },
+    {
+      "flag": "seltype",
+      "value": "atom",
+      "default": "atom",
+      "isDefault": true
+    },
+    {
+      "flag": "cut",
+      "value": "0",
+      "default": "0",
+      "isDefault": true
+    },
+    {
+      "flag": "excl",
+      "value": false,
+      "default": false,
+      "isDefault": true
+    },
+    {
+      "flag": "xy",
+      "value": false,
+      "default": false,
+      "isDefault": true
+    },
+    {
+      "flag": "pbc",
+      "value": true,
+      "default": true,
+      "isDefault": true
+    },
+    {
+      "flag": "rmpbc",
+      "value": true,
+      "default": true,
+      "isDefault": true
+    },
+    {
+      "flag": "surf",
+      "value": "no",
+      "default": "no",
+      "isDefault": true
+    },
+    {
+      "flag": "selrpos",
+      "value": "atom",
+      "default": "atom",
+      "isDefault": true
+    },
+    {
+      "flag": "cn",
+      "value": false,
+      "default": false,
+      "isDefault": true
+    }
+  ],
+  "outputs": [
+    {
+      "kind": "xvg",
+      "path": "/mnt/storage-brno14-ceitec/shared/softmatter/SHARED/forKrystof/walkers_for_denys/hmr+fast+6/o111/m/9.multiwalker/3/rdf/rdf_o111_Methionine_S.xvg",
+      "size": 20840,
+      "sha256": "2395de417320ad06aab159639ebabd452a175dda0db6e0f00379b4c2016d5536"
+    },
+    {
+      "kind": "ndx",
+      "path": "/mnt/storage-brno14-ceitec/shared/softmatter/SHARED/forKrystof/walkers_for_denys/hmr+fast+6/o111/m/9.multiwalker/3/rdf/rdf_o111_Methionine_S.ndx",
+      "size": 624,
+      "sha256": "2e5d6e72ebb29fc56789b74a577eaaa43dd1a10b0808e1736a4d6287e559f0a6"
+    }
+  ],
+  "recipe": {
+    "options": {
+      "bin": "0.03"
+    },
+    "template": "{analysis}_o111_Methionine_S",
+    "outDir": null
+  },
+  "problems": []
+}
