@@ -216,8 +216,8 @@ RDF job also has *open in (de)Cypher*. Or press **D** anywhere but in a field: *
   browser and never kept.
 
 **Each job**: a card per RDF: its structure (water and ions hidden; the molecules laid out side by side, those with
-plotted groups first) beside its g(r), its groups as chips and its curves with their first peaks (gmx-cypher's rule,
-as in the result). Click a group's atom or chip to plot it alone, ⌘, Ctrl or Shift-click to add it; the plotted
+plotted groups first) beside its g(r), its groups as chips and its curves with their peaks: a curve's peak is its
+highest point, wherever it is (the result view keeps gmx-cypher's first-shell rule). Click a group's atom or chip to plot it alone, ⌘, Ctrl or Shift-click to add it; the plotted
 groups glow in their hues, the reference is ringed. *link groups* picks the same group in every job.
 
 **One graph**: every shown RDF on one chart, led by one whose structure and groups are shown (‹ › or [ ] step through
@@ -225,15 +225,24 @@ them). A group you pick is drawn for each RDF that has it: the same atoms of the
 else the same place in a list as long. *color by group*: each group its hue, each RDF its dash; *by job*: each RDF its
 hue, each group its dash. The other RDFs' references on the same structure are ringed dashed.
 
+**Morphing**: RDFs on the same structure with the same groups (by their atoms) that differ only in their reference
+show *morph with…* in their card header. Choosing one puts them in one card: one structure with every reference ringed
+(the first solid, the others dashed), one chart with a curve per group and reference (a dash per reference), and the
+references as chips under the graph. Click a reference's atom or its chip to plot that reference alone; a second click
+on it plots them all again; ⌘, Ctrl or Shift-click adds or takes one (never none). A reference not plotted is drawn
+faint. *split* shows the RDFs one by one again. Morphed cards are kept in this browser, and the export carries them.
+
 **The structure view**: drag to rotate, right- or Alt-drag to pan, scroll to zoom, double-click or **F** to fit the
 plotted groups, **R** to reset. *style* (ball & stick, licorice, spacefill), *not plotted* (tinted in their group's hue,
 grey, or ghost), *molecules* (side by side, or as in the frame), *labels*, *hydrogens* and *peaks*. A view keeps up
-to 4000 atoms (the groups' first). The chart shows each curve's value under the pointer.
+to 4000 atoms (the groups' first). The chart shows each curve's value under the pointer, the highest first.
 
 **Export**: one HTML file that opens in any browser, offline, with nothing to install or fetch: each RDF with its
-structure (rotate, zoom, click a group to plot it), its chart (values under the pointer) and its groups and peaks; and,
+structure (rotate, zoom, click a group to plot it), its chart (values under the pointer, highest first) and its groups and peaks; and,
 for two or more, the one graph (*color by*, each curve shown → dimmed → hidden). It carries mononoki, both themes
 (with a light/dark switch), the data and the very code (de)Cypher draws with. Paths of this machine stay out of it.
+The export dialog's *Headings* are yours: the page's heading (*(de)Cypher* if left empty, also the tab's title) and a
+heading for each card (a morphed card is one, named for its first RDF); left empty, a card keeps its own title.
 
 What (de)Cypher remembers (the picked jobs, runs and vault RDFs, the plotted groups, the style, the key) is kept in
 this browser, like the theme; it writes nothing on the server.

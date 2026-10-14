@@ -57,8 +57,8 @@ export interface SceneState {
   sels: Group[]
   /** Indices into `sels` that are plotted. */
   selected: number[]
-  /** The first is this analysis's reference (solid); others are compared analyses' references on the same structure (dashed). */
-  refs: { label: string; atoms: number[] }[]
+  /** The first is this analysis's reference (solid); others are compared analyses' references on the same structure (dashed). `on: false`: one that is not plotted (morphed RDFs), drawn faint. */
+  refs: { label: string; atoms: number[]; on?: boolean }[]
   /** A group or reference hovered elsewhere (a chip, a curve), ringed here. */
   hoverSel: number
   hoverRef: number
@@ -81,9 +81,13 @@ export interface ChartGeom { m: { l: number; r: number; t: number; b: number }; 
 export interface ExportAnalysis { id: string; title: string; label: string; sub: string; x: number[]; xlabel: string; ylabel: string; ref: { name: string; atoms: string; tone: Tone } | null; sels: { name: string; atoms: string; tone: Tone; y: number[]; peak: Peak | null }[]; struct: string | null; structNote: string; selected: string[]; tone: Tone }
 /** Everything an exported page needs: its tokens, structures without solvent, the analyses, the comparison and the style. */
 export interface ExportData {
+  /** The page's heading, as chosen ('(de)Cypher' unless changed). */
+  header: string
   made: string; by: string; theme: 'light' | 'dark'; tokens: { light: Record<string, string>; dark: Record<string, string> }
   structs: Record<string, Struct>; analyses: ExportAnalysis[]
   compare: { ids: string[]; focus: string; selected: string[]; colorBy: ColorBy } | null
+  /** RDFs shown as one card (they differ only in their reference): the first leads; `on` are those whose reference is plotted. */
+  morphs?: { ids: string[]; on: string[]; title: string }[]
   view: { rep: Rep; rest: Rest; labels: boolean; hydrogens: boolean; arrange: Arrange }
 }
 
@@ -290,9 +294,10 @@ export function decypherKit() {
 
   /**
    * A canvas that draws a Mol and answers the pointer: drag rotates, right- or alt-drag pans, the wheel zooms,
-   * a double click fits the plotted groups, a click on a group's atom picks it (⌘, ctrl or shift: adds it).
+   * a double click fits the plotted groups, a click on a group's atom picks it (⌘, ctrl or shift: adds it); where
+   * several references are shown (morphed RDFs), a click on a reference's atom picks that reference the same way.
    */
-  function structureView(canvas: HTMLCanvasElement, wrap: HTMLElement, cb: { hover: (h: AtomHover | null) => void; pick: (sel: number, add: boolean) => void }) {
+  function structureView(canvas: HTMLCanvasElement, wrap: HTMLElement, cb: { hover: (h: AtomHover | null) => void; pick: (sel: number, add: boolean) => void; pickRef?: (ref: number, add: boolean) => void }) {
     const cam = { M: initRot(), zoom: 1, panX: 0, panY: 0 }
     let st: SceneState | null = null, cw = 0, ch = 0, dpr = 1, fitScale = 0
     let P: Float64Array | null = null, hitR = new Float32Array(0), vis = new Uint8Array(0)
@@ -357,6 +362,7 @@ export function decypherKit() {
         if (pz > zmax) zmax = pz
       }
       const mb = membership()!, sels = st.sels, selIdx = new Set(st.selected)
+      const refOff = (ri: number) => ri >= 0 && st!.refs[ri] != null && st!.refs[ri].on === false
       const rest = selIdx.size ? st.rest : 'tinted', restB = rest === 'tinted' ? 0 : 0.5
       const hovSi = st.hoverSel, hovRef = st.hoverRef
       const R = RADS[rep] || RADS['ball & stick'], BW = BONDW[rep] ?? 0.016
@@ -366,7 +372,7 @@ export function decypherKit() {
         const sel = si >= 0 && selIdx.has(si), prev = si >= 0 && si === hovSi && !sel
         if (e === 'H' && !st.hydrogens && !sel && !prev && !isRef) { vis[k] = 0; hitR[k] = 0; continue }
         vis[k] = 1; let rs = 1
-        if (isRef) { kind[k] = 3; fill[k] = rk === 2 ? mix(th.fg, th.card, 0.3) : th.fg; rim[k] = th.bg; lw[k] = 1; rs = 1.06; bcol[k] = th.bond }
+        if (isRef) { kind[k] = 3; fill[k] = refOff(mb.refOwner[k]) ? mix(th.fg, th.card, 0.78) : rk === 2 ? mix(th.fg, th.card, 0.3) : th.fg; rim[k] = th.bg; lw[k] = 1; rs = 1.06; bcol[k] = th.bond }
         else if (sel) { const t = T[sels[si].tone]; kind[k] = 2; fill[k] = t.base; rim[k] = t.strong; lw[k] = 2; rs = rep === 'spacefill' ? 1.03 : 1.25; bcol[k] = t.strong }
         else if (prev) { const t = T[sels[si].tone]; kind[k] = 4; fill[k] = t.soft; rim[k] = t.strong; lw[k] = 1.6; rs = 1.12; bcol[k] = t.strong }
         else if (si >= 0 && rest === 'tinted') { const t = T[sels[si].tone]; kind[k] = 1; fill[k] = t.soft; rim[k] = t.strong; lw[k] = 1.1; bcol[k] = th.bond }
@@ -410,7 +416,7 @@ export function decypherKit() {
         ctx.fillStyle = mix(fill[k], BG, bl); ctx.fill()
         if (rep !== 'licorice' || kd >= 2) { ctx.lineWidth = lw[k]; ctx.strokeStyle = mix(rim[k], BG, bl); ctx.stroke() }
         if (r > 3 && !ghost(k)) { ctx.beginPath(); ctx.arc(x - r * 0.32, y - r * 0.34, r * 0.3, 0, TAU); ctx.fillStyle = 'rgba(255,255,255,' + th.hl * (1 - bl) + ')'; ctx.fill() }
-        if (kd === 3) { if (mb.ref[k] === 2) ctx.setLineDash([3, 2]); ctx.beginPath(); ctx.arc(x, y, r + 2.4, 0, TAU); ctx.lineWidth = 1.2; ctx.strokeStyle = mix(th.fg, BG, fog * 0.5); ctx.stroke(); ctx.setLineDash([]) }
+        if (kd === 3) { const off = refOff(mb.refOwner[k]); if (mb.ref[k] === 2 || off) ctx.setLineDash([3, 2]); ctx.beginPath(); ctx.arc(x, y, r + 2.4, 0, TAU); ctx.lineWidth = 1.2; ctx.strokeStyle = mix(th.fg, BG, off ? 0.55 : fog * 0.5); ctx.stroke(); ctx.setLineDash([]) }
         const ringed = k === hoverAtom || (kd === 3 && hovRef >= 0 && mb.refOwner[k] === hovRef) || (kd === 2 && mb.groupOf[k] === hovSi)
         if (ringed) { ctx.beginPath(); ctx.arc(x, y, r + 3.5, 0, TAU); ctx.lineWidth = 1.5; ctx.strokeStyle = th.fg; ctx.stroke() }
         ctx.globalAlpha = 1
@@ -448,7 +454,7 @@ export function decypherKit() {
         if (dashed) { ctx.lineWidth = 1.2; ctx.stroke(); ctx.setLineDash([]) }
         ctx.fillStyle = fgc; ctx.fillText(text, px + pw / 2, py + ph / 2 + 0.5)
       }
-      st.refs.forEach((r, ri) => { if (mb.refAtoms[ri].length) callout(mb.refAtoms[ri], 'ref ' + r.label, ri ? th.card : th.fg, ri ? th.fg : th.bg, th.fg, ri > 0) })
+      st.refs.forEach((r, ri) => { if (mb.refAtoms[ri].length) callout(mb.refAtoms[ri], 'ref ' + r.label, ri || r.on === false ? th.card : th.fg, r.on === false ? th.muted : ri ? th.fg : th.bg, r.on === false ? th.border : th.fg, ri > 0 || r.on === false) })
       st.selected.forEach(i => { const g = sels[i]; if (!g) return; const t = T[g.tone]; callout(mb.groupAtoms[i], g.name, t.base, t.fg, t.strong, false) })
       if (hovSi >= 0 && sels[hovSi] && !selIdx.has(hovSi)) { const t = T[sels[hovSi].tone]; callout(mb.groupAtoms[hovSi], sels[hovSi].name, t.soft, t.strong, t.strong, false) }
     }
@@ -499,9 +505,10 @@ export function decypherKit() {
       return best
     }
     const selOf = (k: number) => { const mb = membership(); return mb && k >= 0 && !mb.ref[k] ? mb.groupOf[k] : -1 }
+    const refOf = (k: number) => { const mb = membership(); return mb && k >= 0 && mb.ref[k] ? mb.refOwner[k] : -1 }
     function hoverAt(e: PointerEvent) {
       const k = hit(e), si = selOf(k)
-      canvas.style.cursor = si >= 0 ? 'pointer' : 'grab'
+      canvas.style.cursor = si >= 0 || (cb.pickRef && refOf(k) >= 0) ? 'pointer' : 'grab'
       if (k === hoverAtom) return
       hoverAtom = k
       draw()
@@ -529,7 +536,11 @@ export function decypherKit() {
     }
     const onUp = (e: PointerEvent) => {
       const d = drag; drag = null
-      if (d && !d.moved && e.button === 0) { const si = selOf(hit(e)); if (si >= 0) cb.pick(si, e.metaKey || e.ctrlKey || e.shiftKey) }
+      if (d && !d.moved && e.button === 0) {
+        const k = hit(e), si = selOf(k), ri = refOf(k), add = e.metaKey || e.ctrlKey || e.shiftKey
+        if (si >= 0) cb.pick(si, add)
+        else if (ri >= 0 && cb.pickRef) cb.pickRef(ri, add)
+      }
       hoverAt(e)
     }
     const onLeave = () => { if (!drag && hoverAtom >= 0) { hoverAtom = -1; draw(); cb.hover(null) } }
@@ -565,6 +576,12 @@ export function decypherKit() {
       fit: fitSel,
       reset,
       redraw: draw,
+      /** Where the atom with this GROMACS number is drawn, in CSS pixels of the canvas; null if it is not drawn. */
+      where(nr: number): { x: number; y: number } | null {
+        if (!P || !st || !st.mol) return null
+        const k = nr > 0 && nr < st.mol.g2l.length ? st.mol.g2l[nr] : -1
+        return k >= 0 && vis[k] ? { x: P[4 * k], y: P[4 * k + 1] } : null
+      },
       destroy() {
         events.forEach(([t, f]) => canvas.removeEventListener(t, f))
         if (ro) ro.disconnect()
@@ -580,6 +597,27 @@ export function decypherKit() {
     const key = g.atoms.join(',')
     if (key && toA.struct && toA.struct === fromA.struct) { const hit = toA.sels.find(x => x.atoms.join(',') === key); if (hit) return hit }
     return toA.sels.find(x => x.name === g.name) || (toA.sels.length === fromA.sels.length ? toA.sels[fromA.sels.indexOf(g)] : null) || null
+  }
+
+  // ---------- RDFs that differ only in their reference ----------
+  /** b differs from a only in its reference: the same structure, and each of a's groups, by its atoms, is a group of b. */
+  function sameButReference(a: { struct: string | null; sels: Group[] }, b: { struct: string | null; sels: Group[] }): boolean {
+    if (a === b || !a.struct || a.struct !== b.struct || !a.sels.length || a.sels.length !== b.sels.length) return false
+    return a.sels.every(g => g.atoms.length > 0 && b.sels.some(x => x.atoms.join(',') === g.atoms.join(',')))
+  }
+  /**
+   * The references plotted after a click on one of `all`: it alone, or with ⌘, ctrl or shift added to or taken from
+   * those plotted; a second click on the only one brings them all back, and never none.
+   */
+  function pickRefs(all: string[], on: string[], id: string, add: boolean): string[] {
+    const next = add ? (on.includes(id) ? on.filter(x => x !== id) : all.filter(x => x === id || on.includes(x))) : on.length === 1 && on[0] === id ? all.slice() : [id]
+    return next.length ? next : all.slice()
+  }
+  /** Each reference's name in a legend: its own, with the RDF's label after it when two RDFs name theirs alike. */
+  function refLabels(members: { id: string; label: string; ref: { name: string } | null }[]): Record<string, string> {
+    const out: Record<string, string> = {}
+    members.forEach(m => { if (m.ref) out[m.id] = members.filter(o => o.ref && o.ref.name === m.ref!.name).length > 1 ? m.ref.name + ' · ' + m.label : m.ref.name })
+    return out
   }
 
   /**
@@ -627,6 +665,10 @@ export function decypherKit() {
     const i = Math.max(0, Math.min(x.length - 1, Math.round((r - x[0]) / (x[1] - x[0] || 1))))
     return y[i] || 0
   }
+  /** The values under the pointer at r, highest first (equal values keep the curves' order). */
+  function hoverRows(curves: Curve[], r: number): { curve: Curve; v: number }[] {
+    return curves.map((curve, i) => ({ curve, v: valAt(curve.x, curve.y, r), i })).sort((a, b) => b.v - a.v || a.i - b.i).map(({ curve, v }) => ({ curve, v }))
+  }
   /** The grid point under a pointer at `px` from the chart's left edge, or null outside the plot. */
   function hoverX(geom: ChartGeom, px: number): number | null {
     const t = (px - geom.m.l) / geom.iw, X = geom.grid
@@ -637,7 +679,7 @@ export function decypherKit() {
 
   /**
    * g(r) as an SVG tree: gridlines in `border`, axes in `foreground`, the dashed g = 1 line, each curve in its
-   * colour and dash with its first peak dotted and labelled, and at `hover` a rule with a dot on each curve.
+   * colour and dash with its highest point dotted and labelled, and at `hover` a rule with a dot on each curve.
    */
   function chart(o: { W: number; H: number; curves: Curve[]; grid: number[]; xlabel: string; ylabel: string; hover: number | null; peaks: boolean; pal: Palette; animate?: boolean }): { tree: VNode; geom: ChartGeom } {
     const th = o.pal, W = o.W, H = o.H, m = { l: 48, r: 20, t: 24, b: 40 }
@@ -764,7 +806,8 @@ export function decypherKit() {
         card.style.left = Math.max(0, xv + 294 > W ? xv - 294 : xv + 14) + 'px'
         card.style.top = geom.m.t + 4 + 'px'
         card.replaceChildren(h('div', { class: 'dc-cap' }, (g.ylabel || 'g(r)') + ' at r = ' + hover.toFixed(3) + ' nm'),
-          ...g.curves.slice(0, 14).map(c => h('div', { class: 'dc-hrow' }, swatch(c.color, c.dash), h('b', { style: { color: c.color } }, c.name), h('span', { class: 'dc-cap' }, c.source), h('span', null, valAt(c.x, c.y, hover!).toFixed(2)))))
+          ...hoverRows(g.curves, hover).slice(0, 14).map(({ curve: c, v }) => h('div', { class: 'dc-hrow' }, swatch(c.color, c.dash), h('b', { style: { color: c.color } }, c.name), h('span', { class: 'dc-cap' }, c.source), h('span', null, v.toFixed(2)))),
+          ...(g.curves.length > 14 ? [h('div', { class: 'dc-cap' }, '+ ' + (g.curves.length - 14) + ' more')] : []))
       }
       wrap.addEventListener('mousemove', e => {
         if (!geom) return
@@ -782,12 +825,14 @@ export function decypherKit() {
       if (add) return list.includes(name) ? list.filter(x => x !== name) : [...list, name]
       return list.length === 1 && list[0] === name ? [] : [name]
     }
-    function chips(a: Analysis, sel: () => string[], set: (s: string[]) => void, hoverTo: (i: number) => void) {
+    function chips(a: Analysis, sel: () => string[], set: (s: string[]) => void, hoverTo: (i: number) => void, many?: { items: () => { id: string; label: string; count: number; on: boolean }[]; pick: (id: string, add: boolean) => void }) {
       const box = h('div', { class: 'dc-chips' })
       const render = () => {
         const s = sel(), T = pal().hues
         box.replaceChildren(
-          ...(a.ref ? [h('span', { class: 'dc-chip dc-ref' }, 'ref ' + a.ref.name, h('span', { class: 'dc-n' }, String(a.ref.atoms.length || '—')))] : []),
+          ...(many ? many.items().map((r, i) => h('button', { type: 'button', class: 'dc-chip dc-ref dc-pick' + (i ? ' dc-alt' : '') + (r.on ? '' : ' dc-off'), 'aria-pressed': r.on ? 'true' : 'false', title: 'click: plot only this reference · ⌘-click: add or remove',
+            onclick: (e: MouseEvent) => many.pick(r.id, e.metaKey || e.ctrlKey || e.shiftKey) }, 'ref ' + r.label, h('span', { class: 'dc-n' }, String(r.count || '—'))))
+            : a.ref ? [h('span', { class: 'dc-chip dc-ref' }, 'ref ' + a.ref.name, h('span', { class: 'dc-n' }, String(a.ref.atoms.length || '—')))] : []),
           ...a.sels.map((g, i) => {
             const on = s.includes(g.name), t = T[g.tone]
             return h('button', {
@@ -814,7 +859,7 @@ export function decypherKit() {
       return { el: box, render }
     }
 
-    function structureBox(a: Analysis, sel: () => string[], set: (s: string[]) => void, refs: () => { label: string; atoms: number[] }[]) {
+    function structureBox(a: Analysis, sel: () => string[], set: (s: string[]) => void, refs: () => { label: string; atoms: number[]; on?: boolean }[], pickRef?: (i: number, add: boolean) => void) {
       const mol = molOf(a.struct)
       if (!mol) return { el: h('div', { class: 'dc-nostruct' }, h('b', null, 'No structure'), h('span', { class: 'dc-cap' }, a.structNote || 'this job came without a structure')), set: () => {} }
       const canvas = h('canvas', { class: 'dc-canvas' }) as HTMLCanvasElement, tip = h('div', { class: 'dc-tip', hidden: true })
@@ -829,9 +874,10 @@ export function decypherKit() {
           tip.hidden = false; tip.style.left = hv.left + 'px'; tip.style.top = hv.top + 'px'
           tip.replaceChildren(h('div', { class: 'dc-cap' }, hv.atom),
             h('b', { style: { color: g ? pal().hues[g.tone].strong : 'var(--foreground)' } }, g ? g.name + ' · ' + g.atoms.length + ' atoms' : r ? 'reference · ' + r.label : 'not in any group'),
-            h('div', { class: 'dc-cap' }, g ? (sel().includes(g.name) ? 'click: remove · ⌘-click: keep the others' : 'click: plot · ⌘-click: add') : r ? 'g(r) is measured from these atoms' : ''))
+            h('div', { class: 'dc-cap' }, g ? (sel().includes(g.name) ? 'click: remove · ⌘-click: keep the others' : 'click: plot · ⌘-click: add') : r ? (pickRef ? 'click: plot only this one · ⌘-click: add or remove' : 'g(r) is measured from these atoms') : ''))
         },
         pick: (i, add) => set(pick(sel(), a.sels[i].name, add)),
+        pickRef,
       })
       const update = () => {
         const s = sel()
@@ -847,7 +893,7 @@ export function decypherKit() {
       const render = () => seg.replaceChildren(...(['light', 'dark'] as const).map(t => h('button', { type: 'button', class: theme === t ? 'dc-on' : '', 'aria-pressed': theme === t ? 'true' : 'false', onclick: () => { theme = t; document.documentElement.dataset.theme = t; redraws.forEach(f => f()) } }, t)))
       redraws.push(render)
       render()
-      return h('header', { class: 'dc-header' }, h('div', { class: 'dc-grow' }, h('h1', null, '(de)Cypher'),
+      return h('header', { class: 'dc-header' }, h('div', { class: 'dc-grow' }, h('h1', null, data.header || '(de)Cypher'),
         h('div', { class: 'dc-cap' }, data.analyses.length + (data.analyses.length === 1 ? ' RDF' : ' RDFs') + ' · exported ' + new Date(data.made).toLocaleString() + ' · ' + data.by)), seg)
     }
 
@@ -880,32 +926,51 @@ export function decypherKit() {
         h('div', { class: 'dc-pad' }, ch.el, h('div', { class: 'dc-cap' }, 'click a curve: shown → dimmed → hidden · groups below are matched in every job by their atoms, then their name'), legend, groupChips.el))
     }
 
-    function jobSection(a: Analysis, ea: ExportAnalysis) {
+    /** One RDF's card; or, for RDFs that differ only in their reference, one card for them all (`morph`), led by the first. */
+    function jobSection(members: Analysis[], ea: ExportAnalysis, morph: { title: string; on: string[] } | null) {
+      const a = members[0], many = !!morph && members.length > 1, ids = members.map(m => m.id), names = refLabels(members)
+      let on = many ? ids.filter(id => morph!.on.includes(id)) : ids
+      if (!on.length) on = ids
       let selected = ea.selected.filter(n => a.sels.some(g => g.name === n))
       let hoverSel = -1
-      const curves = () => buildCurves({ focus: a, plotted: [a], selected, colorBy: 'group', pal: pal(), tones }).map(c => ({ ...c, source: a.ref ? 'ref ' + a.ref.name : c.source, dim: hoverSel >= 0 && c.name !== a.sels[hoverSel]?.name }))
+      const curves = () => buildCurves({ focus: a, plotted: members, selected, colorBy: 'group', pal: pal(), tones }).filter(c => on.includes(c.analysis)).map(c => {
+        const m = members.find(x => x.id === c.analysis)!
+        return { ...c, source: m.ref ? 'ref ' + names[m.id] : c.source, dim: hoverSel >= 0 && c.name !== a.sels[hoverSel]?.name }
+      })
       const ch = chartBox(() => ({ curves: curves(), grid: a.x, xlabel: a.xlabel, ylabel: a.ylabel }))
       const tb = table(curves)
-      const refs = () => (a.ref ? [{ label: a.ref.name, atoms: a.ref.atoms }] : [])
+      const refMembers = members.filter(m => m.ref)
+      const refs = () => refMembers.map(m => ({ label: names[m.id], atoms: m.ref!.atoms, on: on.includes(m.id) }))
       let sv: { el: HTMLElement; set: (i: number) => void } | null = null
-      const set = (s: string[]) => { selected = s; ch.render(); tb.render(); cp.render(); if (sv) sv.set(hoverSel) }
-      const cp = chips(a, () => selected, set, i => { hoverSel = i; ch.render(); if (sv) sv.set(i) })
-      sv = data.structs && a.struct ? structureBox(a, () => selected, set, refs) : null
+      const refresh = () => { ch.render(); tb.render(); cp.render(); if (sv) sv.set(hoverSel) }
+      const set = (s: string[]) => { selected = s; refresh() }
+      const pickRef = (id: string, add: boolean) => { on = pickRefs(ids, on, id, add); refresh() }
+      const cp = chips(a, () => selected, set, i => { hoverSel = i; ch.render(); if (sv) sv.set(i) },
+        many ? { items: () => refMembers.map(m => ({ id: m.id, label: names[m.id], count: m.ref!.atoms.length, on: on.includes(m.id) })), pick: pickRef } : undefined)
+      sv = data.structs && a.struct ? structureBox(a, () => selected, set, refs, many ? (i, add) => pickRef(refMembers[i].id, add) : undefined) : null
       tb.render()
       return h('section', { class: 'dc-card' },
-        h('div', { class: 'dc-bar' }, h('h2', null, a.title), h('span', { class: 'dc-cap' }, a.sub)),
+        h('div', { class: 'dc-bar' }, h('h2', null, many ? morph!.title : a.title), h('span', { class: 'dc-cap' }, many ? members.length + ' RDFs · the same groups, each from its own reference' : a.sub)),
         h('div', { class: sv ? 'dc-split' : 'dc-pad' }, sv ? sv.el : null, h('div', { class: 'dc-side' }, ch.el, cp.el, tb.el)))
     }
 
     document.documentElement.dataset.theme = theme
     const page = h('main', { class: 'dc-page' }, header())
     if (data.compare) { const c = compareSection(data.compare); if (c) page.append(c) }
-    analyses.forEach((a, i) => page.append(jobSection(a, data.analyses[i])))
+    // RDFs morphed into one card take the place of the first of them; the others have no card of their own.
+    const byId = new Map(analyses.map((a, i) => [a.id, { a, ea: data.analyses[i] }]))
+    const morphs = (data.morphs || []).map(m => ({ ...m, members: m.ids.map(id => byId.get(id)?.a).filter((x): x is Analysis => !!x) })).filter(m => m.members.length > 1)
+    const joined = new Set(morphs.flatMap(m => m.members))
+    analyses.forEach((a, i) => {
+      const m = morphs.find(x => x.members[0] === a)
+      if (m) page.append(jobSection(m.members, byId.get(a.id)!.ea, m))
+      else if (!joined.has(a)) page.append(jobSection([a], data.analyses[i], null))
+    })
     root.replaceChildren(page)
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => redraws.forEach(f => f()))
   }
 
-  return { TONES, DASH, REPS, RESTS, SOLV, palette, ranges, mix, buildMol, structureView, matchGroup, buildCurves, niceTicks, valAt, hoverX, chart, mount }
+  return { TONES, DASH, REPS, RESTS, SOLV, palette, ranges, mix, buildMol, structureView, matchGroup, buildCurves, sameButReference, pickRefs, refLabels, niceTicks, valAt, hoverRows, hoverX, chart, mount }
 }
 
 export type Kit = ReturnType<typeof decypherKit>

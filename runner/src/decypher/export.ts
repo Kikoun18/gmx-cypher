@@ -38,7 +38,35 @@ export interface ExportInput {
   structures: boolean
   by: string
   made?: string
+  /** The page's heading; '(de)Cypher' if left empty. */
+  header?: string
+  /** A heading of the user's choosing for an RDF's card, by analysis id; the card keeps its own title where there is none. A morphed card takes its first RDF's. */
+  titles?: Record<string, string>
+  /** RDFs shown as one card (they differ only in their reference), by analysis id: the first leads; `on` are those whose reference is plotted. */
+  morphs?: { ids: string[]; on: string[] }[]
 }
+
+export const DEFAULT_HEADER = '(de)Cypher'
+
+/**
+ * The cards a page has: one per RDF, but RDFs morphed into one (they differ only in their reference) stand as one,
+ * at the place of the first of them that is in `analyses`. `on`: the members whose reference is plotted (all if none is).
+ */
+export function cardsOf(analyses: Analysis[], morphs: { ids: string[]; on: string[] }[]): { lead: Analysis; members: Analysis[]; on: string[] }[] {
+  const by = new Map(analyses.map(a => [a.id, a])), joined = new Set<string>()
+  const cards = new Map<string, { lead: Analysis; members: Analysis[]; on: string[] }>()
+  for (const m of morphs) {
+    const members = m.ids.map(x => by.get(x)).filter((a): a is Analysis => !!a && !joined.has(a.id))
+    if (members.length < 2) continue
+    members.forEach(a => joined.add(a.id))
+    const on = members.filter(a => m.on.includes(a.id)).map(a => a.id)
+    cards.set(members[0].id, { lead: members[0], members, on: on.length ? on : members.map(a => a.id) })
+  }
+  return analyses.filter(a => cards.has(a.id) || !joined.has(a.id)).map(a => cards.get(a.id) ?? { lead: a, members: [a], on: [a.id] })
+}
+
+/** A card's default heading: the RDF's title; for morphed RDFs, their labels joined. */
+export const cardTitle = (members: Analysis[]) => (members.length > 1 ? members.map(m => m.label).join(' + ') : members[0].title)
 
 const round = (v: number, d: number) => +v.toFixed(d)
 /** A note without this machine's folders: an absolute path keeps only its last name. */
@@ -53,8 +81,9 @@ export function exportData(o: ExportInput): ExportData {
     sid.set(a.struct, key)
     structs[key] = compactStruct(o.structs[a.struct], keep)
   }
+  const chosen = (a: Analysis | undefined) => ((a && o.titles?.[a.id]) ?? '').trim()
   const analyses: ExportAnalysis[] = o.analyses.map(a => ({
-    id: id.get(a.id)!, title: a.title, label: a.label, sub: a.sub, x: a.x.map(v => round(v, 5)), xlabel: a.xlabel, ylabel: a.ylabel,
+    id: id.get(a.id)!, title: chosen(a) || a.title, label: a.label, sub: a.sub, x: a.x.map(v => round(v, 5)), xlabel: a.xlabel, ylabel: a.ylabel,
     ref: a.ref ? { name: a.ref.name, atoms: toRanges(a.ref.atoms), tone: a.ref.tone } : null,
     sels: a.sels.map(g => ({ name: g.name, atoms: toRanges(g.atoms), tone: g.tone, y: g.y.map(v => round(v, 4)), peak: g.peak && { r: round(g.peak.r, 5), g: round(g.peak.g, 4) } })),
     struct: a.struct ? sid.get(a.struct) ?? null : null, structNote: scrub(a.structNote), selected: o.selected(a), tone: o.tones[a.id] ?? 'coral',
@@ -62,7 +91,10 @@ export function exportData(o: ExportInput): ExportData {
   const compare = o.compare && o.compare.ids.filter(x => id.has(x)).length > 1
     ? { ids: o.compare.ids.filter(x => id.has(x)).map(x => id.get(x)!), focus: id.get(o.compare.focus) ?? id.get(o.compare.ids[0])!, selected: o.compare.selected, colorBy: o.compare.colorBy }
     : null
-  return { made: o.made ?? new Date().toISOString(), by: o.by, theme: o.theme, tokens: o.tokens, structs, analyses, compare, view: o.view }
+  // A morph keeps the RDFs that are in the export, the first of them leading; fewer than two is no morph.
+  const morphs = cardsOf(o.analyses, o.morphs ?? []).filter(c => c.members.length > 1)
+    .map(c => ({ ids: c.members.map(a => id.get(a.id)!), on: c.on.map(x => id.get(x)!), title: chosen(c.lead) || cardTitle(c.members) }))
+  return { header: (o.header ?? '').trim() || DEFAULT_HEADER, made: o.made ?? new Date().toISOString(), by: o.by, theme: o.theme, tokens: o.tokens, structs, analyses, compare, ...(morphs.length ? { morphs } : {}), view: o.view }
 }
 
 const CSS = `*{box-sizing:border-box}
@@ -108,6 +140,9 @@ button:focus-visible{outline:2px solid var(--ring);outline-offset:2px}
 .dc-chip{height:26px;padding:0 10px;border-radius:9999px;border:0;font-size:11px;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;cursor:pointer;background:transparent;transition:background-color 120ms ease,opacity 120ms ease}
 .dc-chip.dc-on{font-weight:700}
 .dc-chip.dc-ref{background:var(--foreground);color:var(--background);cursor:default;border:1.5px solid var(--foreground)}
+.dc-chip.dc-pick{cursor:pointer}
+.dc-chip.dc-alt{background:transparent;color:var(--foreground);border-style:dashed}
+.dc-chip.dc-off{opacity:.45;background:transparent;color:var(--foreground)}
 .dc-chip.dc-curve{border:1px solid var(--border)}
 .dc-chip.dc-curve:hover{background:var(--accent)}
 .dc-dot{width:7px;height:7px;border-radius:9999px;flex-shrink:0}
@@ -128,7 +163,7 @@ export function exportHtml(data: ExportData, fonts: { regular?: string; bold?: s
   const src = decypherKit.toString()
   if (/<\/script/i.test(src)) throw new Error('the kit\'s source holds </script>: it cannot be put inline')
   const face = (b64: string | undefined, weight: number) => (b64 ? '@font-face{font-family:mononoki;src:url(data:font/woff2;base64,' + b64 + ') format("woff2");font-weight:' + weight + ';font-style:normal;font-display:swap}\n' : '')
-  const title = '(de)Cypher · ' + (data.analyses.length === 1 ? data.analyses[0].title : data.analyses.length + ' RDFs')
+  const title = data.header && data.header !== DEFAULT_HEADER ? data.header : DEFAULT_HEADER + ' · ' + (data.analyses.length === 1 ? data.analyses[0].title : data.analyses.length + ' RDFs')
   return '<!doctype html>\n<html lang="en" data-theme="' + data.theme + '">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1">\n'
     + '<meta name="generator" content="' + esc(data.by) + ' (de)Cypher">\n<title>' + esc(title) + '</title>\n<style>\n'
     + face(fonts.regular, 400) + face(fonts.bold, 700)

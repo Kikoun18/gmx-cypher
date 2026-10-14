@@ -8,7 +8,7 @@ import type { AtomHover, ChartGeom, Curve, Group, Mol, Palette, SceneState, VNod
 import type { View } from './state'
 import { kit } from './theme'
 
-export interface StructureHandle { fit: () => void; reset: () => void }
+export interface StructureHandle { fit: () => void; reset: () => void; where: (nr: number) => { x: number; y: number } | null }
 
 /** A line of a curve in its colour and dash, for legends, tables and hover cards. */
 export function Swatch({ color, dash, width = 22 }: { color: string; dash: string; width?: number }) {
@@ -16,18 +16,18 @@ export function Swatch({ color, dash, width = 22 }: { color: string; dash: strin
 }
 
 export const StructurePanel = React.forwardRef<StructureHandle, {
-  mol: Mol | null; pal: Palette; view: View; sels: Group[]; selected: number[]; refs: { label: string; atoms: number[] }[]
-  hoverSel: number; hoverRef?: number; onPick: (sel: number, add: boolean) => void; onActive?: () => void; className?: string; empty: React.ReactNode
-}>(function StructurePanel({ mol, pal, view, sels, selected, refs, hoverSel, hoverRef = -1, onPick, onActive, className, empty }, ref) {
+  mol: Mol | null; pal: Palette; view: View; sels: Group[]; selected: number[]; refs: { label: string; atoms: number[]; on?: boolean }[]
+  hoverSel: number; hoverRef?: number; onPick: (sel: number, add: boolean) => void; onPickRef?: (ref: number, add: boolean) => void; onActive?: () => void; className?: string; empty: React.ReactNode
+}>(function StructurePanel({ mol, pal, view, sels, selected, refs, hoverSel, hoverRef = -1, onPick, onPickRef, onActive, className, empty }, ref) {
   const wrap = React.useRef<HTMLDivElement>(null), canvas = React.useRef<HTMLCanvasElement>(null)
   const ctl = React.useRef<ReturnType<typeof kit.structureView> | null>(null)
   const [tip, setTip] = React.useState<AtomHover | null>(null)
-  const pick = React.useRef(onPick)
-  React.useLayoutEffect(() => { pick.current = onPick })
-  React.useImperativeHandle(ref, () => ({ fit: () => ctl.current?.fit(), reset: () => ctl.current?.reset() }), [])
+  const pick = React.useRef(onPick), pickRef = React.useRef(onPickRef)
+  React.useLayoutEffect(() => { pick.current = onPick; pickRef.current = onPickRef })
+  React.useImperativeHandle(ref, () => ({ fit: () => ctl.current?.fit(), reset: () => ctl.current?.reset(), where: nr => ctl.current?.where(nr) ?? null }), [])
   React.useEffect(() => {
     if (!wrap.current || !canvas.current || !mol) return
-    const c = kit.structureView(canvas.current, wrap.current, { hover: setTip, pick: (i, add) => pick.current(i, add) })
+    const c = kit.structureView(canvas.current, wrap.current, { hover: setTip, pick: (i, add) => pick.current(i, add), pickRef: (i, add) => pickRef.current?.(i, add) })
     ctl.current = c
     if (document.fonts?.ready) document.fonts.ready.then(() => c.redraw())
     return () => { c.destroy(); ctl.current = null }
@@ -55,7 +55,7 @@ export const StructurePanel = React.forwardRef<StructureHandle, {
           <span className="text-control font-bold" style={{ color: g ? pal.hues[g.tone].strong : r ? 'var(--foreground)' : 'var(--muted-foreground)' }}>
             {g ? g.name + ' · ' + g.atoms.length + ' atoms' : r ? 'reference · ' + r.label : 'not in any group'}
           </span>
-          {(g || r) && <span className="text-caption text-muted-foreground">{g ? (on ? (selected.length > 1 ? 'click: plot alone · ⌘-click: remove' : 'click: remove') : 'click: plot · ⌘-click: add') : 'g(r) is measured from these atoms'}</span>}
+          {(g || r) && <span className="text-caption text-muted-foreground">{g ? (on ? (selected.length > 1 ? 'click: plot alone · ⌘-click: remove' : 'click: remove') : 'click: plot · ⌘-click: add') : onPickRef ? 'click: plot only this one · ⌘-click: add or remove' : 'g(r) is measured from these atoms'}</span>}
         </div>
       )}
     </div>
@@ -100,12 +100,12 @@ export function ChartPanel({ curves, grid, xlabel, ylabel, pal, peaks, className
       {geom && hover != null && curves.length > 0 && (
         <div className="pointer-events-none absolute flex w-[300px] flex-col gap-1 rounded-lg border border-border bg-popover px-2.5 py-2 shadow-menu" style={{ left: Math.max(0, xv + 314 > size.w ? xv - 314 : xv + 14), top: geom.m.t + 4 }}>
           <div className="text-caption text-muted-foreground">{(ylabel || 'g(r)')} at r = {hover.toFixed(3)} nm</div>
-          {curves.slice(0, 14).map(c => (
+          {kit.hoverRows(curves, hover).slice(0, 14).map(({ curve: c, v }) => (
             <div key={c.key} className="grid grid-cols-[22px_minmax(0,1fr)_auto_auto] items-center gap-[7px] text-caption">
               <Swatch color={c.color} dash={c.dash} />
               <span className="truncate font-bold" style={{ color: c.color }}>{c.name}</span>
               <span className="truncate text-muted-foreground">{c.source}</span>
-              <span>{kit.valAt(c.x, c.y, hover).toFixed(2)}</span>
+              <span>{v.toFixed(2)}</span>
             </div>
           ))}
           {curves.length > 14 && <div className="text-caption text-muted-foreground">+ {curves.length - 14} more</div>}
@@ -115,7 +115,7 @@ export function ChartPanel({ curves, grid, xlabel, ylabel, pal, peaks, className
   )
 }
 
-/** The curves under a chart: series, source, atoms, first peak; × takes a group off the plot. */
+/** The curves under a chart: series, source, atoms, highest point; × takes a group off the plot. */
 export function CurveTable({ curves, onRemove, onHover, source = true }: { curves: Curve[]; onRemove: (name: string) => void; onHover: (c: Curve | null) => void; source?: boolean }) {
   if (!curves.length) return null
   const cols = source ? 'grid-cols-[26px_minmax(0,1fr)_minmax(0,1.1fr)_44px_70px_56px_26px]' : 'grid-cols-[26px_minmax(0,1fr)_44px_70px_56px_26px]'
@@ -140,17 +140,21 @@ export function CurveTable({ curves, onRemove, onHover, source = true }: { curve
 }
 
 /** The reference and the groups as chips: a click plots one group (or clears it), ⌘, ctrl or shift adds it. */
-export function GroupChips({ refs, sels, selected, pal, dim, hover, onPick, onHover }: {
-  refs: { label: string; count: number; dashed: boolean }[]; sels: Group[]; selected: string[]; pal: Palette; dim: boolean; hover: string | null
+export function GroupChips({ refs, sels, selected, pal, dim, hover, onPick, onPickRef, onHover }: {
+  refs: { label: string; count: number; dashed: boolean; on?: boolean }[]; sels: Group[]; selected: string[]; pal: Palette; dim: boolean; hover: string | null
   onPick: (name: string, add: boolean) => void; onHover: (name: string | null) => void
+  /** Given where RDFs are morphed: the references are buttons, one, the other or both plotted. */
+  onPickRef?: (ref: number, add: boolean) => void
 }) {
   return (
     <div className="flex flex-wrap gap-1.5">
-      {refs.map(r => (
-        <span key={r.label} className={cn('inline-flex h-[26px] items-center gap-1.5 whitespace-nowrap rounded-full border-[1.5px] border-foreground px-2.5 text-caption', r.dashed ? 'border-dashed text-foreground' : 'bg-foreground text-background')}>
-          ref {r.label}<span className="opacity-70">{r.count || '—'}</span>
-        </span>
-      ))}
+      {refs.map((r, i) => {
+        const cls = cn('inline-flex h-[26px] items-center gap-1.5 whitespace-nowrap rounded-full border-[1.5px] border-foreground px-2.5 text-caption', r.dashed || r.on === false ? 'border-dashed text-foreground' : 'bg-foreground text-background', r.on === false && 'opacity-45')
+        const body = <>ref {r.label}<span className="opacity-70">{r.count || '—'}</span></>
+        return onPickRef
+          ? <button key={r.label} type="button" aria-pressed={r.on !== false} title="click: plot only this reference · ⌘-click: add or remove" className={cn(cls, 'cursor-pointer')} onClick={e => onPickRef(i, e.metaKey || e.ctrlKey || e.shiftKey)}>{body}</button>
+          : <span key={r.label} className={cls}>{body}</span>
+      })}
       {sels.map(g => {
         const on = selected.includes(g.name), t = pal.hues[g.tone]
         return (

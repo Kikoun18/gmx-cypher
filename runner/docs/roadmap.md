@@ -128,6 +128,12 @@ Spec: [`batch-2.md`](batch-2.md). Phase 0 report: [`batch-2-phase0.md`](batch-2-
 - [x] A new project starts with COL1 and no tags; the example text is neutral; older data keeps its former columns and tags (T151)
 - [x] The `app/` check compares a hash of the whole tree, so a commit can carry its own baseline (T144)
 
+### After (de)Cypher (your requests, T152–T155)
+- [x] A curve's peak is its highest point (T152)
+- [x] Values under the pointer come highest first (T153)
+- [x] The export's page heading and card headings are your text (T154)
+- [x] RDFs that differ only in their reference can be morphed into one card: pick a reference by its atom or chip (T155)
+
 ### Backlog (Batch 2: add to it, don't do it)
 - Job submission (`qq submit`), and running Cypher's analyses as cluster jobs. (Moved here from the backlog above.)
 - Morpheus: a Table and a Combobox component, and an error band for `LineChart` (built locally in this batch). Morpheus's `DropdownMenu` checkbox items are a non-searchable multi-select option.

@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { decypherKit, type Analysis, type VNode } from '../src/decypher/kit'
-import { fromFiles, fromRecord, fromVault, parseGro, parsePdb, parseXvg, shortLabels, type RecordLike } from '../src/decypher/parse'
+import { fromFiles, fromRecord, fromVault, parseGro, parsePdb, parseXvg, peakOf, shortLabels, type RecordLike } from '../src/decypher/parse'
 import { themeTokens } from '../src/decypher/tokens'
 import { RUNNER } from './helpers'
 
@@ -37,15 +37,38 @@ describe('(de)Cypher reads your runs as the RDF Explorer design does', () => {
     expect(shortLabels(analyses.map(a => a.label))).toEqual(['Methionine_H', 'Methionine_S'])
   })
 
-  it('first peaks by gmx-cypher\'s own rule, and an index without a record names the groups by the legends', () => {
+  it('a peak is the highest point of the curve, not the first shell\'s; an index without a record names the groups by the legends', () => {
     const { analyses } = fromFiles(['rdf_o111_Methionine_H.xvg', 'rdf_o111_Methionine_H.ndx'].map(n => ({ path: n, text: read(n) })))
     const a = analyses[0], x = parseXvg(read('rdf_o111_Methionine_H.xvg'))
     expect(a.ref!.name).toBe('H_Met')
     expect(a.sels.map(g => g.name)).toEqual(x.legends)
     expect(a.struct).toBeNull()
     expect(a.structNote).toBe('no .gro or .pdb among the files')
-    const top = Math.max(...a.sels[4].y)
-    expect(a.sels[4].peak!.g).toBeLessThanOrEqual(top)
+    // Every curve's peak is its highest value, at the r where it is.
+    for (const g of a.sels) {
+      const top = Math.max(...g.y)
+      if (top > 0) expect(g.peak).toEqual({ r: a.x[g.y.indexOf(top)], g: top })
+      else expect(g.peak).toBeNull()
+    }
+  })
+
+  it('peakOf: an early rise to 2 is not the peak when the curve climbs to 8.7 after it', () => {
+    const x = [0.1, 0.2, 0.27, 0.3, 0.33, 0.4, 0.5], y = [0, 0, 2, 1.5, 8.7, 4, 1]
+    expect(peakOf(x, y)).toEqual({ r: 0.33, g: 8.7 })
+    expect(peakOf(x, [0, 3, 1, 3, 2, 0, 0])).toEqual({ r: 0.2, g: 3 })
+    expect(peakOf(x, [0, 0, 0, 0, 0, 0, 0])).toBeNull()
+    expect(peakOf([], [])).toBeNull()
+  })
+
+  it('values under the pointer come highest first, equal ones in the curves\' order', () => {
+    const [h, s] = files().analyses
+    const curves = kit.buildCurves({ focus: h, plotted: [h, s], selected: h.sels.map(g => g.name), colorBy: 'group', pal, tones: {} })
+    const r = h.x[10], rows = kit.hoverRows(curves, r)
+    expect(rows).toHaveLength(curves.length)
+    expect(rows.map(x => x.v)).toEqual(rows.map(x => x.v).slice().sort((p, q) => q - p))
+    expect(rows.map(x => x.v).sort((p, q) => p - q)).toEqual(curves.map(c => kit.valAt(c.x, c.y, r)).sort((p, q) => p - q))
+    const flat = curves.slice(0, 3).map((c, i) => ({ ...c, key: 'f' + i, y: c.y.map(() => 1) }))
+    expect(kit.hoverRows(flat, r).map(x => x.curve.key)).toEqual(['f0', 'f1', 'f2'])
   })
 
   it('a job: its record and its g(r)', () => {

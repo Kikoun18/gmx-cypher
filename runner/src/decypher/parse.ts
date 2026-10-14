@@ -1,11 +1,10 @@
 // (de)Cypher's sources as analyses: a gmx-cypher run (its record and its g(r)), an RDF of the PMF Sequences
 // vault, or files from disk (gro, pdb, ndx, xvg, run.json) linked as the RDF Explorer design links them. The
-// x and y come from PMF Sequences' own parseTable, the first peaks from gmx-cypher's (T27), as in the result view.
+// x and y come from PMF Sequences' own parseTable; a curve's peak is its highest point (T152), not the first shell's (T27).
 
 import { parseTable } from '../../../app/src/lib/seq'
 import { structFormat } from '../../../app/src/lib/structFile'
 import { parseNdx } from '../lib/ndx'
-import { firstPeak } from '../lib/rdf'
 import { decypherKit, type Analysis, type Group, type Peak, type Sel, type Struct, type Tone } from './kit'
 
 const kit = decypherKit()
@@ -76,9 +75,11 @@ export function parseXvg(text: string): Xvg {
   return { x, ys, legends: ys.map((_, i) => t.head.legends[i] || ''), xlabel: t.head.xLabel, ylabel: t.head.yLabel, ndxName, refIdx, selIdx }
 }
 
+/** The curve's highest point (the first of equal ones), wherever it is; null for a curve with no value above zero. */
 export function peakOf(x: number[], y: number[]): Peak | null {
-  const p = firstPeak(x.map((v, i) => [v, y[i]] as [number, number]))
-  return p ? { r: p.r, g: p.g } : null
+  let best = -1
+  for (let i = 0; i < y.length; i++) if (Number.isFinite(y[i]) && Number.isFinite(x[i]) && (best < 0 || y[i] > y[best])) best = i
+  return best >= 0 && y[best] > 0 ? { r: x[best], g: y[best] } : null
 }
 
 /** Groups with their curves: by legend when the legends are the groups' names, else in order. */

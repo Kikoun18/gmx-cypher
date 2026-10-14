@@ -20,14 +20,15 @@ import type { Analysis, Curve, Mol, Palette, Struct, Tone } from './kit'
 import { ChartPanel, CurveTable, GroupChips, StructurePanel, Swatch, type StructureHandle } from './panels'
 import type { LoadedFile } from './parse'
 import { useAnalyses, type Item } from './sources'
-import { pickGroup, refKey, useView, type DecypherSources, type SourceRef, type View } from './state'
+import { activeMorphs, joinMorph, pickGroup, refKey, setMorphRefs, splitMorph, useView, type ActiveMorph, type DecypherSources, type SourceRef, type View } from './state'
 import { kit, PALETTES, TOKENS_BY_THEME, usePageTheme } from './theme'
 import type { VaultRdfs } from './vaultTypes'
-import { download, exportData, exportHtml, exportName, fontData } from './export'
+import { cardsOf, cardTitle, DEFAULT_HEADER, download, exportData, exportHtml, exportName, fontData } from './export'
 
 const pad = (n: number) => String(n).padStart(2, '0')
 const plural = (n: number, one: string, many = one + 's') => n + ' ' + (n === 1 ? one : many)
 const WANTED = /\.(gro|pdb|ndx|xvg|json)$/i
+const NO_MORPHS: ActiveMorph[] = []
 
 /** A toggle chip: coral when on, its state also in weight and in aria-pressed. */
 function Chip({ on, onClick, children, title }: { on: boolean; onClick: () => void; children: React.ReactNode; title?: string }) {
@@ -75,32 +76,55 @@ async function readDrop(dt: DataTransfer): Promise<LoadedFile[]> {
 }
 
 interface CardProps {
-  a: Analysis; tone: Tone; mol: Mol | null; pal: Palette; view: View; selected: string[]; tones: Record<string, Tone>
+  /** One RDF, or several that differ only in their reference (morphed): the first leads. */
+  members: Analysis[]
+  /** The members whose reference is plotted. */
+  on: string[]
+  tone: Tone; mol: Mol | null; pal: Palette; view: View; selected: string[]; tones: Record<string, Tone>
+  /** RDFs that could join this card: the same structure and groups, another reference. */
+  partners: Analysis[]
+  onMorph: (id: string) => void; onSplit: () => void; onRefs: (on: string[]) => void
   onSelect: (names: string[]) => void; handle: (h: StructureHandle | null) => void; onActive: () => void
 }
 
-/** One analysis: its structure beside its g(r), its groups as chips, its curves with their first peaks. */
-function AnalysisCard({ a, tone, mol, pal, view, selected, tones, onSelect, handle, onActive }: CardProps) {
+/** One analysis: its structure beside its g(r), its groups as chips, its curves with their highest points. Morphed: one card for RDFs that differ only in their reference, which one picks, atom or chip, one, the other or both. */
+function AnalysisCard({ members, on, tone, mol, pal, view, selected, tones, partners, onMorph, onSplit, onRefs, onSelect, handle, onActive }: CardProps) {
+  const a = members[0], many = members.length > 1
   const [hover, setHover] = React.useState<string | null>(null), [hot, setHot] = React.useState<string | null>(null)
   const ref = React.useRef<StructureHandle | null>(null)
-  const curves = React.useMemo(() => kit.buildCurves({ focus: a, plotted: [a], selected, colorBy: 'group', pal, tones })
-    .map(c => ({ ...c, source: a.ref ? 'ref ' + a.ref.name : a.label, hot: c.key === hot, dim: hot ? c.key !== hot : !!hover && c.name !== hover && selected.includes(hover) })), [a, selected, pal, tones, hover, hot])
+  const ids = React.useMemo(() => members.map(m => m.id), [members]), names = React.useMemo(() => kit.refLabels(members), [members])
+  const curves = React.useMemo(() => kit.buildCurves({ focus: a, plotted: members, selected, colorBy: 'group', pal, tones })
+    .filter(c => on.includes(c.analysis))
+    .map(c => {
+      const m = members.find(x => x.id === c.analysis)!
+      return { ...c, source: m.ref ? 'ref ' + names[m.id] : m.label, hot: c.key === hot, dim: hot ? c.key !== hot : !!hover && c.name !== hover && selected.includes(hover) }
+    }), [a, members, names, on, selected, pal, tones, hover, hot])
   const idx = React.useMemo(() => a.sels.flatMap((g, i) => (selected.includes(g.name) ? [i] : [])), [a, selected])
-  const refs = React.useMemo(() => (a.ref ? [{ label: a.ref.name, atoms: a.ref.atoms }] : []), [a])
+  const refMembers = React.useMemo(() => members.filter(m => m.ref), [members])
+  const refs = React.useMemo(() => refMembers.map(m => ({ label: names[m.id], atoms: m.ref!.atoms, on: on.includes(m.id) })), [refMembers, names, on])
+  const pickRef = many ? (i: number, add: boolean) => onRefs(kit.pickRefs(ids, on, refMembers[i].id, add)) : undefined
   const hoverSel = hover ? a.sels.findIndex(g => g.name === hover) : -1
+  const title = cardTitle(members)
   return (
-    <section aria-label={a.title} className="flex flex-col overflow-hidden rounded-xl border border-border bg-card" onMouseEnter={onActive}>
+    <section aria-label={title} className="flex flex-col overflow-hidden rounded-xl border border-border bg-card" onMouseEnter={onActive}>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-border px-4 py-2.5">
         <span className="size-2 shrink-0 rounded-full" style={{ background: pal.hues[tone].strong }} />
-        <h3 className="m-0 text-heading font-bold">{a.title}</h3>
-        <span className="text-caption text-muted-foreground">{a.sub}</span>
+        <h3 className="m-0 text-heading font-bold">{title}</h3>
+        <span className="text-caption text-muted-foreground">{many ? plural(members.length, 'RDF') + ' · the same groups, each from its own reference' : a.sub}</span>
         <span className="flex-1" />
-        <span className="max-w-[36ch] truncate text-caption text-muted-foreground" title={a.structNote}>{a.structNote}</span>
+        {partners.length > 0 && (
+          <Select value="" onValueChange={onMorph}>
+            <SelectTrigger size="sm" className="w-40" aria-label={'morph ' + (many ? title : a.label) + ' with another RDF'} title="show RDFs that differ only in their reference as one card"><SelectValue placeholder="morph with…" /></SelectTrigger>
+            <SelectContent>{partners.map(p => <SelectItem key={p.id} value={p.id}>{p.label}{p.ref ? ' · ref ' + p.ref.name : ''}</SelectItem>)}</SelectContent>
+          </Select>
+        )}
+        {many && <Button variant="outline" size="sm" onClick={onSplit} title="show each RDF as its own card again">split</Button>}
+        {!many && <span className="max-w-[36ch] truncate text-caption text-muted-foreground" title={a.structNote}>{a.structNote}</span>}
         {mol && <><Button variant="outline" size="sm" onClick={() => ref.current?.fit()}>fit selection</Button><Button variant="ghost" size="sm" onClick={() => ref.current?.reset()}>reset view</Button></>}
       </div>
       <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,420px),1fr))]">
         <StructurePanel ref={h => { ref.current = h; handle(h) }} className="min-h-[480px] border-r border-border" mol={mol} pal={pal} view={view} sels={a.sels} selected={idx} refs={refs} hoverSel={hoverSel}
-          onPick={(i, add) => onSelect(pickGroup(selected, a.sels[i].name, add))} onActive={onActive}
+          onPick={(i, add) => onSelect(pickGroup(selected, a.sels[i].name, add))} onPickRef={pickRef} onActive={onActive}
           empty={<><span className="text-heading font-bold">No structure</span><span className="max-w-[40ch] text-caption text-muted-foreground">{a.structNote}</span></>} />
         <div className="flex min-w-0 flex-col gap-3 p-4">
           <ChartPanel className="h-[300px] flex-none" curves={curves} grid={a.x} xlabel={a.xlabel} ylabel={a.ylabel} pal={pal} peaks={view.peaks}
@@ -109,9 +133,9 @@ function AnalysisCard({ a, tone, mol, pal, view, selected, tones, onSelect, hand
             <Button variant="ghost" size="sm" onClick={() => onSelect(a.sels.map(g => g.name))}>all</Button>
             <Button variant="ghost" size="sm" onClick={() => onSelect([])}>none</Button>
           </Section>
-          <GroupChips refs={a.ref ? [{ label: a.ref.name, count: a.ref.atoms.length, dashed: false }] : []} sels={a.sels} selected={selected} pal={pal} dim={selected.length > 0 && view.rest !== 'tinted'} hover={hover}
-            onPick={(n, add) => onSelect(pickGroup(selected, n, add))} onHover={setHover} />
-          <CurveTable curves={curves} source={false} onRemove={n => onSelect(selected.filter(x => x !== n))} onHover={c => { setHot(c?.key ?? null); setHover(c?.name ?? null) }} />
+          <GroupChips refs={refs.map((r, k) => ({ label: r.label, count: r.atoms.length, dashed: k > 0, on: r.on }))} sels={a.sels} selected={selected} pal={pal} dim={selected.length > 0 && view.rest !== 'tinted'} hover={hover}
+            onPick={(n, add) => onSelect(pickGroup(selected, n, add))} onPickRef={pickRef} onHover={setHover} />
+          <CurveTable curves={curves} source={many} onRemove={n => onSelect(selected.filter(x => x !== n))} onHover={c => { setHot(c?.key ?? null); setHover(c?.name ?? null) }} />
         </div>
       </div>
     </section>
@@ -285,27 +309,32 @@ function AddPanel({ sources, jobs, allow, vaultPath, vault, loadVault, fileRows,
   )
 }
 
-function ExportDialog({ open, onOpenChange, analyses, structs, view, theme, tones, selectedOf, compare, version }: {
+function ExportDialog({ open, onOpenChange, analyses, structs, view, theme, tones, selectedOf, compare, morphs, version }: {
   open: boolean; onOpenChange: (o: boolean) => void; analyses: Analysis[]; structs: Record<string, Struct>; view: View; theme: 'light' | 'dark'; tones: Record<string, Tone>
-  selectedOf: (a: Analysis) => string[]; compare: { ids: string[]; focus: string; selected: string[] } | null; version: string
+  selectedOf: (a: Analysis) => string[]; compare: { ids: string[]; focus: string; selected: string[] } | null; morphs: ActiveMorph[]; version: string
 }) {
   // Made anew each time it opens (its key), so it starts from what is shown then.
   const [chosen, setChosen] = React.useState<Set<string>>(() => new Set(analyses.map(a => a.id)))
   const [structures, setStructures] = React.useState(true), [withCompare, setWithCompare] = React.useState(true)
   const [name, setName] = React.useState(() => exportName(analyses)), [done, setDone] = React.useState(''), [busy, setBusy] = React.useState(false)
+  // The headings are the user's: the page's own, and each card's (a card of morphed RDFs is one, named for its first).
+  const [header, setHeader] = React.useState(''), [titles, setTitles] = React.useState<Record<string, string>>({})
   const picked = analyses.filter(a => chosen.has(a.id)), pickedKey = picked.map(a => a.id).join()
-  const data = React.useMemo(() => (open && picked.length ? exportData({
-    analyses: picked, structs, selected: selectedOf, tones, theme, tokens: TOKENS_BY_THEME, structures, by: 'gmx-cypher ' + version,
+  const cards = React.useMemo(() => cardsOf(picked, morphs), [pickedKey, morphs]) // eslint-disable-line react-hooks/exhaustive-deps -- picked is what its key says
+  const build = (headings: { header?: string; titles?: Record<string, string> }) => exportData({
+    analyses: picked, structs, selected: selectedOf, tones, theme, tokens: TOKENS_BY_THEME, structures, by: 'gmx-cypher ' + version, morphs, ...headings,
     compare: withCompare && compare && view.mode === 'one' ? { ...compare, colorBy: view.colorBy } : withCompare && picked.length > 1 ? { ids: picked.map(a => a.id), focus: picked[0].id, selected: selectedOf(picked[0]), colorBy: view.colorBy } : null,
     view: { rep: view.rep, rest: view.rest, labels: view.labels, hydrogens: view.hydrogens, arrange: view.arrange },
-  }) : null), [open, pickedKey, structures, withCompare, theme, view, compare]) // eslint-disable-line react-hooks/exhaustive-deps -- picked is what its key says
+  })
+  // Built without the headings (they change with every key typed; the size and the button need only this), and again with them on export.
+  const data = React.useMemo(() => (open && picked.length ? build({}) : null), [open, pickedKey, structures, withCompare, theme, view, compare, morphs]) // eslint-disable-line react-hooks/exhaustive-deps -- picked is what its key says
   const size = data ? JSON.stringify(data).length + 120_000 : 0
   const go = async () => {
     if (!data) return
     setBusy(true)
     try {
       const file = (name.trim() || exportName(picked)).replace(/\.html?$/i, '') + '.html'
-      download(file, exportHtml(data, await fontData()))
+      download(file, exportHtml(build({ header, titles }), await fontData()))
       setDone('✓ exported ' + file)
     } finally { setBusy(false) }
   }
@@ -334,6 +363,22 @@ function ExportDialog({ open, onOpenChange, analyses, structs, view, theme, tone
           <div className="flex flex-col gap-2">
             <label className="flex items-center gap-2.5 text-control"><Checkbox checked={structures} onCheckedChange={v => setStructures(v === true)} />structures · rotate, zoom, click a group to plot it (solvent left out)</label>
             <label className={cn('flex items-center gap-2.5 text-control', picked.length < 2 && 'opacity-45')}><Checkbox checked={withCompare && picked.length > 1} disabled={picked.length < 2} onCheckedChange={v => setWithCompare(v === true)} />one graph · the groups compared across RDFs, curves shown → dimmed → hidden</label>
+          </div>
+          <Section label="Headings" />
+          <div className="flex flex-col gap-2">
+            <Field>
+              <Label htmlFor="export-header">page heading</Label>
+              <Input id="export-header" size="sm" value={header} placeholder={DEFAULT_HEADER} onChange={e => setHeader(e.target.value)} />
+            </Field>
+            <div className="flex max-h-48 flex-col gap-2 overflow-auto">
+              {cards.map(c => (
+                <Field key={c.lead.id}>
+                  <Label htmlFor={'export-title-' + c.lead.id}>{c.members.length > 1 ? 'heading of ' + plural(c.members.length, 'morphed RDF') : 'heading of ' + c.lead.label}</Label>
+                  <Input id={'export-title-' + c.lead.id} size="sm" value={titles[c.lead.id] ?? ''} placeholder={cardTitle(c.members)} onChange={e => setTitles(t => ({ ...t, [c.lead.id]: e.target.value }))} />
+                </Field>
+              ))}
+            </div>
+            <FieldHint>left empty, a heading stays as it is · each is what the exported page shows over that card</FieldHint>
           </div>
           <Field>
             <Label htmlFor="export-name">file name</Label>
@@ -374,6 +419,15 @@ export function Decypher({ open, onOpenChange, sources, jobs, jobsLoaded, allow,
   const ready = React.useMemo(() => items.filter(i => i.analysis).map(i => i.analysis!), [items])
   const tones = React.useMemo(() => Object.fromEntries(items.map((it, i) => [it.analysis?.id ?? it.key, kit.TONES[i % kit.TONES.length]])) as Record<string, Tone>, [items])
   const shown = React.useMemo(() => ready.filter(a => !view.hidden.includes(a.id)), [ready, view.hidden])
+  // RDFs morphed into one card, as each job is shown: the card stands where its first RDF would, the others have none.
+  const morphs = React.useMemo(() => activeMorphs(view.morphed, shown.map(a => a.id)), [view.morphed, shown])
+  const cards = React.useMemo(() => {
+    const byId = new Map(shown.map(a => [a.id, a])), joined = new Set(morphs.flatMap(m => m.ids.slice(1)))
+    return shown.filter(a => !joined.has(a.id)).map(lead => {
+      const m = morphs.find(x => x.ids[0] === lead.id), members = m ? m.ids.map(id => byId.get(id)!) : [lead]
+      return { lead, members, on: m ? m.on : [lead.id], partners: shown.filter(b => !members.includes(b) && kit.sameButReference(lead, b)) }
+    })
+  }, [shown, morphs])
 
   // One drawable structure per file and layout, built again only when the analyses on it change.
   const [molCache] = React.useState(() => new Map<string, Mol | null>())
@@ -472,7 +526,8 @@ export function Decypher({ open, onOpenChange, sources, jobs, jobsLoaded, allow,
               <p className="m-0 text-control text-muted-foreground">{ready.length ? 'every RDF is hidden · tick one on the left' : 'reading…'}</p>
             ) : view.mode === 'each' ? (
               <div className="flex flex-col gap-4">
-                {shown.map(a => <AnalysisCard key={a.id} a={a} tone={tones[a.id]} mol={a.struct ? mols.get(a.struct) ?? null : null} pal={pal} view={view} selected={selectedOf(a)} tones={tones}
+                {cards.map(({ lead: a, members, on, partners }) => <AnalysisCard key={a.id} members={members} on={on} partners={partners} tone={tones[a.id]} mol={a.struct ? mols.get(a.struct) ?? null : null} pal={pal} view={view} selected={selectedOf(a)} tones={tones}
+                  onMorph={id => patch(v => ({ morphed: joinMorph(v.morphed, a.id, id) }))} onSplit={() => patch(v => ({ morphed: splitMorph(v.morphed, a.id) }))} onRefs={next => patch(v => ({ morphed: setMorphRefs(v.morphed, a.id, next) }))}
                   onSelect={n => select(a, n)} handle={h => handles.current.set(a.id, h)} onActive={() => { active.current = a.id }} />)}
               </div>
             ) : focus && (
@@ -487,7 +542,7 @@ export function Decypher({ open, onOpenChange, sources, jobs, jobsLoaded, allow,
             <span className="text-control text-muted-foreground">gro, pdb, ndx, xvg and run.json · each .xvg finds its record, index and structure</span>
           </div>
         )}
-        <ExportDialog key={exporting} open={exportOpen} onOpenChange={setExportOpen} analyses={shown} structs={structs} view={view} theme={theme} tones={tones} selectedOf={selectedOf} version={version}
+        <ExportDialog key={exporting} open={exportOpen} onOpenChange={setExportOpen} analyses={shown} structs={structs} view={view} theme={theme} tones={tones} selectedOf={selectedOf} morphs={view.mode === 'each' ? morphs : NO_MORPHS} version={version}
           compare={focus ? { ids: [focus.id, ...shown.filter(a => a !== focus).map(a => a.id)], focus: focus.id, selected: selectedOf(focus) } : null} />
       </DialogContent>
     </Dialog>
