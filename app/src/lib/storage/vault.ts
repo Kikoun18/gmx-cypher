@@ -1,7 +1,7 @@
 // Opening, creating and locking a vault, schema upgrades, and the projects in it.
 
 import type { Column, Settings } from '../types';
-import { SACCH } from '../pmf';
+import { DEFAULT_COLS } from '../pmf';
 import type { StorageBackend } from './backend/types';
 import { VaultIO } from './io';
 import { begin, commit as commitEntry, applyCommitted, end, newEntry, recover, transact, type Recovered } from './journal';
@@ -31,6 +31,10 @@ export async function isEmptyFolder(b: StorageBackend): Promise<boolean> {
 }
 export async function isVault(b: StorageBackend): Promise<boolean> { return !!(await b.stat(vaultPaths.manifest)); }
 
+/**
+ * `settings` left out is a new project: one column (DEFAULT_COLS) and no tags, stored as an empty list. Pass `{}` for a
+ * project that keeps no settings of its own (one that comes from older data, where an absent tag list means FORMER_TAGS).
+ */
 export interface NewProjectOptions { desc?: string; cols?: Column[]; settings?: Partial<Settings>; id?: string }
 
 export class Vault {
@@ -159,14 +163,14 @@ export class Vault {
 
   async createProject(name: string, o: NewProjectOptions = {}): Promise<ProjectRecord> {
     const id = o.id || uid('p');
-    const cols = (o.cols && o.cols.length ? o.cols : SACCH).map(c => ({ ...c }));
+    const cols = (o.cols && o.cols.length ? o.cols : DEFAULT_COLS).map(c => ({ ...c }));
     const project: ProjectRecord = { id, type: 'project', name: name.trim() || 'Untitled project', desc: o.desc || '', created: new Date().toISOString(), dir: visiblePaths.project(name.trim() || 'Untitled project', id), columnOrder: cols.map(c => c.k), pageOrder: [], rowOrder: [], imports: [] };
     const ws = await this.workspace();
     const e = newEntry('create-project');
     e.mkdirs.push(project.dir);
     e.records.push({ path: recordPaths.project(id), text: stableStringify(project) });
     for (const c of cols) e.records.push({ path: recordPaths.column(id, c.k), text: stableStringify({ id: c.k, type: 'column', label: c.label, short: c.short, name: c.name, light: c.light, dark: c.dark, dir: null } satisfies ColumnRecord) });
-    for (const f of settingsFiles(id, o.settings || {}, [])) if (f.value != null) e.records.push({ path: f.path, text: stableStringify(f.value) });
+    for (const f of settingsFiles(id, o.settings ?? { tags: [] }, [])) if (f.value != null) e.records.push({ path: f.path, text: stableStringify(f.value) });
     e.records.push({ path: vaultPaths.workspace, text: stableStringify({ ...ws, projectOrder: ws.projectOrder.filter(x => x !== id).concat(id) }) });
     await transact(this.io, e, async () => { await this.backend.mkdir(project.dir); });
     this.touch();

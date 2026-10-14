@@ -192,7 +192,7 @@ export async function migrateLegacy(backend: StorageBackend, data: LegacyData, o
     const textById = new Map<string, string>();
     store.seqs.forEach((s, i) => s.structures.forEach((m, j) => { const t = texts.get(withFiles.seqs[i].structures[j].id); if (t != null) textById.set(m.id, t); }));
 
-    await vault.createProject(lp.name, { id, desc: lp.desc, cols: store.cols, settings: store.settings });
+    await vault.createProject(lp.name, { id, desc: lp.desc, cols: store.cols, settings: store.settings ?? {} });
     const svc = await vault.openProject(id, { notes: 'eager' });
     svc.commit(store, uploads);
     await svc.flush();

@@ -223,7 +223,7 @@ export interface Settings {
   rowAll: boolean;
   hiddenOut: boolean;
   analyses?: AnalysisType[];
-  /** The project's run tags, in display order; absent = DEFAULT_TAGS. */
+  /** The project's run tags, in display order; absent = FORMER_TAGS; a new project stores an empty list. */
   tags?: TagDef[];
   /** The transform of PMF runs, for the graphs and the matrix (R2); absent = the entropy correction. */
   pmfTransform?: Transform;

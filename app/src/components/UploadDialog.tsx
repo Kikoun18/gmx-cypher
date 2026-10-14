@@ -222,11 +222,11 @@ export function UploadDialog({ form: f, setForm, readFiles, reading, onDragOver,
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 12, padding: '12px 20px 0' }}>
           {field('Group' + (from('group') ? ' · from file' : ''), op('group'),
-            <input className="inp" value={f.group} onChange={e => setF({ group: e.target.value })} list="pmf-groups" placeholder="e.g. prosecco75" />)}
+            <input className="inp" value={f.group} onChange={e => setF({ group: e.target.value })} list="pmf-groups" placeholder="e.g. group A" />)}
           {field(from('name') ? 'Name · from file' : from('seq') ? 'Name · defaults to sequence' : sharedName > 1 && !f.keepName ? 'Name · +1, +2… per file of the same analysis' : 'Name', op('name'),
-            <input className="inp" value={f.name} onChange={e => setF({ name: e.target.value })} placeholder="e.g. PEP-04" />)}
+            <input className="inp" value={f.name} onChange={e => setF({ name: e.target.value })} placeholder="e.g. SEQ-04" />)}
           {field(from('seq') ? 'Sequence · from file' : 'Sequence · optional', op('seq'),
-            <input className="inp" value={f.seq} onChange={e => setF({ seq: e.target.value.toUpperCase() })} placeholder="e.g. WRWYCR" style={{ letterSpacing: '0.16em', textTransform: 'uppercase' }} />)}
+            <input className="inp" value={f.seq} onChange={e => setF({ seq: e.target.value.toUpperCase() })} placeholder="e.g. ACDEFG" style={{ letterSpacing: '0.16em', textTransform: 'uppercase' }} />)}
           {field('Simulation time' + (from('time') ? ' · from file' : ''), op('time'),
             <input className="inp" value={f.time} onChange={e => setF({ time: e.target.value })} placeholder="e.g. 200 000" />)}
           {field('Temp (K)' + (from('temp') ? ' · from file' : ' · drives correction'), op('temp'),

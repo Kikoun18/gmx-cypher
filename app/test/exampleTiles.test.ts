@@ -6,7 +6,7 @@ import { metricCell, tileProvenance, type Tile } from '../src/lib/metrics';
 import { scriptsIdle, setScriptHost } from '../src/lib/scriptRuns';
 import { sha256Text } from '../src/lib/sha256';
 import type { MetricDef, Settings, Store } from '../src/lib/types';
-import { fixture, text } from './helpers';
+import { fixture, sugarStore, text } from './helpers';
 
 // R4c: the example files, uploaded as the dialog does, give section 3's reference values in their tiles, with the
 // missing-value rule for membrane_thickness.dat (question 6), and functions.py's errors shown, not swallowed.
@@ -18,7 +18,7 @@ beforeAll(async () => {
   st = lib.mergeSettings({}, {}) as Settings;
   const files: lib.UploadFile[] = NAMES.map((n, i) => { const t = lib.parseTable(text(fixture('examples/' + n))); return { id: 'f' + i, file: n, table: t, head: t.head, sha256: 's' + i, parsed: lib.parseName(n, st.pattern) }; });
   const form: lib.UploadForm = { files, name: 'Examples', seq: '', group: '', desc: '', time: '', temp: '310.15', col: 'o26', run: 'auto', parse: false, tags: [], msg: '', err: false, ana: 'auto', onClash: 'replace' };
-  store = lib.addBatch(lib.emptyStore(), form, lib.planBatch(lib.emptyStore(), form, lib.getAnalyses(st), st)).store;
+  store = lib.addBatch(sugarStore(), form, lib.planBatch(sugarStore(), form, lib.getAnalyses(st), st)).store;
   py = await loadPyodide(); await py.runPythonAsync(PY_HELPERS);
   setScriptHost({
     scripts: () => [{ id: 'kfns', name: 'functions.py', fileId: 'ffns', sha256: SHA, fns: {} }],

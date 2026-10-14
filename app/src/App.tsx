@@ -483,7 +483,7 @@ export default function App({ vault, reconnect, onLeave, startProject, viewer }:
     create: (name, desc, copyCurrent) => {
       (async () => {
         const cur = storeRef.current;
-        const p = await vault.createProject(name, { desc: desc.trim(), ...(copyCurrent ? { cols: lib.getCols(cur), settings: cur.settings } : {}) });
+        const p = await vault.createProject(name, { desc: desc.trim(), ...(copyCurrent ? { cols: lib.getCols(cur), settings: cur.settings ?? {} } : {}) });
         await refreshProjects();
         await openProject(p.id);
       })().catch(showErr);
@@ -535,7 +535,7 @@ export default function App({ vault, reconnect, onLeave, startProject, viewer }:
       const prep = await importAsProject(await file.text());
       const base = prep.name || file.name.replace(/\.json$/i, '');
       const name = projectsRef.current.some(x => x.name === base) ? base + ' (imported)' : base;
-      const p = await vault.createProject(name, { cols: prep.store.cols, settings: prep.store.settings });
+      const p = await vault.createProject(name, { cols: prep.store.cols, settings: prep.store.settings ?? {} });
       await refreshProjects();
       await openProject(p.id);
       const s = svcRef.current;

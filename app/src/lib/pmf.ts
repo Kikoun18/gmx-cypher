@@ -2,7 +2,13 @@
 
 import type { Column } from './types';
 
-export const SACCH: Column[] = [
+/** What a new project starts with: one column, to rename, replace or add to. */
+export const DEFAULT_COLS: Column[] = [
+  { k: 'col1', label: 'COL1', short: 'COL1', name: 'COL1', dark: '#ff6a4d', light: '#c62410' },
+];
+
+/** The three columns every project started with before DEFAULT_COLS: what a dataset saved without columns of its own refers to. */
+export const FORMER_COLS: Column[] = [
   { k: 'o26', label: 'O26', short: 'O-antigen', name: 'O-antigen · E. coli', dark: '#ff6a4d', light: '#c62410' },
   { k: 'pg', label: 'PG', short: 'Peptidoglycan', name: 'Peptidoglycan', dark: '#6aa9ff', light: '#1a5fb4' },
   { k: 'ha', label: 'HA', short: 'Hyaluronan', name: 'Hyaluronan', dark: '#5fc08a', light: '#1a7a4c' },

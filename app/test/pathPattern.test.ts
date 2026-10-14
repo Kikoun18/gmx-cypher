@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import * as lib from '../src/lib/seq';
 import { parseGmxHeader } from '../src/lib/gmxHeader';
-import { fixture, newVault, reopen, text, vaultFixture } from './helpers';
+import { fixture, newVault, reopen, sugarStore, text, vaultFixture } from './helpers';
 
 const CLUSTER = '{method}/{column}/{seq}/{*}/{run}';
 
@@ -86,38 +86,38 @@ describe('planBatch with a path pattern', () => {
     name: 'FORM', seq: '', group: '', desc: '', time: '', temp: '300', col: 'pg', run: 'auto', parse, tags: [], msg: '', err: false, ana: 'auto', onClash: 'replace',
   });
   it('the folder gives the row, column and slot; the plan says where each came from', () => {
-    const [p] = lib.planBatch(lib.emptyStore(), form([{ path: 'hmr+fast+6/ha/WRWYCR/9.multiwalker/2/awh_t200000.xvg' }]), types, st);
+    const [p] = lib.planBatch(sugarStore(), form([{ path: 'hmr+fast+6/ha/WRWYCR/9.multiwalker/2/awh_t200000.xvg' }]), types, st);
     expect([p.ok, p.name, p.group, p.col.k, p.run, p.path]).toEqual([true, 'WRWYCR', 'hmr+fast+6', 'ha', 'b', 'hmr+fast+6/ha/WRWYCR/9.multiwalker/2/awh_t200000.xvg']);
     expect(p.from).toEqual({ group: 'path', col: 'path', seq: 'path', run: 'path' });
   });
   it('without a folder, the header working directory is used, marked "header" (F6)', () => {
     const gmx = parseGmxHeader(text(fixture(AWH)));
-    const [p] = lib.planBatch(lib.emptyStore(), form([{ gmx }]), types, lib.mergeSettings({}, { pathPattern: '{method}/{column}/{seq}/{*}/{run}' }));
+    const [p] = lib.planBatch(sugarStore(), form([{ gmx }]), types, lib.mergeSettings({}, { pathPattern: '{method}/{column}/{seq}/{*}/{run}' }));
     // Working dir: …/walkers_for_denys/hmr+fast+6/ha/a/9.multiwalker/1
     expect([p.group, p.col.k, p.name, p.run]).toEqual(['hmr+fast+6', 'ha', 'a', 'a']);
     expect(p.from).toEqual({ group: 'header', col: 'header', seq: 'header', run: 'header' });
   });
   it('a folder wins over the header: the header is only a fallback', () => {
     const gmx = parseGmxHeader(text(fixture(AWH)));
-    const [p] = lib.planBatch(lib.emptyStore(), form([{ gmx, path: 'g/pg/KRWYCR/x/3/awh.xvg', file: 'awh.xvg' }]), types, st);
+    const [p] = lib.planBatch(sugarStore(), form([{ gmx, path: 'g/pg/KRWYCR/x/3/awh.xvg', file: 'awh.xvg' }]), types, st);
     expect([p.col.k, p.name, p.run, p.from.col]).toEqual(['pg', 'KRWYCR', 'c', 'path']);
   });
   it('a conflict between path and name is shown and the file is not uploaded', () => {
     const f = form([{ path: 'hmrfast6/ha/WRWYCR/x/1/hmrfast6_pg_WRWYCR_t200000.xvg', file: 'hmrfast6_pg_WRWYCR_t200000.xvg' }]);
-    const [p] = lib.planBatch(lib.emptyStore(), f, types, st);
+    const [p] = lib.planBatch(sugarStore(), f, types, st);
     expect([p.ok, p.conflicts]).toEqual([false, ['column: pg (name) ≠ ha (path)']]);
   });
   it('an unreadable run in the path is a conflict, not run 1', () => {
     const s2 = lib.mergeSettings({}, { pathPattern: '{column}/{run}' });
-    const [p] = lib.planBatch(lib.emptyStore(), form([{ path: 'ha/9.multiwalker/awh.xvg', file: 'awh.xvg' }]), types, s2);
+    const [p] = lib.planBatch(sugarStore(), form([{ path: 'ha/9.multiwalker/awh.xvg', file: 'awh.xvg' }]), types, s2);
     expect([p.ok, p.conflicts]).toEqual([false, ['run: 9.multiwalker (path) is not a run number 1–10']]);
   });
   it('"same for all" reads neither the name nor the path', () => {
-    const [p] = lib.planBatch(lib.emptyStore(), form([{ path: 'hmr+fast+6/ha/WRWYCR/x/2/awh.xvg', file: 'awh.xvg' }], false), types, st);
+    const [p] = lib.planBatch(sugarStore(), form([{ path: 'hmr+fast+6/ha/WRWYCR/x/2/awh.xvg', file: 'awh.xvg' }], false), types, st);
     expect([p.name, p.col.k, p.from]).toEqual(['FORM', 'pg', {}]);
   });
   it('no path pattern: nothing changes', () => {
-    const [p] = lib.planBatch(lib.emptyStore(), form([{ path: 'hmr+fast+6/ha/WRWYCR/x/2/awh.xvg', file: 'awh.xvg' }]), types, lib.mergeSettings({}, {}));
+    const [p] = lib.planBatch(sugarStore(), form([{ path: 'hmr+fast+6/ha/WRWYCR/x/2/awh.xvg', file: 'awh.xvg' }]), types, lib.mergeSettings({}, {}));
     expect([p.name, p.col.k, p.conflicts]).toEqual(['FORM', 'pg', []]);
   });
 });
@@ -149,7 +149,7 @@ describe('review fixes: the header only fills (F6)', () => {
     const table = lib.parseTable(text(fixture(AWH)));
     const form: lib.UploadForm = { files: [{ id: 'f1', file: AWH, table, head: table.head, gmx: parseGmxHeader(text(fixture(AWH))), parsed: lib.parseName(AWH, st.pattern) }],
       name: '', seq: '', group: '', desc: '', time: '', temp: '300', col: 'pg', run: 'auto', parse: true, tags: [], msg: '', err: false, ana: 'auto', onClash: 'replace' };
-    const [p] = lib.planBatch(lib.emptyStore(), form, lib.getAnalyses(st), st);
+    const [p] = lib.planBatch(sugarStore(), form, lib.getAnalyses(st), st);
     expect([p.ok, p.group, p.from.group, p.from.run]).toEqual([true, 'hmrfast6', 'name', 'header']);
   });
 });

@@ -6,15 +6,23 @@ import { newFileId } from '../src/lib/storage/files';
 import type { Upload } from '../src/lib/storage/plan';
 import { stableStringify } from '../src/lib/storage/json';
 import * as lib from '../src/lib/seq';
+import { FORMER_COLS } from '../src/lib/pmf';
 import type { Slot, Store } from '../src/lib/types';
 
 export const fixture = (name: string) => new Uint8Array(readFileSync(new URL('./fixtures/' + name, import.meta.url)));
 export const text = (bytes: Uint8Array) => new TextDecoder().decode(bytes);
 
+/**
+ * The example files name three columns (o26, pg, ha) and the four former tags, which a project once started with and a new
+ * one no longer does: the tests' stores and projects have them, as a project from before that change does.
+ */
+export const sugarStore = (): Store => ({ ...lib.emptyStore(), cols: FORMER_COLS.map(c => ({ ...c })) });
+
 export async function newVault(b: StorageBackend = new MemoryBackend(), lock?: LockProvider) {
-  const { vault, projectId } = await Vault.create(b, { projectName: 'Sugar PMFs', lock });
-  const svc = await vault.openProject(projectId!, { notes: 'eager' });
-  return { b, vault, svc, pid: projectId! };
+  const { vault } = await Vault.create(b, { lock });
+  const { id } = await vault.createProject('Sugar PMFs', { cols: FORMER_COLS, settings: {} });
+  const svc = await vault.openProject(id, { notes: 'eager' });
+  return { b, vault, svc, pid: id };
 }
 
 export async function reopen(b: StorageBackend, lock?: LockProvider) {

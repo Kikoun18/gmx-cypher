@@ -122,9 +122,10 @@ Spec: [`batch-2.md`](batch-2.md). Phase 0 report: [`batch-2-phase0.md`](batch-2-
 - [x] Atoms keep their element colours when grouped or clicked; a group shows as a halo (group hues kept as an option)
 - [x] C + click sets the centre of rotation to the clicked atom's whole group
 
-### After batch 3 of PMF Sequences (your request, T142–T144)
+### After batch 3 of PMF Sequences (your requests, T142–T145)
 - [x] `app/` replaced by PMF Sequences batch 3, as its source came; Cypher follows it (schema 4, general data, energy typed from its header; T142)
 - [x] Matrix tiles show no "±" and no "n" by default; a setting brings them back (T143)
+- [x] A new project starts with COL1 and no tags; the example text is neutral; older data keeps its former columns and tags (T145)
 - [x] The `app/` check compares a hash of the whole tree, so a commit can carry its own baseline (T144)
 
 ### Backlog (Batch 2: add to it, don't do it)

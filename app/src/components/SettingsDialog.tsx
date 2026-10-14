@@ -94,8 +94,8 @@ export function SettingsDialog({ onClose, focusAnalysis, sorted, useManual, onNe
       } as React.CSSProperties,
     };
   };
-  const [testName, setTestName] = useState('prosecco75_o26_WRWYCR_t200.xvg');
-  const [testPath, setTestPath] = useState('hmr+fast+6/ha/WRWYCR/9.multiwalker/1');
+  const [testName, setTestName] = useState('method_col1_SEQ1_t200.xvg');
+  const [testPath, setTestPath] = useState('method/col1/SEQ1/walkers/1');
   const [newTag, setNewTag] = useState('');
   /** A PMF correction picked but not applied yet: the tiles it would change are shown first (R2). */
   const [nextT, setNextT] = useState<Transform | null>(null);
@@ -351,7 +351,7 @@ export function SettingsDialog({ onClose, focusAnalysis, sorted, useManual, onNe
         {/* Tags */}
         <div style={{ padding: '22px 20px 0' }}>
           {sect('Tags', undefined, 10)}
-          <div style={{ ...small, lineHeight: 1.6, marginBottom: 10 }}>Tags mark how a run was made (hmr, fast water…). Pick them per run in the upload dialog and the run editor. Renaming a tag keeps it on every run.</div>
+          <div style={{ ...small, lineHeight: 1.6, marginBottom: 10 }}>Tags mark how a run was made (a force field, a time step…). Pick them per run in the upload dialog and the run editor. Renaming a tag keeps it on every run.</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {tagList.map((t, i) => {
               const n = lib.tagUse(store, t.k), cf = armed === 'tag:' + t.k;
@@ -413,7 +413,7 @@ export function SettingsDialog({ onClose, focusAnalysis, sorted, useManual, onNe
             <span />
             <span style={{ width: 30, height: 30, border: '1px dashed var(--line)', borderRadius: 8 }} />
             <input className="inp-s" value={newCol.label} onChange={e => setNewCol({ ...newCol, label: e.target.value })} placeholder="Label" style={{ fontWeight: 700 }} />
-            <input className="inp-s" value={newCol.name} onChange={e => setNewCol({ ...newCol, name: e.target.value })} placeholder="Full name, e.g. Chondroitin sulfate" />
+            <input className="inp-s" value={newCol.name} onChange={e => setNewCol({ ...newCol, name: e.target.value })} placeholder="Full name" />
             <button onClick={() => { if (!canAdd) return; commit(lib.addColumn(store, newCol.label, newCol.name).store); setNewCol({ label: '', name: '' }); }}
               style={{ padding: '7px 14px', border: 0, borderRadius: 8, background: canAdd ? 'var(--acc)' : 'var(--line)', color: canAdd ? '#fff' : 'var(--mut)', fontWeight: 700, fontSize: 11, whiteSpace: 'nowrap' }}>+ Add column</button>
           </div>

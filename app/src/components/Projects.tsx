@@ -125,7 +125,7 @@ export function ProjectsDialog({ ops, startCreate, onClose }: { ops: ProjectOps;
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 12, flexWrap: 'wrap' }}>
             <span style={lab}>Start with</span>
-            <Seg value={copy} onPick={setCopy} opts={[{ v: true, label: 'columns & settings of ' + (cur.name.length > 22 ? cur.name.slice(0, 22) + '…' : cur.name) }, { v: false, label: 'defaults · O26 · PG · HA' }]} />
+            <Seg value={copy} onPick={setCopy} opts={[{ v: true, label: 'columns & settings of ' + (cur.name.length > 22 ? cur.name.slice(0, 22) + '…' : cur.name) }, { v: false, label: 'defaults · COL1' }]} />
             <span style={{ flex: 1 }} />
             <button onClick={create} disabled={!name.trim()}
               style={{ padding: '9px 18px', border: 0, borderRadius: 10, background: name.trim() ? 'var(--acc)' : 'var(--line)', color: name.trim() ? '#fff' : 'var(--mut)', fontWeight: 700, fontSize: 12, letterSpacing: '0.03em' }}>Create project</button>

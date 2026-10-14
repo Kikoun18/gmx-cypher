@@ -4,7 +4,7 @@ import { buildGraph, sharedDomain } from '../src/lib/graph';
 import { graphScene, graphXvg, textW, toPDF, toSVG, type Scene } from '../src/lib/export';
 import { exportDataset } from '../src/lib/storage/exchange';
 import type { Store } from '../src/lib/types';
-import { fixture, newVault, reopen, withAnalysis } from './helpers';
+import { fixture, newVault, reopen, sugarStore, withAnalysis } from './helpers';
 
 // R1c-1: labels from the file (F82), drawn with super- and subscripts; units keep their case (F109); row names as x ticks (F113).
 describe('label helpers', () => {
@@ -59,19 +59,19 @@ describe('graph labels and row names', () => {
     ['order', 'order_POPE.xvg', 'Atom', '-Sch'],
     ['temperature', 'temperature.xvg', 'Time (ps)', '(K)'],
   ])('%s from %s takes the file’s labels', (type, file, x, y) => {
-    const m = graph(ana(lib.emptyStore(), type, file), type);
+    const m = graph(ana(sugarStore(), type, file), type);
     expect([m.xLabel, m.yLabel, m.data.xLabel, m.data.yLabel]).toEqual([x, y, x, y]);
   });
   it('files that disagree fall back to the type’s labels, axis by axis', () => {
-    const s = ana(ana(lib.emptyStore(), 'energy', 'temperature.xvg'), 'energy', 'pressure.xvg', 'ha', 'b');
+    const s = ana(ana(sugarStore(), 'energy', 'temperature.xvg'), 'energy', 'pressure.xvg', 'ha', 'b');
     expect([graph(s, 'energy').xLabel, graph(s, 'energy').yLabel]).toEqual(['Time (ps)', 'kJ/mol']);
   });
   it('a file without labels keeps the type’s', () => {
-    const s = withAnalysis(lib.emptyStore(), { name: 'P', col: 'ha', type: 'data', file: 'x.dat', bytes: new TextEncoder().encode('1 2\n2 3\n3 5\n') }).store;
+    const s = withAnalysis(sugarStore(), { name: 'P', col: 'ha', type: 'data', file: 'x.dat', bytes: new TextEncoder().encode('1 2\n2 3\n3 5\n') }).store;
     expect([graph(s, 'data').xLabel, graph(s, 'data').yLabel]).toEqual(['x', 'y']);
   });
   it('order parameters name their x ticks by carbon, thinned to fit, and the xvg keeps the names', () => {
-    const m = graph(ana(lib.emptyStore(), 'order', 'order_POPE.xvg'), 'order');
+    const m = graph(ana(sugarStore(), 'order', 'order_POPE.xvg'), 'order');
     expect(m.data.xTicks!.slice(0, 3)).toEqual([{ v: 1, label: 'C22' }, { v: 3, label: 'C23' }, { v: 5, label: 'C25' }]);
     expect(m.g.xticks.map(t => t.label).slice(0, 2)).toEqual(['C22', 'C23']);
     const xvg = graphXvg(m.data);
@@ -80,7 +80,7 @@ describe('graph labels and row names', () => {
   });
   it('labels and row names come back when a vault reopens, and never reach the record or the export', async () => {
     const { b, svc } = await newVault();
-    const r = withAnalysis(lib.emptyStore(), { name: 'POPC', col: 'ha', type: 'order', file: 'order_POPE.xvg', bytes: fixture('examples/order_POPE.xvg') });
+    const r = withAnalysis(sugarStore(), { name: 'POPC', col: 'ha', type: 'order', file: 'order_POPE.xvg', bytes: fixture('examples/order_POPE.xvg') });
     svc.commit(r.store, r.uploads); await svc.flush();
     const { svc: again, pid } = await reopen(b);
     await again.loadAnalysis(again.store.seqs[0].extras[0].id);

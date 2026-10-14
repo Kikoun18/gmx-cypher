@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import * as lib from '../src/lib/seq';
 import { parseGmxHeader } from '../src/lib/gmxHeader';
-import { fixture, text } from './helpers';
+import { fixture, sugarStore, text } from './helpers';
 
 const types = lib.getAnalyses({});
 const head = (file: string) => lib.parseTable(text(fixture(file))).head;
@@ -56,27 +56,27 @@ describe('planBatch: where the analysis came from', () => {
     };
   };
   it('reports a header hit as the source', () => {
-    const [p] = lib.planBatch(lib.emptyStore(), form('pmf_distance_ha.xvg', AWH), types, st);
+    const [p] = lib.planBatch(sugarStore(), form('pmf_distance_ha.xvg', AWH), types, st);
     expect([p.ana.k, p.anaHow]).toEqual(['pmf', 'header']);
   });
   it('an unrecognised GROMACS analysis arrives as Data, ready to add (F83 replaces F32)', () => {
     const NC = 'gmx/07.md_numcont_protein_sugar.xvg';
     const f = form('x.xvg', NC);
     f.files[0].gmx = parseGmxHeader(text(fixture(NC)));
-    const [p] = lib.planBatch(lib.emptyStore(), f, types, st);
+    const [p] = lib.planBatch(sugarStore(), f, types, st);
     expect([p.ok, p.ana.k, p.anaHow]).toEqual([true, 'data', 'generic']);
-    const [q] = lib.planBatch(lib.emptyStore(), { ...f, ana: 'dist' }, types, st);
+    const [q] = lib.planBatch(sugarStore(), { ...f, ana: 'dist' }, types, st);
     expect([q.ok, q.ana.k, q.anaHow]).toEqual([true, 'dist', 'form']);
   });
   it('a Data file next to a PMF shares its row and slot, with no +1 suffix', () => {
     const NC = 'gmx/07.md_numcont_protein_sugar.xvg';
     const f = form('x.xvg', NC), a = form('pmf.xvg', AWH);
     f.files[0].gmx = parseGmxHeader(text(fixture(NC)));
-    const plan = lib.planBatch(lib.emptyStore(), { ...f, files: [f.files[0], { ...a.files[0], id: 'f2' }] }, types, st);
+    const plan = lib.planBatch(sugarStore(), { ...f, files: [f.files[0], { ...a.files[0], id: 'f2' }] }, types, st);
     expect(plan.map(p => [p.name, p.run, p.ok, p.ana.k])).toEqual([['WRWYCR', 'a', true, 'data'], ['WRWYCR', 'a', true, 'pmf']]);
   });
   it('an explicit {analysis} token beats the header', () => {
-    const [p] = lib.planBatch(lib.emptyStore(), form('rdf_WRWYCR.xvg', AWH, true), types, st);
+    const [p] = lib.planBatch(sugarStore(), form('rdf_WRWYCR.xvg', AWH, true), types, st);
     expect([p.ana.k, p.anaHow]).toEqual(['rdf', 'file']);
   });
 });
@@ -93,7 +93,7 @@ describe('cellForm: one pre-fill for a cell (R7)', () => {
     const st = lib.mergeSettings({}, {});
     const table = lib.parseTable(text(fixture(AWH)));
     const xy = lib.runFromTable(table, 1, 2);
-    const s = lib.addRun(lib.emptyStore(), { name: 'WRWYCR', seq: 'WRWYCR', group: 'g', desc: '', sacch: 'ha', run: 'a', time: '', temp: 300, tags: [], file: 'x', ...xy }).store;
+    const s = lib.addRun(sugarStore(), { name: 'WRWYCR', seq: 'WRWYCR', group: 'g', desc: '', sacch: 'ha', run: 'a', time: '', temp: 300, tags: [], file: 'x', ...xy }).store;
     const form: lib.UploadForm = {
       files: [1, 2].map(i => ({ id: 'f' + i, file: 'drop' + i + '.xvg', table, head: table.head, sha256: 'h' + i })),
       desc: '', time: '', temp: '300', run: 'auto', tags: [], msg: '', err: false, ana: 'auto', onClash: 'replace',

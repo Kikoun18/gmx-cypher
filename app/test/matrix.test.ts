@@ -4,7 +4,7 @@ import * as lib from '../src/lib/seq';
 import { AREA, MIN } from '../src/lib/metrics';
 import { groupRows, matrixData, matrixTiles } from '../src/lib/matrix';
 import { matrixScene, matrixXvg, toPDF } from '../src/lib/export';
-import { reopen, vaultFixture } from './helpers';
+import { reopen, sugarStore, vaultFixture } from './helpers';
 
 // The matrix export against the golden scenes made before batch 3 (test/fixtures/golden/README.md), through the same
 // code the app uses: tiles from the metric (R4a), rows grouped as on screen.
@@ -43,7 +43,7 @@ describe('matrix exports write each value as its tile does', () => {
     const st = lib.mergeSettings({}, {});
     const files: lib.UploadFile[] = ['order_POPE.xvg', 'temperature.xvg'].map((n, i) => { const t = lib.parseTable(text(fixture('examples/' + n))); return { id: 'f' + i, file: n, table: t, head: t.head, sha256: 's' + i, parsed: lib.parseName(n, st.pattern) }; });
     const form: lib.UploadForm = { files, name: 'Examples', seq: '', group: '', desc: '', time: '', temp: '310.15', col: 'o26', run: 'auto', parse: false, tags: [], msg: '', err: false, ana: 'auto', onClash: 'replace' };
-    const store = lib.addBatch(lib.emptyStore(), form, lib.planBatch(lib.emptyStore(), form, lib.getAnalyses(st), st)).store, cols = lib.getCols(store).filter(c => c.k === 'o26');
+    const store = lib.addBatch(sugarStore(), form, lib.planBatch(sugarStore(), form, lib.getAnalyses(st), st)).store, cols = lib.getCols(store).filter(c => c.k === 'o26');
     const shown = ['order', 'temperature'].map(type => {
       const def = { id: 'm', label: 'mean', type, fn: { kind: 'builtin' as const, name: 'mean' }, agg: 'mean' as const, scale: { kind: 'minmax' as const } };
       const tiles = matrixTiles(store.seqs, cols, def, st, null), { glist, anyGroup } = groupRows(store.seqs, cols, tiles, false);

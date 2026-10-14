@@ -136,7 +136,7 @@ export function LiteraturePanel({ row, sel }: { row: Seq; sel: Sel }) {
           </div>
         )}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 10 }}>
-          {field('Title', 'title', 'Structures of the CD44–hyaluronan complex…', 4)}
+          {field('Title', 'title', 'Title of the paper…', 4)}
           {field('Authors', 'authors', 'Banerji, S.; Wright, A. J.; …', 3)}
           {field('Year', 'year', '2007')}
           {field('Journal · book', 'venue', 'Nat. Struct. Mol. Biol.', 2)}

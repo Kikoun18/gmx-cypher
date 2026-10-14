@@ -38,7 +38,7 @@ export function ExportSettings({ sect, keyRow }: { sect: (label: string, extra?:
     setFolder(r.name); setFolderMsg(''); set({ dest: 'folder' });
   };
   const preset = SIZE_PRESETS.find(s => s.w === p.w && (s.w === 0 || s.unit === p.unit));
-  const example = exportName(p.name, { column: cols[0]?.label || 'HA', sequence: store.seqs[0]?.name || 'POPE', tab: lib.TRANSFORMS[pmfT.kind].file, project: projectName, page: page?.name || '', date: today }, p.format, new Set());
+  const example = exportName(p.name, { column: cols[0]?.label || 'COL1', sequence: store.seqs[0]?.name || 'SEQ1', tab: lib.TRANSFORMS[pmfT.kind].file, project: projectName, page: page?.name || '', date: today }, p.format, new Set());
   const dpi = pngDpi(p);
   const row = (label: string, body: ReactNode, hint?: ReactNode) => (
     <div role="group" aria-label={label} style={{ display: 'contents' }}>

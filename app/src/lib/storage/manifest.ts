@@ -3,7 +3,7 @@
 import type { VaultIO } from './io';
 import { CorruptFileError } from './io';
 import { stableStringify, uid } from './json';
-import { DEFAULT_TAGS, tagsOf } from '../seq';
+import { FORMER_TAGS, tagsOf } from '../seq';
 import { SCHEMA_VERSION, type Manifest } from './records';
 import { recordPaths, settingsPaths, vaultPaths } from './path';
 
@@ -61,7 +61,7 @@ const methodsToTags: SchemaMigration = {
         rec.runs = rec.runs.map(r => { const { methods: _m, ...rest } = r; return { ...rest, tags: tagsOf(r) }; });
         out.push({ path, text: stableStringify(rec) });
       }
-      if (!(await io.backend.stat(settingsPaths.tags(pid))) && (await io.backend.stat(recordPaths.project(pid)))) out.push({ path: settingsPaths.tags(pid), text: stableStringify({ tags: DEFAULT_TAGS }) });
+      if (!(await io.backend.stat(settingsPaths.tags(pid))) && (await io.backend.stat(recordPaths.project(pid)))) out.push({ path: settingsPaths.tags(pid), text: stableStringify({ tags: FORMER_TAGS }) });
     }
     return out;
   },

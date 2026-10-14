@@ -9,7 +9,7 @@ import { SCHEMA_VERSION } from '../src/lib/storage/records';
 import { fixture, newVault, reopen, vaultFixture, withPmf } from './helpers';
 
 describe('project tag list (R2a)', () => {
-  it('defaults to the four former methods, labels unchanged', () => {
+  it('a project that keeps no tag list means the four former methods, labels unchanged', () => {
     expect(lib.getTags(lib.mergeSettings({}, {}))).toEqual([
       { k: 'hmr', label: 'hmr' }, { k: 'fast', label: 'fast water' }, { k: 'prosecco75', label: 'prosecco75' }, { k: 'add', label: 'ADD' },
     ]);
@@ -28,9 +28,9 @@ describe('project tag list (R2a)', () => {
     expect(JSON.parse(await b.readText('.matrix/settings/' + pid + '/settings.json')).tags).toBeUndefined();
     expect((await reopen(b)).svc.store.settings?.tags).toEqual(tags);
   });
-  it('a project without tags.json uses the defaults', async () => {
+  it('a project without tags.json (made before new projects had none) means the former four', async () => {
     const { b } = await newVault();
-    expect(lib.getTags(lib.mergeSettings({}, (await reopen(b)).svc.store.settings))).toEqual(lib.DEFAULT_TAGS);
+    expect(lib.getTags(lib.mergeSettings({}, (await reopen(b)).svc.store.settings))).toEqual(lib.FORMER_TAGS);
   });
 });
 
@@ -92,7 +92,7 @@ describe('schema 1 → 2: methods become tags (R2b)', () => {
     const wr = JSON.parse(await b.readText(rowPath(ROWS[0]))).runs.map((r: RunRecLike) => [r.column, r.slot, r.tags]);
     expect(wr).toEqual([['ha', 'a', ['add', 'fast', 'hmr']], ['ha', 'b', ['fast', 'hmr']], ['pg', 'a', ['prosecco75']]]);
     expect(JSON.parse(await b.readText(rowPath(ROWS[1]))).runs.map((r: RunRecLike) => r.tags)).toEqual([[]]);
-    expect(JSON.parse(await b.readText('.matrix/settings/' + PID + '/tags.json'))).toEqual({ tags: lib.DEFAULT_TAGS });
+    expect(JSON.parse(await b.readText('.matrix/settings/' + PID + '/tags.json'))).toEqual({ tags: lib.FORMER_TAGS });
     const backup = (await v.listTrash()).find(t => t.manifest?.type === 'schema-backup' && t.manifest.id === 'v1')!; // the 1 → 2 backup (F79)
     for (const id of ROWS) expect(await b.readText(backup.dir + '/content/' + rowPath(id))).toBe(before[id]);
     // The app sees the same runs, now with tags, and the same labels.
@@ -146,7 +146,7 @@ describe('schema 1 → 2: methods become tags (R2b)', () => {
     const again = await reopen(b);
     const r = again.svc.store.seqs[0].runs[0];
     expect(r.tags).toEqual(['hmr', 'zz-from-import']);
-    expect(lib.tagLabel(r.tags, lib.DEFAULT_TAGS)).toBe('hmr · zz-from-import');
+    expect(lib.tagLabel(r.tags, lib.FORMER_TAGS)).toBe('hmr · zz-from-import');
   });
 
   it('renaming a tag label keeps the runs’ tags', async () => {

@@ -1,7 +1,7 @@
 // Sequence-level PMF store: xvg parsing, per-curve correction, persistence and
 // every pure store transform the page uses. Nothing here touches React.
 
-import { SACCH, correctCurve, runStats, wellArea } from './pmf';
+import { DEFAULT_COLS, FORMER_COLS, correctCurve, runStats, wellArea } from './pmf';
 import type { GmxHeader } from './gmxHeader';
 import { curveDisplay, dashOf, pinsOf, scriptFnsOf, typeFromOf } from './storage/records';
 import { scriptResult, transformKey } from './scriptRuns';
@@ -15,15 +15,18 @@ export const METRIC_META: Record<Metric, { label: string; unit: string; desc: st
   min: { label: 'Min', unit: 'kJ/mol', desc: 'Deepest point of the PMF well' },
 };
 
-/** A new project's run tags: the four former fixed methods, with the same keys and labels. */
-export const DEFAULT_TAGS: TagDef[] = [
+/**
+ * The run tags a project had before new projects started with none: the four former fixed methods, with the same keys
+ * and labels. A project that keeps no tag list of its own (made before that) still means these.
+ */
+export const FORMER_TAGS: TagDef[] = [
   { k: 'hmr', label: 'hmr' },
   { k: 'fast', label: 'fast water' },
   { k: 'prosecco75', label: 'prosecco75' },
   { k: 'add', label: 'ADD' },
 ];
 
-export const getTags = (st: Partial<Settings>): TagDef[] => (Array.isArray(st.tags) ? st.tags : DEFAULT_TAGS);
+export const getTags = (st: Partial<Settings>): TagDef[] => (Array.isArray(st.tags) ? st.tags : FORMER_TAGS);
 
 /** A tag whose key comes from its label (like analysis keys), unique in `list`. Renaming later keeps the key. */
 export function newTag(list: TagDef[], label: string): TagDef {
@@ -80,7 +83,7 @@ export const PALETTE = [
 ];
 
 export function getCols(store: Partial<Store> | null): Column[] {
-  return store && Array.isArray(store.cols) && store.cols.length ? store.cols : SACCH.map(c => ({ ...c }));
+  return store && Array.isArray(store.cols) && store.cols.length ? store.cols : DEFAULT_COLS.map(c => ({ ...c }));
 }
 
 const slug = (t: string) => String(t || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'col';
@@ -714,7 +717,8 @@ export function normStore(v: Partial<Store> | null): Store {
   if (!v || !Array.isArray(v.seqs)) return emptyStore();
   const store: Store = {
     seqs: v.seqs.map(normSeq),
-    cols: getCols(v),
+    // A dataset saved before columns were its own, with runs in it, meant the three former columns.
+    cols: Array.isArray(v.cols) && v.cols.length ? v.cols : v.seqs.some(s => s.runs?.length || s.extras?.length) ? FORMER_COLS.map(c => ({ ...c })) : getCols(v),
     notes: { cell: (v.notes && v.notes.cell) || {}, row: (v.notes && v.notes.row) || {} },
     vis: v.vis || {},
     lit: v.lit || {},

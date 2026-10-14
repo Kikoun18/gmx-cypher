@@ -151,7 +151,8 @@ they are recomputed from the originals whenever the cache is missing or stale.
   absent = the entropy correction) and `metric` (the matrix metric of All sequences). The
   analysis list, the tag list (`{ "tags": [{ "k": "hmr", "label": "hmr" }, …] }`) and the
   matrix metrics (`{ "metrics": [ … ] }`) have their own files; without them the built-in
-  defaults apply. An analysis type may carry `transform`, `tools` (GROMACS tools, a comma
+  defaults apply (for tags: a project with no `tags.json`, made before new projects started with
+  none, means the four former methods; a new project stores an empty list). An analysis type may carry `transform`, `tools` (GROMACS tools, a comma
   list), `style` (`line`, `step`, `points`, `bars`, `auto`), `marker` and `markerLabel`.
 - **Runs** store their tags as a sorted list of keys (`"tags": ["add", "hmr"]`). Renaming a tag
   changes only `tags.json`; a key that isn't in the list (for example from an import) is kept
@@ -376,7 +377,7 @@ become tags; v6 and older carry no line styles, marks or scripts).
 
 ## Features
 
-- **Matrix** of sequences × columns (O26 / PG / HA by default): each tile is the page's matrix
+- **Matrix** of sequences × columns (a new project has one, COL1; rename it and add yours in Settings): each tile is the page's matrix
   metric over the cell's runs (by default the area or minimum of the corrected PMF; see
   [Matrix metrics](#matrix-metrics-and-colour-scales)). Upload files singly or in batches,
   with file-name patterns. A tile shows its value only; *Settings → Appearance → Matrix tiles →
@@ -397,7 +398,7 @@ become tags; v6 and older carry no line styles, marks or scripts).
 - **Provenance**: each run card shows the GROMACS version, tool and creation date as written in
   the file, and opens to the full command line, working directory and executable, each with a
   copy button. Files without a GROMACS header say so.
-- **Tags** per run (hmr, fast water, …), edited per project in Settings → Tags (rename,
+- **Tags** per run (a force field, a time step, …; a new project has none), edited per project in Settings → Tags (rename,
   reorder, add, remove; removing one in use says how many runs carry it). Pick them in the
   upload dialog and the run editor, or create one there with **+ tag**. New uploads start
   untagged.
