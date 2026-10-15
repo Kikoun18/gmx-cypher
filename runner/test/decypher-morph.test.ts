@@ -16,30 +16,63 @@ const loaded = () => fromFiles(NAMES.map(n => ({ path: 'o111/' + n, text: readFi
 const tokens = themeTokens(readFileSync(RUNNER + 'src/tokens.json', 'utf8'))
 const view = { rep: 'ball & stick' as const, rest: 'grey' as const, labels: true, hydrogens: true, arrange: 'side by side' as const }
 
-describe('which RDFs differ only in their reference', () => {
-  it('the same structure and every group by its atoms: your two Methionine runs do; nothing else does', () => {
+describe('which RDFs can be morphed: those that have the same groups', () => {
+  it('the same groups, by their atoms on one structure: your two Methionine runs', () => {
     const { analyses: [h, s] } = loaded()
     expect(kit.sameButReference(h, s)).toBe(true)
     expect(kit.sameButReference(s, h)).toBe(true)
     expect(kit.sameButReference(h, h)).toBe(false)
-    expect(kit.sameButReference(h, { ...s, struct: 'other' })).toBe(false)
-    expect(kit.sameButReference(h, { ...s, struct: null })).toBe(false)
-    // One group fewer, or one with other atoms: a different selection.
-    expect(kit.sameButReference(h, { ...s, sels: s.sels.slice(1) })).toBe(false)
-    expect(kit.sameButReference(h, { ...s, sels: s.sels.map((g, i) => (i ? g : { ...g, atoms: [...g.atoms, 999] })) })).toBe(false)
-    // A group without atoms (an RDF of the vault from no gmx-cypher run) can't be told from another.
-    const bare = { ...h, sels: h.sels.map(g => ({ ...g, atoms: [] })) }
-    expect(kit.sameButReference(bare, { ...bare, sels: bare.sels.slice() })).toBe(false)
+    expect(kit.morphWhy(h, s)).toBeNull()
+    expect(kit.morphWhy(h, h)).toBe('the same RDF')
+    // Other names, but the same atoms of the same structure: the same groups.
+    const renamed = { ...s, sels: s.sels.map((g, i) => ({ ...g, name: 'other' + i })) }
+    expect(kit.sameButReference(h, renamed)).toBe(true)
   })
 
-  it('names the references: their own, with the RDF after when two are called alike', () => {
+  it('without the same structure or any atoms (an RDF of the vault from a run this gmx-cypher doesn\'t know), by their names', () => {
+    const { analyses: [h, s] } = loaded()
+    expect(kit.sameButReference(h, { ...s, struct: 'other' })).toBe(true)
+    expect(kit.sameButReference(h, { ...s, struct: null })).toBe(true)
+    const bare = (a: typeof h) => ({ ...a, struct: null, ref: null, sels: a.sels.map(g => ({ ...g, atoms: [] })) })
+    expect(kit.sameButReference(bare(h), bare(s))).toBe(true)
+    // Atoms that differ on one structure and names that differ: not the same groups.
+    const other = { ...s, sels: s.sels.map((g, i) => ({ ...g, name: 'other' + i, atoms: [...g.atoms, 9999] })) }
+    expect(kit.sameButReference(h, other)).toBe(false)
+    expect(kit.sameButReference(bare(h), { ...bare(s), sels: bare(s).sels.map((g, i) => ({ ...g, name: 'x' + i })) })).toBe(false)
+  })
+
+  it('names are compared loosely: case, punctuation, and a trailing "...x" that only says which reference', () => {
+    expect(kit.looseName('NH_N...S')).toBe('nhn')
+    expect(kit.looseName('nh n…H')).toBe('nhn')
+    expect(kit.looseName('CH2OH_CH2...S')).toBe('ch2ohch2')
+    expect(kit.looseName('CH...S')).not.toBe(kit.looseName('CH2...S'))
+    const g = (name: string) => ({ name, atoms: [], tone: 'coral' as const })
+    const a = { struct: null, sels: [g('NH_N...S'), g('CH...S')] }
+    expect(kit.sameButReference(a, { struct: null, sels: [g('NH_N...H'), g('ch...h'), g('extra')] })).toBe(true)
+    // Two groups that read alike are no match for either.
+    expect(kit.sameButReference(a, { struct: null, sels: [g('NH_N...H'), g('CH...H'), g('ch'), g('Ch...x')] })).toBe(false)
+    expect(kit.matchGroup(a.sels[1], { struct: null, sels: [g('a'), g('CH...H')] }, a)!.name).toBe('CH...H')
+  })
+
+  it('b may have more groups than a; a group of a that b lacks is the reason it can\'t, in words', () => {
+    const g = (name: string) => ({ name, atoms: [], tone: 'coral' as const })
+    const a = { struct: null, sels: [g('A'), g('B'), g('C')] }
+    expect(kit.sameButReference(a, { struct: null, sels: [g('A'), g('B'), g('C'), g('D')] })).toBe(true)
+    expect(kit.morphWhy(a, { struct: null, sels: [g('A'), g('B')] })).toBe('1 of the 3 groups here have no match there, e.g. "C"')
+    expect(kit.morphWhy(a, { struct: null, sels: [g('X'), g('Y'), g('Z')] })).toBe('none of its groups match: "A" is not among its 3 ("X", "Y", …)')
+    expect(kit.morphWhy(a, { struct: null, sels: [] })).toBe('it has no groups')
+    expect(kit.morphWhy({ struct: null, sels: [] }, a)).toBe('no groups here')
+    expect(kit.sameButReference({ struct: null, sels: [] }, a)).toBe(false)
+  })
+
+  it('names the RDFs of a morph: a reference by its name (the RDF after it when two are alike), one without by its label', () => {
     const { analyses: [h, s] } = loaded()
     // Your S run's reference is the sulfurs under the name H_Met: both are called H_Met.
     expect(h.ref!.name).toBe(s.ref!.name)
     expect(kit.refLabels([h, s])).toEqual({ [h.id]: 'H_Met · ' + h.label, [s.id]: 'H_Met · ' + s.label })
     const renamed = { ...s, ref: { ...s.ref!, name: 'S_Met' } }
     expect(kit.refLabels([h, renamed])).toEqual({ [h.id]: 'H_Met', [s.id]: 'S_Met' })
-    expect(kit.refLabels([{ id: 'x', label: 'x', ref: null }])).toEqual({})
+    expect(kit.refLabels([{ id: 'x', label: 'Methionine × PG · a', ref: null }, h])).toEqual({ x: 'Methionine × PG · a', [h.id]: 'H_Met' })
   })
 })
 

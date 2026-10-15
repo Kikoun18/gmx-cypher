@@ -89,7 +89,7 @@ describe('(de)Cypher reads your runs as the RDF Explorer design does', () => {
     expect(a.ref!.name).toBe('H_Met')
     const bare = fromVault({ id: 'v', title: 't', label: 'l', source: 'vault', curves: [{ label: 'a', text, xCol: 1, yCol: 2, xScale: 1 }], record: null, struct: null, structNote: '' })
     expect(bare.sels[0].atoms).toEqual([])
-    expect(bare.sub).toContain('no atom groups (not a gmx-cypher run)')
+    expect(bare.sub).toContain('no atom groups (no run of this gmx-cypher wrote this file)')
   })
 
   it('structures: a .gro in nm, a .pdb from Å, and the drawable molecule without solvent', () => {

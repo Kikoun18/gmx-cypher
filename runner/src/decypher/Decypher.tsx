@@ -81,14 +81,14 @@ interface CardProps {
   /** The members whose reference is plotted. */
   on: string[]
   tone: Tone; mol: Mol | null; pal: Palette; view: View; selected: string[]; tones: Record<string, Tone>
-  /** RDFs that could join this card: the same structure and groups, another reference. */
-  partners: Analysis[]
+  /** The other RDFs shown, with why one can't join this card (null: it can): they have the groups this card's lead has. */
+  candidates: { a: Analysis; why: string | null }[]
   onMorph: (id: string) => void; onSplit: () => void; onRefs: (on: string[]) => void
   onSelect: (names: string[]) => void; handle: (h: StructureHandle | null) => void; onActive: () => void
 }
 
 /** One analysis: its structure beside its g(r), its groups as chips, its curves with their highest points. Morphed: one card for RDFs that differ only in their reference, which one picks, atom or chip, one, the other or both. */
-function AnalysisCard({ members, on, tone, mol, pal, view, selected, tones, partners, onMorph, onSplit, onRefs, onSelect, handle, onActive }: CardProps) {
+function AnalysisCard({ members, on, tone, mol, pal, view, selected, tones, candidates, onMorph, onSplit, onRefs, onSelect, handle, onActive }: CardProps) {
   const a = members[0], many = members.length > 1
   const [hover, setHover] = React.useState<string | null>(null), [hot, setHot] = React.useState<string | null>(null)
   const ref = React.useRef<StructureHandle | null>(null)
@@ -97,12 +97,16 @@ function AnalysisCard({ members, on, tone, mol, pal, view, selected, tones, part
     .filter(c => on.includes(c.analysis))
     .map(c => {
       const m = members.find(x => x.id === c.analysis)!
-      return { ...c, source: m.ref ? 'ref ' + names[m.id] : m.label, hot: c.key === hot, dim: hot ? c.key !== hot : !!hover && c.name !== hover && selected.includes(hover) }
+      return { ...c, source: m.ref ? 'ref ' + names[m.id] : names[m.id], hot: c.key === hot, dim: hot ? c.key !== hot : !!hover && c.name !== hover && selected.includes(hover) }
     }), [a, members, names, on, selected, pal, tones, hover, hot])
   const idx = React.useMemo(() => a.sels.flatMap((g, i) => (selected.includes(g.name) ? [i] : [])), [a, selected])
-  const refMembers = React.useMemo(() => members.filter(m => m.ref), [members])
-  const refs = React.useMemo(() => refMembers.map(m => ({ label: names[m.id], atoms: m.ref!.atoms, on: on.includes(m.id) })), [refMembers, names, on])
-  const pickRef = many ? (i: number, add: boolean) => onRefs(kit.pickRefs(ids, on, refMembers[i].id, add)) : undefined
+  // Only references on this card's structure can be drawn on it; every RDF of a morph has its chip.
+  const onStruct = React.useMemo(() => members.filter(m => m.ref && m.struct === a.struct), [members, a])
+  const refs = React.useMemo(() => onStruct.map(m => ({ label: names[m.id], atoms: m.ref!.atoms, on: on.includes(m.id) })), [onStruct, names, on])
+  const chipRefs = React.useMemo(() => (many ? members.map((m, k) => ({ label: names[m.id], count: m.ref ? m.ref.atoms.length : 0, dashed: k > 0, on: on.includes(m.id), plain: !m.ref }))
+    : refs.map((r, k) => ({ label: r.label, count: r.atoms.length, dashed: k > 0, on: r.on, plain: false }))), [many, members, names, on, refs])
+  const pickRef = many ? (i: number, add: boolean) => onRefs(kit.pickRefs(ids, on, onStruct[i].id, add)) : undefined
+  const pickChip = many ? (i: number, add: boolean) => onRefs(kit.pickRefs(ids, on, members[i].id, add)) : undefined
   const hoverSel = hover ? a.sels.findIndex(g => g.name === hover) : -1
   const title = cardTitle(members)
   return (
@@ -110,12 +114,18 @@ function AnalysisCard({ members, on, tone, mol, pal, view, selected, tones, part
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-border px-4 py-2.5">
         <span className="size-2 shrink-0 rounded-full" style={{ background: pal.hues[tone].strong }} />
         <h3 className="m-0 text-heading font-bold">{title}</h3>
-        <span className="text-caption text-muted-foreground">{many ? plural(members.length, 'RDF') + ' · the same groups, each from its own reference' : a.sub}</span>
+        <span className="text-caption text-muted-foreground">{many ? plural(members.length, 'RDF') + ' · the same groups, one chart' : a.sub}</span>
         <span className="flex-1" />
-        {partners.length > 0 && (
+        {candidates.length > 0 && (
           <Select value="" onValueChange={onMorph}>
-            <SelectTrigger size="sm" className="w-40" aria-label={'morph ' + (many ? title : a.label) + ' with another RDF'} title="show RDFs that differ only in their reference as one card"><SelectValue placeholder="morph with…" /></SelectTrigger>
-            <SelectContent>{partners.map(p => <SelectItem key={p.id} value={p.id}>{p.label}{p.ref ? ' · ref ' + p.ref.name : ''}</SelectItem>)}</SelectContent>
+            <SelectTrigger size="sm" className="w-40" aria-label={'morph ' + (many ? title : a.label) + ' with another RDF'} title="show RDFs with the same groups as one card; those that can't are greyed, with the reason"><SelectValue placeholder="morph with…" /></SelectTrigger>
+            <SelectContent>
+              {candidates.map(({ a: p, why }) => (
+                <SelectItem key={p.id} value={p.id} disabled={!!why}>
+                  <span className="flex flex-col"><span>{p.label}{p.ref ? ' · ref ' + p.ref.name : ''}</span>{why && <span className="text-caption text-muted-foreground">{why}</span>}</span>
+                </SelectItem>
+              ))}
+            </SelectContent>
           </Select>
         )}
         {many && <Button variant="outline" size="sm" onClick={onSplit} title="show each RDF as its own card again">split</Button>}
@@ -133,8 +143,8 @@ function AnalysisCard({ members, on, tone, mol, pal, view, selected, tones, part
             <Button variant="ghost" size="sm" onClick={() => onSelect(a.sels.map(g => g.name))}>all</Button>
             <Button variant="ghost" size="sm" onClick={() => onSelect([])}>none</Button>
           </Section>
-          <GroupChips refs={refs.map((r, k) => ({ label: r.label, count: r.atoms.length, dashed: k > 0, on: r.on }))} sels={a.sels} selected={selected} pal={pal} dim={selected.length > 0 && view.rest !== 'tinted'} hover={hover}
-            onPick={(n, add) => onSelect(pickGroup(selected, n, add))} onPickRef={pickRef} onHover={setHover} />
+          <GroupChips refs={chipRefs} sels={a.sels} selected={selected} pal={pal} dim={selected.length > 0 && view.rest !== 'tinted'} hover={hover}
+            onPick={(n, add) => onSelect(pickGroup(selected, n, add))} onPickRef={pickChip} onHover={setHover} />
           <CurveTable curves={curves} source={many} onRemove={n => onSelect(selected.filter(x => x !== n))} onHover={c => { setHot(c?.key ?? null); setHover(c?.name ?? null) }} />
         </div>
       </div>
@@ -156,6 +166,8 @@ function CompareView({ shown, focus, setFocus, mols, pal, view, patch, selected,
   // The focus's reference, and the references of the others on the same structure, dashed.
   const refs = React.useMemo(() => plotted.filter((a, i) => a.ref && (i === 0 || (a.struct && a.struct === focus.struct)))
     .map((a, i) => ({ label: i === 0 ? a.ref!.name : a.ref!.name + ' · ' + a.label, atoms: a.ref!.atoms })), [plotted, focus])
+  // Plotted groups an RDF has no match for: said, not left to look like a curve that is missing.
+  const unmatched = React.useMemo(() => plotted.slice(1).map(an => ({ an, names: selected.filter(n => { const g = focus.sels.find(x => x.name === n); return !!g && !kit.matchGroup(g, an, focus) }) })).filter(u => u.names.length), [plotted, selected, focus])
   const i = shown.indexOf(focus), step = (d: number) => setFocus(shown[(i + d + shown.length) % shown.length].id)
   return (
     <div className="grid min-h-[660px] grid-cols-[repeat(auto-fit,minmax(min(100%,460px),1fr))] gap-4">
@@ -200,6 +212,7 @@ function CompareView({ shown, focus, setFocus, mols, pal, view, patch, selected,
           empty={curves.length ? null : { title: 'Pick an atom group', hint: 'Each group you pick is drawn for every job that has it: the same atoms of the same structure, else the same name.' }} />
         <div className="border-t border-border px-4 pb-3.5 pt-2.5">
           <CurveTable curves={curves} onRemove={n => onSelect(selected.filter(x => x !== n))} onHover={c => { setHot(c?.key ?? null); setHover(c?.name ?? null) }} />
+          {unmatched.map(u => <p key={u.an.id} className="m-0 text-caption text-butter-strong">{u.an.label}: no group to match {u.names.join(', ')} · groups are matched by their atoms, then their name (case, punctuation and a trailing "…x" ignored), then their place in a list as long</p>)}
           {!curves.length && <p className="m-0 text-caption text-muted-foreground">{view.colorBy === 'group' ? 'by group: each group its hue, each job its dash' : 'by job: each job its hue, each group its dash'}</p>}
         </div>
       </section>
@@ -425,7 +438,7 @@ export function Decypher({ open, onOpenChange, sources, jobs, jobsLoaded, allow,
     const byId = new Map(shown.map(a => [a.id, a])), joined = new Set(morphs.flatMap(m => m.ids.slice(1)))
     return shown.filter(a => !joined.has(a.id)).map(lead => {
       const m = morphs.find(x => x.ids[0] === lead.id), members = m ? m.ids.map(id => byId.get(id)!) : [lead]
-      return { lead, members, on: m ? m.on : [lead.id], partners: shown.filter(b => !members.includes(b) && kit.sameButReference(lead, b)) }
+      return { lead, members, on: m ? m.on : [lead.id], candidates: shown.filter(b => !members.includes(b)).map(b => ({ a: b, why: kit.morphWhy(lead, b) })) }
     })
   }, [shown, morphs])
 
@@ -526,7 +539,7 @@ export function Decypher({ open, onOpenChange, sources, jobs, jobsLoaded, allow,
               <p className="m-0 text-control text-muted-foreground">{ready.length ? 'every RDF is hidden · tick one on the left' : 'reading…'}</p>
             ) : view.mode === 'each' ? (
               <div className="flex flex-col gap-4">
-                {cards.map(({ lead: a, members, on, partners }) => <AnalysisCard key={a.id} members={members} on={on} partners={partners} tone={tones[a.id]} mol={a.struct ? mols.get(a.struct) ?? null : null} pal={pal} view={view} selected={selectedOf(a)} tones={tones}
+                {cards.map(({ lead: a, members, on, candidates }) => <AnalysisCard key={a.id} members={members} on={on} candidates={candidates} tone={tones[a.id]} mol={a.struct ? mols.get(a.struct) ?? null : null} pal={pal} view={view} selected={selectedOf(a)} tones={tones}
                   onMorph={id => patch(v => ({ morphed: joinMorph(v.morphed, a.id, id) }))} onSplit={() => patch(v => ({ morphed: splitMorph(v.morphed, a.id) }))} onRefs={next => patch(v => ({ morphed: setMorphRefs(v.morphed, a.id, next) }))}
                   onSelect={n => select(a, n)} handle={h => handles.current.set(a.id, h)} onActive={() => { active.current = a.id }} />)}
               </div>

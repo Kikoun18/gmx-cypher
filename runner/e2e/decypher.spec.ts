@@ -1,6 +1,6 @@
 // (de)Cypher in a browser: two finished RDF jobs (your Methionine runs) ticked in the jobs tab, side by side with
 // their structure, on one graph, exported as one HTML file that works on its own; its key rebound in settings.
-import { spawn, type ChildProcess } from 'node:child_process'
+import { execFileSync, spawn, type ChildProcess } from 'node:child_process'
 import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -27,6 +27,10 @@ test.beforeAll(async () => {
     const spec = { kind: 'rdf', title: stem + ' · ' + rec.groups[0].name + ' → 13 groups', file: 'gmx', args: [], cwd: sim, meta: { stem, outDir: out, record: join(out, stem + '.run.json'), names: { xvg: stem + '.xvg', ndx: stem + '.ndx' } } }
     writeFileSync(join(home, 'jobs', id + '.ndjson'), [{ t: 'created', at, spec }, { t: 'started', at, pid: 1 }, { t: 'ended', at, status: 'done', code: 0, signal: null }].map(e => JSON.stringify(e)).join('\n') + '\n')
   }
+  // PMF Sequences' vault with two RDFs of one cell, whose runs this runner doesn't know (as for a vault from another machine).
+  const vault = mkdtempSync(join(tmpdir(), 'gmxc-e2e-vault-'))
+  execFileSync(process.execPath, ['--import', './server/register.mjs', 'e2e/make-vault.ts', vault], { cwd: RUNNER })
+  writeFileSync(join(home, 'config.json'), JSON.stringify({ vault }))
   runner = spawn(process.execPath, ['--import', './server/register.mjs', 'server/main.ts', '--port', '0', '--gmx', join(RUNNER, 'test/fake-gmx.mjs'), '--allow', sim],
     { cwd: RUNNER, env: { ...process.env, GMX_CYPHER_HOME: home } })
   url = await new Promise<string>((resolve, reject) => {
@@ -137,7 +141,7 @@ test('morph the two runs into one card, pick their references, sorted values, he
   const card = dialog.getByRole('region', { name: 'Methionine_H + Methionine_S' })
   await expect(card).toBeVisible()
   await expect(dialog.getByRole('region', { name: /rdf_o111_Methionine_S/ })).toHaveCount(0)
-  await expect(card.getByText('2 RDFs · the same groups, each from its own reference')).toBeVisible()
+  await expect(card.getByText('2 RDFs · the same groups, one chart')).toBeVisible()
   await expect(card.locator('canvas')).toHaveCount(1)
 
   // Both references plotted; a chip plots that one alone, a second click on it both again, ⌘/shift adds or takes one.
@@ -206,5 +210,41 @@ test('morph the two runs into one card, pick their references, sorted values, he
   expect(exportedValues.length).toBeGreaterThanOrEqual(4)
   expect(exportedValues).toEqual(exportedValues.slice().sort((a, b) => b - a))
   expect(exportErrors).toEqual([])
+  expect(errors).toEqual([])
+})
+
+test('two RDFs of the vault, whose runs are unknown: the morph menu is there, and they morph by their group names', async ({ page }) => {
+  const errors = watch(page)
+  await page.goto(url)
+  await page.keyboard.press('d')
+  const dialog = page.getByRole('dialog', { name: '(de)Cypher' })
+  await dialog.getByRole('radio', { name: 'vault' }).click()
+  await dialog.getByText('Methionine × PG · run a', { exact: true }).click()
+  await dialog.getByText('Methionine × PG · run b', { exact: true }).click()
+  const cards = dialog.getByRole('region', { name: 'Methionine × PG', exact: true })
+  await expect(cards).toHaveCount(2)
+  // No atoms for the groups, so none to match by; the names are the same, so they do match.
+  await expect(dialog.getByText('Groups 13 · plotted 01').first()).toBeVisible()
+  await cards.first().getByRole('combobox', { name: /^morph .* with another RDF/ }).click()
+  await page.getByRole('option', { name: /Methionine × PG · b/ }).click()
+  const card = dialog.getByRole('region', { name: /Methionine × PG · a \+ Methionine × PG · b/ })
+  await expect(card).toBeVisible()
+  await expect(cards).toHaveCount(0)
+  await expect(card.getByText('2 RDFs · the same groups, one chart')).toBeVisible()
+
+  // With no reference known, each RDF has its own chip, named for it: one, the other or both.
+  const chips = card.getByRole('button', { name: /^Methionine × PG · [ab]$/ })
+  await expect(chips).toHaveCount(2)
+  await expect(chips.nth(0)).toHaveAttribute('aria-pressed', 'true')
+  await expect(chips.nth(1)).toHaveAttribute('aria-pressed', 'true')
+  await expect(card.getByRole('button', { name: 'take NH_N...S off the plot' })).toHaveCount(2)
+  await chips.nth(1).click()
+  await expect(chips.nth(0)).toHaveAttribute('aria-pressed', 'false')
+  await expect(card.getByRole('button', { name: 'take NH_N...S off the plot' })).toHaveCount(1)
+  await chips.nth(1).click()
+  await expect(chips.nth(0)).toHaveAttribute('aria-pressed', 'true')
+  await expect(card.getByRole('button', { name: 'take NH_N...S off the plot' })).toHaveCount(2)
+  await card.getByRole('button', { name: 'split' }).click()
+  await expect(cards).toHaveCount(2)
   expect(errors).toEqual([])
 })

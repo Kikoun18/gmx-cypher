@@ -222,15 +222,17 @@ groups glow in their hues, the reference is ringed. *link groups* picks the same
 
 **One graph**: every shown RDF on one chart, led by one whose structure and groups are shown (‹ › or [ ] step through
 them). A group you pick is drawn for each RDF that has it: the same atoms of the same structure, else the same name,
-else the same place in a list as long. *color by group*: each group its hue, each RDF its dash; *by job*: each RDF its
+else the same place in a list as long (a name is matched exactly, then loosely: case, punctuation and a trailing "…x" ignored; a group an RDF has no match for is said under the chart). *color by group*: each group its hue, each RDF its dash; *by job*: each RDF its
 hue, each group its dash. The other RDFs' references on the same structure are ringed dashed.
 
-**Morphing**: RDFs on the same structure with the same groups (by their atoms) that differ only in their reference
-show *morph with…* in their card header. Choosing one puts them in one card: one structure with every reference ringed
+**Morphing**: an RDF whose groups another has too (each group by its atoms where both stand on the same structure,
+else by its name: case, punctuation and a trailing "…x" ignored) can be morphed with it. *morph with…* is in every card's
+header while other RDFs are shown; those that can't join are greyed, with the reason. Choosing one puts them in one card: one structure with every reference ringed
 (the first solid, the others dashed), one chart with a curve per group and reference (a dash per reference), and the
 references as chips under the graph. Click a reference's atom or its chip to plot that reference alone; a second click
 on it plots them all again; ⌘, Ctrl or Shift-click adds or takes one (never none). A reference not plotted is drawn
-faint. *split* shows the RDFs one by one again. Morphed cards are kept in this browser, and the export carries them.
+faint. An RDF whose reference isn't known (a vault RDF written by a run this gmx-cypher doesn't know) has a chip named
+for the RDF instead. *split* shows the RDFs one by one again. Morphed cards are kept in this browser, and the export carries them.
 
 **The structure view**: drag to rotate, right- or Alt-drag to pan, scroll to zoom, double-click or **F** to fit the
 plotted groups, **R** to reset. *style* (ball & stick, licorice, spacefill), *not plotted* (tinted in their group's hue,

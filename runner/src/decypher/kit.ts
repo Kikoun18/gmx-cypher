@@ -591,19 +591,45 @@ export function decypherKit() {
   }
 
   // ---------- curves ----------
-  /** The same group in another analysis: the same atoms of the same structure, else the same name, else the same place in a list as long. */
-  function matchGroup<G extends Group>(g: G, toA: { sels: G[]; struct: string | null }, fromA: { sels: G[]; struct: string | null }): G | null {
-    if (toA === fromA) return g
+  /**
+   * A name without what only tells runs apart: case, punctuation, and a trailing "...x" or "…x" (gmx names a curve
+   * "group...reference"), so "NH_N...S", "nh_n" and "NH N…H" are one name.
+   */
+  function looseName(s: string): string {
+    return String(s).replace(/(?:\.{2,}|…)[\s\S]*$/, '').toLowerCase().replace(/[^a-z0-9]+/g, '')
+  }
+  /** The group of `toA` that is the same as `g` of `fromA` by its atoms (the same structure) or its name, exact and then loosely; null if none. */
+  function sameGroup<G extends Group>(g: G, toA: { sels: G[]; struct: string | null }, fromA: { sels: G[]; struct: string | null }): G | null {
     const key = g.atoms.join(',')
     if (key && toA.struct && toA.struct === fromA.struct) { const hit = toA.sels.find(x => x.atoms.join(',') === key); if (hit) return hit }
-    return toA.sels.find(x => x.name === g.name) || (toA.sels.length === fromA.sels.length ? toA.sels[fromA.sels.indexOf(g)] : null) || null
+    const exact = toA.sels.find(x => x.name === g.name)
+    if (exact) return exact
+    const ln = looseName(g.name), like = ln ? toA.sels.filter(x => looseName(x.name) === ln) : []
+    return like.length === 1 ? like[0] : null
+  }
+  /** The same group in another analysis: the same atoms of the same structure, else the same name (loosely), else the same place in a list as long. */
+  function matchGroup<G extends Group>(g: G, toA: { sels: G[]; struct: string | null }, fromA: { sels: G[]; struct: string | null }): G | null {
+    if (toA === fromA) return g
+    return sameGroup(g, toA, fromA) || (toA.sels.length === fromA.sels.length ? toA.sels[fromA.sels.indexOf(g)] : null) || null
   }
 
   // ---------- RDFs that differ only in their reference ----------
-  /** b differs from a only in its reference: the same structure, and each of a's groups, by its atoms, is a group of b. */
+  /**
+   * b has the groups of a: each group of a, by its atoms where they stand on the same structure, else by its name
+   * (loosely), is a group of b. Where the references differ is the only difference that matters: nothing else is compared.
+   */
   function sameButReference(a: { struct: string | null; sels: Group[] }, b: { struct: string | null; sels: Group[] }): boolean {
-    if (a === b || !a.struct || a.struct !== b.struct || !a.sels.length || a.sels.length !== b.sels.length) return false
-    return a.sels.every(g => g.atoms.length > 0 && b.sels.some(x => x.atoms.join(',') === g.atoms.join(',')))
+    return a !== b && a.sels.length > 0 && a.sels.every(g => sameGroup(g, b, a) != null)
+  }
+  /** Why b can't be morphed with a, in words; null if it can. */
+  function morphWhy(a: { struct: string | null; sels: Group[] }, b: { struct: string | null; sels: Group[] }): string | null {
+    if (a === b) return 'the same RDF'
+    if (!a.sels.length) return 'no groups here'
+    const lost = a.sels.filter(g => sameGroup(g, b, a) == null)
+    if (!lost.length) return null
+    if (!b.sels.length) return 'it has no groups'
+    return lost.length === a.sels.length ? 'none of its groups match: "' + a.sels[0].name + '" is not among its ' + b.sels.length + ' (' + b.sels.slice(0, 2).map(g => '"' + g.name + '"').join(', ') + (b.sels.length > 2 ? ', …' : '') + ')'
+      : lost.length + ' of the ' + a.sels.length + ' groups here have no match there, e.g. "' + lost[0].name + '"'
   }
   /**
    * The references plotted after a click on one of `all`: it alone, or with ⌘, ctrl or shift added to or taken from
@@ -613,10 +639,10 @@ export function decypherKit() {
     const next = add ? (on.includes(id) ? on.filter(x => x !== id) : all.filter(x => x === id || on.includes(x))) : on.length === 1 && on[0] === id ? all.slice() : [id]
     return next.length ? next : all.slice()
   }
-  /** Each reference's name in a legend: its own, with the RDF's label after it when two RDFs name theirs alike. */
+  /** What each RDF of a morph is called in a legend: its reference's name (with the RDF's label after it when two are named alike), or, with no reference known, the RDF's label. */
   function refLabels(members: { id: string; label: string; ref: { name: string } | null }[]): Record<string, string> {
     const out: Record<string, string> = {}
-    members.forEach(m => { if (m.ref) out[m.id] = members.filter(o => o.ref && o.ref.name === m.ref!.name).length > 1 ? m.ref.name + ' · ' + m.label : m.ref.name })
+    members.forEach(m => { out[m.id] = !m.ref ? m.label : members.filter(o => o.ref && o.ref.name === m.ref!.name).length > 1 ? m.ref.name + ' · ' + m.label : m.ref.name })
     return out
   }
 
@@ -825,13 +851,13 @@ export function decypherKit() {
       if (add) return list.includes(name) ? list.filter(x => x !== name) : [...list, name]
       return list.length === 1 && list[0] === name ? [] : [name]
     }
-    function chips(a: Analysis, sel: () => string[], set: (s: string[]) => void, hoverTo: (i: number) => void, many?: { items: () => { id: string; label: string; count: number; on: boolean }[]; pick: (id: string, add: boolean) => void }) {
+    function chips(a: Analysis, sel: () => string[], set: (s: string[]) => void, hoverTo: (i: number) => void, many?: { items: () => { id: string; label: string; count: number; on: boolean; plain: boolean }[]; pick: (id: string, add: boolean) => void }) {
       const box = h('div', { class: 'dc-chips' })
       const render = () => {
         const s = sel(), T = pal().hues
         box.replaceChildren(
           ...(many ? many.items().map((r, i) => h('button', { type: 'button', class: 'dc-chip dc-ref dc-pick' + (i ? ' dc-alt' : '') + (r.on ? '' : ' dc-off'), 'aria-pressed': r.on ? 'true' : 'false', title: 'click: plot only this reference · ⌘-click: add or remove',
-            onclick: (e: MouseEvent) => many.pick(r.id, e.metaKey || e.ctrlKey || e.shiftKey) }, 'ref ' + r.label, h('span', { class: 'dc-n' }, String(r.count || '—'))))
+            onclick: (e: MouseEvent) => many.pick(r.id, e.metaKey || e.ctrlKey || e.shiftKey) }, (r.plain ? '' : 'ref ') + r.label, r.plain ? null : h('span', { class: 'dc-n' }, String(r.count || '—'))))
             : a.ref ? [h('span', { class: 'dc-chip dc-ref' }, 'ref ' + a.ref.name, h('span', { class: 'dc-n' }, String(a.ref.atoms.length || '—')))] : []),
           ...a.sels.map((g, i) => {
             const on = s.includes(g.name), t = T[g.tone]
@@ -935,22 +961,23 @@ export function decypherKit() {
       let hoverSel = -1
       const curves = () => buildCurves({ focus: a, plotted: members, selected, colorBy: 'group', pal: pal(), tones }).filter(c => on.includes(c.analysis)).map(c => {
         const m = members.find(x => x.id === c.analysis)!
-        return { ...c, source: m.ref ? 'ref ' + names[m.id] : c.source, dim: hoverSel >= 0 && c.name !== a.sels[hoverSel]?.name }
+        return { ...c, source: m.ref ? 'ref ' + names[m.id] : names[m.id], dim: hoverSel >= 0 && c.name !== a.sels[hoverSel]?.name }
       })
       const ch = chartBox(() => ({ curves: curves(), grid: a.x, xlabel: a.xlabel, ylabel: a.ylabel }))
       const tb = table(curves)
-      const refMembers = members.filter(m => m.ref)
-      const refs = () => refMembers.map(m => ({ label: names[m.id], atoms: m.ref!.atoms, on: on.includes(m.id) }))
+      // Only references on this card's structure can be drawn on it; every RDF of a morph has its chip.
+      const onStruct = members.filter(m => m.ref && m.struct === a.struct)
+      const refs = () => onStruct.map(m => ({ label: names[m.id], atoms: m.ref!.atoms, on: on.includes(m.id) }))
       let sv: { el: HTMLElement; set: (i: number) => void } | null = null
       const refresh = () => { ch.render(); tb.render(); cp.render(); if (sv) sv.set(hoverSel) }
       const set = (s: string[]) => { selected = s; refresh() }
       const pickRef = (id: string, add: boolean) => { on = pickRefs(ids, on, id, add); refresh() }
       const cp = chips(a, () => selected, set, i => { hoverSel = i; ch.render(); if (sv) sv.set(i) },
-        many ? { items: () => refMembers.map(m => ({ id: m.id, label: names[m.id], count: m.ref!.atoms.length, on: on.includes(m.id) })), pick: pickRef } : undefined)
-      sv = data.structs && a.struct ? structureBox(a, () => selected, set, refs, many ? (i, add) => pickRef(refMembers[i].id, add) : undefined) : null
+        many ? { items: () => members.map(m => ({ id: m.id, label: names[m.id], count: m.ref ? m.ref.atoms.length : 0, on: on.includes(m.id), plain: !m.ref })), pick: pickRef } : undefined)
+      sv = data.structs && a.struct ? structureBox(a, () => selected, set, refs, many ? (i, add) => pickRef(onStruct[i].id, add) : undefined) : null
       tb.render()
       return h('section', { class: 'dc-card' },
-        h('div', { class: 'dc-bar' }, h('h2', null, many ? morph!.title : a.title), h('span', { class: 'dc-cap' }, many ? members.length + ' RDFs · the same groups, each from its own reference' : a.sub)),
+        h('div', { class: 'dc-bar' }, h('h2', null, many ? morph!.title : a.title), h('span', { class: 'dc-cap' }, many ? members.length + ' RDFs · the same groups, one chart' : a.sub)),
         h('div', { class: sv ? 'dc-split' : 'dc-pad' }, sv ? sv.el : null, h('div', { class: 'dc-side' }, ch.el, cp.el, tb.el)))
     }
 
@@ -970,7 +997,7 @@ export function decypherKit() {
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => redraws.forEach(f => f()))
   }
 
-  return { TONES, DASH, REPS, RESTS, SOLV, palette, ranges, mix, buildMol, structureView, matchGroup, buildCurves, sameButReference, pickRefs, refLabels, niceTicks, valAt, hoverRows, hoverX, chart, mount }
+  return { TONES, DASH, REPS, RESTS, SOLV, palette, ranges, mix, buildMol, structureView, matchGroup, buildCurves, looseName, sameButReference, morphWhy, pickRefs, refLabels, niceTicks, valAt, hoverRows, hoverX, chart, mount }
 }
 
 export type Kit = ReturnType<typeof decypherKit>
