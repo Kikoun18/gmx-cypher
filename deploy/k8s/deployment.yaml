@@ -1,0 +1,70 @@
+# PMF Sequences: the static site from app/, served by nginx (deploy/docker/Dockerfile).
+# Edit the image below, then: kubectl apply -f deploy/k8s/ -n <your-namespace>
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pmf-sequences
+  labels:
+    app.kubernetes.io/name: pmf-sequences
+spec:
+  # The site is static and keeps no state (the vault lives in each user's browser, on their disk), so a second replica
+  # is only for availability: raise it freely.
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: pmf-sequences
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: pmf-sequences
+    spec:
+      # CERIT-SC runs only non-root containers.
+      securityContext:
+        runAsUser: 1000
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      # The site never talks to the Kubernetes API.
+      automountServiceAccountToken: false
+      containers:
+        - name: pmf-sequences
+          # EDIT: the image you pushed (deploy/README.md). A version tag (:1.0.0) rolls out only when you change it;
+          # with :latest, `kubectl rollout restart deployment/pmf-sequences` pulls the newest.
+          image: ghcr.io/kikoun18/pmf-sequences:latest
+          ports:
+            - name: http
+              containerPort: 8080
+          securityContext:
+            allowPrivilegeEscalation: false
+            # nginx writes only to /tmp (below), so the rest of the filesystem can be read-only.
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 2
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 20m
+              memory: 32Mi
+            # The CPU limit leaves room for compressing Pyodide's wasm (about 9 MB) the first time a browser asks.
+            limits:
+              cpu: 500m
+              memory: 128Mi
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 64Mi

@@ -1,0 +1,10 @@
+# The build context is the repository root; only what the Dockerfile copies goes in. The last matching line wins.
+*
+!app
+!deploy
+app/node_modules
+app/dist
+app/docs
+app/.vault-out
+deploy/k8s
+deploy/README.md

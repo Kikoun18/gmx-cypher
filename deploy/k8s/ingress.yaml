@@ -1,0 +1,31 @@
+# The public address, https://<name>.dyn.cloud.e-infra.cz. PMF Sequences needs HTTPS: the browser offers its
+# folder access (showDirectoryPicker) only on a secure origin. cert-manager issues the Let's Encrypt certificate by
+# itself; it takes a minute or two after the first apply (kubectl get certificate -n <your-namespace>).
+#
+# EDIT: the name in the two `host` lines and in `secretName` (its dots become dashes). Keep them the same.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: pmf-sequences
+  labels:
+    app.kubernetes.io/name: pmf-sequences
+  annotations:
+    kubernetes.io/tls-acme: "true"
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - pmf-sequences.dyn.cloud.e-infra.cz
+      secretName: pmf-sequences-dyn-cloud-e-infra-cz-tls
+  rules:
+    - host: pmf-sequences.dyn.cloud.e-infra.cz
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: pmf-sequences
+                port:
+                  number: 80
