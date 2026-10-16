@@ -81,7 +81,7 @@ asks again for `index.html` every time (see below), so it picks the new build up
 ## Without Docker
 
 No image to build or push: the pod runs the stock `nginxinc/nginx-unprivileged` image, `nginx.conf` comes from a
-ConfigMap, and the built site sits on a volume (a PersistentVolumeClaim) that you fill with `kubectl cp`. You need
+ConfigMap, and the built site sits on a volume (a PersistentVolumeClaim) that you fill with `tar` through `kubectl exec`. You need
 Node.js 22 and `kubectl`, nothing else. Use this **instead of** steps 1–3 above; the Service and Ingress are the same
 (edit the host in `deploy/k8s/ingress.yaml` as in step 3).
 
@@ -99,8 +99,12 @@ kubectl get pods -n $NS -w            # wait for pmf-sequences-… 1/1 Running, 
 
 # 3. Copy the site into the volume
 POD=$(kubectl get pod -n $NS -l app.kubernetes.io/name=pmf-sequences --field-selector status.phase=Running -o jsonpath='{.items[0].metadata.name}')
-kubectl cp app/dist/. $POD:/usr/share/nginx/html -n $NS
+tar -C app/dist -cf - . | kubectl exec -i $POD -n $NS -- tar -C /usr/share/nginx/html -xf -
+kubectl exec $POD -n $NS -- ls /usr/share/nginx/html        # assets  img  index.html  py  sacch.json
 ```
+
+(Not `kubectl cp`: some versions put the files in a folder named `html` inside the target, and nginx then finds no
+`index.html`. If that happened: `kubectl exec $POD -n $NS -- sh -c 'cd /usr/share/nginx/html && mv html/* . && rmdir html'`.)
 
 Then open the address (wait for `kubectl get certificate -n $NS` to say `READY True` the first time).
 
@@ -109,15 +113,16 @@ Then open the address (wait for `kubectl get certificate -n $NS` to say `READY T
 ```sh
 (cd app && npm run build)
 kubectl exec $POD -n $NS -- sh -c 'rm -rf /usr/share/nginx/html/*'
-kubectl cp app/dist/. $POD:/usr/share/nginx/html -n $NS
+tar -C app/dist -cf - . | kubectl exec -i $POD -n $NS -- tar -C /usr/share/nginx/html -xf -
 ```
 
 If you applied `deploy/k8s/deployment.yaml` before, applying this folder replaces that Deployment (same name); the
 Service and Ingress stay. If the pod shows `ImagePullBackOff` with `429 Too Many Requests`, Docker Hub is limiting the
 cluster's anonymous pulls: wait and retry, or use the Docker route with your own registry.
 
-Not checked on a cluster: the files and their wiring pass the same schema checks as the others, but `kubectl cp` into
-the volume and nginx's start with these mounts have not been run.
+Not checked on a cluster: the files and their wiring pass the same schema checks as the others, and the copy into the
+volume has been run once by hand (it found the files one folder too deep with `kubectl cp`, hence the `tar` above);
+nginx's start with these mounts and the `tar` copy as written here have not been run by the author.
 
 ## Why it is set up this way
 

@@ -1,4 +1,4 @@
-# Where the built site (app/dist) lives. You fill it with `kubectl cp` (deploy/README.md, "Without Docker").
+# Where the built site (app/dist) lives. You fill it with tar through kubectl exec (deploy/README.md, "Without Docker").
 # It is the only thing here that holds files: delete this claim and the site's files go with it.
 apiVersion: v1
 kind: PersistentVolumeClaim

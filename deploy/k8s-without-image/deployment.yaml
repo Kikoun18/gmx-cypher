@@ -1,5 +1,5 @@
 # PMF Sequences without building an image: the stock nginx image, nginx.conf from a ConfigMap, and the site's files
-# (app/dist) on a PersistentVolumeClaim that you fill with `kubectl cp`. Same Service and Ingress as the other
+# (app/dist) on a PersistentVolumeClaim that you fill with tar through kubectl exec. Same Service and Ingress as the other
 # variant. Steps: "Without Docker" in deploy/README.md. Use this folder or deploy/k8s/deployment.yaml, not both.
 apiVersion: apps/v1
 kind: Deployment
@@ -43,7 +43,7 @@ spec:
             # nginx writes only here.
             - name: tmp
               mountPath: /tmp
-            # The site. nginx only reads it; it is writable so that `kubectl cp` can fill it.
+            # The site. nginx only reads it; it is writable so that you can fill it.
             - name: site
               mountPath: /usr/share/nginx/html
             # deploy/docker/nginx.conf, from the ConfigMap (a change needs a restart of the pod).
