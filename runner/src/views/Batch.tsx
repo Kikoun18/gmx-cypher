@@ -13,7 +13,7 @@ import { STATUS, type Job } from '../jobs'
 import { batchSummary, sentSummary } from '../lib/batch'
 import { recipeFromDraft, type Recipe } from '../lib/recipe'
 import { cn } from '../lib/utils'
-import { FIELD_LABEL } from '../../../app/src/lib/seq'
+import { FIELD_LABEL } from '../../../matrix/src/lib/seq'
 
 interface Item { rel: string; fields: Record<string, string>; run: number | null; runInput: string | null; structure: string | null; counts: number[] | null; problems: string[] }
 interface Batch { id: string; recipe: string; root: string; template: string; concurrency: number; created: string; cancelled: boolean; items: (Item & { status: string; job?: string; error?: string })[] }
@@ -78,7 +78,7 @@ function BatchCard({ b, jobs, vault, onOpenJob }: { b: Batch; jobs: Job[]; vault
             </Select>
           )}
           <Button variant="outline" size="sm" disabled={!project || !!sent} onClick={sendAll}>{sent ? '✓ sent' : 'send all to vault'}</Button>
-          <span className="text-caption text-muted-foreground" aria-live="polite">{sent ? sentSummary(sent) : 'each by the rule of a single send: only where PMF Sequences would put it where its path says; the rest are listed'}</span>
+          <span className="text-caption text-muted-foreground" aria-live="polite">{sent ? sentSummary(sent) : 'each by the rule of a single send: only where the Matrix would put it where its path says; the rest are listed'}</span>
         </div>
       )}
       {error && <FieldHint error>✗ {error}</FieldHint>}
@@ -134,7 +134,7 @@ export function BatchView({ state, draft, jobs, onOpenJob }: { state: AppState; 
         <Field>
           <Label htmlFor="b-template">path template</Label>
           <Input id="b-template" size="sm" value={template} placeholder="hmr+fast+6/{column}/{seq}/9.multiwalker/{run}/07_md.xtc" onChange={e => { setTemplate(e.target.value); setItems(null) }} onKeyDown={e => e.key === 'Enter' && template && preview()} />
-          <FieldHint>PMF Sequences' tokens ({'{method} {column} {name} {seq} {run} {time}'}), {'{*}'} for any one folder, ** for any folders</FieldHint>
+          <FieldHint>The Matrix's tokens ({'{method} {column} {name} {seq} {run} {time}'}), {'{*}'} for any one folder, ** for any folders</FieldHint>
         </Field>
         <Field>
           <Label htmlFor="b-n">at a time</Label>

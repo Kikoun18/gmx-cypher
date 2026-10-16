@@ -6,8 +6,8 @@ import { parseHelp } from '../src/lib/gmxText';
 import type { Group } from '../src/lib/groups';
 import { recordProblems } from '../src/lib/record';
 import { rmsArgv, rmsOptionProblems, rmsStdin } from '../src/lib/rms';
-import { detectAna, getAnalyses, parseTable } from '../../app/src/lib/seq';
-import { parseGmxHeader } from '../../app/src/lib/gmxHeader';
+import { detectAna, getAnalyses, parseTable } from '../../matrix/src/lib/seq';
+import { parseGmxHeader } from '../../matrix/src/lib/gmxHeader';
 import { planRun, startRun, type RunRequest } from '../server/runs';
 import { apiServer, FAKE_GMX, RUNNER, tmp } from './helpers';
 
@@ -47,11 +47,11 @@ describe('gmx rms (R9a): the fit group, then the groups measured, on stdin', () 
     expect(rmsOptionProblems(options, HELP)).toEqual(problems);
   });
 
-  it('options the form does not offer are refused (-what stays rmsd, the type PMF Sequences reads)', () => {
+  it('options the form does not offer are refused (-what stays rmsd, the type the Matrix reads)', () => {
     expect(() => rmsArgv({ options: { what: 'rho' }, selections: 0 }, io, HELP)).toThrow('-what is not an option gmx-cypher sets for rms');
   });
 
-  it('its output is RMSD in PMF Sequences, which reads its first curve: the fit group', () => {
+  it('its output is RMSD in the Matrix, which reads its first curve: the fit group', () => {
     const t = text('r9/rms/rmsd_nvt.xvg');
     expect(detectAna(getAnalyses(null), 'rms_nvt.xvg', parseTable(t).head, parseGmxHeader(t)?.tool ?? null).k).toBe('rmsd');
     expect(rmsCommand.outputs).toEqual([expect.objectContaining({ file: 'xvg', type: 'rmsd', vault: true })]);

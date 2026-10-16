@@ -5,7 +5,7 @@
 
 import { readFileSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { countAtoms, structFormat } from '../../app/src/lib/structFile';
+import { countAtoms, structFormat } from '../../matrix/src/lib/structFile';
 import { judgeInputs, judgeSizes, type Counts } from '../src/lib/checks';
 import { frameEstimate, parseCheckAtoms, parseDump, parseSizes, type Dump } from '../src/lib/gmxText';
 import type { Slot } from '../src/lib/inputs';

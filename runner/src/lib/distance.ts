@@ -37,12 +37,12 @@ export const DISTANCE_FORM: { flag: string; group: string; label: string; unit?:
   { flag: 'rmpbc', group: 'periodic boundaries', label: 'make molecules whole', what: 'from the run input, in every frame' },
   { flag: 'all', group: 'output', label: 'every distance too', what: 'a second file: each pair or centre distance over time, not only their average', switch: 'oall' },
   { flag: 'xyz', group: 'output', label: 'x, y and z too', what: 'a file with the components of each distance', switch: 'oxyz' },
-  { flag: 'hist', group: 'output', label: 'the histogram too', what: 'a distribution of the distances; PMF Sequences would read it as an umbrella histogram, so it is not sent', switch: 'oh' },
+  { flag: 'hist', group: 'output', label: 'the histogram too', what: 'a distribution of the distances; the Matrix would read it as an umbrella histogram, so it is not sent', switch: 'oh' },
   { flag: 'len', group: 'output', label: 'histogram mean', unit: 'nm', what: 'the histogram spans 0 to twice this' },
   { flag: 'binw', group: 'output', label: 'histogram bin', unit: 'nm', what: 'the width of each bin' },
 ];
 const BY = new Map(DISTANCE_FORM.map(f => [f.flag, f]));
-/** Set whatever the form says: PMF Sequences reads ps and the xmgrace @ lines (as T22 for rdf). */
+/** Set whatever the form says: the Matrix reads ps and the xmgrace @ lines (as T22 for rdf). */
 const FIXED: Record<string, string> = { tu: 'ps', xvg: 'xmgrace' };
 
 /** What gmx distance would refuse among the options, in words. */

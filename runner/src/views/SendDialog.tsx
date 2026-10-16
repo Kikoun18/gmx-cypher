@@ -21,7 +21,7 @@ interface Preview {
 const FROM: Record<Source, string> = { path: 'from the folder pattern', header: 'from the folder pattern', name: 'from the file name' }
 const FIELD_KEY: Record<keyof Fields, string> = { name: 'name', col: 'col', group: 'group', run: 'run', time: 'time' }
 
-/** The send dialog (R6b): where the result belongs, its file name by the project's pattern, and PMF Sequences' own landing preview. */
+/** The send dialog (R6b): where the result belongs, its file name by the project's pattern, and the Matrix's own landing preview. */
 export function SendDialog({ job, open, onOpenChange, returnFocus }: { job: Job; open: boolean; onOpenChange: (o: boolean) => void; returnFocus?: React.RefObject<HTMLElement | null> }) {
   const [vault, setVault] = React.useState<VaultInfo | null>(null)
   const [project, setProject] = React.useState<string | null>(null)
@@ -71,9 +71,9 @@ export function SendDialog({ job, open, onOpenChange, returnFocus }: { job: Job;
             <Alert variant="success"><Check /><AlertTitle>sent: {sent.path}</AlertTitle>
               <AlertDescription>{sent.renamed && <p>A file of that name was already in the inbox, so this one is {sent.name}.</p>}<p>Nothing else in the vault changed. The run's own files stay where they are.</p></AlertDescription>
             </Alert>
-            <Section label="In PMF Sequences" />
+            <Section label="In the Matrix" />
             <ol className="m-0 flex list-decimal flex-col gap-1 pl-5 text-control">{sent.next.map(x => <li key={x}>{x}</li>)}</ol>
-            {sent.link && <a className="self-start text-control text-coral-strong underline-offset-[3px] hover:underline" href={sent.link} target="_blank" rel="noopener noreferrer">open {pv?.project.name} in PMF Sequences ↗</a>}
+            {sent.link && <a className="self-start text-control text-coral-strong underline-offset-[3px] hover:underline" href={sent.link} target="_blank" rel="noopener noreferrer">open {pv?.project.name} in the Matrix ↗</a>}
           </DialogBody>
         ) : (
         <DialogBody>
@@ -107,13 +107,13 @@ export function SendDialog({ job, open, onOpenChange, returnFocus }: { job: Job;
                 : <FieldHint>{name != null ? 'typed · ' : ''}the project's pattern {pv.pattern}, filled from the fields above</FieldHint>}
             </Field>
           )}
-          <Section label="Landing preview"><span className="text-caption text-muted-foreground">PMF Sequences' own planBatch on this file</span></Section>
+          <Section label="Landing preview"><span className="text-caption text-muted-foreground">The Matrix's own planBatch on this file</span></Section>
           {r?.error && <FieldHint error>✗ {r.error}</FieldHint>}
-          {!r && <p className="m-0 text-control text-muted-foreground" aria-live="polite">asking PMF Sequences' planner…</p>}
+          {!r && <p className="m-0 text-control text-muted-foreground" aria-live="polite">asking the Matrix's planner…</p>}
           {l && (
             <div className="flex flex-col gap-3" aria-live="polite">
               <p className="m-0 text-control">
-                {l.row ? <>PMF Sequences will put it at <b>{l.row} × {l.col.label}</b> · run {l.run} · {l.type.label} ({typeSource(l.type.how)}){l.rowNew && ' · new row'}{l.col.isNew && ' · new column'}{l.replaces && ' · replaces the RDF there'}</> : 'PMF Sequences would not know where to put it'}
+                {l.row ? <>The Matrix will put it at <b>{l.row} × {l.col.label}</b> · run {l.run} · {l.type.label} ({typeSource(l.type.how)}){l.rowNew && ' · new row'}{l.col.isNew && ' · new column'}{l.replaces && ' · replaces the RDF there'}</> : 'The Matrix would not know where to put it'}
                 {' · '}{pv.reasons.length ? <span className="text-destructive">✗ not what you chose: {pv.reasons.join(', ')}</span> : <span className="text-mint-strong">✓ matches what you chose</span>}
               </p>
               {(l.problems.length > 0 || pv.reasons.length > 0) && (
@@ -125,13 +125,13 @@ export function SendDialog({ job, open, onOpenChange, returnFocus }: { job: Job;
                 </Alert>
               )}
               {l.twin && (
-                <Alert variant="warning"><Info /><AlertTitle>PMF Sequences would start a second row {l.row}</AlertTitle>
-                  <AlertDescription><p>It matches a row by group, name and sequence together. The row {l.row} there has {l.twin.seq ? 'sequence ' + l.twin.seq : 'no sequence'}{l.twin.group ? ' and group ' + l.twin.group : ''}; this file gives {l.seq ? 'sequence ' + l.seq : 'no sequence'}{l.group ? ' and group ' + l.group : ''}. When you attach it, type {l.twin.seq ? 'the sequence ' + l.twin.seq : 'the group ' + l.twin.group} in PMF Sequences' upload dialog, or add {'{seq}'} to the project's file pattern.</p></AlertDescription>
+                <Alert variant="warning"><Info /><AlertTitle>The Matrix would start a second row {l.row}</AlertTitle>
+                  <AlertDescription><p>It matches a row by group, name and sequence together. The row {l.row} there has {l.twin.seq ? 'sequence ' + l.twin.seq : 'no sequence'}{l.twin.group ? ' and group ' + l.twin.group : ''}; this file gives {l.seq ? 'sequence ' + l.seq : 'no sequence'}{l.group ? ' and group ' + l.group : ''}. When you attach it, type {l.twin.seq ? 'the sequence ' + l.twin.seq : 'the group ' + l.twin.group} in the Matrix's upload dialog, or add {'{seq}'} to the project's file pattern.</p></AlertDescription>
                 </Alert>
               )}
               {lost.length > 0 && (
                 <Alert variant="warning"><Info /><AlertTitle>{l.curves.inFile.length} curves in this file, {l.curves.imported.length} will be imported</AlertTitle>
-                  <AlertDescription><p>The project's {l.type.label} reads {l.curves.imported.join(', ')} only. To keep {lost.join(', ')} too, set {l.type.label} y columns to all in PMF Sequences → Settings → Analyses.</p></AlertDescription>
+                  <AlertDescription><p>The project's {l.type.label} reads {l.curves.imported.join(', ')} only. To keep {lost.join(', ')} too, set {l.type.label} y columns to all in the Matrix → Settings → Analyses.</p></AlertDescription>
                 </Alert>
               )}
             </div>

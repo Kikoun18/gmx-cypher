@@ -47,7 +47,7 @@ describe('recipes (T37)', () => {
 });
 
 describe('a recipe\'s file name', () => {
-  it('is its name made safe as PMF Sequences makes file names, the same in the page and the server (review finding 11)', () => {
+  it('is its name made safe as the Matrix makes file names, the same in the page and the server (review finding 11)', () => {
     expect(recipeId('ion pairs / v1')).toBe('ion pairs _ v1');
     expect(recipeId('ion pairs _ v1')).toBe(recipeId('ion pairs / v1'));
   });

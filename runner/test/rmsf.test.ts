@@ -5,8 +5,8 @@ import { roleProblems, rmsfCommand } from '../src/lib/commands';
 import { parseHelp } from '../src/lib/gmxText';
 import type { Group } from '../src/lib/groups';
 import { rmsfArgv, rmsfOptionProblems, rmsfStdin } from '../src/lib/rmsf';
-import { detectAna, getAnalyses, parseTable } from '../../app/src/lib/seq';
-import { parseGmxHeader } from '../../app/src/lib/gmxHeader';
+import { detectAna, getAnalyses, parseTable } from '../../matrix/src/lib/seq';
+import { parseGmxHeader } from '../../matrix/src/lib/gmxHeader';
 import { planRun, startRun, type RunRequest } from '../server/runs';
 import { apiServer, FAKE_GMX, RUNNER, tmp } from './helpers';
 
@@ -29,7 +29,7 @@ describe('gmx rmsf (R9b): one group, on stdin', () => {
     expect(roleProblems(rmsfCommand, 3)).toEqual(['gmx rmsf takes one group: remove the other 2']);
   });
 
-  it('its x is the atom number in the system (or the residue number): PMF Sequences types it RMSF and labels x "Residue"', () => {
+  it('its x is the atom number in the system (or the residue number): the Matrix types it RMSF and labels x "Residue"', () => {
     for (const f of ['r9/rmsf/rmsf_nvt.xvg', 'r9/rmsf-res/rmsf_nvt.xvg']) {
       const t = text(f);
       expect(detectAna(getAnalyses(null), 'rmsf_nvt.xvg', parseTable(t).head, parseGmxHeader(t)?.tool ?? null).k).toBe('rmsf');

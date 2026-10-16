@@ -1,9 +1,9 @@
-// (de)Cypher's sources as analyses: a gmx-cypher run (its record and its g(r)), an RDF of the PMF Sequences
+// (de)Cypher's sources as analyses: a gmx-cypher run (its record and its g(r)), an RDF of the Matrix
 // vault, or files from disk (gro, pdb, ndx, xvg, run.json) linked as the RDF Explorer design links them. The
-// x and y come from PMF Sequences' own parseTable; a curve's peak is its highest point (T152), not the first shell's (T27).
+// x and y come from the Matrix's own parseTable; a curve's peak is its highest point (T152), not the first shell's (T27).
 
-import { parseTable } from '../../../app/src/lib/seq'
-import { structFormat } from '../../../app/src/lib/structFile'
+import { parseTable } from '../../../matrix/src/lib/seq'
+import { structFormat } from '../../../matrix/src/lib/structFile'
 import { parseNdx } from '../lib/ndx'
 import { decypherKit, type Analysis, type Group, type Peak, type Sel, type Struct, type Tone } from './kit'
 
@@ -145,7 +145,7 @@ function interp(xs: number[], ys: number[], x: number) {
 }
 
 /**
- * An RDF analysis of PMF Sequences: each curve from its file's columns as the vault records them. With the
+ * An RDF analysis of the Matrix: each curve from its file's columns as the vault records them. With the
  * gmx-cypher run that wrote the file (found by its SHA-256), column k is that run's selection k: its atoms and hue.
  */
 export function fromVault(o: { id: string; title: string; label: string; source: string; curves: VaultCurve[]; record: RecordLike | null; struct: string | null; structNote: string }): Analysis {

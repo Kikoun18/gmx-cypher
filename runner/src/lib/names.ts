@@ -1,15 +1,15 @@
-// Output names (R5, T30): one stem per run from a template, made safe and unique with PMF Sequences' own
+// Output names (R5, T30): one stem per run from a template, made safe and unique with the Matrix's own
 // safeFileName and uniqueName, so all four files of a run are new names and nothing is ever overwritten.
 
-import { TOKENS } from '../../../app/src/lib/seq';
-import { FILE_NAME_MAX, safeFileName, uniqueName } from '../../../app/src/lib/storage/path';
+import { TOKENS } from '../../../matrix/src/lib/seq';
+import { FILE_NAME_MAX, safeFileName, uniqueName } from '../../../matrix/src/lib/storage/path';
 
 export const DEFAULT_TEMPLATE = '{analysis}_{trajectory}';
 
-/** The runner's own tokens, then PMF Sequences' fields (filled from a vault target, R6). `{*}` means nothing in a name. */
+/** The runner's own tokens, then the Matrix's fields (filled from a vault target, R6). `{*}` means nothing in a name. */
 export const NAME_TOKENS = ['{analysis}', '{trajectory}', ...TOKENS.map(t => t.t).filter(t => t !== '{*}' && t !== '{analysis}')];
 
-/** The stem a template gives, safe as a file name, with room left for a ` (2)` suffix within PMF Sequences' 64. */
+/** The stem a template gives, safe as a file name, with room left for a ` (2)` suffix within the Matrix' 64. */
 export function renderStem(template: string, values: Record<string, string>): string {
   const text = template.replace(/\{[^{}]*\}/g, token => {
     if (!NAME_TOKENS.includes(token)) throw new Error('unknown token ' + token);

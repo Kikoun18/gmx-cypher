@@ -2,8 +2,8 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { parseHelp } from '../src/lib/gmxText';
 import { awhArgv, awhFrames, awhNames, awhOptionProblems, awhTargetError, framesWritten, frameOptions, type AwhFrame } from '../src/lib/awh';
-import { DEFAULT_PATTERN, detectAna, getAnalyses, parseName, parseTable } from '../../app/src/lib/seq';
-import { parseGmxHeader } from '../../app/src/lib/gmxHeader';
+import { DEFAULT_PATTERN, detectAna, getAnalyses, parseName, parseTable } from '../../matrix/src/lib/seq';
+import { parseGmxHeader } from '../../matrix/src/lib/gmxHeader';
 
 // A real AWH run (GROMACS 2025.4, test/fixtures/awh/): one bias, AWH data every 2 ps from 0 to 20 ps, and the
 // 11 files `gmx awh -o awh/awh.xvg` wrote for it.
@@ -60,8 +60,8 @@ describe('the frame choice (R5): last, every N-th, or all, and how many files ea
   });
 });
 
-describe('names (R5): the output stem gives PMF Sequences\' own pattern', () => {
-  it('a stem like hmrfast6_ha_WRWYCR gives hmrfast6_ha_WRWYCR_t20.xvg, which PMF Sequences reads back field by field', () => {
+describe('names (R5): the output stem gives the Matrix\'s own pattern', () => {
+  it('a stem like hmrfast6_ha_WRWYCR gives hmrfast6_ha_WRWYCR_t20.xvg, which the Matrix reads back field by field', () => {
     const [name] = awhNames('hmrfast6_ha_WRWYCR', framesWritten(frames, { b: '20' }));
     expect(name).toBe('hmrfast6_ha_WRWYCR_t20.xvg');
     expect(parseName(name, DEFAULT_PATTERN)).toEqual({ matched: true, fields: { group: 'hmrfast6', col: 'ha', seq: 'WRWYCR', time: '20' } });
@@ -72,7 +72,7 @@ describe('names (R5): the output stem gives PMF Sequences\' own pattern', () => 
   });
 });
 
-describe('the AWH output in PMF Sequences (R5): a PMF, and its target error', () => {
+describe('the AWH output in the Matrix (R5): a PMF, and its target error', () => {
   const text = readFileSync(new URL('awh/out/awh_t20.xvg', FIX), 'utf8');
 
   it('is typed PMF from its header, whatever its name', () => {

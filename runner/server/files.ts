@@ -5,7 +5,7 @@ import { createReadStream, createWriteStream, mkdirSync, readdirSync, realpathSy
 import { dirname, join, sep } from 'node:path';
 import type { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
-import { safeFileName } from '../../app/src/lib/storage/path';
+import { safeFileName } from '../../matrix/src/lib/storage/path';
 import { inputRole } from '../src/lib/inputs';
 import { HttpError } from './http';
 

@@ -1,17 +1,17 @@
-// The landing preview (R6b, T33, T34): where PMF Sequences will put a result, by PMF Sequences' own
+// The landing preview (R6b, T33, T34): where the Matrix will put a result, by the Matrix's own
 // planBatch on the real file, set up as Vault → Untracked files → attach sets it up: a blank upload form,
 // the file's table and header, and its name parsed with the project's pattern (UploadDialog's `parsed`).
 
-import { parseGmxHeader } from '../../../app/src/lib/gmxHeader';
-import { blankUploadForm, getAnalyses, getCols, mergeSettings, parseName, parseTable, patternFields, planBatch, seqKey, SLOTS, type UploadFile } from '../../../app/src/lib/seq';
-import { safeFileName } from '../../../app/src/lib/storage/path';
-import type { Store } from '../../../app/src/lib/types';
+import { parseGmxHeader } from '../../../matrix/src/lib/gmxHeader';
+import { blankUploadForm, getAnalyses, getCols, mergeSettings, parseName, parseTable, patternFields, planBatch, seqKey, SLOTS, type UploadFile } from '../../../matrix/src/lib/seq';
+import { safeFileName } from '../../../matrix/src/lib/storage/path';
+import type { Store } from '../../../matrix/src/lib/types';
 
 export interface Fields { name: string; col: string; group: string; run: number; time: string }
 export type Source = 'name' | 'path' | 'header';
 
 /**
- * Where PMF Sequences took a file's type from, in words (`anaHow` of its plan, batch 3): the project's name pattern,
+ * Where the Matrix took a file's type from, in words (`anaHow` of its plan, batch 3): the project's name pattern,
  * the form, the file's GROMACS header, words in the file name, or nothing known, in which case it is filed as Data.
  */
 export function typeSource(how: string): string {
@@ -21,12 +21,12 @@ export function typeSource(how: string): string {
 export interface Landing {
   ok: boolean;
   row: string; seq: string; rowNew: boolean; group: string;
-  /** A row with this name that PMF Sequences won't use, because its group or sequence differ: a second row would start. */
+  /** A row with this name that the Matrix won't use, because its group or sequence differ: a second row would start. */
   twin?: { seq: string; group: string };
   col: { k: string; label: string; isNew: boolean };
   run: number;
   type: { k: string; label: string; how: string };
-  /** Curve labels PMF Sequences imports, and every y column's legend in the file. */
+  /** Curve labels the Matrix imports, and every y column's legend in the file. */
   curves: { imported: string[]; inFile: string[] };
   from: Partial<Record<string, Source>>;
   replaces: boolean;
@@ -39,7 +39,7 @@ export function landing(store: Store, fileName: string, text: string): Landing {
   const st = settingsOf(store), table = parseTable(text);
   const file: UploadFile = { id: 'f1', file: fileName, table: table.n >= 2 ? table : null, head: table.head, gmx: parseGmxHeader(text), parsed: parseName(fileName, st.pattern) };
   const p = planBatch(store, { ...blankUploadForm(st, getCols(store)), files: [file] }, getAnalyses(st), st)[0];
-  // A row is the same row only by group, name and sequence together, as PMF Sequences matches it (seqKey).
+  // A row is the same row only by group, name and sequence together, as the Matrix matches it (seqKey).
   const row = store.seqs.find(s => seqKey(s.name, s.seq, s.group) === seqKey(p.name, p.seq, p.group));
   const twin = !row && p.name ? store.seqs.find(s => s.name.trim().toLowerCase() === p.name.trim().toLowerCase()) : undefined;
   const problems = [

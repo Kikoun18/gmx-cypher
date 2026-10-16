@@ -14,7 +14,7 @@ describe('starting the runner', () => {
     expect((await fetch(new URL('/api/state', r.url))).status).toBe(401);
   });
 
-  it('loads PMF Sequences unchanged through the resolve hook', async () => {
+  it('loads the Matrix unchanged through the resolve hook', async () => {
     const { json } = await api<{ name: string; tokens: { t: string }[] }>(await start(), '/api/state');
     expect(json.name).toBe('gmx-cypher');
     expect(json.tokens.map(t => t.t)).toContain('{seq}');

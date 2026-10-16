@@ -3,7 +3,7 @@ import { spawnSync } from 'node:child_process';
 import { join } from 'node:path';
 import { writeFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { parseTable } from '../../app/src/lib/seq';
+import { parseTable } from '../../matrix/src/lib/seq';
 import { firstPeak, resultSeries } from '../src/lib/rdf';
 import { FAKE_GMX, tmp } from './helpers';
 
@@ -29,7 +29,7 @@ describe('the first peak (T27): the highest point of the first shell where g(r) 
   });
 });
 
-describe('the result as curves, read with PMF Sequences\' parseTable', () => {
+describe('the result as curves, read with the Matrix\'s parseTable', () => {
   it('the real 2025.4 file: one curve per selection, named after its group', () => {
     const s = resultSeries(fixture);
     expect(s.map(c => [c.label, c.points.length])).toEqual([['water_O', 866], ['sodium', 866]]);

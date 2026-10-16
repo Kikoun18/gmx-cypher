@@ -7,9 +7,9 @@ import {
 } from '../src/lib/hbond';
 import { hbondCommand, hbondLegacyCommand, roleProblems } from '../src/lib/commands';
 import { curveStats as countStats } from '../src/lib/curves';
-import { detectAna, getAnalyses, parseTable } from '../../app/src/lib/seq';
+import { detectAna, getAnalyses, parseTable } from '../../matrix/src/lib/seq';
 import { resultSeries } from '../src/lib/rdf';
-import { parseGmxHeader } from '../../app/src/lib/gmxHeader';
+import { parseGmxHeader } from '../../matrix/src/lib/gmxHeader';
 
 const FIX = new URL('./fixtures/', import.meta.url);
 const text = (p: string) => readFileSync(new URL(p, FIX), 'utf8');
@@ -137,7 +137,7 @@ describe('the count over time in numbers (R8)', () => {
   });
 });
 
-describe('the outputs in PMF Sequences (R8, section 4)', () => {
+describe('the outputs in the Matrix (R8, section 4)', () => {
   it.each([
     ['hbond/new/hbond_nvt.xvg', 'hbond_nvt.xvg', 'hbond'],
     ['hbond/legacy/hbond_nvt.xvg', 'hbond_nvt.xvg', 'hbond'],

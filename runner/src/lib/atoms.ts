@@ -1,8 +1,8 @@
-// Every atom of a structure file with its GROMACS number (its 1-based position), and whether PMF Sequences'
+// Every atom of a structure file with its GROMACS number (its 1-based position), and whether the Matrix'
 // toPdb draws it (T14). The walk is toPdb's own: the same lines, the same elementOf. The k-th drawn atom is
 // the k-th atom 3Dmol holds when it loads toPdb's text with keepH, so drawnNumbers(atoms)[k] is its number.
 
-import { elementOf } from '../../../app/src/lib/structFile';
+import { elementOf } from '../../../matrix/src/lib/structFile';
 
 export interface Atom { nr: number; name: string; resn: string; resi: number; elem: string | null; drawn: boolean }
 

@@ -7,7 +7,7 @@ import { checkOptions, numberProblems, optionArgs, valueProblems } from './form'
 import type { HelpOption } from './gmxText';
 import type { Options } from './rdf';
 
-/** The options offered, in the form's order; -what stays rmsd (PMF Sequences' RMSD type), -tu ps and -xvg xmgrace. */
+/** The options offered, in the form's order; -what stays rmsd (the Matrix's RMSD type), -tu ps and -xvg xmgrace. */
 export const RMS_FORM: CommandOption[] = [
   { flag: 'fit', group: 'fit', label: 'fit', what: "onto the run input's structure: rotation and translation, translation only, or none" },
   { flag: 'mw', group: 'fit', label: 'mass-weighted fit', what: 'masses from the run input' },

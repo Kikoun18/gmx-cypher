@@ -1,22 +1,22 @@
-// The vault reader (R6a, T32): PMF Sequences' own code reads the vault through a backend whose every write
+// The vault reader (R6a, T32): the Matrix's own code reads the vault through a backend whose every write
 // throws, so gmx-cypher cannot change it. Vault.open and ProjectService.open write (a lock, the index, an
-// upgrade), so only their read steps are repeated here, each with PMF Sequences' functions.
+// upgrade), so only their read steps are repeated here, each with the Matrix's functions.
 
 import { realpathSync } from 'node:fs';
-import { NodeBackend } from '../../app/scripts/node-backend';
-import { DEFAULT_ANALYSES, DEFAULT_SETTINGS } from '../../app/src/lib/seq';
-import { StorageError, type StorageBackend } from '../../app/src/lib/storage/backend/types';
-import { VaultIO } from '../../app/src/lib/storage/io';
-import { APP_ID, compatibility, readManifest } from '../../app/src/lib/storage/manifest';
-import { SCHEMA_VERSION } from '../../app/src/lib/storage/records';
-import { storeFrom, type ProjectState } from '../../app/src/lib/storage/model';
-import { join, recordPaths, vaultPaths } from '../../app/src/lib/storage/path';
-import type { ColumnRecord, PageRecord, ProjectRecord, RowRecord } from '../../app/src/lib/storage/records';
-import { readSettings } from '../../app/src/lib/storage/settings';
-import type { AnalysisType, Store } from '../../app/src/lib/types';
+import { NodeBackend } from '../../matrix/scripts/node-backend';
+import { DEFAULT_ANALYSES, DEFAULT_SETTINGS } from '../../matrix/src/lib/seq';
+import { StorageError, type StorageBackend } from '../../matrix/src/lib/storage/backend/types';
+import { VaultIO } from '../../matrix/src/lib/storage/io';
+import { APP_ID, compatibility, readManifest } from '../../matrix/src/lib/storage/manifest';
+import { SCHEMA_VERSION } from '../../matrix/src/lib/storage/records';
+import { storeFrom, type ProjectState } from '../../matrix/src/lib/storage/model';
+import { join, recordPaths, vaultPaths } from '../../matrix/src/lib/storage/path';
+import type { ColumnRecord, PageRecord, ProjectRecord, RowRecord } from '../../matrix/src/lib/storage/records';
+import { readSettings } from '../../matrix/src/lib/storage/settings';
+import type { AnalysisType, Store } from '../../matrix/src/lib/types';
 import { landing, mismatch, nameFromPattern, type Fields } from '../src/lib/landing';
 
-/** Reads go to PMF Sequences' NodeBackend; every write throws. */
+/** Reads go to the Matrix's NodeBackend; every write throws. */
 export class ReadOnlyBackend implements StorageBackend {
   readonly label: string;
   private readonly inner: StorageBackend;
@@ -36,15 +36,15 @@ export class ReadOnlyBackend implements StorageBackend {
 
 export interface VaultView { path: string; io: VaultIO; schema: number; compat: 'ok' | 'upgrade' }
 
-/** Schemas 1 to the current one, 4 with batch 3 (T32, T142): PMF Sequences upgrades older ones itself when it opens them. */
+/** Schemas 1 to the current one, 4 with batch 3 (T32, T142): the Matrix upgrades older ones itself when it opens them. */
 export async function openVault(path: string): Promise<VaultView> {
   const root = realpathSync(path), io = new VaultIO(new ReadOnlyBackend(new NodeBackend(root)));
   io.readOnly = true;
   const m = await readManifest(io).catch(() => null);
-  if (!m) throw new Error(path + ' is not a PMF Sequences vault (no .matrix/manifest.json)');
+  if (!m) throw new Error(path + ' is not a Matrix vault (no .matrix/manifest.json)');
   const compat = m.app === APP_ID ? compatibility(m) : 'foreign';
-  if (compat === 'foreign') throw new Error(path + ' is not a PMF Sequences vault (its manifest names ' + (m.app || '?') + ' / ' + (m.format || '?') + ')');
-  if (compat === 'newer') throw new Error(path + ' was made by a newer PMF Sequences (schema ' + m.schemaVersion + '); gmx-cypher reads schemas 1–' + SCHEMA_VERSION);
+  if (compat === 'foreign') throw new Error(path + ' is not a Matrix vault (its manifest names ' + (m.app || '?') + ' / ' + (m.format || '?') + ')');
+  if (compat === 'newer') throw new Error(path + ' was made by a newer version of the Matrix (schema ' + m.schemaVersion + '); gmx-cypher reads schemas 1–' + SCHEMA_VERSION);
   return { path: root, io, schema: m.schemaVersion, compat };
 }
 
@@ -127,7 +127,7 @@ export async function landingFor(v: VaultView, pid: string, xvg: { name: string;
   const read = await readProject(v, pid), { pattern, pathPattern } = projectSummary(read).settings;
   const first = landing(read.store, xvg.name, xvg.text);
   const fields: Fields = req.fields ?? { name: first.row, col: first.col.label, group: first.group, run: first.run, time: xvg.lastTime == null ? '' : String(Math.round(xvg.lastTime)) };
-  // {analysis} is what PMF Sequences reads the file as (rdf, energy, pmf…), so the name agrees with the file (review finding 3).
+  // {analysis} is what the Matrix reads the file as (rdf, energy, pmf…), so the name agrees with the file (review finding 3).
   const made = nameFromPattern(pattern, { ...fields, ana: first.type.k || 'rdf' }), name = req.name?.trim() || made.name;
   const preview = landing(read.store, name, xvg.text);
   return {

@@ -1,7 +1,7 @@
 // The structure and index files of the draft, read once per path and shared by the groups and RDF views.
 
 import * as React from 'react'
-import { structFormat } from '../../app/src/lib/structFile'
+import { structFormat } from '../../matrix/src/lib/structFile'
 import { atomTable, type Atom } from './lib/atoms'
 import { parseNdx, type NdxGroup } from './lib/ndx'
 

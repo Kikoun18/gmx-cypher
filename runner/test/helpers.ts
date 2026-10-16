@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 export const RUNNER = new URL('..', import.meta.url).pathname;
-export const APP = new URL('../../app/', import.meta.url).pathname;
+export const APP = new URL('../../matrix/', import.meta.url).pathname;
 export const tmp = (prefix: string) => mkdtempSync(join(tmpdir(), 'gmxc-' + prefix + '-'));
 
 export interface Started { url: string; cookie: string; out: () => string; home: string; proc: ChildProcess }

@@ -7,8 +7,8 @@ import { FORM, rdfArgs, rdfIo, recipeProblems } from '../src/lib/rdf';
 import { outputNames } from '../src/lib/names';
 import { recipeFileProblems, recipeFromDraft } from '../src/lib/recipe';
 import { recordProblems } from '../src/lib/record';
-import { detectAna, getAnalyses, parseTable } from '../../app/src/lib/seq';
-import { parseGmxHeader } from '../../app/src/lib/gmxHeader';
+import { detectAna, getAnalyses, parseTable } from '../../matrix/src/lib/seq';
+import { parseGmxHeader } from '../../matrix/src/lib/gmxHeader';
 
 const read = (name: string) => JSON.parse(readFileSync(new URL('./fixtures/formats/' + name, import.meta.url), 'utf8'));
 
@@ -118,7 +118,7 @@ describe('what each command calls its groups, and how many it takes (R9)', () =>
   });
 });
 
-describe('every output has a PMF Sequences type decision (R3a, section 3)', () => {
+describe('every output has a Matrix type decision (R3a, section 3)', () => {
   it.each(COMMANDS.map(c => [c.tool, c] as const))('%s: each file has a type, or none with the reason; one goes to the vault by default', (_, c) => {
     expect(c.outputs.length).toBeGreaterThan(0);
     for (const o of c.outputs) expect(o.type !== null || !!o.why).toBe(true);
@@ -126,7 +126,7 @@ describe('every output has a PMF Sequences type decision (R3a, section 3)', () =
     expect(c.outputs.find(o => o.vault)!.file).toBe('xvg');
   });
 
-  // The decision checked against PMF Sequences itself, on real 2025.4 output under the default name gmx-cypher gives it.
+  // The decision checked against the Matrix itself, on real 2025.4 output under the default name gmx-cypher gives it.
   it.each([
     ['rdf', 'xvg', 'gmx-2025.4/rdf_nvt.xvg', 'rdf_nvt.xvg'],
     ['energy', 'xvg', 'gmx-2025.4/energy-potential.xvg', 'energy_rerun.xvg'],
@@ -141,18 +141,18 @@ describe('every output has a PMF Sequences type decision (R3a, section 3)', () =
     ['gyrate', 'xvg', 'r9/gyrate/gyrate_nvt.xvg', 'gyrate_nvt.xvg'],
     ['gyrate-legacy', 'xvg', 'r9/gyrate-legacy/gyrate_nvt.xvg', 'gyrate-legacy_nvt.xvg'],
     ['mindist', 'xvg', 'r9/mindist/mindist_nvt.xvg', 'mindist_nvt.xvg'],
-  ])('%s %s: PMF Sequences agrees on %s', (tool, file, fixture, name) => {
+  ])('%s %s: the Matrix agrees on %s', (tool, file, fixture, name) => {
     const text = readFileSync(new URL('./fixtures/' + fixture, import.meta.url), 'utf8');
     const want = commandOf(tool)!.outputs.find(o => o.file === file)!.type;
     expect(detectAna(getAnalyses(null), name, parseTable(text).head, parseGmxHeader(text)?.tool ?? null).k).toBe(want);
   });
 });
 
-describe('a WHAM profile would be mistyped by PMF Sequences (question 28)', () => {
+describe('a WHAM profile would be mistyped by the Matrix (question 28)', () => {
   it('real 2025.4 profile.xvg: its title "Umbrella potential" reads as Histogram, so it is not sent until you decide', () => {
     const text = readFileSync(new URL('./fixtures/wham/out/profile.xvg', import.meta.url), 'utf8');
     expect(whamCommand.outputs.find(o => o.file === 'profile')).toMatchObject({ type: null, vault: false });
-    // What PMF Sequences does today, pinned so a change there is noticed: "umbrella" is a keyword of its Histogram type.
+    // What the Matrix does today, pinned so a change there is noticed: "umbrella" is a keyword of its Histogram type.
     expect(detectAna(getAnalyses(null), 'wham_us_profile.xvg', parseTable(text).head, parseGmxHeader(text)?.tool ?? null)).toEqual({ k: 'hist', from: 'header' });
   });
 });

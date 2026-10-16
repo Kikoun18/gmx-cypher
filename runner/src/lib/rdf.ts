@@ -3,7 +3,7 @@
 
 import type { HelpOption } from './gmxText';
 import { outputNames } from './names';
-import { parseTable } from '../../../app/src/lib/seq';
+import { parseTable } from '../../../matrix/src/lib/seq';
 
 export type Options = Record<string, string | boolean>;
 export interface Recipe { options: Options; selections: number }
@@ -33,7 +33,7 @@ export const FORM: { flag: string; group: string; label: string; unit?: string; 
   { flag: 'cn', group: 'output', label: 'cumulative number too', what: 'a second file: the average number of atoms within r', switch: 'cn' },
 ];
 
-/** Set by gmx-cypher whatever the form says: PMF Sequences reads ps and the xmgrace @ lines (T22). */
+/** Set by gmx-cypher whatever the form says: the Matrix reads ps and the xmgrace @ lines (T22). */
 const FIXED: Record<string, string> = { tu: 'ps', xvg: 'xmgrace' };
 const NUMERIC = new Set(['time', 'real', 'int']);
 const unset = (v: string | boolean | undefined) => v === undefined || v === '';
@@ -107,7 +107,7 @@ export function runEstimate(est: Estimate | null, opt: Options): Estimate | null
   return { frames: every ? Math.floor((end - start) / every + 1e-9) + 1 : 1, start, end };
 }
 
-/** One curve per y column of an .xvg, named by its legend, read with PMF Sequences' own parseTable. */
+/** One curve per y column of an .xvg, named by its legend, read with the Matrix's own parseTable. */
 export function resultSeries(xvg: string): { label: string; points: [number, number][] }[] {
   const t = parseTable(xvg), x = t.cols[0] || [];
   return t.cols.slice(1).map((y, j) => ({

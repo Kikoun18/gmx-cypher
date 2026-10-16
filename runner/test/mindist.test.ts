@@ -6,8 +6,8 @@ import { parseHelp } from '../src/lib/gmxText';
 import type { Group } from '../src/lib/groups';
 import { mindistArgv, mindistNames, mindistOptionProblems, mindistStdin } from '../src/lib/mindist';
 import { resultSeries } from '../src/lib/rdf';
-import { detectAna, getAnalyses, parseTable } from '../../app/src/lib/seq';
-import { parseGmxHeader } from '../../app/src/lib/gmxHeader';
+import { detectAna, getAnalyses, parseTable } from '../../matrix/src/lib/seq';
+import { parseGmxHeader } from '../../matrix/src/lib/gmxHeader';
 import { planRun, startRun, type RunRequest } from '../server/runs';
 import { apiServer, FAKE_GMX, RUNNER, tmp } from './helpers';
 
@@ -35,11 +35,11 @@ describe('gmx mindist (R9d): the reference, then each group, on stdin', () => {
     expect(() => mindistArgv({ options: { pi: true }, selections: 1 }, io, HELP)).toThrow('-pi is not an option gmx-cypher sets for mindist');
   });
 
-  it('its files: the distances for the vault (Distance), the contacts beside them (general Data in PMF Sequences)', () => {
+  it('its files: the distances for the vault (Distance), the contacts beside them (general Data in the Matrix)', () => {
     expect(mindistNames('m', {})).toEqual({ xvg: 'm.xvg', ndx: 'm.ndx', record: 'm.run.json' });
     expect(mindistNames('m', { contacts: true }).more).toEqual(['m_contacts.xvg']);
     expect(type(text('r9/mindist/mindist_nvt.xvg'), 'mindist_nvt.xvg')).toBe('dist');
-    // Before batch 3 PMF Sequences left it unknown ('') and asked for a type; now it files it as general Data.
+    // Before batch 3 the Matrix left it unknown ('') and asked for a type; now it files it as general Data.
     expect(type(text('r9/mindist/mindist_nvt_numcont.xvg'), 'mindist_nvt_contacts.xvg')).toBe('data');
     // Its numbers are in e-notation; one curve per group, named "reference-group".
     expect(resultSeries(text('r9/mindist/mindist_nvt.xvg')).map(c => [c.label, c.points.length, c.points[0][1]])).toEqual([['sulfate-sodium', 21, 0.4532218], ['sulfate-water', 21, 0.1777329]]);

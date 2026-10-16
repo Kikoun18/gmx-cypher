@@ -3,7 +3,7 @@ import type { GLModel, GLViewer } from '3dmol'
 import { Checkbox } from '../ui/checkbox'
 import { Kbd } from '../ui/kbd'
 import { ToggleGroup, ToggleGroupItem } from '../ui/toggle-group'
-import { defaultView, structStyle, toPdb, type Look } from '../../../app/src/lib/structFile'
+import { defaultView, structStyle, toPdb, type Look } from '../../../matrix/src/lib/structFile'
 import { drawnNumbers, type Atom } from '../lib/atoms'
 import type { Tone } from '../lib/tones'
 import { boxDimensions, boxEdges, outsideBox, parseBox } from '../lib/box'
@@ -53,7 +53,7 @@ function useThemeName() {
 }
 
 /**
- * The structure drawn with PMF Sequences' toPdb, structStyle and defaultView (R3a). It is loaded with keepH
+ * The structure drawn with the Matrix's toPdb, structStyle and defaultView (R3a). It is loaded with keepH
  * and hydrogens are hidden by style, so 3Dmol's atom index k is always the k-th drawn atom, whose GROMACS
  * number is drawnNumbers(atoms)[k] (T14). Atoms keep their element colours and a group is a halo in its hue (T141), or
  * the group's atoms are drawn in the hue's strong ink and the rest in grey. C + click sets the centre of rotation (T140).

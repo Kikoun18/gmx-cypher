@@ -20,7 +20,7 @@ import { structureMismatch } from '../src/lib/checks';
 import { frameEstimate } from '../src/lib/gmxText';
 import { runEstimate, type Options } from '../src/lib/rdf';
 import { buildRecord, type FileInfo, type Output, type RunRecord } from '../src/lib/record';
-import { structFormat } from '../../app/src/lib/structFile';
+import { structFormat } from '../../matrix/src/lib/structFile';
 import type { Ctx } from './api';
 import { awhScan } from './awh';
 import { checkSizes, dumpRunInput } from './check';
@@ -36,7 +36,7 @@ export interface RunRequest {
   inputs: Partial<Record<Slot, string>>; groups: Group[]; options: Options; template?: string; outDir?: string | null;
   /** The energy terms picked, by number from the file's menu (R4); sent on stdin. */
   terms?: number[];
-  /** Values for the name template's PMF Sequences tokens: a batch's path fields (review finding 4). */
+  /** Values for the name template's Matrix tokens: a batch's path fields (review finding 4). */
   names?: Record<string, string>;
   /** A batch run whose names were taken meanwhile takes the next free stem instead of stopping (review finding 5). */
   retryNames?: boolean;
@@ -104,7 +104,7 @@ export async function planRun(ctx: Ctx, req: RunRequest, roots: string[]): Promi
     throw new HttpError(400, folder + ', the folder that holds all the inputs, is outside the allowed folders: choose an output folder inside them');
   // The vault is written only by sending, into a project's _inbox (review finding 11).
   const vault = ctx.config.vault && existsSync(ctx.config.vault) ? realpathSync(ctx.config.vault) : null;
-  if (vault && within(outDir, vault)) throw new HttpError(400, outDir + ' is inside the PMF Sequences vault; results go there only by send to vault');
+  if (vault && within(outDir, vault)) throw new HttpError(400, outDir + ' is inside the Matrix vault; results go there only by send to vault');
   let stem: string;
   try { stem = renderStem(req.template || DEFAULT_TEMPLATE, { ...req.names, analysis: cmd.tool, trajectory: named }); }
   catch (e) {
@@ -142,7 +142,7 @@ export async function planRun(ctx: Ctx, req: RunRequest, roots: string[]): Promi
     if (!frames.length) problems.push('this energy file has no AWH data');
     // gmx awh writes nothing and still exits 0 when -b is past the last frame (2025.4, checked).
     else if (!written.length) problems.push('no AWH frame in this range: the file has frames from ' + frames[0].time + ' to ' + frames[frames.length - 1].time + ' ps');
-    // The last frame is the run's file for the vault (the usual choice for PMF Sequences); the earlier ones come with it.
+    // The last frame is the run's file for the vault (the usual choice for the Matrix); the earlier ones come with it.
     if (files.length) names = { xvg: files[files.length - 1], record: names.record, more: files.slice(0, -1) };
   }
   // gmx wham reads its windows from two lists, written beside the outputs, with the windows' real paths.

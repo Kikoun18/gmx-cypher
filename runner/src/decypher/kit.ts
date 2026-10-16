@@ -15,7 +15,7 @@ export interface Peak { r: number; g: number }
 export interface Group { name: string; atoms: number[]; tone: Tone }
 export interface Sel extends Group { y: number[]; peak: Peak | null }
 
-/** One RDF: a gmx-cypher job, a run record found on disk, an RDF of the PMF Sequences vault, or files from disk. */
+/** One RDF: a gmx-cypher job, a run record found on disk, an RDF of the Matrix vault, or files from disk. */
 export interface Analysis {
   id: string
   kind: 'job' | 'record' | 'vault' | 'file'

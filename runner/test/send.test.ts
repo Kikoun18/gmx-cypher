@@ -1,11 +1,11 @@
 import { copyFileSync, cpSync, mkdirSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { NodeBackend } from '../../app/scripts/node-backend';
-import { addColumn } from '../../app/src/lib/seq';
-import { scanProject } from '../../app/src/lib/storage/index';
-import { Vault } from '../../app/src/lib/storage/vault';
-import { newVault } from '../../app/test/helpers';
+import { NodeBackend } from '../../matrix/scripts/node-backend';
+import { addColumn } from '../../matrix/src/lib/seq';
+import { scanProject } from '../../matrix/src/lib/storage/index';
+import { Vault } from '../../matrix/src/lib/storage/vault';
+import { newVault } from '../../matrix/test/helpers';
 import { startRun } from '../server/runs';
 import { apiServer, RUNNER, tmp } from './helpers';
 
@@ -42,8 +42,8 @@ describe('send to the vault inbox (T35, T36)', () => {
     const r = await s.call('/api/send', { job: job.id, project: project.id, name: 'hmr+fast+6_SO4_NA2SO4_t10.xvg' });
     expect(r.json).toMatchObject({ path: project.dir + '/_inbox/hmr+fast+6_SO4_NA2SO4_t10.xvg', name: 'hmr+fast+6_SO4_NA2SO4_t10.xvg', renamed: false });
     expect(r.json.next).toEqual([
-      'open ' + project.name + ' in PMF Sequences',
-      'Vault → Check folder now (or reload the page): PMF Sequences rescans the folder only then',
+      'open ' + project.name + ' in the Matrix',
+      'Vault → Check folder now (or reload the page): the Matrix rescans the folder only then',
       'Vault → Untracked files → attach hmr+fast+6_SO4_NA2SO4_t10.xvg: the upload dialog shows where it lands',
     ]);
     const after = files(vdir), added = [...after.keys()].filter(k => !before.has(k));
@@ -62,7 +62,7 @@ describe('send to the vault inbox (T35, T36)', () => {
     await s.close();
   });
 
-  it("PMF Sequences' own scanProject lists it, and a ProjectService (on a copy) reports it as untracked", async () => {
+  it("The Matrix's own scanProject lists it, and a ProjectService (on a copy) reports it as untracked", async () => {
     const { s, vdir, job, project } = await setup();
     const r = await s.call('/api/send', { job: job.id, project: project.id, name: 'hmr+fast+6_SO4_NA2SO4_t10.xvg' });
     expect(Object.keys((await scanProject(new NodeBackend(vdir), project.dir)).files)).toContain(r.json.path);
@@ -78,16 +78,16 @@ describe('send to the vault inbox (T35, T36)', () => {
 
   it('refuses a name that is not a plain file name, and a run that is not done', async () => {
     const { s, job, project } = await setup();
-    expect((await s.call('/api/send', { job: job.id, project: project.id, name: '../x.xvg' })).json).toEqual({ error: '../x.xvg is not a plain file name (as PMF Sequences would save it: _x.xvg)' });
+    expect((await s.call('/api/send', { job: job.id, project: project.id, name: '../x.xvg' })).json).toEqual({ error: '../x.xvg is not a plain file name (as the Matrix would save it: _x.xvg)' });
     expect((await s.call('/api/send', { job: 'nope', project: project.id, name: 'x.xvg' })).status).toBe(404);
     await s.close();
   });
 });
 
-describe('the link to the project in PMF Sequences (T36)', () => {
+describe('the link to the project in the Matrix (T36)', () => {
   it('is offered when its address is set (http or https only)', async () => {
     const { s, job, project } = await setup();
-    expect((await s.call('/api/config', { pmfUrl: 'javascript:alert(1)' })).json).toEqual({ error: 'the PMF Sequences address must start with http:// or https://' });
+    expect((await s.call('/api/config', { pmfUrl: 'javascript:alert(1)' })).json).toEqual({ error: 'the Matrix address must start with http:// or https://' });
     await s.call('/api/config', { pmfUrl: 'http://localhost:5173/' });
     expect((await s.call('/api/send', { job: job.id, project: project.id, name: 'x.xvg' })).json.link).toBe('http://localhost:5173/#/p/' + project.id + '/all');
     await s.close();

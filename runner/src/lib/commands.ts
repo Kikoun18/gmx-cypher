@@ -64,8 +64,8 @@ export interface CommandDef {
   /** Further suffixes a stem's files can have, for the check that none exists yet (T30). */
   suffixes?: string[];
   /**
-   * Each file a run writes: the PMF Sequences type it lands as (section 3), or null with the reason it has none,
-   * and whether "send to vault" sends it. Checked against PMF Sequences' own detectAna on real output (tests).
+   * Each file a run writes: the Matrix type it lands as (section 3), or null with the reason it has none,
+   * and whether "send to vault" sends it. Checked against the Matrix's own detectAna on real output (tests).
    */
   outputs: { file: string; type: string | null; vault: boolean; why?: string }[];
   /** The paths gmx is given and the directory it runs in, for the outputs in `outDir`. */
@@ -115,7 +115,7 @@ export const rdfCommand: CommandDef = {
   outputNames,
   outputs: [
     { file: 'xvg', type: 'rdf', vault: true },
-    { file: 'cn', type: null, vault: false, why: 'PMF Sequences reads its title "Cumulative Number RDF" as another RDF (T35)' },
+    { file: 'cn', type: null, vault: false, why: 'The Matrix reads its title "Cumulative Number RDF" as another RDF (T35)' },
   ],
   io: (p, outDir, stem) => rdfIo({ trajectory: p.trajectory ?? '', runInput: p.runInput ?? '' }, outDir, stem),
   problems: recipeProblems,
@@ -133,8 +133,8 @@ export const energyCommand: CommandDef = {
   groups: false,
   options: ENERGY_FORM,
   outputNames: stem => ({ xvg: stem + '.xvg', record: stem + '.run.json' }),
-  // Typed Energy by its name only: its title "GROMACS Energies" misses PMF Sequences' keyword (T103).
-  outputs: [{ file: 'xvg', type: 'energy', vault: true, why: 'typed Energy from its header ("GROMACS Energies"; before PMF Sequences batch 3, only from a file name containing "energy")' }],
+  // Typed Energy by its name only: its title "GROMACS Energies" misses the Matrix's keyword (T103).
+  outputs: [{ file: 'xvg', type: 'energy', vault: true, why: 'typed Energy from its header ("GROMACS Energies"; before the Matrix batch 3, only from a file name containing "energy")' }],
   io: (p, outDir, stem) => {
     const edr = p.edr ?? '', cwd = edr.slice(0, edr.lastIndexOf('/')) || '/';
     return { cwd, io: { edr: relPath(cwd, edr), ...(p.runInput ? { tpr: relPath(cwd, p.runInput) } : {}), output: relPath(cwd, outDir + '/' + stem + '.xvg') } };
@@ -183,7 +183,7 @@ export const whamCommand: CommandDef = {
   suffixes: WHAM_SUFFIXES,
   outputs: [
     { file: 'xvg', type: 'hist', vault: true, why: 'the histograms, typed Histogram by their title; sent by default (question 28)' },
-    { file: 'profile', type: null, vault: false, why: 'PMF Sequences reads it as a Histogram (its title "Umbrella potential" has its keyword), and as a PMF it would get the AWH correction (+2kT ln r, tail at 0): not sent until you decide (question 28)' },
+    { file: 'profile', type: null, vault: false, why: 'The Matrix reads it as a Histogram (its title "Umbrella potential" has its keyword), and as a PMF it would get the AWH correction (+2kT ln r, tail at 0): not sent until you decide (question 28)' },
   ],
   io: (_p, outDir, stem) => {
     const cwd = outDir.slice(0, outDir.lastIndexOf('/')) || '/', out = (f: string) => relPath(cwd, outDir + '/' + stem + f);
@@ -208,9 +208,9 @@ export const distanceCommand: CommandDef = {
   outputNames: (stem, options = {}) => distanceNames(stem, options),
   suffixes: DISTANCE_SUFFIXES,
   outputs: [
-    { file: 'xvg', type: 'dist', vault: true, why: 'PMF Sequences takes one curve of it: the first selection (its Distance type reads column 2)' },
+    { file: 'xvg', type: 'dist', vault: true, why: 'The Matrix takes one curve of it: the first selection (its Distance type reads column 2)' },
     { file: 'all', type: 'dist', vault: false },
-    { file: 'hist', type: null, vault: false, why: 'a distribution of distances, which PMF Sequences reads as an umbrella Histogram (section 4)' },
+    { file: 'hist', type: null, vault: false, why: 'a distribution of distances, which the Matrix reads as an umbrella Histogram (section 4)' },
   ],
   io: (p, outDir, stem) => {
     const { cwd, io } = rdfIo({ trajectory: p.trajectory ?? '', runInput: p.runInput ?? '' }, outDir, stem), out = (f: string) => relPath(cwd, outDir + '/' + stem + f);
@@ -229,7 +229,7 @@ function hbondIo(p: Partial<Record<InputSlot, string>>, outDir: string, stem: st
 
 const HBOND_OUTPUTS: CommandDef['outputs'] = [
   { file: 'xvg', type: 'hbond', vault: true, why: 'the number of H-bonds over time (question 34)' },
-  { file: 'dist', type: null, vault: false, why: 'a distribution, which PMF Sequences reads as an umbrella Histogram or as H-bonds (question 34)' },
+  { file: 'dist', type: null, vault: false, why: 'a distribution, which the Matrix reads as an umbrella Histogram or as H-bonds (question 34)' },
   { file: 'ang', type: null, vault: false, why: 'a distribution, likewise' },
 ];
 
@@ -247,7 +247,7 @@ export const hbondCommand: CommandDef = {
   options: HBOND_FORM,
   outputNames: (stem, options = {}) => hbondNames(stem, options),
   suffixes: HBOND_SUFFIXES,
-  outputs: [...HBOND_OUTPUTS, { file: 'dan', type: null, vault: false, why: 'donors and acceptors per frame: PMF Sequences reads them as H-bonds from the name' }],
+  outputs: [...HBOND_OUTPUTS, { file: 'dan', type: null, vault: false, why: 'donors and acceptors per frame: the Matrix reads them as H-bonds from the name' }],
   io: hbondIo,
   problems: hbondOptionProblems,
   argv: (r, io, help) => hbondArgv(r, io as HbondIo, help),
@@ -307,7 +307,7 @@ export const rmsCommand: CommandDef = {
   roles: { first: 'fit group', rest: 'RMSD group', min: 0 },
   options: RMS_FORM,
   outputNames: oneOutput,
-  outputs: [{ file: 'xvg', type: 'rmsd', vault: true, why: "PMF Sequences reads its first curve: the fit group's own RMSD" }],
+  outputs: [{ file: 'xvg', type: 'rmsd', vault: true, why: "The Matrix reads its first curve: the fit group's own RMSD" }],
   io: trajectoryIo,
   problems: rmsOptionProblems,
   argv: (r, io, help) => rmsArgv(r, io as RmsIo, help),
@@ -328,14 +328,14 @@ export const rmsfCommand: CommandDef = {
   roles: ONE_GROUP,
   options: RMSF_FORM,
   outputNames: oneOutput,
-  outputs: [{ file: 'xvg', type: 'rmsf', vault: true, why: 'PMF Sequences labels its x "Residue", also when it is atoms' }],
+  outputs: [{ file: 'xvg', type: 'rmsf', vault: true, why: 'The Matrix labels its x "Residue", also when it is atoms' }],
   io: trajectoryIo,
   problems: rmsfOptionProblems,
   argv: (r, io, help) => rmsfArgv(r, io as RmsfIo, help),
   stdin: rmsfStdin,
 };
 
-const GYRATE_OUTPUTS: CommandDef['outputs'] = [{ file: 'xvg', type: 'rg', vault: true, why: 'PMF Sequences reads its first curve: the total radius of gyration' }];
+const GYRATE_OUTPUTS: CommandDef['outputs'] = [{ file: 'xvg', type: 'rg', vault: true, why: 'The Matrix reads its first curve: the total radius of gyration' }];
 
 /** gmx gyrate (R9c), the selection tool of GROMACS 2024 and later: the radius of gyration of one group over time. */
 export const gyrateCommand: CommandDef = {
@@ -390,8 +390,8 @@ export const mindistCommand: CommandDef = {
   outputNames: (stem, options = {}) => mindistNames(stem, options),
   suffixes: MINDIST_SUFFIXES,
   outputs: [
-    { file: 'xvg', type: 'dist', vault: true, why: 'PMF Sequences reads its first curve: the reference to the first group' },
-    { file: 'contacts', type: null, vault: false, why: 'titled "Number of Contacts < d nm": PMF Sequences has no type for it and files it as general Data (batch 3)' },
+    { file: 'xvg', type: 'dist', vault: true, why: 'The Matrix reads its first curve: the reference to the first group' },
+    { file: 'contacts', type: null, vault: false, why: 'titled "Number of Contacts < d nm": the Matrix has no type for it and files it as general Data (batch 3)' },
   ],
   io: (p, outDir, stem) => {
     const { cwd, io } = trajectoryIo(p, outDir, stem);
@@ -411,7 +411,7 @@ export interface CommandDraft { analysis?: string; options: Options; optionsBy?:
 /**
  * The draft with another command picked: the options and template of the one left are kept aside, and the new one's
  * come back. They never cross commands: RDF's -bin is no option of gmx energy, energy's -sum none of gmx rdf (review
- * finding 1), and an AWH stem typed for PMF Sequences (`hmrfast6_ha_WRWYCR`) must not name an RDF run.
+ * finding 1), and an AWH stem typed for the Matrix (`hmrfast6_ha_WRWYCR`) must not name an RDF run.
  */
 export function withCommand<D extends CommandDraft>(d: D, tool: string): D {
   const from = d.analysis ?? 'rdf';

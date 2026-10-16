@@ -1,8 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { NodeBackend } from '../../app/scripts/node-backend';
-import { addColumn } from '../../app/src/lib/seq';
-import { newVault } from '../../app/test/helpers';
+import { NodeBackend } from '../../matrix/scripts/node-backend';
+import { addColumn } from '../../matrix/src/lib/seq';
+import { newVault } from '../../matrix/test/helpers';
 import { landingFor, listProjects, openVault } from '../server/vault';
 import { tmp } from './helpers';
 

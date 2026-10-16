@@ -1,10 +1,10 @@
-// (de)Cypher's link to PMF Sequences: the vault's RDF analyses with their rows' structures, read only, and for
+// (de)Cypher's link to the Matrix: the vault's RDF analyses with their rows' structures, read only, and for
 // each RDF file the gmx-cypher run that wrote it, found by its SHA-256 among the runs' records: the record holds
 // the atoms of each group, so the structure view can show them. Only those files are ever sent to the page.
 
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import type { RowRecord } from '../../app/src/lib/storage/records';
+import type { RowRecord } from '../../matrix/src/lib/storage/records';
 import type { RunRecord } from '../src/lib/record';
 import type { VaultRdfs, VaultRow, VaultRun } from '../src/decypher/vaultTypes';
 import { inside, real, within } from './files';
@@ -39,7 +39,7 @@ export function runsBySha(jobs: Jobs): Map<string, VaultRun> {
   return out;
 }
 
-/** Whether a project's analysis type is an RDF: PMF Sequences' own `rdf`, or a type of the project's named so. */
+/** Whether a project's analysis type is an RDF: the Matrix's own `rdf`, or a type of the project's named so. */
 const rdfTypes = (types: { k: string; label: string; name: string; match: string }[]) =>
   new Set(['rdf', ...types.filter(t => /\b(rdf|radial)\b/i.test(t.label + ' ' + t.name + ' ' + t.match)).map(t => t.k)]);
 

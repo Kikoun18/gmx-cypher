@@ -1,4 +1,4 @@
-// PMF Sequences' sources are written for Vite and import `./pmf` without an extension, which Node refuses.
+// The Matrix's sources are written for Vite and import `./pmf` without an extension, which Node refuses.
 // This adds `.ts` to such relative imports, so they load unchanged (T1).
 export async function resolve(specifier, context, next) {
   try {

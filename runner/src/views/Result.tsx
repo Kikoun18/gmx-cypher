@@ -13,7 +13,7 @@ import { COMMANDS } from '../lib/commands'
 import { driftLarger, type EnergyRow } from '../lib/energy'
 import { curveStats } from '../lib/curves'
 import { firstPeak, resultSeries } from '../lib/rdf'
-import { parseTable } from '../../../app/src/lib/seq'
+import { parseTable } from '../../../matrix/src/lib/seq'
 import type { RunRecord } from '../lib/record'
 import { toneText, toneVar, type Tone } from '../lib/tones'
 import { cn } from '../lib/utils'
@@ -267,12 +267,12 @@ function DistanceChart({ job, record }: { job: Job; record: RunRecord }) {
       </div>
       <p className="m-0 text-caption text-muted-foreground">
         {measure === 'pairs' ? 'atom k of ' + ref.name + ' with atom k of each selection' : 'between the centres of ' + (measure === 'com' ? 'mass' : 'geometry') + ' of ' + ref.name + ' and of each selection'}
-        {sels.length > 1 ? ' · PMF Sequences takes the first curve of a distance file' : ''}
+        {sels.length > 1 ? ' · the Matrix takes the first curve of a distance file' : ''}
       </p>
       {hist && <>
         <Section label="Histogram" />
         {named(hist, 'distance (nm)', 'probability')}
-        <p className="m-0 text-caption text-muted-foreground">not sent to the vault: PMF Sequences would read it as an umbrella histogram</p>
+        <p className="m-0 text-caption text-muted-foreground">not sent to the vault: the Matrix would read it as an umbrella histogram</p>
       </>}
     </div>
   )
@@ -307,7 +307,7 @@ function HbondChart({ job, record }: { job: Job; record: RunRecord }) {
       {dist && distribution(dist, 'Distance distribution', legacy ? 'donor – acceptor (nm)' : 'distance (nm)', 'density (1/nm)')}
       {ang && distribution(ang, 'Angle distribution', 'angle (°)', 'density (1/°)')}
       {dan && distribution(dan, 'Donors and acceptors', 'time (ps)', 'number')}
-      {(dist || ang || dan) && <p className="m-0 text-caption text-muted-foreground">not sent to the vault: PMF Sequences would read these as an umbrella histogram or as H-bonds</p>}
+      {(dist || ang || dan) && <p className="m-0 text-caption text-muted-foreground">not sent to the vault: the Matrix would read these as an umbrella histogram or as H-bonds</p>}
     </div>
   )
 }
@@ -339,7 +339,7 @@ function RmsChart({ job, record }: { job: Job; record: RunRecord }) {
   const fit = String(record.options.find(o => o.flag === 'fit')?.value ?? 'rot+trans'), prev = Number(record.options.find(o => o.flag === 'prev')?.value ?? 0)
   const against = prev > 0 ? 'the frame ' + prev + ' frame' + (prev > 1 ? 's' : '') + ' before' : "the run input's structure"
   const how = fit === 'none' ? 'without a fit' : 'after a fit of ' + record.groups[0]?.name + ' (' + (fit === 'translation' ? 'translation only' : 'rotation and translation') + ')'
-  return <GroupSeries job={job} groups={record.groups} yLabel="RMSD (nm)" unit="nm" note={'against ' + against + ', ' + how + (record.groups.length > 1 ? ' · PMF Sequences takes the first curve, ' + record.groups[0].name : '')} />
+  return <GroupSeries job={job} groups={record.groups} yLabel="RMSD (nm)" unit="nm" note={'against ' + against + ', ' + how + (record.groups.length > 1 ? ' · the Matrix takes the first curve, ' + record.groups[0].name : '')} />
 }
 
 /** gmx rmsf (R9b): the fluctuation along the group's atoms or residues, its highest point marked. */
@@ -357,7 +357,7 @@ function RmsfChart({ job, record }: { job: Job; record: RunRecord }) {
         {top && <Stat label={'highest · ' + unit + ' ' + top[0]} value={top[1].toFixed(3) + ' nm'} hint={g?.name} />}
       </div>
       <p className="m-0 text-caption text-muted-foreground">
-        per {unit} of {g?.name}, {fit ? "after a fit onto the run input's structure" : 'without a fit: the group\'s own motion is included'} · PMF Sequences labels this x "Residue"{res ? '' : ', though here it is atoms'}
+        per {unit} of {g?.name}, {fit ? "after a fit onto the run input's structure" : 'without a fit: the group\'s own motion is included'} · the Matrix labels this x "Residue"{res ? '' : ', though here it is atoms'}
       </p>
     </div>
   )
@@ -378,7 +378,7 @@ function GyrateChart({ job, record }: { job: Job; record: RunRecord }) {
         {stats.length === 4 && <Stat label="about x, y, z · mean" value={stats.slice(1).map(x => x!.mean.toFixed(3)).join(' · ')} hint="nm" />}
       </div>
       <p className="m-0 text-caption text-muted-foreground">
-        weighted by {weight} · {legacy ? 'the legacy tool (' + (record.command.args[0] === 'gyrate' ? 'gmx gyrate of this GROMACS' : 'gmx gyrate-legacy') + ')' : 'the selection tool, gmx gyrate'} · PMF Sequences takes the first curve, Rg
+        weighted by {weight} · {legacy ? 'the legacy tool (' + (record.command.args[0] === 'gyrate' ? 'gmx gyrate of this GROMACS' : 'gmx gyrate-legacy') + ')' : 'the selection tool, gmx gyrate'} · the Matrix takes the first curve, Rg
       </p>
     </div>
   )
@@ -400,11 +400,11 @@ function MindistChart({ job, record }: { job: Job; record: RunRecord }) {
           return st && <Stat key={i} label={c.label + ' · closest'} value={st.min.toFixed(3) + ' nm'} hint={'at ' + at?.[0] + ' ps · mean ' + st.mean.toFixed(3) + ' ± ' + st.sd.toFixed(3) + ' nm'} />
         })}
       </div>
-      <p className="m-0 text-caption text-muted-foreground">between any atom of {ref?.name} and any atom of each group{curves.length > 1 ? ' · PMF Sequences takes the first curve, ' + curves[0].label : ''}</p>
+      <p className="m-0 text-caption text-muted-foreground">between any atom of {ref?.name} and any atom of each group{curves.length > 1 ? ' · the Matrix takes the first curve, ' + curves[0].label : ''}</p>
       {contacts && <>
         <Section label={'Contacts within ' + d + ' nm'} />
         <LineChart series={named(contacts)} xLabel="time (ps)" yLabel="atom pairs" height={200} legend={curves.length > 1} zeroLine={false} />
-        <p className="m-0 text-caption text-muted-foreground">not sent to the vault: PMF Sequences gives this file no type</p>
+        <p className="m-0 text-caption text-muted-foreground">not sent to the vault: the Matrix gives this file no type</p>
       </>}
     </div>
   )
@@ -445,7 +445,7 @@ export function RunResult({ job, onRunAgain, vault }: { job: Job; onRunAgain: (r
       <div className="flex flex-wrap items-center gap-3">
         {job.status === 'done' && vault && <Button ref={sendButton} onClick={() => setSending(true)}>send to vault…</Button>}
         <Button variant="outline" onClick={() => onRunAgain(rec)}>run again</Button>
-        <span className="text-caption text-muted-foreground">{job.status === 'done' && !vault ? 'set a PMF Sequences vault in settings to send this result · ' : ''}run again opens this recipe in {rec.analysis ?? 'rdf'}; the new run gets new names</span>
+        <span className="text-caption text-muted-foreground">{job.status === 'done' && !vault ? 'set a Matrix vault in settings to send this result · ' : ''}run again opens this recipe in {rec.analysis ?? 'rdf'}; the new run gets new names</span>
       </div>
       {vault && <SendDialog job={job} open={sending} onOpenChange={setSending} returnFocus={sendButton} />}
     </div>

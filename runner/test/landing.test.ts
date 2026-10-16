@@ -1,9 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { NodeBackend } from '../../app/scripts/node-backend';
-import { addColumn, DEFAULT_ANALYSES } from '../../app/src/lib/seq';
-import type { Store } from '../../app/src/lib/types';
-import { fixture, newVault, withPmf } from '../../app/test/helpers';
+import { NodeBackend } from '../../matrix/scripts/node-backend';
+import { addColumn, DEFAULT_ANALYSES } from '../../matrix/src/lib/seq';
+import type { Store } from '../../matrix/src/lib/types';
+import { fixture, newVault, withPmf } from '../../matrix/test/helpers';
 import { landing, mismatch, nameFromPattern, typeSource } from '../src/lib/landing';
 import { listProjects, openVault, readProject } from '../server/vault';
 import { tmp } from './helpers';
@@ -14,7 +14,7 @@ const text = readFileSync(new URL('./fixtures/gmx-2025.4/rdf_nvt.xvg', import.me
 let store: Store;
 
 beforeAll(async () => {
-  // A project made by PMF Sequences itself, with row NA2SO4 and column SO4, read back by gmx-cypher's reader.
+  // A project made by the Matrix itself, with row NA2SO4 and column SO4, read back by gmx-cypher's reader.
   const dir = tmp('vault'), { svc, vault } = await newVault(new NodeBackend(dir));
   const c = addColumn(svc.store, 'SO4', 'sulfate');
   const a = withPmf(c.store, { name: 'NA2SO4', col: c.col.k, file: 'pmf.xvg', bytes: fixture('hmrfast6_ha_a_t200000.xvg'), group: 'hmr+fast+6' });
@@ -28,9 +28,9 @@ beforeAll(async () => {
 const using = (s: object) => ({ ...store, settings: { ...store.settings, ...s } });
 const FOLDERS = '{method}/{column}/{name}/{*}/{run}';
 
-describe("where PMF Sequences will put a result: its own planBatch (T33)", () => {
+describe("where the Matrix will put a result: its own planBatch (T33)", () => {
   it('folder pattern only: every field from the header\'s working directory', () => {
-    // PMF Sequences matches a row by group, name and sequence: no sequence here, so a second NA2SO4 row (found by attaching it with PMF Sequences' code).
+    // The Matrix matches a row by group, name and sequence: no sequence here, so a second NA2SO4 row (found by attaching it with the Matrix's code).
     expect(landing(using({ pathPattern: FOLDERS }), 'rdf_nvt.xvg', text)).toEqual({
       ok: true, row: 'NA2SO4', seq: '', rowNew: true, twin: { seq: 'NA2SO4', group: 'hmr+fast+6' }, group: 'hmr+fast+6', col: { k: 'so4', label: 'SO4', isNew: false }, run: 2,
       type: { k: 'rdf', label: 'RDF', how: 'header' }, curves: { imported: ['water_O'], inFile: ['water_O', 'sodium'] },
@@ -116,8 +116,8 @@ describe('POST /api/landing', () => {
   });
 });
 
-describe('a file PMF Sequences has no type for (batch 3: filed as general Data, not refused)', () => {
-  // gmx mindist's contacts: titled "Number of Contacts < 0.6 nm", which no PMF Sequences type recognises.
+describe('a file the Matrix has no type for (batch 3: filed as general Data, not refused)', () => {
+  // gmx mindist's contacts: titled "Number of Contacts < 0.6 nm", which no Matrix type recognises.
   const contacts = readFileSync(new URL('./fixtures/r9/mindist/mindist_nvt_numcont.xvg', import.meta.url), 'utf8')
     .replace(/^# Working dir:.*$/m, '# Working dir:  /home/user/sim/hmr+fast+6/so4/NA2SO4/9.multiwalker/2');
 

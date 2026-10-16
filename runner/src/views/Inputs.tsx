@@ -14,7 +14,7 @@ import { COMMANDS, commandOf } from '../lib/commands'
 import { inputRole, type Role, type Slot } from '../lib/inputs'
 import { useAwhScan, useTerms } from '../terms'
 import { cn } from '../lib/utils'
-import { fmtBytes } from '../../../app/src/lib/structFile'
+import { fmtBytes } from '../../../matrix/src/lib/structFile'
 
 interface Entry { name: string; kind: 'dir' | 'file'; size: number; mtime: number; role: Role | 'output' | null }
 interface Listing { path: string; parent: string | null; entries: Entry[]; hidden: number }

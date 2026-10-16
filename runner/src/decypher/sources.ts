@@ -71,11 +71,11 @@ async function loadVault(ref: Extract<SourceRef, { kind: 'vault' }>, list: Vault
   const g = record ? recordGroups(record) : null, need = g ? maxAtom([g.ref, ...g.sels]) : 0
   const out: Record<string, Struct> = {}, tried: string[] = []
   let key: string | null = null, note = ''
-  // The row's own structure first: the GRO that PMF Sequences keeps with the sequence.
+  // The row's own structure first: the GRO that the Matrix keeps with the sequence.
   for (const s of row.structures) {
     try {
       const st = await structAt('vault:' + s.file, '/api/decypher/vault/file?path=' + enc(s.file), s.name)
-      if (enough(st, need)) { key = 'vault:' + s.file; out[key] = st; note = s.name + ' · ' + row.name + '\'s structure in PMF Sequences'; break }
+      if (enough(st, need)) { key = 'vault:' + s.file; out[key] = st; note = s.name + ' · ' + row.name + '\'s structure in the Matrix'; break }
       tried.push(atomsNote(s.name, st, need))
     } catch (e) { tried.push(s.name + ': ' + (e as Error).message) }
   }

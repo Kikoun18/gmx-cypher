@@ -2,8 +2,8 @@ import { createHash } from 'node:crypto'
 import { copyFileSync, mkdirSync, readdirSync, readFileSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { NodeBackend } from '../../app/scripts/node-backend'
-import { newVault, withAnalysis, withPmf, withStructure, fixture } from '../../app/test/helpers'
+import { NodeBackend } from '../../matrix/scripts/node-backend'
+import { newVault, withAnalysis, withPmf, withStructure, fixture } from '../../matrix/test/helpers'
 import { findRuns, readRun, runsBySha, vaultFile, vaultRdfs } from '../server/decypher'
 import { Jobs } from '../server/jobs'
 import { openVault } from '../server/vault'
@@ -20,7 +20,7 @@ function listing(root: string): string[] {
   return out
 }
 
-/** PMF Sequences' own vault: WRWYCR with a PMF run, your H run's g(r) as its RDF on HA, and the peptide's structure. */
+/** The Matrix's own vault: WRWYCR with a PMF run, your H run's g(r) as its RDF on HA, and the peptide's structure. */
 async function madeVault() {
   const dir = tmp('vault')
   const { svc, vault } = await newVault(new NodeBackend(dir))
@@ -44,7 +44,7 @@ function jobsWithRun(home: string) {
   return new Jobs(join(home, 'jobs'))
 }
 
-describe('(de)Cypher reads the RDFs of PMF Sequences, with their structures (read only)', () => {
+describe('(de)Cypher reads the RDFs of the Matrix, with their structures (read only)', () => {
   it('lists each RDF with its curves, its row\'s structures and the run that wrote it; nothing written', async () => {
     const dir = await madeVault(), before = listing(dir), jobs = jobsWithRun(tmp('home'))
     expect([...runsBySha(jobs).values()].map(r => r.job)).toEqual(['jmv5ik7gl0l8e'])
@@ -75,7 +75,7 @@ describe('(de)Cypher reads the RDFs of PMF Sequences, with their structures (rea
   it('the routes: no vault is said in words; with one, the list and its files', async () => {
     const s = await apiServer()
     try {
-      expect(await s.call('/api/decypher/vault')).toEqual({ status: 409, json: { error: 'no vault set: choose the PMF Sequences vault in settings' } })
+      expect(await s.call('/api/decypher/vault')).toEqual({ status: 409, json: { error: 'no vault set: choose the Matrix vault in settings' } })
       s.ctx.config.vault = await madeVault()
       const r = await s.call<{ projects: { rows: { rdfs: { curves: { file: string }[] }[] }[] }[] }>('/api/decypher/vault')
       expect(r.status).toBe(200)

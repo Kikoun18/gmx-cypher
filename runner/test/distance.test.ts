@@ -2,8 +2,8 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { parseHelp } from '../src/lib/gmxText';
 import { distanceArgv, distanceNames, distanceOptionProblems, distancePairProblems, distanceSelections, parseDistanceStats } from '../src/lib/distance';
-import { detectAna, getAnalyses, parseTable } from '../../app/src/lib/seq';
-import { parseGmxHeader } from '../../app/src/lib/gmxHeader';
+import { detectAna, getAnalyses, parseTable } from '../../matrix/src/lib/seq';
+import { parseGmxHeader } from '../../matrix/src/lib/gmxHeader';
 
 const FIX = new URL('./fixtures/', import.meta.url);
 const text = (p: string) => readFileSync(new URL(p, FIX), 'utf8');
@@ -80,7 +80,7 @@ describe('the averages gmx distance prints (R7)', () => {
   });
 });
 
-describe('the outputs in PMF Sequences (R7, section 4)', () => {
+describe('the outputs in the Matrix (R7, section 4)', () => {
   it.each([
     ['distance/com/distance_nvt.xvg', 'distance_nvt.xvg', 'dist'],
     ['distance/com/distance_nvt_all.xvg', 'distance_nvt_all.xvg', 'dist'],
@@ -91,7 +91,7 @@ describe('the outputs in PMF Sequences (R7, section 4)', () => {
     expect(detectAna(getAnalyses(null), name, parseTable(t).head, parseGmxHeader(t)?.tool ?? null).k).toBe(k);
   });
 
-  it('PMF Sequences takes one curve of a distance file (its yCols is 2): the first selection', () => {
+  it('The Matrix takes one curve of a distance file (its yCols is 2): the first selection', () => {
     expect(getAnalyses(null).find(a => a.k === 'dist')?.yCols).toBe('2');
   });
 });

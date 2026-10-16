@@ -6,8 +6,8 @@ import { parseHelp } from '../src/lib/gmxText';
 import type { Group } from '../src/lib/groups';
 import { gyrateArgv, gyrateKind, gyrateLegacyArgv, gyrateLegacyStdin } from '../src/lib/gyrate';
 import { resultSeries } from '../src/lib/rdf';
-import { detectAna, getAnalyses, parseTable } from '../../app/src/lib/seq';
-import { parseGmxHeader } from '../../app/src/lib/gmxHeader';
+import { detectAna, getAnalyses, parseTable } from '../../matrix/src/lib/seq';
+import { parseGmxHeader } from '../../matrix/src/lib/gmxHeader';
 import { planRun, startRun, type RunRequest } from '../server/runs';
 import { apiServer, FAKE_GMX, RUNNER, tmp } from './helpers';
 
@@ -60,7 +60,7 @@ describe('the two tools, each with its own options (R9c)', () => {
     expect(six).toEqual([1.48948, 1.54799]);
   });
 
-  it('both write the total and the three axes; PMF Sequences types both Rg and reads the total', () => {
+  it('both write the total and the three axes; the Matrix types both Rg and reads the total', () => {
     for (const f of ['r9/gyrate/gyrate_nvt.xvg', 'r9/gyrate-legacy/gyrate_nvt.xvg']) {
       const t = text(f);
       expect(resultSeries(t)).toHaveLength(4);

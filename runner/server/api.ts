@@ -4,7 +4,7 @@ import { COMMANDS, commandOf, type OutputNames } from '../src/lib/commands';
 import { existsSync, readFileSync, realpathSync, statSync } from 'node:fs';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { basename, dirname, isAbsolute, join } from 'node:path';
-import { TOKENS } from '../../app/src/lib/seq';
+import { TOKENS } from '../../matrix/src/lib/seq';
 import { inputRole, suggestInputs } from '../src/lib/inputs';
 import { fromRanges } from '../src/lib/atoms';
 import { nameProblem } from '../src/lib/groups';
@@ -164,11 +164,11 @@ export function makeApi(ctx: Ctx): Api {
     }
     if (is(req, 'GET', url, '/api/decypher/vault')) {
       // (de)Cypher: the vault's RDFs with their rows' structures, and the run that wrote each, read only.
-      if (!ctx.config.vault) throw new HttpError(409, 'no vault set: choose the PMF Sequences vault in settings');
+      if (!ctx.config.vault) throw new HttpError(409, 'no vault set: choose the Matrix vault in settings');
       return { body: await listVault(await openVault(ctx.config.vault), ctx.jobs) };
     }
     if (is(req, 'GET', url, '/api/decypher/vault/file')) {
-      if (!ctx.config.vault) throw new HttpError(409, 'no vault set: choose the PMF Sequences vault in settings');
+      if (!ctx.config.vault) throw new HttpError(409, 'no vault set: choose the Matrix vault in settings');
       const text = await vaultFile(await openVault(ctx.config.vault), ctx.jobs, url.searchParams.get('path') || '');
       res.writeHead(200, { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' });
       res.end(text);
@@ -198,7 +198,7 @@ export function makeApi(ctx: Ctx): Api {
       if (!ctx.config.vault) throw new HttpError(409, 'no vault set');
       const v = await openVault(ctx.config.vault), project = (await listProjects(v)).find(p => p.id === b.project);
       if (!project) throw new HttpError(404, 'no project ' + b.project + ' in the vault');
-      // Only g(r): the cumulative-number file is titled "Cumulative Number RDF", which PMF Sequences would read as another RDF (T35).
+      // Only g(r): the cumulative-number file is titled "Cumulative Number RDF", which the Matrix would read as another RDF (T35).
       return { body: sendToInbox(v, project, join(String(j.meta!.outDir), (j.meta!.names as { xvg: string }).xvg), String(b.name ?? ''), ctx.config.pmfUrl) };
     }
     if (is(req, 'POST', url, '/api/batch/preview')) {
@@ -269,7 +269,7 @@ export function makeApi(ctx: Ctx): Api {
       const unknown = Object.keys(patch || {}).filter(k => !SETTABLE.includes(k as keyof Config));
       if (unknown.length) throw new HttpError(400, 'unknown setting: ' + unknown.join(', '));
       if (patch.allow) patch.allow = realFolders(patch.allow);
-      if (patch.pmfUrl && !/^https?:\/\/[^\s]+$/.test(patch.pmfUrl)) throw new HttpError(400, 'the PMF Sequences address must start with http:// or https://');
+      if (patch.pmfUrl && !/^https?:\/\/[^\s]+$/.test(patch.pmfUrl)) throw new HttpError(400, 'the Matrix address must start with http:// or https://');
       // The tool's own name, found on PATH, or the absolute path of a program that exists: never a relative path
       // resolved against the server's folder, or another program's name (review).
       for (const k of ['qq', 'gmxEta'] as const) {
@@ -277,7 +277,7 @@ export function makeApi(ctx: Ctx): Api {
         if (v != null && (typeof v !== 'string' || !(v === name || (isAbsolute(v) && /^[\w./+-]+$/.test(v) && executable(v)))))
           throw new HttpError(400, k + ': ' + name + ' (found on PATH), or the absolute path of a program that exists');
       }
-      // A vault is checked before it is kept: PMF Sequences' manifest, schemas 1–4 (T32, T142).
+      // A vault is checked before it is kept: the Matrix's manifest, schemas 1–4 (T32, T142).
       if (patch.vault) patch.vault = (await openVault(patch.vault).catch(e => { throw new HttpError(400, (e as Error).message); })).path;
       ctx.config = { ...ctx.config, ...patch };
       saveConfig(ctx.home, ctx.config);

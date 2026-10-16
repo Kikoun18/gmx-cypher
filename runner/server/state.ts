@@ -10,9 +10,9 @@ export interface Config {
   gmx: string | null;
   /** Folders the file browser may show (R2a). */
   allow: string[];
-  /** The PMF Sequences vault folder (R6). */
+  /** The Matrix vault folder (R6). */
   vault: string | null;
-  /** PMF Sequences' address, for a link to the project (R6c). */
+  /** The Matrix's address, for a link to the project (R6c). */
   pmfUrl: string | null;
   /** Jobs at a time (R7b). */
   concurrency: number;

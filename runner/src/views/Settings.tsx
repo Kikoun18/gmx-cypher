@@ -99,7 +99,7 @@ export function Settings({ state, open, onOpenChange, onState, returnFocus }: { 
             </div>
             {folderError && <FieldHint error>✗ {folderError}</FieldHint>}
           </Field>
-          <Section label="PMF Sequences vault" />
+          <Section label="Matrix vault" />
           <Field>
             <Label htmlFor="vault">vault folder</Label>
             <div className="flex gap-2">
@@ -111,12 +111,12 @@ export function Settings({ state, open, onOpenChange, onState, returnFocus }: { 
             <FieldHint>Read only: projects, rows and patterns, for where a result lands. A result you send goes into the project's _inbox folder; nothing else in the vault is ever written.</FieldHint>
           </Field>
           <Field>
-            <Label htmlFor="pmf-url">PMF Sequences address · optional</Label>
+            <Label htmlFor="pmf-url">The Matrix address · optional</Label>
             <div className="flex gap-2">
               <Input id="pmf-url" size="sm" value={pmfUrl} placeholder="http://localhost:5173/" onChange={e => setPmfUrl(e.target.value)} onKeyDown={e => e.key === 'Enter' && savePmfUrl()} />
               <Button variant="outline" onClick={savePmfUrl} disabled={pmfUrl.trim() === (state.config.pmfUrl || '')}>save</Button>
             </div>
-            {pmfError ? <FieldHint error>✗ {pmfError}</FieldHint> : <FieldHint>Where you open PMF Sequences; after sending, gmx-cypher links to the project there.</FieldHint>}
+            {pmfError ? <FieldHint error>✗ {pmfError}</FieldHint> : <FieldHint>Where you open the Matrix; after sending, gmx-cypher links to the project there.</FieldHint>}
           </Field>
           <Section label="Keyboard" />
           <KeyField />

@@ -9,7 +9,7 @@ describe('output names from a template (T30)', () => {
     expect(renderStem(DEFAULT_TEMPLATE, values)).toBe('rdf_nvt');
   });
 
-  it("every token: the runner's own and PMF Sequences' fields", () => {
+  it("every token: the runner's own and the Matrix's fields", () => {
     const all = { ...values, method: 'umbrella', column: 'SO4', name: 'NA2SO4', seq: 'AAG', time: '100ns', run: '3', temp: '300K' };
     expect(renderStem('{method}-{column}-{name}-{seq}-{time}-{run}-{temp}-{analysis}-{trajectory}', all)).toBe('umbrella-SO4-NA2SO4-AAG-100ns-3-300K-rdf-nvt');
   });
@@ -21,7 +21,7 @@ describe('output names from a template (T30)', () => {
     expect(() => renderStem('rdf_{trajectory', values)).toThrow('a { or } without its pair');
   });
 
-  it("makes names safe with PMF Sequences' safeFileName", () => {
+  it("makes names safe with the Matrix's safeFileName", () => {
     expect(renderStem('a/b:c*{trajectory}', values)).toBe('a_b_c_nvt');
     expect(renderStem('..{trajectory}.', values)).toBe('nvt');
     expect(renderStem('con', values)).toBe('_con');

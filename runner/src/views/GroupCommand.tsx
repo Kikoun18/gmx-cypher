@@ -95,7 +95,7 @@ function OptionField({ f, o, value, set }: { f: CommandOption; o: HelpOption; va
   )
 }
 
-/** The file-name template (T30, tokens as PMF Sequences' plus the runner's) and another output folder, if any. */
+/** The file-name template (T30, tokens as the Matrix's plus the runner's) and another output folder, if any. */
 function Names({ draft, setDraft, plan, tool }: { draft: Draft; setDraft: React.Dispatch<React.SetStateAction<Draft>>; plan: PlanView | undefined; tool: string }) {
   const id = React.useId()
   return (

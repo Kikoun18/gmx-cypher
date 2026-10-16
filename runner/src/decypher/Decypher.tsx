@@ -1,5 +1,5 @@
 // (de)Cypher: RDFs of several jobs at once, each with the structure its groups are atoms of, side by side or on
-// one graph, from gmx-cypher's own jobs, from PMF Sequences' vault (with the row's structure), or from files.
+// one graph, from gmx-cypher's own jobs, from the Matrix's vault (with the row's structure), or from files.
 // The RDF Explorer design (v3) in Morpheus, as gmx-cypher's own view; it opens from the jobs tab or with a key.
 
 import * as React from 'react'
@@ -249,7 +249,7 @@ function RunsTab({ allow, row }: { allow: string[]; row: (ref: SourceRef, title:
   )
 }
 
-/** Where the picked sources come from: this gmx-cypher's RDF jobs, runs on disk, PMF Sequences' vault, or files. */
+/** Where the picked sources come from: this gmx-cypher's RDF jobs, runs on disk, the Matrix's vault, or files. */
 function AddPanel({ sources, jobs, allow, vaultPath, vault, loadVault, fileRows, onFiles, onClearFiles }: {
   sources: DecypherSources; jobs: Job[]; allow: string[]; vaultPath: string | null; vault: { list?: VaultRdfs; error?: string } | null; loadVault: () => void
   fileRows: { path: string; kind: string; status: string; error: boolean }[]; onFiles: (f: LoadedFile[]) => void; onClearFiles: () => void
@@ -280,7 +280,7 @@ function AddPanel({ sources, jobs, allow, vaultPath, vault, loadVault, fileRows,
         : <p className="m-0 text-caption text-muted-foreground">no RDF jobs yet · run gmx rdf from the analysis tab</p>)}
       {tab === 'runs' && <RunsTab allow={allow} row={row} />}
       {tab === 'vault' && (!vaultPath
-        ? <p className="m-0 text-caption text-muted-foreground">no vault set · choose the PMF Sequences vault in settings, then its RDFs come here with each row's structure</p>
+        ? <p className="m-0 text-caption text-muted-foreground">no vault set · choose the Matrix vault in settings, then its RDFs come here with each row's structure</p>
         : !vault ? <p className="m-0 text-caption text-muted-foreground" aria-live="polite">reading the vault…</p>
         : vault?.error ? <div className="flex flex-col gap-1.5"><p className="m-0 text-caption text-destructive">✗ {vault.error}</p><Button variant="outline" size="sm" className="w-fit" onClick={loadVault}><RefreshCw /> try again</Button></div>
         : vault?.list && (
@@ -532,7 +532,7 @@ export function Decypher({ open, onOpenChange, sources, jobs, jobsLoaded, allow,
             {!items.length ? (
               <div className="mx-auto mt-10 flex max-w-[620px] flex-col gap-4 rounded-2xl border-2 border-dashed border-input bg-card p-10">
                 <span className="text-display font-bold">Nothing to decipher yet</span>
-                <span className="max-w-[62ch] text-prose text-muted-foreground">Pick RDFs on the left: your gmx-cypher jobs, the RDFs of the PMF Sequences vault (each with its row's structure), or files dropped here. Several at once are shown side by side, or compared on one graph.</span>
+                <span className="max-w-[62ch] text-prose text-muted-foreground">Pick RDFs on the left: your gmx-cypher jobs, the RDFs of the Matrix vault (each with its row's structure), or files dropped here. Several at once are shown side by side, or compared on one graph.</span>
                 <span className="text-caption text-muted-foreground">{keyName ? keyName + ' opens and closes (de)Cypher · ' : ''}change the key in settings · F fits the plotted groups · R resets the view</span>
               </div>
             ) : !shown.length ? (

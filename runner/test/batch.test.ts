@@ -8,7 +8,7 @@ import { apiServer, clusterCopy, tmp } from './helpers';
 
 const TEMPLATE = 'hmr+fast+6/{column}/{seq}/9.multiwalker/{run}/07_md.xtc';
 
-describe("path templates, matched with PMF Sequences' parsePath (T38)", () => {
+describe("path templates, matched with the Matrix's parsePath (T38)", () => {
   it.each<[string, string, unknown]>([
     ['hmr+fast+6/ha/WRWYCR/9.multiwalker/1/07_md.xtc', TEMPLATE, { fields: { col: 'ha', seq: 'WRWYCR', run: 'a' }, run: 1, problems: [] }],
     ['hmr+fast+6/pg/WRWYCR/9.multiwalker/3/07_md.xtc', '**/{column}/{seq}/9.multiwalker/{run}/07_md.xtc', { fields: { col: 'pg', seq: 'WRWYCR', run: 'c' }, run: 3, problems: [] }],
@@ -77,9 +77,9 @@ describe('the walk under the root (review finding 11)', () => {
 
 describe('batches over HTTP', () => {
   it('preview, run the chosen matches, then send all to the vault, file by file by the rule of R6', async () => {
-    const { NodeBackend } = await import('../../app/scripts/node-backend');
-    const { addColumn } = await import('../../app/src/lib/seq');
-    const { newVault } = await import('../../app/test/helpers');
+    const { NodeBackend } = await import('../../matrix/scripts/node-backend');
+    const { addColumn } = await import('../../matrix/src/lib/seq');
+    const { newVault } = await import('../../matrix/test/helpers');
     const { apiServer } = await import('./helpers');
     const root = clusterCopy(), vdir = tmp('vault'), { svc, vault } = await newVault(new NodeBackend(vdir));
     svc.commit({ ...svc.store, settings: { ...svc.store.settings, pathPattern: '{method}/{column}/{seq}/{*}/{run}', pattern: '{method}_{column}_{seq}_{run}.xvg' } });
@@ -110,8 +110,8 @@ describe('batches over HTTP', () => {
 describe('send all, item by item (review finding 10)', () => {
   it('an item that fails is listed with its reason, and the others are still sent', async () => {
     const { renameSync } = await import('node:fs');
-    const { NodeBackend } = await import('../../app/scripts/node-backend');
-    const { newVault } = await import('../../app/test/helpers');
+    const { NodeBackend } = await import('../../matrix/scripts/node-backend');
+    const { newVault } = await import('../../matrix/test/helpers');
     const { apiServer } = await import('./helpers');
     const { Batches, sendAll } = await import('../server/batch');
     const root = clusterCopy(), vdir = tmp('vault'), { svc, vault } = await newVault(new NodeBackend(vdir));
@@ -157,7 +157,7 @@ describe('batch names and folders (review findings 4 and 5)', () => {
     await s.close();
   });
 
-  it("PMF Sequences' tokens in the output name take the path template's fields; a token the path doesn't give is a problem in the preview", () => {
+  it("The Matrix's tokens in the output name take the path template's fields; a token the path doesn't give is a problem in the preview", () => {
     const root = clusterCopy();
     expect(findTrajectories(root, TEMPLATE, named('{analysis}_{column}_{seq}_{run}'), [root]).map(i => i.problems)).toEqual([[], [], []]);
     expect(findTrajectories(root, TEMPLATE, named('{analysis}_{time}'), [root])[0].problems).toEqual(['file name: {time} has no value here']);

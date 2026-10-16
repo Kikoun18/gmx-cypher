@@ -15,7 +15,7 @@ import { DEFAULT_TEMPLATE } from '../lib/names'
 import type { Options } from '../lib/rdf'
 import { usePlan } from '../plan'
 import { useAwhScan } from '../terms'
-import { DEFAULT_PATTERN, FIELD_LABEL, parseName } from '../../../app/src/lib/seq'
+import { DEFAULT_PATTERN, FIELD_LABEL, parseName } from '../../../matrix/src/lib/seq'
 import { Code } from './Code'
 
 type Kind = FrameChoice['kind']
@@ -91,7 +91,7 @@ export function Awh({ gmx, draft, setDraft, onStarted }: { gmx: GmxState; draft:
             <ToggleGroupItem value="every">every {ordinal(every)} · {count({ kind: 'every', n: every })} files</ToggleGroupItem>
             <ToggleGroupItem value="all">all · {count({ kind: 'all' })} files</ToggleGroupItem>
           </ToggleGroup>
-          <FieldHint>{choice === 'last' ? 'the usual choice for PMF Sequences: the profile at the end' : choice === 'every' ? 'for convergence: the profile as it grew' : 'one file per stored frame'} · t = {timesText(written)} ps</FieldHint>
+          <FieldHint>{choice === 'last' ? 'the usual choice for the Matrix: the profile at the end' : choice === 'every' ? 'for convergence: the profile as it grew' : 'one file per stored frame'} · t = {timesText(written)} ps</FieldHint>
         </Field>
         {choice === 'every' && (
           <Field>
@@ -105,17 +105,17 @@ export function Awh({ gmx, draft, setDraft, onStarted }: { gmx: GmxState; draft:
           <Checkbox id="awh-more" className="mt-0.5" checked={options.more === true} onCheckedChange={v => { const { more: _m, ...rest } = options; setOptions(v === true ? { ...rest, more: true } : rest) }} />
           <span><span className="font-bold">{more.label}</span><span className="block text-caption text-muted-foreground">{more.what}</span></span>
         </label>
-        <p className="m-0 text-caption text-muted-foreground">kJ/mol always: PMF Sequences reads kJ/mol (gmx awh -kt is not offered)</p>
+        <p className="m-0 text-caption text-muted-foreground">kJ/mol always: the Matrix reads kJ/mol (gmx awh -kt is not offered)</p>
 
         <Section label="Name" />
         <Field>
           <Label htmlFor="awh-template">output name</Label>
           <Input id="awh-template" size="sm" className="max-w-md" value={draft.template ?? ''} placeholder={DEFAULT_TEMPLATE} onChange={e => setDraft(d => ({ ...d, template: e.target.value || undefined }))} />
-          <FieldHint>gmx awh adds _t&lt;time&gt; to each file · a name like method_col1_SEQ1 gives PMF Sequences' own pattern, {DEFAULT_PATTERN}</FieldHint>
+          <FieldHint>gmx awh adds _t&lt;time&gt; to each file · a name like method_col1_SEQ1 gives the Matrix's own pattern, {DEFAULT_PATTERN}</FieldHint>
         </Field>
         {vaultFile && (parsed?.matched
-          ? <p className="m-0 text-control text-mint-strong" aria-live="polite">✓ PMF Sequences reads {vaultFile} as {Object.entries(parsed.fields).map(([k, v]) => FIELD_LABEL[k as keyof typeof FIELD_LABEL] + ' ' + v).join(' · ')}</p>
-          : <p className="m-0 text-control text-muted-foreground" aria-live="polite">{vaultFile} doesn't follow PMF Sequences' default pattern {DEFAULT_PATTERN}: it can still be sent, and is then named by the project's pattern</p>)}
+          ? <p className="m-0 text-control text-mint-strong" aria-live="polite">✓ the Matrix reads {vaultFile} as {Object.entries(parsed.fields).map(([k, v]) => FIELD_LABEL[k as keyof typeof FIELD_LABEL] + ' ' + v).join(' · ')}</p>
+          : <p className="m-0 text-control text-muted-foreground" aria-live="polite">{vaultFile} doesn't follow the Matrix's default pattern {DEFAULT_PATTERN}: it can still be sent, and is then named by the project's pattern</p>)}
       </div>
 
       <aside className="flex min-w-0 flex-col gap-4">

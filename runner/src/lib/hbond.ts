@@ -28,7 +28,7 @@ export const HBOND_FORM: FormOption[] = [
   { flag: 'dt', group: 'frames', label: 'every', unit: 'ps', what: 'one frame per this many ps; 0 = every frame' },
   { flag: 'pbc', group: 'periodic boundaries', label: 'periodic boundaries', what: 'bonds across the box edges' },
   { flag: 'rmpbc', group: 'periodic boundaries', label: 'make molecules whole', what: 'from the run input, in every frame' },
-  { flag: 'dist', group: 'output', label: 'distance distribution too', what: 'not sent to the vault: PMF Sequences would read it as an umbrella histogram', switch: 'dist' },
+  { flag: 'dist', group: 'output', label: 'distance distribution too', what: 'not sent to the vault: the Matrix would read it as an umbrella histogram', switch: 'dist' },
   { flag: 'ang', group: 'output', label: 'angle distribution too', what: 'not sent to the vault, likewise', switch: 'ang' },
   { flag: 'dan', group: 'output', label: 'donors and acceptors too', what: 'their number in each frame; not sent to the vault', switch: 'dan' },
 ];
@@ -42,7 +42,7 @@ export const LEGACY_FORM: FormOption[] = [
   { flag: 'b', group: 'frames', label: 'first', unit: 'ps', what: 'frames before this time are skipped' },
   { flag: 'e', group: 'frames', label: 'last', unit: 'ps', what: '0 = to the end of the trajectory' },
   { flag: 'dt', group: 'frames', label: 'every', unit: 'ps', what: 'one frame per this many ps; 0 = every frame' },
-  { flag: 'dist', group: 'output', label: 'distance distribution too', what: 'not sent to the vault: PMF Sequences would read it as H-bonds', switch: 'dist' },
+  { flag: 'dist', group: 'output', label: 'distance distribution too', what: 'not sent to the vault: the Matrix would read it as H-bonds', switch: 'dist' },
   { flag: 'ang', group: 'output', label: 'angle distribution too', what: 'not sent to the vault; needs merging off', switch: 'ang' },
 ];
 

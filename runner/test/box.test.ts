@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { boxDimensions, boxEdges, outsideBox, parseBox, type Vectors } from '../src/lib/box';
 
 const FIX = (name: string) => readFileSync(new URL('./fixtures/' + name, import.meta.url), 'utf8');
-const APP = (name: string) => readFileSync(new URL('../../app/test/fixtures/' + name, import.meta.url), 'utf8');
+const APP = (name: string) => readFileSync(new URL('../../matrix/test/fixtures/' + name, import.meta.url), 'utf8');
 /** A CRYST1 line in its fixed columns: a, b, c in Å (7–33), the angles in degrees (34–54). */
 const cryst = (a: number, b: number, c: number, al: number, be: number, ga: number) =>
   'CRYST1' + a.toFixed(3).padStart(9) + b.toFixed(3).padStart(9) + c.toFixed(3).padStart(9) + al.toFixed(2).padStart(7) + be.toFixed(2).padStart(7) + ga.toFixed(2).padStart(7) + ' P 1           1';

@@ -5,7 +5,7 @@
 import { EventEmitter } from 'node:events';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { basename, dirname, join, relative } from 'node:path';
-import { structFormat } from '../../app/src/lib/structFile';
+import { structFormat } from '../../matrix/src/lib/structFile';
 import { atomTable } from '../src/lib/atoms';
 import { matchTrajectory, nameValues, vaultFields, type BatchMatch } from '../src/lib/batch';
 import { renderStem } from '../src/lib/names';
@@ -171,7 +171,7 @@ export class Batches extends EventEmitter {
 
 /**
  * Send all (R7b): each done run of the batch, file by file by the rule of R6: the fields its path gave
- * (the folder pattern of the project fills the rest), the name from the project's pattern, PMF Sequences'
+ * (the folder pattern of the project fills the rest), the name from the project's pattern, the Matrix'
  * preview; sent only when it lands where the fields say, else skipped with the reason.
  */
 export async function sendAll(ctx: Ctx, b: Batch, project: string): Promise<{ rel: string; sent?: string; skipped?: string }[]> {

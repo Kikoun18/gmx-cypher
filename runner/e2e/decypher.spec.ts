@@ -27,7 +27,7 @@ test.beforeAll(async () => {
     const spec = { kind: 'rdf', title: stem + ' · ' + rec.groups[0].name + ' → 13 groups', file: 'gmx', args: [], cwd: sim, meta: { stem, outDir: out, record: join(out, stem + '.run.json'), names: { xvg: stem + '.xvg', ndx: stem + '.ndx' } } }
     writeFileSync(join(home, 'jobs', id + '.ndjson'), [{ t: 'created', at, spec }, { t: 'started', at, pid: 1 }, { t: 'ended', at, status: 'done', code: 0, signal: null }].map(e => JSON.stringify(e)).join('\n') + '\n')
   }
-  // PMF Sequences' vault with two RDFs of one cell, whose runs this runner doesn't know (as for a vault from another machine).
+  // The Matrix's vault with two RDFs of one cell, whose runs this runner doesn't know (as for a vault from another machine).
   const vault = mkdtempSync(join(tmpdir(), 'gmxc-e2e-vault-'))
   execFileSync(process.execPath, ['--import', './server/register.mjs', 'e2e/make-vault.ts', vault], { cwd: RUNNER })
   writeFileSync(join(home, 'config.json'), JSON.stringify({ vault }))

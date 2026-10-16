@@ -4,7 +4,7 @@ import type { CommandOption } from './commands';
 import type { HelpOption } from './gmxText';
 import { isDefault, type Options } from './rdf';
 
-/** Set whatever the form says: PMF Sequences reads ps and the xmgrace @ lines (as T22 for rdf). */
+/** Set whatever the form says: the Matrix reads ps and the xmgrace @ lines (as T22 for rdf). */
 export const FIXED: Record<string, string> = { tu: 'ps', xvg: 'xmgrace' };
 
 /**

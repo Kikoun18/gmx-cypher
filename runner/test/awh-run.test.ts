@@ -1,9 +1,9 @@
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { NodeBackend } from '../../app/scripts/node-backend';
-import { addColumn } from '../../app/src/lib/seq';
-import { newVault } from '../../app/test/helpers';
+import { NodeBackend } from '../../matrix/scripts/node-backend';
+import { addColumn } from '../../matrix/src/lib/seq';
+import { newVault } from '../../matrix/test/helpers';
 import { recordProblems } from '../src/lib/record';
 import { planRun, startRun, type RunRequest } from '../server/runs';
 import { apiServer, FAKE_GMX, RUNNER, tmp } from './helpers';
@@ -90,7 +90,7 @@ describe('a run of gmx awh (R5)', () => {
   });
 });
 
-describe('the AWH result lands in PMF Sequences as a PMF, at its time (R5)', () => {
+describe('the AWH result lands in the Matrix as a PMF, at its time (R5)', () => {
   it('the last frame, named by the project pattern: PMF, row, column and time 20', async () => {
     const vdir = tmp('vault'), { svc, vault } = await newVault(new NodeBackend(vdir));
     const c = addColumn(svc.store, 'HA', 'histidine');
