@@ -120,9 +120,9 @@ If you applied `deploy/k8s/deployment.yaml` before, applying this folder replace
 Service and Ingress stay. If the pod shows `ImagePullBackOff` with `429 Too Many Requests`, Docker Hub is limiting the
 cluster's anonymous pulls: wait and retry, or use the Docker route with your own registry.
 
-Not checked on a cluster: the files and their wiring pass the same schema checks as the others, and the copy into the
-volume has been run once by hand (it found the files one folder too deep with `kubectl cp`, hence the `tar` above);
-nginx's start with these mounts and the `tar` copy as written here have not been run by the author.
+What has run on a cluster (CERIT-SC, by a user): the pod starts with these mounts and nginx answers, the certificate is
+issued, and `kubectl cp` left the files one folder too deep, hence the `tar` above. Not yet run: the `tar` copy as
+written here.
 
 ## Why it is set up this way
 
