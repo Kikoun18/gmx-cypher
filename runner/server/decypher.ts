@@ -5,7 +5,7 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import type { RowRecord } from '../../matrix/src/lib/storage/records';
-import type { RunRecord } from '../src/lib/record';
+import { recordComplete, type RunRecord } from '../src/lib/record';
 import type { VaultRdfs, VaultRow, VaultRun } from '../src/decypher/vaultTypes';
 import { inside, real, within } from './files';
 import { HttpError } from './http';
@@ -113,7 +113,7 @@ export function findRuns(root: string, roots: string[], limit = 400, budget = 50
       if (st?.isDirectory()) { walk(p, depth + 1); continue; }
       if (!st?.isFile() || !name.endsWith('.run.json') || st.size > 4 << 20) continue;
       const rec = recordAt(r, false);
-      if (!isRdfRecord(rec) || !rec.outputs.some(o => o.kind === 'xvg')) continue;
+      if (!isRdfRecord(rec) || !recordComplete(rec) || !rec.outputs.some(o => o.kind === 'xvg')) continue;
       if (runs.length >= limit) { more = true; return; }
       const ref = rec.groups.find(g => g.role === 'reference');
       runs.push({ path: r, stem: name.slice(0, -'.run.json'.length), frames: rec.frames?.analysed ?? null, groups: rec.groups.length, reference: ref?.name ?? null, structure: rec.inputs?.structure?.path ?? null, ended: rec.ended ?? null });
@@ -130,6 +130,7 @@ export function readRun(path: string, roots: string[]): { record: RunRecord; xvg
   if (!p.endsWith('.run.json')) throw new HttpError(400, path + ' is not a gmx-cypher run record (.run.json)');
   const rec = recordAt(p, false);
   if (!isRdfRecord(rec)) throw new HttpError(400, path + ' is not the record of an RDF run');
+  if (!recordComplete(rec)) throw new HttpError(409, path + " is incomplete: its job didn't finish (the record was written when it started)");
   const out = rec.outputs.find(o => o.kind === 'xvg')!;
   return { record: rec, xvg: readFileSync(inside(out.path, roots), 'utf8') };
 }

@@ -37,6 +37,12 @@ describe('(de)Cypher reads your runs as the RDF Explorer design does', () => {
     expect(shortLabels(analyses.map(a => a.label))).toEqual(['Methionine_H', 'Methionine_S'])
   })
 
+  it("a dropped record whose job didn't finish is not used: its row says so (R2b)", () => {
+    const rec = JSON.parse(read('rdf_o111_Methionine_H.run.json'))
+    const { files } = fromFiles([{ path: 'cut.run.json', text: JSON.stringify({ ...rec, status: 'running', complete: false }) }])
+    expect(files[0].status).toBe("✗ an incomplete record: its job didn't finish")
+  })
+
   it('a peak is the highest point of the curve, not the first shell\'s; an index without a record names the groups by the legends', () => {
     const { analyses } = fromFiles(['rdf_o111_Methionine_H.xvg', 'rdf_o111_Methionine_H.ndx'].map(n => ({ path: n, text: read(n) })))
     const a = analyses[0], x = parseXvg(read('rdf_o111_Methionine_H.xvg'))

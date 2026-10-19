@@ -247,10 +247,12 @@ export function makeApi(ctx: Ctx): Api {
       if (req.method === 'GET' && job[2] === '/record') {
         const path = j.meta?.record as string | undefined;
         if (j.ended) await recordWritten(j.id);
-        if (!path || !existsSync(path)) throw new HttpError(404, j.ended ? 'this run has no record' : 'the record is written when the run ends');
-        // A run without groups claims its stem with an empty record (T103): one left empty never got its record (review finding 8).
+        // Written as the job starts, completed when it ends (R2b): the page asks for it once the job has ended.
+        if (!j.ended) throw new HttpError(404, 'the record is completed when the job ends');
+        if (!path || !existsSync(path)) throw new HttpError(404, 'this job has no record');
+        // A job without groups claims its stem with an empty record (T103): one from before R2b may have stayed empty (review finding 8).
         const text = readFileSync(path, 'utf8');
-        if (!text.trim()) throw new HttpError(404, j.ended ? 'this run has no record: it stopped before gmx-cypher wrote it' : 'the record is written when the run ends');
+        if (!text.trim()) throw new HttpError(404, 'this job has no record: it stopped before gmx-cypher wrote it');
         return { body: JSON.parse(text) };
       }
       if (req.method === 'GET' && job[2] === '/output') {

@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { copyFileSync, existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { api, FAKE_GMX, RUNNER, startRunner, tmp, type Started } from './helpers';
+import { recordComplete } from '../src/lib/record';
 
 let running: Started[] = [];
 afterEach(() => { for (const r of running) r.proc.kill('SIGTERM'); running = []; });
@@ -71,6 +72,26 @@ describe('SIGHUP: the terminal or SSH session closed (R2a, T157)', () => {
     expect(r.proc.exitCode).toBeNull();
     expect(job?.status).toBe('done');
     expect(existsSync(join(dir, 'rdf/rdf_nvt.run.json'))).toBe(true);
+  }, 30_000);
+});
+
+describe('a runner killed mid-job (R2b)', () => {
+  it('leaves a record that says the job did not finish', async () => {
+    const dir = tmp('nvt');
+    for (const f of ['nvt.tpr', 'nvt.gro', 'nvt.xtc']) copyFileSync(RUNNER + 'test/fixtures/nvt/' + f, join(dir, f));
+    const r = await startRunner(['--gmx', FAKE_GMX, '--allow', dir], { FAKE_GMX_SLOW: '300' });
+    running.push(r);
+    const groups = [
+      { role: 'reference', name: 'sulfur', tone: 'coral', steps: [{ op: 'add', rule: { kind: 'name', value: 'S1' } }] },
+      { role: 'selection', name: 'water_O', tone: 'sky', steps: [{ op: 'add', rule: { kind: 'name', value: 'OW1', resn: 'SOL' } }] },
+    ];
+    expect((await api(r, '/api/runs', { inputs: { trajectory: join(dir, 'nvt.xtc'), runInput: join(dir, 'nvt.tpr'), structure: join(dir, 'nvt.gro') }, groups, options: {} })).status).toBe(200);
+    await new Promise(res => setTimeout(res, 300));
+    r.proc.kill('SIGKILL');
+    await new Promise(res => r.proc.once('exit', res));
+    const rec = JSON.parse(readFileSync(join(dir, 'rdf/rdf_nvt.run.json'), 'utf8'));
+    expect(rec).toMatchObject({ status: 'running', complete: false, ended: null });
+    expect(recordComplete(rec)).toBe(false);
   }, 30_000);
 });
 

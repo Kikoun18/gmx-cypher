@@ -32,6 +32,8 @@ export interface RunRecord {
   started: string | null;
   ended: string | null;
   status: Status;
+  /** False in the record written when the job starts, true once it is completed at the end (version 3, R2b). Records from before have no field: they were written only at the end. */
+  complete?: boolean;
   exit: { code: number | null; signal: string | null } | null;
   frames: { analysed: number; lastTime: number } | null;
   log: string;
@@ -84,6 +86,8 @@ export interface RecordParts {
   pull?: 'pullx' | 'pullf';
   distances?: DistanceStat[];
   summary?: string[];
+  /** Whether the job has ended and this is its final record (R2b). */
+  complete?: boolean;
 }
 
 export function buildRecord(p: RecordParts): RunRecord {
@@ -93,7 +97,7 @@ export function buildRecord(p: RecordParts): RunRecord {
     format: 'gmx-cypher run', version: 3, analysis: p.analysis, ...(p.record ? { record: p.record } : {}), ...(p.stdin != null ? { stdin: p.stdin } : {}), ...(p.statistics !== undefined ? { statistics: p.statistics } : {}),
     ...(p.windows ? { windows: p.windows } : {}), ...(p.distances ? { distances: p.distances } : {}), ...(p.summary ? { summary: p.summary } : {}),
     runner: { name: 'gmx-cypher', version: p.runner }, gmx: p.gmx, job: p.job.id, command: p.command, env: p.env,
-    started: p.job.started ?? null, ended: p.job.ended ?? null, status: p.job.status, exit: p.job.exit ?? null,
+    started: p.job.started ?? null, ended: p.job.ended ?? null, status: p.job.status, ...(p.complete !== undefined ? { complete: p.complete } : {}), exit: p.job.exit ?? null,
     frames: p.frames !== undefined ? p.frames : p.job.progress.analysed ? { analysed: p.job.progress.analysed.frames, lastTime: p.job.progress.analysed.lastTime } : null, log: p.job.log, inputs: p.inputs,
     groups: p.groups.map((g, index) => {
       const nrs = groupAtoms(p.atoms, g.steps);
@@ -108,6 +112,9 @@ export function buildRecord(p: RecordParts): RunRecord {
     problems: p.problems,
   };
 }
+
+/** Whether a record is its job's final one (R2b): the one written at the start says it isn't; one from before was written at the end. */
+export const recordComplete = (r: { complete?: boolean; status?: string }) => r.complete !== false && r.status !== 'running';
 
 /** What makes a parsed file unusable as a v1 record, in words; [] when it is one. */
 export function recordProblems(x: unknown): string[] {

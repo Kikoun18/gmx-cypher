@@ -128,7 +128,7 @@ describe('a run of gmx energy (R4): planned, checked against the file, and recor
     const { job, record } = await startRun(s.ctx, req, roots);
     await record;
     writeFileSync(join(dir, 'energy/energy_rerun.run.json'), '');
-    expect(await s.call('/api/jobs/' + job.id + '/record')).toEqual({ status: 404, json: { error: 'this run has no record: it stopped before gmx-cypher wrote it' } });
+    expect(await s.call('/api/jobs/' + job.id + '/record')).toEqual({ status: 404, json: { error: 'this job has no record: it stopped before gmx-cypher wrote it' } });
     await s.close();
   });
 

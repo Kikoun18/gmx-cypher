@@ -124,6 +124,14 @@ describe('(de)Cypher finds RDF runs gmx-cypher wrote before, by their records', 
     expect(() => readRun(join(out, 'rdf_o111_Methionine_H.xvg'), [root])).toThrow('is not a gmx-cypher run record')
   })
 
+  it('skips and refuses a record whose job did not finish: the one written at its start (R2b)', () => {
+    const { root, out } = runsOnDisk()
+    const rec = JSON.parse(readFileSync(join(out, 'rdf_o111_Methionine_H.run.json'), 'utf8'))
+    writeFileSync(join(out, 'rdf_cut.run.json'), JSON.stringify({ ...rec, status: 'running', complete: false, ended: null }))
+    expect(findRuns(root, [root]).runs.map(r => r.stem)).not.toContain('rdf_cut')
+    expect(() => readRun(join(out, 'rdf_cut.run.json'), [root])).toThrow("is incomplete: its job didn't finish")
+  })
+
   it('stays inside the allowed folders: a folder outside is refused, a link out is not followed', () => {
     const { root } = runsOnDisk(), other = runsOnDisk()
     expect(() => findRuns(other.root, [root])).toThrow('outside the allowed folders')

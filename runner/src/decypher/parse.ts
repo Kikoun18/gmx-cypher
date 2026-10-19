@@ -95,7 +95,7 @@ function withCurves(x: Xvg, groups: Group[]): Sel[] {
 // ---------- a run record ----------
 export interface RecordGroup { index?: number; role: string; name: string; tone?: string; atoms: string }
 export interface RecordLike {
-  analysis?: string; job?: string; record?: string
+  analysis?: string; job?: string; record?: string; status?: string; complete?: boolean
   command?: { args?: string[] }
   frames?: { analysed: number; lastTime: number } | null
   inputs?: Record<string, { path: string } | undefined>
@@ -194,6 +194,7 @@ export function fromFiles(files: LoadedFile[]): { analyses: Analysis[]; structs:
       else if (kind === 'run') {
         const r = JSON.parse(f.text) as RecordLike
         if (!r || !Array.isArray(r.groups)) throw new Error('no groups')
+        if (r.complete === false || r.status === 'running') { p.error = "an incomplete record: its job didn't finish"; return p }
         p.data = r; p.status = '✓ ' + (r.analysis || 'rdf') + (r.frames ? ' · ' + r.frames.analysed + ' frames' : '')
       } else p.error = 'not a gro, pdb, ndx, xvg or run.json'
     } catch (e) { p.error = 'not a valid ' + kind + ' (' + (e as Error).message + ')' }
