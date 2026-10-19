@@ -107,18 +107,15 @@ export function decypherKit() {
   }
   const BONDW: Record<Rep, number> = { 'ball & stick': 0.016, licorice: 0.044, spacefill: 0 }
   const MAX_ATOMS = 4000
-  /** Atoms not in a group are warm greys, so the groups' pastels are the only colour in the view. */
-  const NEUTRAL = {
-    light: { bond: '#a8a29e', edge: '#201e1d', hl: 0.45, neutral: { C: '#7d7773', H: '#f7f6f5', O: '#b3aaa4', N: '#9b948f', S: '#cfc5bd', P: '#b8b0aa', X: '#a39d99' } },
-    dark: { bond: '#5a5450', edge: '#0e0d0c', hl: 0.26, neutral: { C: '#8a8480', H: '#aaa49f', O: '#6f6965', N: '#7a7470', S: '#a0978f', P: '#8a8480', X: '#7a7470' } },
-  }
+  /** The highlight's opacity on an atom, per theme (the colours are tokens: the role layer's atom-*, bond and edge). */
+  const HL = { light: 0.45, dark: 0.26 }
 
-  /** The canvas and chart colours of a theme, from its resolved Morpheus tokens. */
+  /** The canvas and chart colours of a theme, from its resolved tokens (Morpheus's with gmx-cypher's role layer). Atoms not in a group are warm greys, so the groups' pastels are the only colour in the view. */
   function palette(dark: boolean, t: Record<string, string>): Palette {
     const hues = {} as Record<Tone, Hue>
     for (const k of TONES) hues[k] = { base: t[k], fg: t[k + '-foreground'], soft: t[k + '-soft'], strong: t[k + '-strong'] }
-    const n = dark ? NEUTRAL.dark : NEUTRAL.light
-    return { dark, bg: t.background, fg: t.foreground, card: t.card, secondary: t.secondary, muted: t['muted-foreground'], border: t.border, input: t.input, ring: t.ring, bond: n.bond, edge: n.edge, hl: n.hl, neutral: n.neutral, hues }
+    const neutral = { C: t['atom-c'], H: t['atom-h'], O: t['atom-o'], N: t['atom-n'], S: t['atom-s'], P: t['atom-p'], X: t['atom-x'] }
+    return { dark, bg: t.background, fg: t.foreground, card: t.card, secondary: t.secondary, muted: t['muted-foreground'], border: t.border, input: t.input, ring: t.ring, bond: t.bond, edge: t.edge, hl: dark ? HL.dark : HL.light, neutral, hues }
   }
 
   /** `43-3239:4, 5` as atom numbers. */

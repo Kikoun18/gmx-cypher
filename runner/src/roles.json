@@ -3,17 +3,157 @@
   "about": "The role layer over Morpheus's tokens.json (copied verbatim): where gmx-cypher's colour roles differ from Morpheus (docs/design-contract.md §2, T159). Generated into tokens.css with tokens.json by scripts/tokens.ts.",
   "color": {
     "tokens": [
-      { "name": "state", "value": { "light": "#201e1d", "dark": "#f0eeec" }, "usage": "UI state, as an ink fill: the selected toggle, the primary action, the active tab. Never data." },
-      { "name": "state-foreground", "value": { "light": "#f3f2f2", "dark": "#141312" }, "usage": "Text on `state`." },
-      { "name": "primary", "value": "{state}", "usage": "Morpheus's primary action, here in ink: coral is a group's hue." },
-      { "name": "primary-foreground", "value": "{state-foreground}", "usage": "Text on `primary`." },
-      { "name": "ring", "value": "{state}", "usage": "The focus ring, in ink." },
-      { "name": "destructive", "value": { "light": "#8f1d1d", "dark": "#fd2a6d" }, "usage": "Errors, failed and armed destructive actions only. At least 0.10 apart in OKLab from every tone, ring and primary." },
-      { "name": "destructive-foreground", "value": { "light": "#ffffff", "dark": "#201e1d" }, "usage": "Text on `destructive`." },
-      { "name": "ramp-0", "value": { "light": "#a5700d", "dark": "#a57710" }, "usage": "Ordered series (time, ξ, RMSF), first stop; interpolated in OKLCH. At least 3:1 on every ground." },
-      { "name": "ramp-1", "value": { "light": "#a83903", "dark": "#e97c48" }, "usage": "Ordered series, second stop." },
-      { "name": "ramp-2", "value": { "light": "#891151", "dark": "#fd9cba" }, "usage": "Ordered series, third stop." },
-      { "name": "ramp-3", "value": { "light": "#3f1a69", "dark": "#e3d6fe" }, "usage": "Ordered series, last stop." }
+      {
+        "name": "state",
+        "value": {
+          "light": "#201e1d",
+          "dark": "#f0eeec"
+        },
+        "usage": "UI state, as an ink fill: the selected toggle, the primary action, the active tab. Never data."
+      },
+      {
+        "name": "state-foreground",
+        "value": {
+          "light": "#f3f2f2",
+          "dark": "#141312"
+        },
+        "usage": "Text on `state`."
+      },
+      {
+        "name": "primary",
+        "value": "{state}",
+        "usage": "Morpheus's primary action, here in ink: coral is a group's hue."
+      },
+      {
+        "name": "primary-foreground",
+        "value": "{state-foreground}",
+        "usage": "Text on `primary`."
+      },
+      {
+        "name": "ring",
+        "value": "{state}",
+        "usage": "The focus ring, in ink."
+      },
+      {
+        "name": "destructive",
+        "value": {
+          "light": "#8f1d1d",
+          "dark": "#fd2a6d"
+        },
+        "usage": "Errors, failed and armed destructive actions only. At least 0.10 apart in OKLab from every tone, ring and primary."
+      },
+      {
+        "name": "destructive-foreground",
+        "value": {
+          "light": "#ffffff",
+          "dark": "#201e1d"
+        },
+        "usage": "Text on `destructive`."
+      },
+      {
+        "name": "ramp-0",
+        "value": {
+          "light": "#a5700d",
+          "dark": "#a57710"
+        },
+        "usage": "Ordered series (time, ξ, RMSF), first stop; interpolated in OKLCH. At least 3:1 on every ground."
+      },
+      {
+        "name": "ramp-1",
+        "value": {
+          "light": "#a83903",
+          "dark": "#e97c48"
+        },
+        "usage": "Ordered series, second stop."
+      },
+      {
+        "name": "ramp-2",
+        "value": {
+          "light": "#891151",
+          "dark": "#fd9cba"
+        },
+        "usage": "Ordered series, third stop."
+      },
+      {
+        "name": "ramp-3",
+        "value": {
+          "light": "#3f1a69",
+          "dark": "#e3d6fe"
+        },
+        "usage": "Ordered series, last stop."
+      },
+      {
+        "name": "bond",
+        "value": {
+          "light": "#a8a29e",
+          "dark": "#5a5450"
+        },
+        "usage": "Bonds between atoms outside every group, in the structure views."
+      },
+      {
+        "name": "edge",
+        "value": {
+          "light": "#201e1d",
+          "dark": "#0e0d0c"
+        },
+        "usage": "The rim mixed into an atom outside every group."
+      },
+      {
+        "name": "atom-c",
+        "value": {
+          "light": "#7d7773",
+          "dark": "#8a8480"
+        },
+        "usage": "An atom outside every group, by element (C): warm greys, so the groups' hues are the only colour in a structure."
+      },
+      {
+        "name": "atom-h",
+        "value": {
+          "light": "#f7f6f5",
+          "dark": "#aaa49f"
+        },
+        "usage": "An atom outside every group, by element (H): warm greys, so the groups' hues are the only colour in a structure."
+      },
+      {
+        "name": "atom-o",
+        "value": {
+          "light": "#b3aaa4",
+          "dark": "#6f6965"
+        },
+        "usage": "An atom outside every group, by element (O): warm greys, so the groups' hues are the only colour in a structure."
+      },
+      {
+        "name": "atom-n",
+        "value": {
+          "light": "#9b948f",
+          "dark": "#7a7470"
+        },
+        "usage": "An atom outside every group, by element (N): warm greys, so the groups' hues are the only colour in a structure."
+      },
+      {
+        "name": "atom-s",
+        "value": {
+          "light": "#cfc5bd",
+          "dark": "#a0978f"
+        },
+        "usage": "An atom outside every group, by element (S): warm greys, so the groups' hues are the only colour in a structure."
+      },
+      {
+        "name": "atom-p",
+        "value": {
+          "light": "#b8b0aa",
+          "dark": "#8a8480"
+        },
+        "usage": "An atom outside every group, by element (P): warm greys, so the groups' hues are the only colour in a structure."
+      },
+      {
+        "name": "atom-x",
+        "value": {
+          "light": "#a39d99",
+          "dark": "#7a7470"
+        },
+        "usage": "An atom outside every group, by element (X; X: any other): warm greys, so the groups' hues are the only colour in a structure."
+      }
     ]
   }
 }

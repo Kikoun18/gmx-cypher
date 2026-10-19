@@ -1,6 +1,9 @@
 // The design contract's checks (docs/design-contract.md §7), each reading its rule from src/core/contract.ts.
 import { describe, expect, it } from 'vitest';
-import { INTERNAL_REFERENCE } from '../src/core/contract';
+import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { join } from 'node:path';
+import { COLOUR_FILES, INTERNAL_REFERENCE } from '../src/core/contract';
+import { RUNNER } from './helpers';
 import { stringsOf, uiStrings } from './ui-strings';
 
 describe('no internal reference reaches the page (R3a)', () => {
@@ -18,3 +21,13 @@ describe('no internal reference reaches the page (R3a)', () => {
     expect(stringsOf('x.tsx', src).filter(s => INTERNAL_REFERENCE.test(s.text)).map(s => s.line)).toEqual([1, 2, 3, 3]);
   });
 });
+
+describe('colours come from the tokens (R4b)', () => {
+  const walk = (d: string): string[] => readdirSync(d).flatMap(n => { const p = join(d, n); return statSync(p).isDirectory() ? walk(p) : [p.slice(RUNNER.length)]; });
+  it('no hex colour in src/ outside tokens.json and the role layer (the generated tokens.css aside)', () => {
+    const hits = walk(RUNNER + 'src').filter(f => /\.(tsx?|css|json)$/.test(f) && !COLOUR_FILES.includes(f) && f !== 'src/tokens.css')
+      .flatMap(f => readFileSync(RUNNER + f, 'utf8').split('\n').flatMap((l, i) => (/#[0-9a-f]{6}\b|#[0-9a-f]{3}\b/i.test(l) ? [f + ':' + (i + 1)] : [])));
+    expect(hits).toEqual([]);
+  });
+});
+

@@ -166,3 +166,13 @@ describe('(de)Cypher reads your runs as the RDF Explorer design does', () => {
     expect(again.chart({ W: 400, H: 300, curves: c, grid: h.x, xlabel: '', ylabel: '', hover: null, peaks: true, pal: again.palette(false, tokens(false)) }).tree[0]).toBe('svg')
   })
 })
+
+describe('the neutrals moved into the role layer unchanged (R4b)', () => {
+  it('the palette draws atoms outside every group, bonds and rims in the same colours as before', () => {
+    const t = themeTokens(readFileSync(new URL('../src/tokens.json', import.meta.url), 'utf8'), readFileSync(new URL('../src/roles.json', import.meta.url), 'utf8'))
+    const light = kit.palette(false, t.light), dark = kit.palette(true, t.dark)
+    expect([light.bond, light.edge, light.hl, light.neutral]).toEqual(['#a8a29e', '#201e1d', 0.45, { C: '#7d7773', H: '#f7f6f5', O: '#b3aaa4', N: '#9b948f', S: '#cfc5bd', P: '#b8b0aa', X: '#a39d99' }])
+    expect([dark.bond, dark.edge, dark.hl, dark.neutral]).toEqual(['#5a5450', '#0e0d0c', 0.26, { C: '#8a8480', H: '#aaa49f', O: '#6f6965', N: '#7a7470', S: '#a0978f', P: '#8a8480', X: '#7a7470' }])
+  })
+})
+

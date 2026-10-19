@@ -15,7 +15,11 @@ export const ROLES: Record<string, readonly string[]> = {
   group: TONES.flatMap(t => [t, t + '-foreground', t + '-soft', t + '-strong']),
   reference: ['foreground'],
   'ordered series': ['ramp-0', 'ramp-1', 'ramp-2', 'ramp-3'],
+  neutral: ['atom-c', 'atom-h', 'atom-o', 'atom-n', 'atom-s', 'atom-p', 'atom-x', 'bond', 'edge'],
 }
+
+/** The only files in src/ that may name a colour by its hex value (R4b): Morpheus's tokens and the role layer. */
+export const COLOUR_FILES = ['src/tokens.json', 'src/roles.json']
 
 /** The tokens of UI state: never a data tone (contract §2). */
 export const UI_STATE = ROLES['ui state']
