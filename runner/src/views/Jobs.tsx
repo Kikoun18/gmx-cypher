@@ -57,12 +57,13 @@ function JobDetail({ job, log, onRunAgain, vault, decypher }: { job: Job; log: s
           <div className="h-full rounded-full bg-butter transition-[width] duration-300" style={{ width: f * 100 + '%' }} />
         </div>
       )}
-      {(running || job.progress.frame != null) && <p className="m-0 text-control" aria-live="polite">{job.status === 'failed' || job.status === 'cancelled' ? 'stopped at ' : ''}{progressText(job)}{took && ' · ' + took}</p>}
+      {job.unfollowed && <p className="m-0 text-caption text-muted-foreground">gmx-cypher restarted while this job ran: it still runs (pid {job.pid}), but its output and its end are no longer read here, and its record is not completed</p>}
+      {(running || job.progress.frame != null) && !job.unfollowed && <p className="m-0 text-control" aria-live="polite">{job.status === 'failed' || job.status === 'cancelled' ? 'stopped at ' : ''}{progressText(job)}{took && ' · ' + took}</p>}
       {job.status === 'interrupted' && <p className="m-0 text-caption text-muted-foreground">{job.error}</p>}
       <RunResult job={job} onRunAgain={onRunAgain} vault={vault} />
       <Section label="Command" />
       <Code label="command" text={commandText(job)} />
-      <Section label="Log"><span className="text-caption text-muted-foreground">{job.status === 'running' ? 'live · stdout and stderr' : 'stdout and stderr'}</span></Section>
+      <Section label="Log"><span className="text-caption text-muted-foreground">{job.status === 'running' && !job.unfollowed ? 'live · stdout and stderr' : 'stdout and stderr'}</span></Section>
       <div ref={logRef}><Code label="log" text={asTerminal(log ?? '')} className="max-h-80 text-muted-foreground" /></div>
       <p className="m-0 text-caption text-muted-foreground">a job keeps running when this page is closed or reloaded · started {new Date(job.created).toLocaleString()}</p>
     </div>
