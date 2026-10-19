@@ -171,7 +171,7 @@ From [`batch-3.md`](batch-3.md) §5: one coherent app, (de)Cypher for every anal
 - [ ] R1b `src/core/contract.ts`: the phrases never shown, the role → token map, the default keys, the status levels
 - [x] R4a Colour roles; the reference in ink; `destructive` used only for errors (the class-usage scan lands with R9c, when the status component exists)
 - [x] R4b `NEUTRAL` moved into the tokens; no hex outside the tokens
-- [ ] R4c Titles in Archivo 800 (T160)
+- [x] R4c Titles in Archivo 800 (T160)
 - [ ] R3b One set of words on every screen
 - [ ] R14b-1 The connected project, as a setting (moved here from Phase 8: R3c names jobs from it)
 - [ ] R3c Display names from the project pattern

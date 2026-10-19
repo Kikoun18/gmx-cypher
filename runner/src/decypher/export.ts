@@ -104,7 +104,7 @@ button{font-family:inherit;color:inherit}
 button:focus-visible{outline:2px solid var(--ring);outline-offset:2px}
 .dc-page{max-width:1560px;margin:0 auto;padding:0 20px 40px;display:flex;flex-direction:column;gap:16px}
 .dc-header{display:flex;align-items:center;gap:16px;padding:14px 0;border-bottom:1px solid var(--border)}
-.dc-header h1{margin:0;font-size:22px;line-height:28px;font-weight:700;letter-spacing:-0.01em}
+.dc-header h1{margin:0;font-family:Archivo,ui-sans-serif,system-ui,sans-serif;font-size:22px;line-height:28px;font-weight:800;letter-spacing:-0.01em}
 .dc-grow{flex:1;min-width:0}
 .dc-cap{font-size:11px;line-height:16px;color:var(--muted-foreground)}
 .dc-label{font-size:10px;line-height:14px;letter-spacing:.12em;color:var(--muted-foreground);text-transform:uppercase}
@@ -114,7 +114,7 @@ button:focus-visible{outline:2px solid var(--ring);outline-offset:2px}
 .dc-seg button.dc-on{background:var(--primary);color:var(--primary-foreground);font-weight:700;box-shadow:var(--shadow-raised)}
 .dc-card{background:var(--card);border:1px solid var(--border);border-radius:16px;display:flex;flex-direction:column;min-width:0;overflow:hidden}
 .dc-bar{display:flex;align-items:center;flex-wrap:wrap;gap:4px 12px;padding:10px 16px;border-bottom:1px solid var(--border)}
-.dc-bar h2{margin:0;font-size:18px;line-height:24px;font-weight:700}
+.dc-bar h2{margin:0;font-family:Archivo,ui-sans-serif,system-ui,sans-serif;font-size:18px;line-height:24px;font-weight:800}
 .dc-pad{padding:12px 16px 16px;display:flex;flex-direction:column;gap:10px;min-width:0}
 .dc-split{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr))}
 .dc-side{padding:12px 16px 16px;display:flex;flex-direction:column;gap:10px;min-width:0}
@@ -159,22 +159,27 @@ const vars = (t: Record<string, string>) => Object.entries(t).map(([k, v]) => '-
 const esc = (s: string) => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!)
 
 /** The whole page: fonts as data, both themes' tokens, the kit's source and the data, inline. */
-export function exportHtml(data: ExportData, fonts: { regular?: string; bold?: string } = {}): string {
+export function exportHtml(data: ExportData, fonts: Fonts = {}): string {
   const src = decypherKit.toString()
   if (/<\/script/i.test(src)) throw new Error('the kit\'s source holds </script>: it cannot be put inline')
-  const face = (b64: string | undefined, weight: number) => (b64 ? '@font-face{font-family:mononoki;src:url(data:font/woff2;base64,' + b64 + ') format("woff2");font-weight:' + weight + ';font-style:normal;font-display:swap}\n' : '')
+  const face = (b64: string | undefined, weight: number, family = 'mononoki', range = '') => (b64 ? '@font-face{font-family:' + family + ';src:url(data:font/woff2;base64,' + b64 + ') format("woff2");font-weight:' + weight + ';font-style:normal;font-display:swap' + (range ? ';unicode-range:' + range : '') + '}\n' : '')
   const title = data.header && data.header !== DEFAULT_HEADER ? data.header : DEFAULT_HEADER + ' · ' + (data.analyses.length === 1 ? data.analyses[0].title : data.analyses.length + ' RDFs')
   return '<!doctype html>\n<html lang="en" data-theme="' + data.theme + '">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1">\n'
     + '<meta name="generator" content="' + esc(data.by) + ' (de)Cypher">\n<title>' + esc(title) + '</title>\n<style>\n'
-    + face(fonts.regular, 400) + face(fonts.bold, 700)
+    + face(fonts.regular, 400) + face(fonts.bold, 700) + face(fonts.title, 800, 'Archivo', LATIN) + face(fonts.titleExt, 800, 'Archivo', LATIN_EXT)
     + ':root,[data-theme="light"]{' + vars(data.tokens.light) + ';color-scheme:light}\n[data-theme="dark"]{' + vars(data.tokens.dark) + ';color-scheme:dark}\n' + CSS + '\n</style>\n</head>\n<body>\n'
     + '<div id="app"><p style="padding:20px">This page draws with JavaScript: turn it on to see the structures and charts.</p></div>\n'
     + '<script type="application/json" id="dc-data">' + JSON.stringify(data).replace(/</g, '\\u003c') + '</script>\n'
     + '<script>\n(function () {\nvar kit = (' + src + ')();\nkit.mount(document.getElementById("app"), JSON.parse(document.getElementById("dc-data").textContent));\n})();\n</script>\n</body>\n</html>\n'
 }
 
-/** mononoki 400 and 700 as base64, from the page's own fonts; none if they can't be read (the page falls back to a mono font). */
-export async function fontData(): Promise<{ regular?: string; bold?: string }> {
+/** The page's fonts as base64: mononoki 400 and 700, and Archivo 800 for titles (T160), latin and latin-ext. */
+export interface Fonts { regular?: string; bold?: string; title?: string; titleExt?: string }
+const LATIN = 'U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD'
+const LATIN_EXT = 'U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF'
+
+/** The page's fonts as base64, from its own files; none if they can't be read (the page falls back to a mono and a sans font). */
+export async function fontData(): Promise<Fonts> {
   const b64 = async (url: string) => {
     try {
       const r = await fetch(url)
@@ -185,8 +190,8 @@ export async function fontData(): Promise<{ regular?: string; bold?: string }> {
       return btoa(s)
     } catch { return undefined }
   }
-  const [regular, bold] = await Promise.all([b64('/fonts/mononoki-latin-400-normal.woff2'), b64('/fonts/mononoki-latin-700-normal.woff2')])
-  return { regular, bold }
+  const [regular, bold, title, titleExt] = await Promise.all(['mononoki-latin-400-normal', 'mononoki-latin-700-normal', 'archivo-latin-800-normal', 'archivo-latin-ext-800-normal'].map(f => b64('/fonts/' + f + '.woff2')))
+  return { regular, bold, title, titleExt }
 }
 
 /** Saves text as a file through the browser's download. */

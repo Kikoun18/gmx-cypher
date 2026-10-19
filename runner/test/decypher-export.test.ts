@@ -57,4 +57,15 @@ describe('the HTML export: one file, nothing fetched, each job still interactive
     expect(exportName(analyses, new Date('2026-10-13T10:00:00Z'))).toBe('decypher_2-RDFs_2026-10-13.html')
     expect(exportName([analyses[0]], new Date('2026-10-13T10:00:00Z'))).toBe('decypher_rdf_o111_Methionine_H_2026-10-13.html')
   })
+
+  it('titles in Archivo 800, as data, as on the page (T160)', () => {
+    const { analyses, structs } = loaded()
+    const d = exportData({ analyses, structs, selected: () => [], tones: {}, compare: null, view, theme: 'light', tokens, structures: false, by: 'gmx-cypher 0.1.0' })
+    const html = exportHtml(d, { regular: 'AAAA', bold: 'BBBB', title: 'CCCC', titleExt: 'DDDD' })
+    expect(html).toContain('@font-face{font-family:Archivo;src:url(data:font/woff2;base64,CCCC) format("woff2");font-weight:800')
+    expect(html).toContain('@font-face{font-family:Archivo;src:url(data:font/woff2;base64,DDDD) format("woff2");font-weight:800')
+    expect(html).toMatch(/\.dc-header h1\{[^}]*font-family:Archivo,/)
+    expect(html).toMatch(/\.dc-bar h2\{[^}]*font-family:Archivo,/)
+    expect(html).not.toMatch(/https?:\/\/fonts/)
+  })
 })
