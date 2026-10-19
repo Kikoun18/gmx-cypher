@@ -107,14 +107,14 @@ export function Energy({ gmx, draft, setDraft, onStarted }: { gmx: GmxState; dra
 
       <aside className="flex min-w-0 flex-col gap-4">
         <Section label="Command" />
-        {planned?.error && <Alert variant="destructive"><X /><AlertTitle>gmx-cypher can't plan this run</AlertTitle><AlertDescription><p className="whitespace-pre-line">{planned.error}</p></AlertDescription></Alert>}
+        {planned?.error && <Alert variant="destructive"><X /><AlertTitle>gmx-cypher can't plan this job</AlertTitle><AlertDescription><p className="whitespace-pre-line">{planned.error}</p></AlertDescription></Alert>}
         {plan && <>
-          {plan.problems.length > 0 && <Alert variant="destructive" aria-live="polite"><X /><AlertTitle>gmx would refuse this run</AlertTitle><AlertDescription>{plan.problems.map(p => <p key={p}>{p}</p>)}</AlertDescription></Alert>}
+          {plan.problems.length > 0 && <Alert variant="destructive" aria-live="polite"><X /><AlertTitle>gmx would refuse this job</AlertTitle><AlertDescription>{plan.problems.map(p => <p key={p}>{p}</p>)}</AlertDescription></Alert>}
           <Code text={commandText({ cwd: plan.cwd, file: plan.file, args: plan.argv, env: plan.env })} label="energy command" />
           {plan.stdin != null && <p className="m-0 text-caption text-muted-foreground">answers on stdin, then the end: <span className="font-bold text-foreground">{plan.stdin.trimEnd().split('\n').join(' · ')}</span></p>}
           <p className="m-0 text-caption text-muted-foreground">writes {plan.stem}.xvg and its record in {plan.outDir.split('/').slice(-2).join('/')}/ · new names, nothing overwritten</p>
         </>}
-        {refused?.key === key && <Alert variant="destructive"><X /><AlertTitle>gmx-cypher didn't start this run</AlertTitle><AlertDescription><p className="whitespace-pre-line">{refused.message}</p></AlertDescription></Alert>}
+        {refused?.key === key && <Alert variant="destructive"><X /><AlertTitle>gmx-cypher didn't start this job</AlertTitle><AlertDescription><p className="whitespace-pre-line">{refused.message}</p></AlertDescription></Alert>}
         <div className="flex flex-wrap items-center gap-3">
           <Button size="lg" disabled={blocked || starting || !terms.length} onClick={start}>{starting ? 'starting…' : 'run'}</Button>
           <span className="text-caption text-muted-foreground" aria-live="polite">{!gmx.ok ? 'no working gmx: see settings' : !terms.length ? 'pick at least one term' : 'the statistics come out with the result'}</span>

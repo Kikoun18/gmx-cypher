@@ -938,7 +938,7 @@ export function decypherKit() {
           return h('button', { type: 'button', class: 'dc-chip dc-curve', style: { opacity: s === 'on' ? '1' : s === 'dim' ? '0.55' : '0.35' }, onclick: () => { shown[x.key] = NEXT[s]; update() } },
             swatch(x.color, x.dash), h('b', { style: { color: x.color } }, x.name), h('span', { class: 'dc-cap' }, x.source + WORD[s]))
         }))
-        seg.replaceChildren(...(['group', 'job'] as const).map(v => h('button', { type: 'button', class: colorBy === v ? 'dc-on' : '', onclick: () => { colorBy = v; update() } }, v)))
+        seg.replaceChildren(...(['group', 'job'] as const).map(v => h('button', { type: 'button', class: colorBy === v ? 'dc-on' : '', onclick: () => { colorBy = v; update() } }, v === 'job' ? 'result' : v)))
       }
       const groupChips = chips(focus, () => selected, s => { selected = s; update() }, () => {})
       const update = () => { render(); ch.render(); groupChips.render() }
@@ -946,7 +946,7 @@ export function decypherKit() {
       render()
       return h('section', { class: 'dc-card dc-compare' },
         h('div', { class: 'dc-bar' }, h('span', { class: 'dc-label' }, 'ONE GRAPH'), h('span', { class: 'dc-cap' }, plotted.map(a => a.label).join(' · ')), h('span', { class: 'dc-grow' }), h('span', { class: 'dc-label' }, 'COLOR BY'), seg),
-        h('div', { class: 'dc-pad' }, ch.el, h('div', { class: 'dc-cap' }, 'click a curve: shown → dimmed → hidden · groups below are matched in every job by their atoms, then their name'), legend, groupChips.el))
+        h('div', { class: 'dc-pad' }, ch.el, h('div', { class: 'dc-cap' }, 'click a curve: shown → dimmed → hidden · groups below are matched in every result by their atoms, then their name'), legend, groupChips.el))
     }
 
     /** One RDF's card; or, for RDFs that differ only in their reference, one card for them all (`morph`), led by the first. */

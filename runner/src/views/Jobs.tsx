@@ -46,7 +46,7 @@ function JobDetail({ job, log, onRunAgain, vault, decypher }: { job: Job; log: s
         <h2 className="m-0 text-title font-bold">{job.title}</h2>
         <Badge tone={job.status === 'running' ? 'butter' : job.status === 'done' ? 'mint' : 'stone'} variant={job.status === 'failed' ? 'destructive' : undefined}>{s.word}</Badge>
         <span className="flex-1" />
-        {job.kind === 'rdf' && job.status === 'done' && <Button variant="outline" onClick={() => decypher.open([{ kind: 'job', id: job.id }])}>open in (de)Cypher</Button>}
+        {job.kind === 'rdf' && job.status === 'done' && <Button variant="outline" onClick={() => decypher.open([{ kind: 'job', id: job.id }])}>compare</Button>}
         {job.status === 'running' && !job.unfollowed && <Button variant="destructive" onClick={cancel}>{armed ? 'click again to cancel' : 'cancel'}</Button>}
       </div>
       {job.status === 'failed' && job.error && (
@@ -62,7 +62,7 @@ function JobDetail({ job, log, onRunAgain, vault, decypher }: { job: Job; log: s
       {job.status === 'interrupted' && <p className="m-0 text-caption text-muted-foreground">{job.error}</p>}
       <RunResult job={job} onRunAgain={onRunAgain} vault={vault} />
       <Section label="Command" />
-      <Code label="command" text={commandText(job)} />
+      <Code label="command line" text={commandText(job)} />
       <Section label="Log"><span className="text-caption text-muted-foreground">{job.status === 'running' && !job.unfollowed ? 'live · stdout and stderr' : 'stdout and stderr'}</span></Section>
       <div ref={logRef}><Code label="log" text={asTerminal(log ?? '')} className="max-h-80 text-muted-foreground" /></div>
       <p className="m-0 text-caption text-muted-foreground">a job keeps running when this page is closed or reloaded · started {new Date(job.created).toLocaleString()}</p>
@@ -77,22 +77,22 @@ export function JobsView({ jobs, logs, loadLog, selected, onSelect, onRunAgain, 
   if (!jobs.length) return (
     <div className="flex flex-wrap items-center gap-3">
       <p className="m-0 text-control text-muted-foreground">no jobs yet</p>
-      <Button variant="outline" size="sm" onClick={() => decypher.open()}>(de)Cypher{decypher.keyName ? ' · ' + decypher.keyName : ''}</Button>
+      <Button variant="outline" size="sm" onClick={() => decypher.open()}>compare{decypher.keyName ? ' · ' + decypher.keyName : ''}</Button>
     </div>
   )
   return (
     <div className="grid grid-cols-[220px_minmax(0,1fr)] gap-5">
       <nav className="flex flex-col gap-1" aria-label="jobs">
         <Section label={'Jobs ' + String(jobs.length).padStart(2, '0')} />
-        {/* (de)Cypher: tick RDF jobs to see them together, with their structures; the button or its key opens it. */}
+        {/* Compare: tick RDF jobs to see their results together, with their structures; the button or its key opens it. */}
         <Button variant="outline" size="sm" className="mb-1 justify-between" onClick={() => decypher.open()} title={decypher.keyName ? decypher.keyName + ' opens it too (settings → keyboard)' : 'set a key in settings → keyboard'}>
-          <span>(de)Cypher{picked ? ' · ' + String(picked).padStart(2, '0') : ''}</span>{decypher.keyName && <Kbd>{decypher.keyName}</Kbd>}
+          <span>compare{picked ? ' · ' + String(picked).padStart(2, '0') : ''}</span>{decypher.keyName && <Kbd>{decypher.keyName}</Kbd>}
         </Button>
         {jobs.map(j => {
           const rdf = j.kind === 'rdf', ref: SourceRef = { kind: 'job', id: j.id }
           return (
             <div key={j.id} className={cn('flex items-start gap-1 rounded-lg hover:bg-muted', j.id === job?.id && 'bg-muted ring-1 ring-inset ring-border')}>
-              {rdf ? <Checkbox className="ml-2.5 mt-[11px]" checked={decypher.sources.has(ref)} onCheckedChange={() => decypher.sources.toggle(ref)} aria-label={'show ' + j.title + ' in (de)Cypher'} disabled={j.status === 'failed' || j.status === 'cancelled' || j.status === 'interrupted'} />
+              {rdf ? <Checkbox className="ml-2.5 mt-[11px]" checked={decypher.sources.has(ref)} onCheckedChange={() => decypher.sources.toggle(ref)} aria-label={'compare ' + j.title} disabled={j.status === 'failed' || j.status === 'cancelled' || j.status === 'interrupted'} />
                 : anyRdf && <span className="ml-2.5 w-[13px] shrink-0" />}
               <button onClick={() => onSelect(j.id)} aria-current={j.id === job?.id ? 'true' : undefined} className={cn('flex min-w-0 flex-1 flex-col items-start gap-0.5 py-2 pr-3 text-left', anyRdf ? 'pl-1.5' : 'pl-3')}>
                 <span className="text-control font-bold">{j.title}</span>

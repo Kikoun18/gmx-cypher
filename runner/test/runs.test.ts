@@ -101,7 +101,7 @@ describe.skipIf(REAL)('nothing is overwritten, even when files appear meanwhile 
     const { dir, s, req, roots } = await setup();
     process.env.FAKE_GMX_TOUCH = 'rdf=' + join(dir, 'rdf/rdf_nvt.xvg');
     const r = await (await startRun(s.ctx, req, roots)).record;
-    expect(r.problems).toEqual(['gmx backed up a file that appeared during the run: #rdf_nvt.xvg.1#']);
+    expect(r.problems).toEqual(['gmx backed up a file that appeared during the job: #rdf_nvt.xvg.1#']);
     expect(readFileSync(join(dir, 'rdf/#rdf_nvt.xvg.1#'), 'utf8')).toContain('appeared while gmx rdf ran');
     await s.close();
   });
@@ -112,7 +112,7 @@ describe.skipIf(REAL)('nothing is overwritten, even when files appear meanwhile 
     try {
       process.env.FAKE_GMX_TOUCH = 'rdf=' + join(dir, 'rdf/rdf_nvt.xvg');
       const r = await (await startRun(s.ctx, req, roots)).record;
-      expect(r.problems).toEqual(['gmx backed up a file that appeared during the run: #rdf_nvt.xvg.1#']);
+      expect(r.problems).toEqual(['gmx backed up a file that appeared during the job: #rdf_nvt.xvg.1#']);
       expect(r.env.GMX_MAXBACKUP).toBe('99');
     } finally { delete process.env.GMX_MAXBACKUP; }
     await s.close();

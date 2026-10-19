@@ -15,7 +15,7 @@ function KeyField() {
   const b = bindings.decypher, problem = keyProblem(b)
   return (
     <Field>
-      <Label id="key-decypher-label">open and close (de)Cypher</Label>
+      <Label id="key-decypher-label">open and close compare</Label>
       <div className="flex flex-wrap items-center gap-2">
         <Kbd className="h-6 min-w-6 text-[11px]">{keyLabel(b)}</Kbd>
         <Button id="key-decypher" variant="outline" size="sm" aria-pressed={listening} aria-labelledby="key-decypher-label key-decypher"
@@ -31,7 +31,7 @@ function KeyField() {
         {b && <Button variant="ghost" size="sm" onClick={() => setBindings({ ...bindings, decypher: null })}>no key</Button>}
         {keyLabel(b) !== keyLabel(DEFAULT_BINDINGS.decypher) && <Button variant="ghost" size="sm" onClick={() => setBindings(DEFAULT_BINDINGS)}>back to {keyLabel(DEFAULT_BINDINGS.decypher)}</Button>}
       </div>
-      {problem ? <FieldHint error>✗ {problem}</FieldHint> : <FieldHint>{b ? keyLabel(b) + ' anywhere but in a field; the jobs tab has the same as a button.' : 'no key: open (de)Cypher from the jobs tab.'} Inside it, F fits the plotted groups, R resets the view and [ ] step through jobs. Kept in this browser.</FieldHint>}
+      {problem ? <FieldHint error>✗ {problem}</FieldHint> : <FieldHint>{b ? keyLabel(b) + ' anywhere but in a field; the jobs tab has the same as a button.' : 'no key: open compare from the jobs tab.'} Inside it, F fits the plotted groups, R resets the view and [ ] step through results. Kept in this browser.</FieldHint>}
     </Field>
   )
 }

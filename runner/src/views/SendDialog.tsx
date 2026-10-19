@@ -46,7 +46,7 @@ export function SendDialog({ job, open, onOpenChange, returnFocus }: { job: Job;
   const r = p?.key === key ? p : null, pv = r?.preview, l = pv?.preview
   const shown = fields ?? pv?.fields
   const set = (k: keyof Fields, v: string) => { if (!shown) return; setFields({ ...shown, [k]: k === 'run' ? Number(v) || 0 : v }); setTyped(t => new Set(t).add(k)) }
-  const hint = (k: keyof Fields) => (typed.has(k) ? 'typed' : pv?.from[FIELD_KEY[k]] ? FROM[pv.from[FIELD_KEY[k]]!] : k === 'time' && shown?.time ? "the run's last time (ps)" : 'not in the folder or the file name: type it')
+  const hint = (k: keyof Fields) => (typed.has(k) ? 'typed' : pv?.from[FIELD_KEY[k]] ? FROM[pv.from[FIELD_KEY[k]]!] : k === 'time' && shown?.time ? "the job's last time (ps)" : 'not in the folder or the file name: type it')
   const needsTime = !!pv && /\{t(ime)?\}/i.test(pv.pattern)
   const lost = l ? l.curves.inFile.filter(c => !l.curves.imported.includes(c)) : []
   const fileName = name ?? pv?.name ?? ''
@@ -69,7 +69,7 @@ export function SendDialog({ job, open, onOpenChange, returnFocus }: { job: Job;
         {sent ? (
           <DialogBody>
             <Alert variant="success"><Check /><AlertTitle>sent: {sent.path}</AlertTitle>
-              <AlertDescription>{sent.renamed && <p>A file of that name was already in the inbox, so this one is {sent.name}.</p>}<p>Nothing else in the vault changed. The run's own files stay where they are.</p></AlertDescription>
+              <AlertDescription>{sent.renamed && <p>A file of that name was already in the inbox, so this one is {sent.name}.</p>}<p>Nothing else in the vault changed. The job's own files stay where they are.</p></AlertDescription>
             </Alert>
             <Section label="In the Matrix" />
             <ol className="m-0 flex list-decimal flex-col gap-1 pl-5 text-control">{sent.next.map(x => <li key={x}>{x}</li>)}</ol>
@@ -120,7 +120,7 @@ export function SendDialog({ job, open, onOpenChange, returnFocus }: { job: Job;
                 <Alert variant="destructive"><X /><AlertTitle>it would not land where you chose</AlertTitle>
                   <AlertDescription>
                     {l.problems.map(x => <p key={x}>{x}</p>)}
-                    {pv.reasons.length > 0 && <p>{name != null ? 'The typed name does not read as ' : 'The name does not read as '}the fields above with the pattern {pv.pattern}{pv.pathPattern ? ', and the folder pattern ' + pv.pathPattern + ' reads the run’s working directory' : ''}. Use the suggested name (clear the file name), or change the fields.</p>}
+                    {pv.reasons.length > 0 && <p>{name != null ? 'The typed name does not read as ' : 'The name does not read as '}the fields above with the pattern {pv.pattern}{pv.pathPattern ? ', and the folder pattern ' + pv.pathPattern + ' reads the job’s working directory' : ''}. Use the suggested name (clear the file name), or change the fields.</p>}
                   </AlertDescription>
                 </Alert>
               )}

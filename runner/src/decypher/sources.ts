@@ -37,7 +37,7 @@ const atomsNote = (name: string, s: Struct, need: number) => name + ' has ' + s.
 async function runStructure(rec: RecordLike): Promise<{ key: string | null; note: string; structs: Record<string, Struct> }> {
   const sp = rec.inputs?.structure?.path, out: Record<string, Struct> = {}
   const g = recordGroups(rec), need = maxAtom([g.ref, ...g.sels])
-  let key: string | null = null, note = 'the run named no structure'
+  let key: string | null = null, note = 'the job named no structure'
   if (sp) {
     try {
       const s = await structAt('path:' + sp, '/api/file?path=' + enc(sp), sp)

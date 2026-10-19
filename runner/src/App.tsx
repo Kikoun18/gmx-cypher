@@ -120,7 +120,7 @@ export function App() {
         <TabsList className="px-3">
           <TabsTrigger value="inputs">inputs</TabsTrigger>
           {groupsStep && <TabsTrigger value="groups">groups</TabsTrigger>}
-          <TabsTrigger value="analysis">analysis</TabsTrigger>
+          <TabsTrigger value="analysis">command</TabsTrigger>
           <TabsTrigger value="jobs">jobs {jobs.jobs.length > 0 && <TabsCount>{running ? running + ' running' : String(jobs.jobs.length).padStart(2, '0')}</TabsCount>}</TabsTrigger>
           <TabsTrigger value="batch">batch</TabsTrigger>
           {/* Your cluster jobs (R10): another kind of job than gmx-cypher's own, so another tab. */}

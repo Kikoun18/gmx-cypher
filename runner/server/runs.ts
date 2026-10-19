@@ -286,7 +286,7 @@ export async function startRun(ctx: Ctx, req: RunRequest, roots: string[]): Prom
       }
       // A GROMACS backup (#name.1#) of one of our names means something wrote it during the run.
       const problems = readdirSync(plan.outDir).filter(n => { const m = /^#(.+)\.\d+#$/.exec(n); return m && ours.has(nameKey(m[1])); })
-        .map(n => 'gmx backed up a file that appeared during the run: ' + n);
+        .map(n => 'gmx backed up a file that appeared during the job: ' + n);
       const r = recordOf(j, outputs, problems);
       replaceOwn(recordPath, json(r), j.id);
       return r;

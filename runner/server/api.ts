@@ -259,10 +259,10 @@ export function makeApi(ctx: Ctx): Api {
       if (req.method === 'GET' && job[2] === '/output') {
         // A run's own .xvg files only, by kind, or one of gmx awh's frames by its name (R5): the chart reads them.
         const kind = url.searchParams.get('kind') || '', file = url.searchParams.get('name'), names = j.meta?.names as OutputNames | undefined;
-        if (file != null && !names?.more?.includes(file) && file !== names?.xvg) throw new HttpError(404, 'this run wrote no file ' + file);
+        if (file != null && !names?.more?.includes(file) && file !== names?.xvg) throw new HttpError(404, 'this job wrote no file ' + file);
         if (file == null && kind !== 'xvg' && kind !== 'cn') throw new HttpError(400, 'no output ' + kind + ': xvg or cn');
         const name = file ?? names?.[kind as 'xvg' | 'cn'], path = name && join(String(j.meta!.outDir), name);
-        if (!path || !existsSync(path)) throw new HttpError(404, 'this run wrote no ' + kind + ' file');
+        if (!path || !existsSync(path)) throw new HttpError(404, 'this job wrote no ' + kind + ' file');
         sendFile(res, path, { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' });
         return 'handled';
       }

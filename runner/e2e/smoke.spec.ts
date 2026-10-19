@@ -59,8 +59,8 @@ test('pick inputs, make groups, run, see the chart', async ({ page }) => {
   expect(await refCard.getByText('6 atoms').evaluate(e => getComputedStyle(e).color)).toBe(ink)
 
   // RDF: the command is the planned one; run it.
-  await page.getByRole('tab', { name: 'analysis' }).click()
-  await expect(page.getByLabel('command', { exact: true })).toContainText("-o rdf/rdf_nvt.xvg -ref 'group 0' -sel 'group 1'")
+  await page.getByRole('tab', { name: 'command' }).click()
+  await expect(page.getByLabel('command line', { exact: true })).toContainText("-o rdf/rdf_nvt.xvg -ref 'group 0' -sel 'group 1'")
   await page.getByRole('button', { name: 'run', exact: true }).click()
 
   // Jobs: it runs, ends, and shows its chart, first peak and record.

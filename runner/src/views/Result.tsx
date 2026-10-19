@@ -416,7 +416,7 @@ export function RunResult({ job, onRunAgain, vault }: { job: Job; onRunAgain: (r
   const [sending, setSending] = React.useState(false)
   const sendButton = React.useRef<HTMLButtonElement>(null)
   if (!isRun(job.kind) || !job.ended) return null
-  if (!r) return <p className="m-0 text-caption text-muted-foreground" aria-live="polite">reading the run record…</p>
+  if (!r) return <p className="m-0 text-caption text-muted-foreground" aria-live="polite">reading the record…</p>
   if (r.error) return <p className="m-0 text-caption text-muted-foreground">no run record: {r.error}</p>
   const rec = r.record!, dir = (job.meta?.outDir as string) || ''
   return (
@@ -444,8 +444,8 @@ export function RunResult({ job, onRunAgain, vault }: { job: Job; onRunAgain: (r
       </tbody></table>
       <div className="flex flex-wrap items-center gap-3">
         {job.status === 'done' && vault && <Button ref={sendButton} onClick={() => setSending(true)}>send to vault…</Button>}
-        <Button variant="outline" onClick={() => onRunAgain(rec)}>run again</Button>
-        <span className="text-caption text-muted-foreground">{job.status === 'done' && !vault ? 'set a Matrix vault in settings to send this result · ' : ''}run again opens this recipe in {rec.analysis ?? 'rdf'}; the new run gets new names</span>
+        <Button variant="outline" onClick={() => onRunAgain(rec)}>open in set-up</Button>
+        <span className="text-caption text-muted-foreground">{job.status === 'done' && !vault ? 'set a Matrix vault in settings to send this result · ' : ''}open in set-up fills the steps with this job's inputs, groups and options ({rec.analysis ?? 'rdf'}); a new job gets new names</span>
       </div>
       {vault && <SendDialog job={job} open={sending} onOpenChange={setSending} returnFocus={sendButton} />}
     </div>

@@ -22,6 +22,8 @@ async function madeVault() {
   const r = withAnalysis(a.store, { name: 'WRWYCR', col: 'ha', type: 'rdf', file: 'rdf.xvg', bytes: rdfFixture, group: 'hmr+fast+6' });
   svc.commit(r.store, new Map([...a.uploads, ...r.uploads]));
   await svc.flush();
+  // The Matrix verifies the project in the background and may write its index then: wait, so the listing below is final.
+  await svc.verified;
   await vault.close();
   return dir;
 }

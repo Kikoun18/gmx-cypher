@@ -192,7 +192,7 @@ export function GroupCommand({ command, gmx, draft, setDraft, onStarted }: ViewP
         <Section label="Command" />
         {!trajectory || !runInput ? <p className="m-0 text-control text-muted-foreground">pick a trajectory and a run input in inputs</p>
           : planned?.error ? <FieldHint error>✗ {planned.error}</FieldHint>
-          : plan ? <Code label="command" text={commandText({ cwd: plan.cwd, file: plan.file, args: plan.argv, env: plan.env })} />
+          : plan ? <Code label="command line" text={commandText({ cwd: plan.cwd, file: plan.file, args: plan.argv, env: plan.env })} />
           : <p className="m-0 text-control text-muted-foreground" aria-live="polite">choosing names…</p>}
         {/* The tools that ask for their groups get them on stdin: part of what runs (review). */}
         {plan?.stdin != null && <p className="m-0 text-caption text-muted-foreground">answers on stdin, by group number: <span className="font-bold text-foreground">{plan.stdin.trimEnd().split('\n').join(' · ')}</span></p>}
@@ -220,11 +220,11 @@ export function GroupCommand({ command, gmx, draft, setDraft, onStarted }: ViewP
             {[plan.names.xvg, ...(options.cn === true && plan.names.cn ? [plan.names.cn] : []), ...(plan.names.more ?? []), plan.names.ndx, plan.names.record].join(' · ')} — in {where} · new names, nothing overwritten
           </p>
           {refused?.key === key && (
-            <Alert variant="destructive"><X /><AlertTitle>gmx-cypher didn't start this run</AlertTitle><AlertDescription><p className="whitespace-pre-line">{refused.message}</p></AlertDescription></Alert>
+            <Alert variant="destructive"><X /><AlertTitle>gmx-cypher didn't start this job</AlertTitle><AlertDescription><p className="whitespace-pre-line">{refused.message}</p></AlertDescription></Alert>
           )}
           <div className="flex flex-wrap items-center gap-3">
             <Button size="lg" disabled={!!blockers.length || starting} onClick={start}>{starting ? 'checking groups with gmx…' : 'run'}</Button>
-            <span className="text-caption text-muted-foreground" aria-live="polite">{blockers[0] || 'gmx select confirms each group first; the run continues if this page closes'}</span>
+            <span className="text-caption text-muted-foreground" aria-live="polite">{blockers[0] || 'gmx select confirms each group first; the job continues if this page closes'}</span>
           </div>
         </>}
       </aside>

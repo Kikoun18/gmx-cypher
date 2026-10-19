@@ -62,7 +62,7 @@ export function Awh({ gmx, draft, setDraft, onStarted }: { gmx: GmxState; draft:
   if (!edr || !tpr) return <p className="m-0 text-control text-muted-foreground">pick the energy file and its run input in the inputs tab first</p>
   if (read?.error) return <Alert variant="destructive"><X /><AlertTitle>gmx awh could not read these files</AlertTitle><AlertDescription><p className="whitespace-pre-line">{read.error}</p></AlertDescription></Alert>
   if (!read?.scan) return <p className="m-0 text-control text-muted-foreground" aria-live="polite">reading the AWH frames of {edr.split('/').pop()} with gmx awh…</p>
-  if (!frames.length) return <Alert variant="destructive"><X /><AlertTitle>no AWH data</AlertTitle><AlertDescription><p>gmx awh found no AWH frames in {edr.split('/').pop()}: was it written by a run with AWH?</p></AlertDescription></Alert>
+  if (!frames.length) return <Alert variant="destructive"><X /><AlertTitle>no AWH data</AlertTitle><AlertDescription><p>gmx awh found no AWH frames in {edr.split('/').pop()}: was it written by a simulation with AWH?</p></AlertDescription></Alert>
 
   const setOptions = (o: Options) => setDraft(d => ({ ...d, options: o }))
   const every = Number(options.skip) > 1 ? Number(options.skip) : 4
@@ -120,13 +120,13 @@ export function Awh({ gmx, draft, setDraft, onStarted }: { gmx: GmxState; draft:
 
       <aside className="flex min-w-0 flex-col gap-4">
         <Section label="Command" />
-        {planned?.error && <Alert variant="destructive"><X /><AlertTitle>gmx-cypher can't plan this run</AlertTitle><AlertDescription><p className="whitespace-pre-line">{planned.error}</p></AlertDescription></Alert>}
+        {planned?.error && <Alert variant="destructive"><X /><AlertTitle>gmx-cypher can't plan this job</AlertTitle><AlertDescription><p className="whitespace-pre-line">{planned.error}</p></AlertDescription></Alert>}
         {plan && <>
-          {plan.problems.length > 0 && <Alert variant="destructive" aria-live="polite"><X /><AlertTitle>gmx would refuse this run</AlertTitle><AlertDescription>{plan.problems.map(p => <p key={p}>{p}</p>)}</AlertDescription></Alert>}
+          {plan.problems.length > 0 && <Alert variant="destructive" aria-live="polite"><X /><AlertTitle>gmx would refuse this job</AlertTitle><AlertDescription>{plan.problems.map(p => <p key={p}>{p}</p>)}</AlertDescription></Alert>}
           <Code text={commandText({ cwd: plan.cwd, file: plan.file, args: plan.argv, env: plan.env })} label="awh command" />
           <p className="m-0 text-caption text-muted-foreground">writes {[...(plan.names.more ?? []), plan.names.xvg].length > 1 ? (plan.names.more?.length ?? 0) + 1 + ' files, ' + plan.names.more![0] + ' … ' : ''}{plan.names.xvg} and its record in {plan.outDir.split('/').slice(-2).join('/')}/ · new names, nothing overwritten · {plan.names.xvg} is the one sent to the vault</p>
         </>}
-        {refused?.key === key && <Alert variant="destructive"><X /><AlertTitle>gmx-cypher didn't start this run</AlertTitle><AlertDescription><p className="whitespace-pre-line">{refused.message}</p></AlertDescription></Alert>}
+        {refused?.key === key && <Alert variant="destructive"><X /><AlertTitle>gmx-cypher didn't start this job</AlertTitle><AlertDescription><p className="whitespace-pre-line">{refused.message}</p></AlertDescription></Alert>}
         <div className="flex flex-wrap items-center gap-3">
           <Button size="lg" disabled={!gmx.ok || !!planned?.error || !!plan?.problems.length || starting || !written.length} onClick={start}>{starting ? 'starting…' : 'run'}</Button>
           <span className="text-caption text-muted-foreground" aria-live="polite">{!gmx.ok ? 'no working gmx: see settings' : written.length + ' file' + (written.length > 1 ? 's' : '') + ' of PMF, one per frame'}</span>

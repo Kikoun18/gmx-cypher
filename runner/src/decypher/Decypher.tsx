@@ -40,12 +40,12 @@ function Chip({ on, onClick, children, title }: { on: boolean; onClick: () => vo
   )
 }
 
-function Seg<T extends string>({ label, value, options, onChange }: { label: string; value: T; options: readonly T[]; onChange: (v: T) => void }) {
+function Seg<T extends string>({ label, value, options, onChange, labels }: { label: string; value: T; options: readonly T[]; onChange: (v: T) => void; labels?: Partial<Record<T, string>> }) {
   return (
     <div className="flex items-center gap-2">
       <span className="text-label uppercase text-muted-foreground">{label}</span>
       <ToggleGroup type="single" size="sm" value={value} onValueChange={v => v && onChange(v as T)} aria-label={label.toLowerCase()}>
-        {options.map(o => <ToggleGroupItem key={o} value={o}>{o}</ToggleGroupItem>)}
+        {options.map(o => <ToggleGroupItem key={o} value={o}>{labels?.[o] ?? o}</ToggleGroupItem>)}
       </ToggleGroup>
     </div>
   )
@@ -206,14 +206,14 @@ function CompareView({ shown, focus, setFocus, mols, pal, view, patch, selected,
             </span>
           ))}
           <span className="flex-1" />
-          <Seg label="color by" value={view.colorBy} options={['group', 'job'] as const} onChange={v => patch({ colorBy: v })} />
+          <Seg label="color by" value={view.colorBy} options={['group', 'job'] as const} labels={{ job: 'result' }} onChange={v => patch({ colorBy: v })} />
         </div>
         <ChartPanel className="mx-4 mb-1.5 mt-3.5 flex-1" curves={curves} grid={focus.x} xlabel={focus.xlabel} ylabel={focus.ylabel} pal={pal} peaks={view.peaks}
-          empty={curves.length ? null : { title: 'Pick an atom group', hint: 'Each group you pick is drawn for every job that has it: the same atoms of the same structure, else the same name.' }} />
+          empty={curves.length ? null : { title: 'Pick an atom group', hint: 'Each group you pick is drawn for every result that has it: the same atoms of the same structure, else the same name.' }} />
         <div className="border-t border-border px-4 pb-3.5 pt-2.5">
           <CurveTable curves={curves} onRemove={n => onSelect(selected.filter(x => x !== n))} onHover={c => { setHot(c?.key ?? null); setHover(c?.name ?? null) }} />
           {unmatched.map(u => <p key={u.an.id} className="m-0 text-caption text-butter-strong">{u.an.label}: no group to match {u.names.join(', ')} · groups are matched by their atoms, then their name (case, punctuation and a trailing "…x" ignored), then their place in a list as long</p>)}
-          {!curves.length && <p className="m-0 text-caption text-muted-foreground">{view.colorBy === 'group' ? 'by group: each group its hue, each job its dash' : 'by job: each job its hue, each group its dash'}</p>}
+          {!curves.length && <p className="m-0 text-caption text-muted-foreground">{view.colorBy === 'group' ? 'by group: each group its hue, each result its dash' : 'by result: each result its hue, each group its dash'}</p>}
         </div>
       </section>
     </div>
@@ -273,7 +273,7 @@ function AddPanel({ sources, jobs, allow, vaultPath, vault, loadVault, fileRows,
     <div className="flex min-h-0 flex-col gap-2.5">
       <Section label="Add" />
       <ToggleGroup type="single" size="sm" value={tab} onValueChange={v => { if (!v) return; setTab(v as typeof tab); if (v === 'vault' && !vault) loadVault() }} aria-label="add from">
-        <ToggleGroupItem value="jobs">jobs</ToggleGroupItem><ToggleGroupItem value="runs">runs</ToggleGroupItem><ToggleGroupItem value="vault">vault</ToggleGroupItem><ToggleGroupItem value="files">files</ToggleGroupItem>
+        <ToggleGroupItem value="jobs">jobs</ToggleGroupItem><ToggleGroupItem value="runs">on disk</ToggleGroupItem><ToggleGroupItem value="vault">vault</ToggleGroupItem><ToggleGroupItem value="files">files</ToggleGroupItem>
       </ToggleGroup>
       {tab === 'jobs' && (rdfJobs.length
         ? <div className="flex flex-col">{rdfJobs.map(j => row({ kind: 'job', id: j.id }, j.title, <><span className={statusOf(j).className}>{statusOf(j).word}</span> · {jobLine(j)}</>, j.status === 'failed' || j.status === 'cancelled' || j.status === 'interrupted'))}</div>
@@ -357,7 +357,7 @@ function ExportDialog({ open, onOpenChange, analyses, structs, view, theme, tone
         <DialogHeader>
           <DialogHeading>
             <DialogTitle>Export</DialogTitle>
-            <DialogDescription>one html file · opens in any browser, offline · each job stays interactive</DialogDescription>
+            <DialogDescription>one html file · opens in any browser, offline · each result stays interactive</DialogDescription>
           </DialogHeading>
         </DialogHeader>
         <DialogBody>
@@ -493,14 +493,14 @@ export function Decypher({ open, onOpenChange, sources, jobs, jobsLoaded, allow,
         onDrop={async e => { if (!Array.from(e.dataTransfer.types).includes('Files')) return; e.preventDefault(); setDrag(false); files_(await readDrop(e.dataTransfer)) }}>
         <header className="flex min-h-14 shrink-0 flex-wrap items-center gap-x-4 gap-y-2 border-b border-border px-5 py-2.5">
           <div className="flex min-w-0 flex-col">
-            <DialogTitle className="text-heading">(de)Cypher</DialogTitle>
+            <DialogTitle className="text-heading">compare</DialogTitle>
             <DialogDescription id="decypher-sub" className="tracking-normal">{subtitle}</DialogDescription>
           </div>
           <span className="flex-1" />
-          <Seg label="show" value={view.mode === 'each' ? 'each job' : 'one graph'} options={['each job', 'one graph'] as const} onChange={v => patch({ mode: v === 'each job' ? 'each' : 'one' })} />
+          <Seg label="show" value={view.mode === 'each' ? 'each result' : 'one graph'} options={['each result', 'one graph'] as const} onChange={v => patch({ mode: v === 'each result' ? 'each' : 'one' })} />
           <Button variant="outline" size="sm" onClick={() => { setExporting(n => n + 1); setExportOpen(true) }} disabled={!shown.length}><Download /> export</Button>
           {keyName && <span className="text-caption text-muted-foreground">{keyName} closes</span>}
-          <DialogClose asChild><Button variant="ghost" size="icon-sm" aria-label="close (de)Cypher"><X /></Button></DialogClose>
+          <DialogClose asChild><Button variant="ghost" size="icon-sm" aria-label="close compare"><X /></Button></DialogClose>
         </header>
         <div className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-2 border-b border-border px-5 py-2">
           <Seg label="style" value={view.rep} options={kit.REPS} onChange={v => patch({ rep: v })} />
@@ -511,7 +511,7 @@ export function Decypher({ open, onOpenChange, sources, jobs, jobsLoaded, allow,
             <Chip on={view.labels} onClick={() => patch({ labels: !view.labels })}>labels</Chip>
             <Chip on={view.hydrogens} onClick={() => patch({ hydrogens: !view.hydrogens })}>hydrogens</Chip>
             <Chip on={view.peaks} onClick={() => patch({ peaks: !view.peaks })}>peaks</Chip>
-            {view.mode === 'each' && <Chip on={view.link} onClick={() => patch({ link: !view.link })} title="a group picked in one job is picked in every job that has it">link groups</Chip>}
+            {view.mode === 'each' && <Chip on={view.link} onClick={() => patch({ link: !view.link })} title="a group picked in one result is picked in every result that has it">link groups</Chip>}
           </div>
         </div>
         <div className="grid min-h-0 flex-1 grid-cols-[300px_minmax(0,1fr)]">

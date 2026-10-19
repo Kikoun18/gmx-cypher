@@ -32,7 +32,7 @@ describe('the (de)Cypher key, rebindable in settings', () => {
   it('says what a key would get in the way of', () => {
     expect(keyProblem({ key: 'd' })).toBe('')
     expect(keyProblem({ key: 'c' })).toContain('centres the 3D view')
-    expect(keyProblem({ key: 'f' })).toContain('inside (de)Cypher')
+    expect(keyProblem({ key: 'f' })).toContain('in compare')
     expect(keyProblem({ key: 'c', alt: true })).toBe('')
     expect(keyProblem({ key: 'k', ctrl: true })).toContain('the browser may keep')
   })

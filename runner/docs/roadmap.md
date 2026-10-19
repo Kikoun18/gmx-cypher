@@ -172,7 +172,7 @@ From [`batch-3.md`](batch-3.md) §5: one coherent app, (de)Cypher for every anal
 - [x] R4a Colour roles; the reference in ink; `destructive` used only for errors (the class-usage scan lands with R9c, when the status component exists)
 - [x] R4b `NEUTRAL` moved into the tokens; no hex outside the tokens
 - [x] R4c Titles in Archivo 800 (T160)
-- [ ] R3b One set of words on every screen
+- [x] R3b One set of words on every screen (the tabs become set-up steps with R9a; the peak words with R3d)
 - [ ] R14b-1 The connected project, as a setting (moved here from Phase 8: R3c names jobs from it)
 - [ ] R3c Display names from the project pattern
 - [ ] R3d Both peak rules, named and shown

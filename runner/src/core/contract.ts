@@ -4,6 +4,20 @@
 import { TONES } from '../lib/tones'
 export { TONES }
 
+/**
+ * Words the page never shows (R3b, contract §1): a job is one gmx execution, a record its .run.json, a run the
+ * Matrix's replicate slot, a result what a job produced. *Run* stays a verb.
+ */
+export const NEVER_SHOWN: { phrase: RegExp; instead: string }[] = [
+  { phrase: /\b(each|every) job\b/i, instead: 'each result, every result' },
+  { phrase: /\brun again\b/i, instead: 'open in set-up' },
+  // "run input" is GROMACS's .tpr, and "run number" or "run slot" the Matrix's run: both keep the word.
+  { phrase: /\b(this|that|the|a) run\b(?!['’]?s? input| number| slot)/i, instead: 'this job, the job' },
+  { phrase: /\brun['’]s\b(?! input)|\bruns on disk\b|\bthe runs\b/i, instead: "the job's, records on disk, the jobs" },
+  { phrase: /\bby job\b|\beach job its\b/i, instead: 'colour by result' },
+  { phrase: /\bopen in \(de\)Cypher\b|\b(open|close) \(de\)Cypher\b|\binside \(de\)Cypher\b/i, instead: 'compare' },
+]
+
 /** An internal reference the page never shows (R3a): a ticket, a question or a request, such as "(T35)", "(question 28)" or "(R9c)". */
 export const INTERNAL_REFERENCE = /\((?:questions? \d+|T\d+|R\d+[a-z]?)\b[^)]*\)|\bquestions? \d+\b/
 

@@ -36,7 +36,7 @@ export function keyProblem(b: Binding | null): string {
   if (!b) return ''
   const plain = !b.ctrl && !b.meta && !b.alt
   if (plain && (b.key === 'c' || b.key === 'b')) return 'held C centres the 3D view on a group, and B shows its box: ' + keyLabel(b) + ' would do both'
-  if (plain && ['f', 'r', '[', ']'].includes(b.key)) return 'inside (de)Cypher, F fits, R resets and [ ] step: ' + keyLabel(b) + ' would close it instead'
+  if (plain && ['f', 'r', '[', ']'].includes(b.key)) return 'in compare, F fits, R resets and [ ] step: ' + keyLabel(b) + ' would close it instead'
   if (b.key === 'Escape' || b.key === 'Tab' || b.key === 'Enter') return keyLabel(b) + ' already moves or closes things'
   if (b.ctrl || b.meta) return 'the browser may keep ' + keyLabel(b) + ' for itself'
   return ''

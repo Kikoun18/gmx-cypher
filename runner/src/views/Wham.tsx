@@ -133,14 +133,14 @@ export function Wham({ gmx, draft, setDraft, onStarted }: { gmx: GmxState; draft
       <aside className="flex min-w-0 flex-col gap-4">
         <Section label="Command" />
         {!body && <p className="m-0 text-control text-muted-foreground">find the windows first</p>}
-        {planned?.error && <Alert variant="destructive"><X /><AlertTitle>gmx-cypher can't plan this run</AlertTitle><AlertDescription><p className="whitespace-pre-line">{planned.error}</p></AlertDescription></Alert>}
+        {planned?.error && <Alert variant="destructive"><X /><AlertTitle>gmx-cypher can't plan this job</AlertTitle><AlertDescription><p className="whitespace-pre-line">{planned.error}</p></AlertDescription></Alert>}
         {plan && <>
-          {plan.problems.length > 0 && <Alert variant="destructive" aria-live="polite"><X /><AlertTitle>gmx would refuse this run</AlertTitle><AlertDescription>{plan.problems.map(p => <p key={p}>{p}</p>)}</AlertDescription></Alert>}
+          {plan.problems.length > 0 && <Alert variant="destructive" aria-live="polite"><X /><AlertTitle>gmx would refuse this job</AlertTitle><AlertDescription>{plan.problems.map(p => <p key={p}>{p}</p>)}</AlertDescription></Alert>}
           <Code text={commandText({ cwd: plan.cwd, file: plan.file, args: plan.argv, env: plan.env })} label="wham command" />
           {plan.notes.map(n => <p key={n} className="m-0 text-caption text-muted-foreground">{n}</p>)}
           <p className="m-0 text-caption text-muted-foreground">writes {[plan.names.xvg, ...(plan.names.more ?? [])].join(' · ')} and its record in {plan.outDir.split('/').slice(-2).join('/')}/ · new names, nothing overwritten</p>
         </>}
-        {refused?.key === key && <Alert variant="destructive"><X /><AlertTitle>gmx-cypher didn't start this run</AlertTitle><AlertDescription><p className="whitespace-pre-line">{refused.message}</p></AlertDescription></Alert>}
+        {refused?.key === key && <Alert variant="destructive"><X /><AlertTitle>gmx-cypher didn't start this job</AlertTitle><AlertDescription><p className="whitespace-pre-line">{refused.message}</p></AlertDescription></Alert>}
         <div className="flex flex-wrap items-center gap-3">
           <Button size="lg" disabled={!gmx.ok || !body || !!planned?.error || !!plan?.problems.length || starting} onClick={start}>{starting ? 'starting…' : 'run'}</Button>
           <span className="text-caption text-muted-foreground" aria-live="polite">{!gmx.ok ? 'no working gmx: see settings' : w.windows.length < 2 ? 'at least two windows' : 'the overlap of neighbouring windows comes with the result'}</span>

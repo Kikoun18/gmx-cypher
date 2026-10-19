@@ -188,7 +188,7 @@ export function Inputs({ state, draft, setDraft, onSettings, onNext }: { state: 
           onFiles={upload} action={<Button variant="outline" onClick={() => fileRef.current?.click()}><Upload /> choose files</Button>} />
       </div>
       <div className="flex flex-col gap-4">
-        <Section label="This run" />
+        <Section label="This job" />
         {slots.map(({ slot, label, optional: always }) => {
           // Optional: the index for RDF; for a command without groups, any input it can run without (energy's run input).
           const optional = always || (!command.groups && !command.required.includes(slot))
@@ -210,7 +210,7 @@ export function Inputs({ state, draft, setDraft, onSettings, onNext }: { state: 
         {command.tool === 'energy'
           ? <p className="m-0 text-control" aria-live="polite">{draft.inputs.edr ? energy?.terms ? '✓ ' + energy.terms.length + ' terms · read by gmx energy' : energy?.error ? '✗ ' + energy.error : 'reading the terms…' : 'pick an energy file'}</p>
           : command.tool === 'wham'
-          ? <p className="m-0 text-control text-muted-foreground">gmx wham reads umbrella windows, not these inputs: find them in the analysis tab</p>
+          ? <p className="m-0 text-control text-muted-foreground">gmx wham reads umbrella windows, not these inputs: find them in the command tab</p>
           : command.tool === 'awh'
           ? <p className="m-0 text-control" aria-live="polite">{!draft.inputs.edr || !draft.inputs.runInput ? 'pick the energy file and its run input'
             : awh?.error ? '✗ ' + awh.error : !frames ? 'reading the AWH frames…' : !frames.length ? '✗ no AWH data in this energy file'

@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import { COLOUR_FILES, INTERNAL_REFERENCE } from '../src/core/contract';
+import { COLOUR_FILES, INTERNAL_REFERENCE, NEVER_SHOWN } from '../src/core/contract';
 import { RUNNER } from './helpers';
 import { stringsOf, uiStrings } from './ui-strings';
 
@@ -27,6 +27,13 @@ describe('colours come from the tokens (R4b)', () => {
   it('no hex colour in src/ outside tokens.json and the role layer (the generated tokens.css aside)', () => {
     const hits = walk(RUNNER + 'src').filter(f => /\.(tsx?|css|json)$/.test(f) && !COLOUR_FILES.includes(f) && f !== 'src/tokens.css')
       .flatMap(f => readFileSync(RUNNER + f, 'utf8').split('\n').flatMap((l, i) => (/#[0-9a-f]{6}\b|#[0-9a-f]{3}\b/i.test(l) ? [f + ':' + (i + 1)] : [])));
+    expect(hits).toEqual([]);
+  });
+});
+
+describe('one set of words (R3b)', () => {
+  it('no UI string uses a word the contract keeps for something else', () => {
+    const hits = uiStrings().flatMap(s => NEVER_SHOWN.filter(n => n.phrase.test(s.text)).map(n => s.file + ':' + s.line + '  ' + s.text.trim().slice(0, 100) + '  → ' + n.instead));
     expect(hits).toEqual([]);
   });
 });
