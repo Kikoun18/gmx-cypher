@@ -181,7 +181,7 @@ From [`batch-3.md`](batch-3.md) §5: one coherent app, (de)Cypher for every anal
 ### Phase 3: One visualization core (R5, R6)
 - [x] R5a One copy each of tones, dashes (the Matrix's 10, with names), ticks and atom ranges (T170)
 - [x] R5b One structure model (T171)
-- [ ] R5c Every chart drawn by the core, with a hover readout; the Morpheus `LineChart` copy removed
+- [x] R5c Every chart drawn by the core, with a hover readout; the Morpheus `LineChart` copy removed (T172)
 - [ ] R6a Every chart exports to SVG, PDF, PNG and CSV, and any result to HTML
 - [ ] R6b Export settings
 
