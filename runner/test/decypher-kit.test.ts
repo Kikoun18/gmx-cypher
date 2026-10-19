@@ -133,7 +133,7 @@ describe('(de)Cypher reads your runs as the RDF Explorer design does', () => {
   it('the chart: axes, a path and a peak per curve, a rule where the pointer is', () => {
     const [h] = files().analyses
     const curves = kit.buildCurves({ focus: h, plotted: [h], selected: ['O5...S'], colorBy: 'group', pal, tones: {} })
-    const { tree, geom } = kit.chart({ W: 600, H: 360, curves, grid: h.x, xlabel: h.xlabel, ylabel: h.ylabel, hover: 0.6, peaks: true, pal })
+    const { tree, geom } = kit.chart({ W: 600, H: 360, curves, grid: h.x, xlabel: h.xlabel, ylabel: h.ylabel, hover: 0.6, marks: 'maximum', pal })
     expect(tree[0]).toBe('svg')
     expect(nodes(tree, 'path')).toHaveLength(2)
     expect(nodes(tree, 'circle')).toHaveLength(2)
@@ -147,7 +147,7 @@ describe('(de)Cypher reads your runs as the RDF Explorer design does', () => {
     const [h] = files().analyses
     const one = kit.buildCurves({ focus: h, plotted: [h], selected: ['O5...S'], colorBy: 'group', pal, tones: {} })[0]
     const curves = [0, 1, 2, 3].map(i => ({ ...one, key: 'k' + i }))
-    const { tree } = kit.chart({ W: 600, H: 360, curves, grid: h.x, xlabel: '', ylabel: '', hover: null, peaks: true, pal })
+    const { tree } = kit.chart({ W: 600, H: 360, curves, grid: h.x, xlabel: '', ylabel: '', hover: null, marks: 'maximum', pal })
     const labels = nodes(tree, 'text').filter(t => t[2] === one.peak!.r.toFixed(3))
     expect(labels.map(t => t[1].y)).toEqual([-8, -21, -34])
     expect(nodes(tree, 'circle')).toHaveLength(4)
@@ -163,7 +163,7 @@ describe('(de)Cypher reads your runs as the RDF Explorer design does', () => {
     expect(Array.from(a.local)).toEqual(Array.from(b.local))
     const [h] = files().analyses as Analysis[]
     const c = again.buildCurves({ focus: h, plotted: [h], selected: ['CH...S'], colorBy: 'group', pal: again.palette(false, tokens(false)), tones: {} })
-    expect(again.chart({ W: 400, H: 300, curves: c, grid: h.x, xlabel: '', ylabel: '', hover: null, peaks: true, pal: again.palette(false, tokens(false)) }).tree[0]).toBe('svg')
+    expect(again.chart({ W: 400, H: 300, curves: c, grid: h.x, xlabel: '', ylabel: '', hover: null, marks: 'maximum', pal: again.palette(false, tokens(false)) }).tree[0]).toBe('svg')
   })
 })
 
@@ -173,6 +173,21 @@ describe('the neutrals moved into the role layer unchanged (R4b)', () => {
     const light = kit.palette(false, t.light), dark = kit.palette(true, t.dark)
     expect([light.bond, light.edge, light.hl, light.neutral]).toEqual(['#a8a29e', '#201e1d', 0.45, { C: '#7d7773', H: '#f7f6f5', O: '#b3aaa4', N: '#9b948f', S: '#cfc5bd', P: '#b8b0aa', X: '#a39d99' }])
     expect([dark.bond, dark.edge, dark.hl, dark.neutral]).toEqual(['#5a5450', '#0e0d0c', 0.26, { C: '#8a8480', H: '#aaa49f', O: '#6f6965', N: '#7a7470', S: '#a0978f', P: '#8a8480', X: '#7a7470' }])
+  })
+})
+
+describe('both peak rules in compare (R3d)', () => {
+  it('each group has its maximum and its first shell; the chart marks the maximum filled and the first shell hollow', () => {
+    const a = files().analyses.find(x => x.label.endsWith('_H'))!, g = a.sels.find(s => s.name === 'NH_N...S')!
+    expect([g.peak!.r, g.shell!.r]).toEqual([0.6, 0.45])
+    const pal = kit.palette(false, TOKENS.light)
+    const curves = kit.buildCurves({ focus: a, plotted: [a], selected: ['NH_N...S'], colorBy: 'group', pal, tones: {} })
+    const svg = (marks: 'both' | 'maximum' | 'first shell' | 'none') => JSON.stringify(kit.chart({ W: 600, H: 300, curves, grid: a.x, xlabel: 'r (nm)', ylabel: 'g(r)', hover: null, marks, pal }).tree)
+    expect(svg('both')).toContain('"key":"pk"')
+    expect(svg('both')).toContain('"key":"sh"')
+    expect(svg('maximum')).not.toContain('"key":"sh"')
+    expect(svg('first shell')).not.toContain('"key":"pk"')
+    expect(svg('none')).not.toMatch(/"key":"(pk|sh)"/)
   })
 })
 

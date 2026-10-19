@@ -4,7 +4,7 @@
 
 import * as React from 'react'
 import { cn } from '../lib/utils'
-import type { AtomHover, ChartGeom, Curve, Group, Mol, Palette, SceneState, VNode } from './kit'
+import type { AtomHover, ChartGeom, Curve, Group, Marks, Mol, Palette, SceneState, VNode } from './kit'
 import type { View } from './state'
 import { kit } from './theme'
 
@@ -70,8 +70,8 @@ function toReact(n: VNode | string, i: number): React.ReactNode {
 }
 
 /** The chart, filling its box; under the pointer, a rule, a dot on each curve and their values. */
-export function ChartPanel({ curves, grid, xlabel, ylabel, pal, peaks, className, empty }: {
-  curves: Curve[]; grid: number[]; xlabel: string; ylabel: string; pal: Palette; peaks: boolean; className?: string; empty?: { title: string; hint: string } | null
+export function ChartPanel({ curves, grid, xlabel, ylabel, pal, marks, className, empty }: {
+  curves: Curve[]; grid: number[]; xlabel: string; ylabel: string; pal: Palette; marks: Marks; className?: string; empty?: { title: string; hint: string } | null
 }) {
   const box = React.useRef<HTMLDivElement>(null)
   const [size, setSize] = React.useState({ w: 0, h: 0 })
@@ -83,7 +83,7 @@ export function ChartPanel({ curves, grid, xlabel, ylabel, pal, peaks, className
     ro.observe(el)
     return () => ro.disconnect()
   }, [])
-  const out = React.useMemo(() => (size.w && size.h ? kit.chart({ W: size.w, H: size.h, curves, grid, xlabel, ylabel, hover, peaks, pal, animate: true }) : null), [size, curves, grid, xlabel, ylabel, hover, peaks, pal])
+  const out = React.useMemo(() => (size.w && size.h ? kit.chart({ W: size.w, H: size.h, curves, grid, xlabel, ylabel, hover, marks, pal, animate: true }) : null), [size, curves, grid, xlabel, ylabel, hover, marks, pal])
   const geom: ChartGeom | null = out?.geom ?? null
   const xv = geom && hover != null ? geom.m.l + ((hover - geom.x0) / (geom.x1 - geom.x0 || 1)) * geom.iw : 0
   return (
@@ -115,14 +115,14 @@ export function ChartPanel({ curves, grid, xlabel, ylabel, pal, peaks, className
   )
 }
 
-/** The curves under a chart: series, source, atoms, highest point; × takes a group off the plot. */
+/** The curves under a chart: series, source, atoms, both peak rules (R3d); × takes a group off the plot. */
 export function CurveTable({ curves, onRemove, onHover, source = true }: { curves: Curve[]; onRemove: (name: string) => void; onHover: (c: Curve | null) => void; source?: boolean }) {
   if (!curves.length) return null
-  const cols = source ? 'grid-cols-[26px_minmax(0,1fr)_minmax(0,1.1fr)_44px_70px_56px_26px]' : 'grid-cols-[26px_minmax(0,1fr)_44px_70px_56px_26px]'
+  const cols = source ? 'grid-cols-[26px_minmax(0,1fr)_minmax(0,1.1fr)_44px_96px_96px_26px]' : 'grid-cols-[26px_minmax(0,1fr)_44px_96px_96px_26px]'
   return (
     <div className="flex max-h-64 flex-col gap-0.5 overflow-auto">
       <div className={cn('grid items-center gap-2 pb-1 text-label uppercase text-muted-foreground', cols)}>
-        <span /><span>series</span>{source && <span>source</span>}<span className="text-right">atoms</span><span className="text-right">peak r</span><span className="text-right">peak g</span><span />
+        <span /><span>series</span>{source && <span>source</span>}<span className="text-right">atoms</span><span className="text-right">maximum r · g</span><span className="text-right">first shell r · g</span><span />
       </div>
       {curves.map(c => (
         <div key={c.key} className={cn('grid min-h-[26px] items-center gap-2 text-control', cols)} onMouseEnter={() => onHover(c)} onMouseLeave={() => onHover(null)}>
@@ -130,8 +130,8 @@ export function CurveTable({ curves, onRemove, onHover, source = true }: { curve
           <span className="truncate font-bold" style={{ color: c.color }}>{c.name}</span>
           {source && <span className="truncate text-muted-foreground">{c.source}</span>}
           <span className="text-right">{c.atoms || '—'}</span>
-          <span className="text-right">{c.peak ? c.peak.r.toFixed(3) : '—'}</span>
-          <span className="text-right">{c.peak ? c.peak.g.toFixed(2) : '—'}</span>
+          <span className="text-right">{c.peak ? c.peak.r.toFixed(3) + ' · ' + c.peak.g.toFixed(2) : '—'}</span>
+          <span className="text-right">{c.shell ? c.shell.r.toFixed(3) + ' · ' + c.shell.g.toFixed(2) : '—'}</span>
           <button type="button" aria-label={'take ' + c.name + ' off the plot'} onClick={() => onRemove(c.name)} className="grid size-[22px] place-items-center justify-self-end rounded-full text-muted-foreground hover:bg-accent hover:text-foreground">×</button>
         </div>
       ))}

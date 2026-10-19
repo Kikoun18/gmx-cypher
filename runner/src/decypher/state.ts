@@ -2,7 +2,7 @@
 // and how you last looked at them. Files from disk are read in the page and not kept.
 
 import * as React from 'react'
-import type { ColorBy, Arrange, Rep, Rest } from './kit'
+import type { ColorBy, Arrange, Marks, Rep, Rest } from './kit'
 
 export type SourceRef =
   | { kind: 'job'; id: string }
@@ -51,7 +51,8 @@ export interface View {
   arrange: Arrange
   labels: boolean
   hydrogens: boolean
-  peaks: boolean
+  /** The peak marks the charts draw (R3d): the maximum filled, the first shell hollow. A view saved before kept a `peaks` switch. */
+  marks: Marks
   /** Picking a group in one job picks the same group in the others. */
   link: boolean
   /** Analyses left out of the view, by id. */
@@ -64,7 +65,7 @@ export interface View {
   morphed: Morph[]
 }
 
-export const DEFAULT_VIEW: View = { mode: 'each', colorBy: 'group', rep: 'ball & stick', rest: 'grey', arrange: 'side by side', labels: true, hydrogens: true, peaks: true, link: false, hidden: [], selected: {}, focus: null, morphed: [] }
+export const DEFAULT_VIEW: View = { mode: 'each', colorBy: 'group', rep: 'ball & stick', rest: 'grey', arrange: 'side by side', labels: true, hydrogens: true, marks: 'both', link: false, hidden: [], selected: {}, focus: null, morphed: [] }
 
 function checkView(v: unknown): View | null {
   if (!v || typeof v !== 'object') return null
@@ -78,7 +79,7 @@ function checkView(v: unknown): View | null {
     mode: one(o.mode, ['each', 'one'] as const, d.mode), colorBy: one(o.colorBy, ['group', 'job'] as const, d.colorBy),
     rep: one(o.rep, ['ball & stick', 'licorice', 'spacefill'] as const, d.rep), rest: one(o.rest, ['tinted', 'grey', 'ghost'] as const, d.rest),
     arrange: one(o.arrange, ['side by side', 'frame positions'] as const, d.arrange),
-    labels: bool(o.labels, d.labels), hydrogens: bool(o.hydrogens, d.hydrogens), peaks: bool(o.peaks, d.peaks), link: bool(o.link, d.link),
+    labels: bool(o.labels, d.labels), hydrogens: bool(o.hydrogens, d.hydrogens), marks: one(o.marks, ['both', 'maximum', 'first shell', 'none'] as const, (o as { peaks?: boolean }).peaks === false ? 'none' : d.marks), link: bool(o.link, d.link),
     hidden: Array.isArray(o.hidden) ? o.hidden.filter(x => typeof x === 'string') : [], selected, focus: typeof o.focus === 'string' ? o.focus : null, morphed,
   }
 }

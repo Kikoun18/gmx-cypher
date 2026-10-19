@@ -5,6 +5,7 @@
 import { parseTable } from '../../../matrix/src/lib/seq'
 import { structFormat } from '../../../matrix/src/lib/structFile'
 import { parseNdx } from '../lib/ndx'
+import { peaks } from '../lib/rdf'
 import { decypherKit, type Analysis, type Group, type Peak, type Sel, type Struct, type Tone } from './kit'
 
 const kit = decypherKit()
@@ -75,6 +76,12 @@ export function parseXvg(text: string): Xvg {
   return { x, ys, legends: ys.map((_, i) => t.head.legends[i] || ''), xlabel: t.head.xLabel, ylabel: t.head.yLabel, ndxName, refIdx, selIdx }
 }
 
+/** The curve's first shell (T27's rule, R3d): none when g(r) never rises above 1. */
+export function shellOf(x: number[], y: number[]): Peak | null {
+  const s = peaks(x.flatMap((v, i) => (Number.isFinite(v) && Number.isFinite(y[i]) ? [[v, y[i]] as [number, number]] : []))).firstShell
+  return s && { r: s.r, g: s.g }
+}
+
 /** The curve's highest point (the first of equal ones), wherever it is; null for a curve with no value above zero. */
 export function peakOf(x: number[], y: number[]): Peak | null {
   let best = -1
@@ -88,7 +95,7 @@ function withCurves(x: Xvg, groups: Group[]): Sel[] {
     let col = x.legends.indexOf(g.name)
     if (col < 0) col = i
     const y = x.ys[col] || []
-    return { ...g, y, peak: y.length ? peakOf(x.x, y) : null }
+    return { ...g, y, peak: y.length ? peakOf(x.x, y) : null, shell: y.length ? shellOf(x.x, y) : null }
   }).filter(g => g.y.length)
 }
 
@@ -162,7 +169,7 @@ export function fromVault(o: { id: string; title: string; label: string; source:
     if (!cy) return []
     const y = c.text === first.text && c.xCol === first.xCol ? cy.filter((_, j) => keep[j]).map(v => (Number.isFinite(v) ? v : 0)) : x.map(v => interp(cx, cy, v))
     const g = c.xCol === 1 ? groups.sels[c.yCol - 2] : undefined
-    return [{ name: c.label, atoms: g ? g.atoms : [], tone: g ? g.tone : TONES[i % TONES.length], y, peak: peakOf(x, y) }]
+    return [{ name: c.label, atoms: g ? g.atoms : [], tone: g ? g.tone : TONES[i % TONES.length], y, peak: peakOf(x, y), shell: shellOf(x, y) }]
   })
   const head = t0.head
   return {

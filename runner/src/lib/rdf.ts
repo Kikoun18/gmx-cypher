@@ -119,6 +119,15 @@ export function resultSeries(xvg: string): { label: string; points: [number, num
 export interface Peak { r: number; g: number; rule: 'first shell' | 'maximum' }
 
 /**
+ * Both peak rules (R3d, T163), always named: the first shell (T27's rule; none when g(r) never rises above 1, where
+ * T27 fell back to the maximum) and the maximum (T152: the highest point, wherever it is; none for a zero curve).
+ */
+export function peaks(points: [number, number][]): { firstShell: Peak | null; maximum: Peak | null } {
+  const p = firstPeak(points), top = points.reduce<[number, number] | null>((a, q) => (!a || q[1] > a[1] ? q : a), null);
+  return { firstShell: p?.rule === 'first shell' ? p : null, maximum: top && top[1] > 0 ? { r: top[0], g: top[1], rule: 'maximum' } : null };
+}
+
+/**
  * The first peak (T27): the highest point of the first stretch where g(r) > 1, with dips below 1 narrower
  * than `bridge` nm bridged (sparse data leaves single empty bins inside a shell); if g(r) never exceeds 1,
  * the global maximum; null for a curve that is zero everywhere.

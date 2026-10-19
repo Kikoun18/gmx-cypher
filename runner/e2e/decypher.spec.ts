@@ -198,10 +198,10 @@ test('morph the two runs into one card, pick their references, sorted values, he
   await chips.nth(1).click({ modifiers: ['Shift'] })
   await expect(one.locator('.dc-trow b')).toHaveCount(4)
 
-  // The peak is the highest point of the curve, and the exported values come highest first as well.
+  // The maximum is the highest point of the curve (the table gives it as "r · g", beside the first shell), and the exported values come highest first as well.
   const data = JSON.parse(/<script type="application\/json" id="dc-data">(.*?)<\/script>/s.exec(html)![1])
   const top = (a: number, name: string) => Math.max(...data.analyses[a].sels.find((g: { name: string }) => g.name === name).y)
-  const peakG = (await one.locator('.dc-trow').filter({ hasText: 'NH_N...S' }).first().locator('span.dc-r').last().innerText()).trim()
+  const peakG = (await one.locator('.dc-trow').filter({ hasText: 'NH_N...S' }).first().locator('span.dc-r').nth(1).innerText()).split(' · ')[1].trim()
   expect([top(0, 'NH_N...S').toFixed(2), top(1, 'NH_N...S').toFixed(2)]).toContain(peakG)
   const ebox = (await one.locator('.dc-chart svg').first().boundingBox())!
   await exported.mouse.move(ebox.x + ebox.width * 0.35, ebox.y + ebox.height * 0.5)

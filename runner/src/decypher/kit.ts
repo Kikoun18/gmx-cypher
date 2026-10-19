@@ -13,7 +13,10 @@ export type ColorBy = 'group' | 'job'
 export interface Struct { title: string; n: number; nr: number[]; resnr: number[]; resn: string[]; name: string[]; xyz: number[]; box: [number, number, number] }
 export interface Peak { r: number; g: number }
 export interface Group { name: string; atoms: number[]; tone: Tone }
-export interface Sel extends Group { y: number[]; peak: Peak | null }
+/** A group's curve, with both peak rules (R3d): `peak` is the maximum, `shell` the first shell (none if g(r) never rises above 1). */
+export interface Sel extends Group { y: number[]; peak: Peak | null; shell?: Peak | null }
+/** Which peak marks a chart draws (R3d): the maximum filled, the first shell hollow. */
+export type Marks = 'both' | 'maximum' | 'first shell' | 'none'
 
 /** One RDF: a gmx-cypher job, a run record found on disk, an RDF of the Matrix vault, or files from disk. */
 export interface Analysis {
@@ -69,7 +72,7 @@ export interface AtomHover { atom: string; sel: number; ref: number; left: numbe
 
 export interface Curve {
   key: string; name: string; source: string; analysis: string
-  x: number[]; y: number[]; color: string; dash: string; peak: Peak | null; atoms: number
+  x: number[]; y: number[]; color: string; dash: string; peak: Peak | null; shell?: Peak | null; atoms: number
   hot?: boolean; dim?: boolean
 }
 
@@ -78,7 +81,7 @@ export type VNode = [string, Record<string, unknown>, ...(VNode | string)[]]
 export interface ChartGeom { m: { l: number; r: number; t: number; b: number }; iw: number; ih: number; x0: number; x1: number; y1: number; grid: number[] }
 
 /** One job as an export carries it: atoms as ranges, y values rounded, its selection when exported. */
-export interface ExportAnalysis { id: string; title: string; label: string; sub: string; x: number[]; xlabel: string; ylabel: string; ref: { name: string; atoms: string; tone: Tone } | null; sels: { name: string; atoms: string; tone: Tone; y: number[]; peak: Peak | null }[]; struct: string | null; structNote: string; selected: string[]; tone: Tone }
+export interface ExportAnalysis { id: string; title: string; label: string; sub: string; x: number[]; xlabel: string; ylabel: string; ref: { name: string; atoms: string; tone: Tone } | null; sels: { name: string; atoms: string; tone: Tone; y: number[]; peak: Peak | null; shell?: Peak | null }[]; struct: string | null; structNote: string; selected: string[]; tone: Tone }
 /** Everything an exported page needs: its tokens, structures without solvent, the analyses, the comparison and the style. */
 export interface ExportData {
   /** The page's heading, as chosen ('(de)Cypher' unless changed). */
@@ -670,7 +673,7 @@ export function decypherKit() {
           if (mi > 0) color = mix(color, ink, Math.min(0.6, 0.3 * mi))
           dash = DASH[mi % DASH.length]
         }
-        out.push({ key: an.id + '|' + gg.name + '|' + name, name, source: an.label, analysis: an.id, x: an.x, y: gg.y, color, dash, peak: gg.peak, atoms: gg.atoms.length })
+        out.push({ key: an.id + '|' + gg.name + '|' + name, name, source: an.label, analysis: an.id, x: an.x, y: gg.y, color, dash, peak: gg.peak, shell: gg.shell ?? null, atoms: gg.atoms.length })
       })
     })
     return out
@@ -706,7 +709,7 @@ export function decypherKit() {
    * g(r) as an SVG tree: gridlines in `border`, axes in `foreground`, the dashed g = 1 line, each curve in its
    * colour and dash with its highest point dotted and labelled, and at `hover` a rule with a dot on each curve.
    */
-  function chart(o: { W: number; H: number; curves: Curve[]; grid: number[]; xlabel: string; ylabel: string; hover: number | null; peaks: boolean; pal: Palette; animate?: boolean }): { tree: VNode; geom: ChartGeom } {
+  function chart(o: { W: number; H: number; curves: Curve[]; grid: number[]; xlabel: string; ylabel: string; hover: number | null; marks: Marks; pal: Palette; animate?: boolean }): { tree: VNode; geom: ChartGeom } {
     const th = o.pal, W = o.W, H = o.H, m = { l: 48, r: 20, t: 24, b: 40 }
     const iw = Math.max(20, W - m.l - m.r), ih = Math.max(20, H - m.t - m.b)
     const grid = o.curves.length ? o.curves[0].x : o.grid
@@ -743,7 +746,9 @@ export function decypherKit() {
     o.curves.forEach(c => {
       const d = c.y.map((v, j) => (j ? 'L' : 'M') + sx(c.x[j]).toFixed(1) + ',' + sy(v).toFixed(1)).join('')
       const g: VNode[] = [['path', { key: 'p', d, fill: 'none', stroke: c.color, strokeWidth: c.hot ? 2.8 : 2, strokeLinejoin: 'round', strokeLinecap: 'round', strokeDasharray: c.dash === 'none' ? undefined : c.dash, style: o.animate ? { d: 'path("' + d + '")', transition: 'd 360ms ' + ease + ', stroke 200ms ease' } : undefined }]]
-      if (o.peaks && c.peak) {
+      // The first shell, hollow and unlabelled (R3d); the maximum below it, filled, with its r.
+      if ((o.marks === 'both' || o.marks === 'first shell') && c.shell) g.push(['circle', { key: 'sh', cx: sx(c.shell.r), cy: sy(c.shell.g), r: 3.6, fill: BG, stroke: c.color, strokeWidth: 1.8 }])
+      if ((o.marks === 'both' || o.marks === 'maximum') && c.peak) {
         const pk = c.peak, px = sx(pk.r), py = sy(pk.g), text = pk.r.toFixed(3), ty = c.dim ? null : labelAt(px, py, text)
         const mark: VNode = ['g', { key: 'pk', style: { transform: 'translate(' + px.toFixed(1) + 'px,' + py.toFixed(1) + 'px)', transition: o.animate ? 'transform 360ms ' + ease : undefined } },
           ['circle', { key: 'c', cx: 0, cy: 0, r: 4, fill: c.color }]]
@@ -773,7 +778,7 @@ export function decypherKit() {
     const analyses: Analysis[] = data.analyses.map(a => ({
       id: a.id, kind: 'job', title: a.title, label: a.label, sub: a.sub, x: a.x, xlabel: a.xlabel, ylabel: a.ylabel,
       ref: a.ref ? { name: a.ref.name, atoms: ranges(a.ref.atoms), tone: a.ref.tone } : null,
-      sels: a.sels.map(s => ({ name: s.name, atoms: ranges(s.atoms), tone: s.tone, y: s.y, peak: s.peak })), struct: a.struct, structNote: a.structNote,
+      sels: a.sels.map(s => ({ name: s.name, atoms: ranges(s.atoms), tone: s.tone, y: s.y, peak: s.peak, shell: s.shell ?? null })), struct: a.struct, structNote: a.structNote,
     }))
     const tones: Record<string, Tone> = {}
     data.analyses.forEach(a => { tones[a.id] = a.tone })
@@ -822,7 +827,7 @@ export function decypherKit() {
       const render = () => {
         const W = box.clientWidth, H = box.clientHeight
         if (!W || !H) return
-        const g = get(), out = chart({ W, H, curves: g.curves, grid: g.grid, xlabel: g.xlabel, ylabel: g.ylabel, hover, peaks: true, pal: pal() })
+        const g = get(), out = chart({ W, H, curves: g.curves, grid: g.grid, xlabel: g.xlabel, ylabel: g.ylabel, hover, marks: 'both', pal: pal() })
         geom = out.geom
         box.replaceChildren(svg(out.tree))
         if (hover == null || !g.curves.length) { card.hidden = true; return }
@@ -877,8 +882,8 @@ export function decypherKit() {
       const box = h('div', { class: 'dc-table' })
       const render = () => {
         const cs = get()
-        box.replaceChildren(...(cs.length ? [h('div', { class: 'dc-trow dc-thead' }, h('span'), h('span', null, 'SERIES'), h('span', null, 'SOURCE'), h('span', { class: 'dc-r' }, 'ATOMS'), h('span', { class: 'dc-r' }, 'PEAK R'), h('span', { class: 'dc-r' }, 'PEAK G'))] : []),
-          ...cs.map(c => h('div', { class: 'dc-trow' }, swatch(c.color, c.dash), h('b', { style: { color: c.color } }, c.name), h('span', { class: 'dc-cap' }, c.source), h('span', { class: 'dc-r' }, String(c.atoms || '—')), h('span', { class: 'dc-r' }, c.peak ? c.peak.r.toFixed(3) : '—'), h('span', { class: 'dc-r' }, c.peak ? c.peak.g.toFixed(2) : '—'))))
+        box.replaceChildren(...(cs.length ? [h('div', { class: 'dc-trow dc-thead' }, h('span'), h('span', null, 'SERIES'), h('span', null, 'SOURCE'), h('span', { class: 'dc-r' }, 'ATOMS'), h('span', { class: 'dc-r' }, 'MAXIMUM R · G'), h('span', { class: 'dc-r' }, 'FIRST SHELL R · G'))] : []),
+          ...cs.map(c => h('div', { class: 'dc-trow' }, swatch(c.color, c.dash), h('b', { style: { color: c.color } }, c.name), h('span', { class: 'dc-cap' }, c.source), h('span', { class: 'dc-r' }, String(c.atoms || '—')), h('span', { class: 'dc-r' }, c.peak ? c.peak.r.toFixed(3) + ' · ' + c.peak.g.toFixed(2) : '—'), h('span', { class: 'dc-r' }, c.shell ? c.shell.r.toFixed(3) + ' · ' + c.shell.g.toFixed(2) : '—'))))
       }
       redraws.push(render)
       return { el: box, render }

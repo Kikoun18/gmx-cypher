@@ -66,8 +66,10 @@ test('pick inputs, make groups, run, see the chart', async ({ page }) => {
   // Jobs: it runs, ends, and shows its chart, first peak and record.
   await expect(page.getByRole('heading', { name: /rdf_nvt · sulfur → water_O/ })).toBeVisible()
   await expect(page.locator('figure[data-slot=line-chart]').first()).toBeVisible({ timeout: 30_000 })
-  await expect(page.getByText('first peak · water_O')).toBeVisible()
-  await expect(page.getByText('0.374 nm')).toBeVisible()
+  await expect(page.getByText('first shell · water_O')).toBeVisible()
+  await expect(page.getByText('maximum · water_O')).toBeVisible()
+  // Here the first shell is the maximum: both stats read 0.374 nm.
+  await expect(page.getByText('0.374 nm')).toHaveCount(2)
   await expect(page.getByText('rdf_nvt.run.json')).toBeVisible()
   // The result's group table: the reference's name in ink too.
   expect(await page.getByRole('cell', { name: 'sulfur', exact: true }).evaluate(e => getComputedStyle(e).color)).toBe(ink)

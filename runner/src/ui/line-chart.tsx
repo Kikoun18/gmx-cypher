@@ -17,6 +17,8 @@ export interface ChartSeries {
   state?: "on" | "dim" | "off"
   /** Mark the curve's maximum or minimum with a dot. */
   marker?: "max" | "min"
+  /** A second point marked hollow (R3d: an RDF's first shell beside its maximum). */
+  hollow?: [number, number] | null
   /** Write the marked point's x or y next to the dot. */
   markerLabel?: "x" | "y"
   /** ± per point, drawn as a band in the curve's tone (gmx-cypher's addition for WHAM's bootstrap error, R6; a Morpheus candidate). */
@@ -150,6 +152,7 @@ function LineChart({
                 {band && <path d={band} fill={c} fillOpacity={0.18} stroke="none" />}
                 <path d={d} fill="none" stroke={c} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round"
                   strokeDasharray={DASH[(s.dash ?? 0) % DASH.length]} />
+                {s.hollow && <circle cx={sx(s.hollow[0])} cy={sy(s.hollow[1])} r={3.6} className="fill-card" stroke={c} strokeWidth={1.8} />}
                 {mk && (
                   <g>
                     <circle cx={sx(mk[0])} cy={sy(mk[1])} r={4} fill={c} />

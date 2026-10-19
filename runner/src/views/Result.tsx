@@ -12,7 +12,7 @@ import { neighbourOverlaps, overlapNotes, parseBootstrap, parseHistograms } from
 import { COMMANDS } from '../lib/commands'
 import { driftLarger, type EnergyRow } from '../lib/energy'
 import { curveStats } from '../lib/curves'
-import { firstPeak, resultSeries } from '../lib/rdf'
+import { peaks, resultSeries } from '../lib/rdf'
 import { parseTable } from '../../../matrix/src/lib/seq'
 import type { RunRecord } from '../lib/record'
 import { groupText, toneText, toneVar, type Tone } from '../lib/tones'
@@ -59,7 +59,10 @@ function Curves({ text, tones, yLabel, height, shown, setShown, marked = true }:
   text: string; tones: Tone[]; yLabel: string; height: number; shown: Shown[]; setShown: (s: Shown[]) => void; marked?: boolean
 }) {
   const curves = React.useMemo(() => resultSeries(text), [text])
-  const series: (ChartSeries & { i: number })[] = curves.map((c, i) => ({ i, label: c.label, points: c.points, tone: tones[i], state: shown[i] ?? 'on', ...(marked ? { marker: 'max' as const, markerLabel: 'x' as const } : {}) }))
+  const series: (ChartSeries & { i: number })[] = curves.map((c, i) => {
+    const shell = marked ? peaks(c.points).firstShell : null
+    return { i, label: c.label, points: c.points, tone: tones[i], state: shown[i] ?? 'on', ...(marked ? { marker: 'max' as const, markerLabel: 'x' as const, hollow: shell && [shell.r, shell.g] as [number, number] } : {}) }
+  })
   const drawn = series.filter(s => s.state !== 'off')
   return (
     <div className="flex flex-col gap-2">
@@ -101,11 +104,14 @@ function RdfChart({ job, record }: { job: Job; record: RunRecord }) {
   return (
     <div className="flex flex-col gap-3">
       <Curves text={xvg} tones={tones} yLabel="g(r)" height={300} shown={shown} setShown={setShown} />
-      <p className="m-0 text-caption text-muted-foreground">click a curve's name: shown → dimmed → hidden · the dot marks each curve's maximum</p>
+      <p className="m-0 text-caption text-muted-foreground">click a curve's name: shown → dimmed → hidden · ● maximum · ○ first shell</p>
       <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3">
-        {curves.map((c, i) => {
-          const p = firstPeak(c.points)
-          return <Stat key={i} label={'first peak · ' + c.label} value={p ? p.r.toFixed(3) + ' nm' : '—'} hint={p ? 'g = ' + p.g.toPrecision(3) + (p.rule === 'maximum' ? ' · never above 1: the maximum' : '') : 'g(r) is zero everywhere'} />
+        {curves.flatMap((c, i) => {
+          const { firstShell, maximum } = peaks(c.points)
+          return [
+            <Stat key={'s' + i} label={'first shell · ' + c.label} value={firstShell ? firstShell.r.toFixed(3) + ' nm' : '—'} hint={firstShell ? 'g = ' + firstShell.g.toPrecision(3) : maximum ? 'never above 1: see the maximum' : 'g(r) is zero everywhere'} />,
+            <Stat key={'m' + i} label={'maximum · ' + c.label} value={maximum ? maximum.r.toFixed(3) + ' nm' : '—'} hint={maximum ? 'g = ' + maximum.g.toPrecision(3) : 'g(r) is zero everywhere'} />,
+          ]
         })}
         {record.frames && <Stat label="frames" value={String(record.frames.analysed)} hint={start + '–' + record.frames.lastTime + ' ps · ' + (dt ? 'every ' + dt + ' ps' : 'every frame')} />}
       </div>

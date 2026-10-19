@@ -175,7 +175,7 @@ From [`batch-3.md`](batch-3.md) §5: one coherent app, (de)Cypher for every anal
 - [x] R3b One set of words on every screen (the tabs become set-up steps with R9a; the peak words with R3d)
 - [x] R14b-1 The connected project, as a setting (moved here from Phase 8: R3c names jobs from it)
 - [x] R3c Display names from the project pattern
-- [ ] R3d Both peak rules, named and shown
+- [x] R3d Both peak rules, named and shown (in the CSV with R6a)
 - [ ] R9c One status component, used for every status
 
 ### Phase 3: One visualization core (R5, R6)
