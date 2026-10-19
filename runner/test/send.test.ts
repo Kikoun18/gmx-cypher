@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { copyFileSync, cpSync, mkdirSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -46,8 +47,11 @@ describe('send to the vault inbox (T35, T36)', () => {
       'Vault → Check folder now (or reload the page): the Matrix rescans the folder only then',
       'Vault → Untracked files → attach hmr+fast+6_SO4_NA2SO4_t10.xvg: the upload dialog shows where it lands',
     ]);
-    const after = files(vdir), added = [...after.keys()].filter(k => !before.has(k));
-    expect(added).toEqual(['/' + project.dir + '/_inbox/', '/' + project.dir + '/_inbox/hmr+fast+6_SO4_NA2SO4_t10.xvg']);
+    const after = files(vdir), added = [...after.keys()].filter(k => !before.has(k)).sort();
+    const sha = createHash('sha256').update(readFileSync(join(dir, 'rdf/rdf_nvt.xvg'))).digest('hex');
+    // The inbox, and gmx-cypher's own space with the job's record (R14a): nothing else.
+    expect(added).toEqual(['/' + project.dir + '/_inbox/', '/' + project.dir + '/_inbox/hmr+fast+6_SO4_NA2SO4_t10.xvg', '/gmx-cypher/', '/gmx-cypher/README.md', '/gmx-cypher/records/', '/gmx-cypher/records/' + sha + '.run.json', '/gmx-cypher/space.json'].sort());
+    expect(r.json.record).toBe('gmx-cypher/records/' + sha + '.run.json');
     for (const [k, v] of before) if (!k.endsWith('/')) expect(after.get(k)).toBe(v);
     expect(readFileSync(join(vdir, r.json.path))).toEqual(readFileSync(join(dir, 'rdf/rdf_nvt.xvg')));
     await s.close();
@@ -80,6 +84,23 @@ describe('send to the vault inbox (T35, T36)', () => {
     const { s, job, project } = await setup();
     expect((await s.call('/api/send', { job: job.id, project: project.id, name: '../x.xvg' })).json).toEqual({ error: '../x.xvg is not a plain file name (as the Matrix would save it: _x.xvg)' });
     expect((await s.call('/api/send', { job: 'nope', project: project.id, name: 'x.xvg' })).status).toBe(404);
+    await s.close();
+  });
+});
+
+describe("the job's record beside the sent result (R14a, T158)", () => {
+  it('is copied once into gmx-cypher/records/<sha256>.run.json, naming no folder of this machine', async () => {
+    const { s, vdir, dir, job, project } = await setup();
+    const r = await s.call('/api/send', { job: job.id, project: project.id, name: 'x.xvg' });
+    const copy = JSON.parse(readFileSync(join(vdir, r.json.record), 'utf8')), own = JSON.parse(readFileSync(join(dir, 'rdf/rdf_nvt.run.json'), 'utf8'));
+    expect(copy).toMatchObject({ job: job.id, status: 'done', complete: true, env: {}, copy: { paths: 'relative to their allowed folder' } });
+    expect(copy.groups).toEqual(own.groups);
+    expect(copy.inputs.trajectory.path).toBe('hmr+fast+6/so4/NA2SO4/9.multiwalker/1/nvt.xtc');
+    expect(JSON.stringify(copy)).not.toContain(dir);
+    // Sent again under another name: the same result, the same record, left as it was.
+    const again = await s.call('/api/send', { job: job.id, project: project.id, name: 'y.xvg' });
+    expect(again.json.record).toBe(r.json.record);
+    expect(readdirSync(join(vdir, 'gmx-cypher/records'))).toHaveLength(1);
     await s.close();
   });
 });

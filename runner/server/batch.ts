@@ -19,7 +19,7 @@ import { inside, namesIn, real, within } from './files';
 import { HttpError } from './http';
 import type { Job } from './jobs';
 import { startRun } from './runs';
-import { sendToInbox } from './send';
+import { keepRecord, sendToInbox } from './send';
 import { landingFor, listProjects, openVault } from './vault';
 
 export interface BatchItem extends BatchMatch {
@@ -189,7 +189,9 @@ export async function sendAll(ctx: Ctx, b: Batch, project: string): Promise<{ re
       const fields = { ...first.fields, ...Object.fromEntries(Object.entries(own).filter(([, x]) => x)) };
       const l = await landingFor(v, project, file, { fields });
       const why = [...l.missing.map(t => 'no value for ' + t), ...l.preview.problems, ...l.reasons];
-      out.push(why.length ? { rel: i.rel, skipped: why.join('; ') } : { rel: i.rel, sent: sendToInbox(v, p, xvg, l.name, ctx.config.pmfUrl).path });
+      if (why.length) { out.push({ rel: i.rel, skipped: why.join('; ') }); continue; }
+      out.push({ rel: i.rel, sent: sendToInbox(v, p, xvg, l.name, ctx.config.pmfUrl).path });
+      keepRecord(v, String(j.meta!.record), [...ctx.config.allow, join(ctx.home, 'uploads')], 'gmx-cypher ' + ctx.version);
     } catch (e) { out.push({ rel: i.rel, skipped: 'could not be sent: ' + (e as Error).message }); }
   }
   return out;

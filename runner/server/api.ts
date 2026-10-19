@@ -22,7 +22,7 @@ import { listRecipes, readRecipe, saveRecipe } from './recipes';
 import { recipeFileProblems, type Recipe } from '../src/lib/recipe';
 import { cpus } from 'node:os';
 import { planRun, recordWritten, startRun } from './runs';
-import { sendToInbox } from './send';
+import { keepRecord, sendToInbox } from './send';
 import { landingFor, listProjects, openVault, projectSummary, readProject } from './vault';
 import { findRuns, listVault, readRun, vaultFile } from './decypher';
 import type { Fields } from '../src/lib/landing';
@@ -199,7 +199,8 @@ export function makeApi(ctx: Ctx): Api {
       const v = await openVault(ctx.config.vault), project = (await listProjects(v)).find(p => p.id === b.project);
       if (!project) throw new HttpError(404, 'no project ' + b.project + ' in the vault');
       // Only g(r): the cumulative-number file is titled "Cumulative Number RDF", which the Matrix would read as another RDF (T35).
-      return { body: sendToInbox(v, project, join(String(j.meta!.outDir), (j.meta!.names as { xvg: string }).xvg), String(b.name ?? ''), ctx.config.pmfUrl) };
+      const sent = sendToInbox(v, project, join(String(j.meta!.outDir), (j.meta!.names as { xvg: string }).xvg), String(b.name ?? ''), ctx.config.pmfUrl);
+      return { body: { ...sent, record: keepRecord(v, String(j.meta!.record), roots(), 'gmx-cypher ' + ctx.version) } };
     }
     if (is(req, 'POST', url, '/api/batch/preview')) {
       const b = await readJson<{ root: string; template: string; recipe: unknown }>(req);
