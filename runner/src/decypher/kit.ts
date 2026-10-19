@@ -434,7 +434,9 @@ export function decypherKit() {
       Object.keys(bb).forEach(key => { const m = +key, lab = mol.molLabels[m]; if (lab) ctx.fillText(lab, (bb[m].x0 + bb[m].x1) / 2, Math.min(h - 44, bb[m].y1 + 16)) })
       ctx.font = '700 11px mononoki, ui-monospace, monospace'
       const placed: { x: number; y: number; w: number; h: number }[] = []
-      const callout = (atoms: number[], text: string, bg: string, fgc: string, line: string, dashed: boolean) => {
+      /** A label over the topmost atom: a group's in its hue; the reference's an ink outline (T159), dashed for a second one or one not plotted. */
+      const callout = (atoms: number[], text: string, bg: string, fgc: string, line: string, border: 'none' | 'solid' | 'dashed') => {
+        const dashed = border === 'dashed'
         let top = -1, ty = Infinity
         atoms.forEach(k => { if (!vis[k]) return; const yy = P![4 * k + 1] - hitR[k]; if (yy < ty) { ty = yy; top = k } })
         if (top < 0) return
@@ -448,12 +450,12 @@ export function decypherKit() {
         if (dashed) ctx.setLineDash([3, 2])
         ctx.beginPath(); ctx.moveTo(ax, ty - 3); ctx.lineTo(Math.min(Math.max(ax, px + 10), px + pw - 10), py + ph); ctx.stroke()
         rr(ctx, px, py, pw, ph, 10); ctx.fillStyle = bg; ctx.fill()
-        if (dashed) { ctx.lineWidth = 1.2; ctx.stroke(); ctx.setLineDash([]) }
+        if (border !== 'none') { ctx.lineWidth = 1.2; ctx.stroke(); ctx.setLineDash([]) }
         ctx.fillStyle = fgc; ctx.fillText(text, px + pw / 2, py + ph / 2 + 0.5)
       }
-      st.refs.forEach((r, ri) => { if (mb.refAtoms[ri].length) callout(mb.refAtoms[ri], 'ref ' + r.label, ri || r.on === false ? th.card : th.fg, r.on === false ? th.muted : ri ? th.fg : th.bg, r.on === false ? th.border : th.fg, ri > 0 || r.on === false) })
-      st.selected.forEach(i => { const g = sels[i]; if (!g) return; const t = T[g.tone]; callout(mb.groupAtoms[i], g.name, t.base, t.fg, t.strong, false) })
-      if (hovSi >= 0 && sels[hovSi] && !selIdx.has(hovSi)) { const t = T[sels[hovSi].tone]; callout(mb.groupAtoms[hovSi], sels[hovSi].name, t.soft, t.strong, t.strong, false) }
+      st.refs.forEach((r, ri) => { if (mb.refAtoms[ri].length) callout(mb.refAtoms[ri], 'ref ' + r.label, th.card, r.on === false ? th.muted : th.fg, r.on === false ? th.border : th.fg, ri > 0 || r.on === false ? 'dashed' : 'solid') })
+      st.selected.forEach(i => { const g = sels[i]; if (!g) return; const t = T[g.tone]; callout(mb.groupAtoms[i], g.name, t.base, t.fg, t.strong, 'none') })
+      if (hovSi >= 0 && sels[hovSi] && !selIdx.has(hovSi)) { const t = T[sels[hovSi].tone]; callout(mb.groupAtoms[hovSi], sels[hovSi].name, t.soft, t.strong, t.strong, 'none') }
     }
 
     function animateCam(to: { zoom: number; panX: number; panY: number }, ms = 380) {

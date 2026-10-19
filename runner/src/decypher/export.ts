@@ -139,7 +139,7 @@ button:focus-visible{outline:2px solid var(--ring);outline-offset:2px}
 .dc-chips{display:flex;flex-wrap:wrap;gap:6px}
 .dc-chip{height:26px;padding:0 10px;border-radius:9999px;border:0;font-size:11px;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;cursor:pointer;background:transparent;transition:background-color 120ms ease,opacity 120ms ease}
 .dc-chip.dc-on{font-weight:700}
-.dc-chip.dc-ref{background:var(--foreground);color:var(--background);cursor:default;border:1.5px solid var(--foreground)}
+.dc-chip.dc-ref{background:transparent;color:var(--foreground);cursor:default;border:1.5px solid var(--foreground)}
 .dc-chip.dc-pick{cursor:pointer}
 .dc-chip.dc-alt{background:transparent;color:var(--foreground);border-style:dashed}
 .dc-chip.dc-off{opacity:.45;background:transparent;color:var(--foreground)}

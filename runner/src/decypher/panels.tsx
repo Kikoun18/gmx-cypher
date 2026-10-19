@@ -149,7 +149,7 @@ export function GroupChips({ refs, sels, selected, pal, dim, hover, onPick, onPi
   return (
     <div className="flex flex-wrap gap-1.5">
       {refs.map((r, i) => {
-        const cls = cn('inline-flex h-[26px] items-center gap-1.5 whitespace-nowrap rounded-full border-[1.5px] border-foreground px-2.5 text-caption', r.dashed || r.on === false ? 'border-dashed text-foreground' : 'bg-foreground text-background', r.on === false && 'opacity-45')
+        const cls = cn('inline-flex h-[26px] items-center gap-1.5 whitespace-nowrap rounded-full border-[1.5px] border-foreground px-2.5 text-caption', r.dashed || r.on === false ? 'border-dashed text-foreground' : 'text-foreground', r.on === false && 'opacity-45')
         const body = <>{r.plain ? '' : 'ref '}{r.label}{!r.plain && <span className="opacity-70">{r.count || '—'}</span>}</>
         return onPickRef
           ? <button key={r.label} type="button" aria-pressed={r.on !== false} title="click: plot only this reference · ⌘-click: add or remove" className={cn(cls, 'cursor-pointer')} onClick={e => onPickRef(i, e.metaKey || e.ctrlKey || e.shiftKey)}>{body}</button>
