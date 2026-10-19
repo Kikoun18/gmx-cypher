@@ -115,7 +115,7 @@ export const rdfCommand: CommandDef = {
   outputNames,
   outputs: [
     { file: 'xvg', type: 'rdf', vault: true },
-    { file: 'cn', type: null, vault: false, why: 'The Matrix reads its title "Cumulative Number RDF" as another RDF (T35)' },
+    { file: 'cn', type: null, vault: false, why: 'not sent: the Matrix reads its title "Cumulative Number RDF" as another RDF' },
   ],
   io: (p, outDir, stem) => rdfIo({ trajectory: p.trajectory ?? '', runInput: p.runInput ?? '' }, outDir, stem),
   problems: recipeProblems,
@@ -182,8 +182,8 @@ export const whamCommand: CommandDef = {
   outputNames: stem => whamOutputNames(stem, false),
   suffixes: WHAM_SUFFIXES,
   outputs: [
-    { file: 'xvg', type: 'hist', vault: true, why: 'the histograms, typed Histogram by their title; sent by default (question 28)' },
-    { file: 'profile', type: null, vault: false, why: 'The Matrix reads it as a Histogram (its title "Umbrella potential" has its keyword), and as a PMF it would get the AWH correction (+2kT ln r, tail at 0): not sent until you decide (question 28)' },
+    { file: 'xvg', type: 'hist', vault: true, why: 'the histograms, typed Histogram by their title; sent by default' },
+    { file: 'profile', type: null, vault: false, why: 'not sent: the Matrix would read it as a Histogram (its title "Umbrella potential" has that keyword), and as a PMF it would get the AWH correction (+2kT ln r, tail at 0)' },
   ],
   io: (_p, outDir, stem) => {
     const cwd = outDir.slice(0, outDir.lastIndexOf('/')) || '/', out = (f: string) => relPath(cwd, outDir + '/' + stem + f);
@@ -228,8 +228,8 @@ function hbondIo(p: Partial<Record<InputSlot, string>>, outDir: string, stem: st
 }
 
 const HBOND_OUTPUTS: CommandDef['outputs'] = [
-  { file: 'xvg', type: 'hbond', vault: true, why: 'the number of H-bonds over time (question 34)' },
-  { file: 'dist', type: null, vault: false, why: 'a distribution, which the Matrix reads as an umbrella Histogram or as H-bonds (question 34)' },
+  { file: 'xvg', type: 'hbond', vault: true, why: 'the number of H-bonds over time' },
+  { file: 'dist', type: null, vault: false, why: 'a distribution: not sent, since the Matrix would read it as an umbrella Histogram or as H-bonds' },
   { file: 'ang', type: null, vault: false, why: 'a distribution, likewise' },
 ];
 
@@ -281,7 +281,7 @@ export const hbondLegacyCommand: CommandDef = {
   // gmx hbond first: its -h is read for the selection tool anyway, so a gmx before 2024 answers without a failed call.
   find: {
     tools: ['hbond', 'hbond-legacy'], accepts: h => hbondKind(h) === 'legacy', missing: 'this gmx has no legacy H-bond tool (gmx hbond-legacy, or gmx hbond before GROMACS 2024)',
-    unless: { tool: 'hbond', why: "this gmx has the selection tool, gmx hbond: the legacy one is offered only without it, so the two tools' criteria never mix (question 33)" },
+    unless: { tool: 'hbond', why: "this gmx has the selection tool, gmx hbond: the legacy one is offered only without it, so the two tools' criteria never mix" },
   },
   summary: LEGACY_SUMMARY,
 };
@@ -373,7 +373,7 @@ export const gyrateLegacyCommand: CommandDef = {
   stdin: gyrateLegacyStdin,
   find: {
     tools: ['gyrate', 'gyrate-legacy'], accepts: h => gyrateKind(h) === 'legacy', missing: 'this gmx has no legacy gyrate tool (gmx gyrate-legacy, or gmx gyrate before GROMACS 2024)',
-    unless: { tool: 'gyrate', why: "this gmx has the selection tool, gmx gyrate: the legacy one is offered only without it, so the two tools' results never mix (T122)" },
+    unless: { tool: 'gyrate', why: "this gmx has the selection tool, gmx gyrate: the legacy one is offered only without it, so the two tools' results never mix" },
   },
 };
 

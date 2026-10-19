@@ -164,7 +164,7 @@ From [`batch-3.md`](batch-3.md) §5: one coherent app, (de)Cypher for every anal
 ### Phase 1: Protect data (R2, R3a, R14a)
 - [x] R2a SIGHUP
 - [x] R2b The record is written when the job starts, and completed atomically when it ends
-- [ ] R3a Ticket references out of the UI, with the test that keeps them out
+- [x] R3a Ticket references out of the UI, with the test that keeps them out
 - [ ] R14a The vault space, and a copy of the record beside each sent result (if agreed)
 
 ### Phase 2: The contract in code (R1, R3, R4, R9c)

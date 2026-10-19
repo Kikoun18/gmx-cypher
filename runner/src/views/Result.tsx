@@ -222,7 +222,7 @@ function WhamChart({ job, record }: { job: Job; record: RunRecord }) {
   return (
     <div className="flex flex-col gap-3">
       <LineChart series={[{ label: 'profile', points: prof, tone: 'coral', ...(errors ? { errors } : {}) }]} xLabel="ξ (nm)" yLabel="E (kJ/mol)" height={260} legend={false} />
-      <p className="m-0 text-caption text-muted-foreground">{errors ? 'the band: ± one standard deviation over ' + (record.options.find(o => o.flag === 'nBootstrap')?.value ?? '') + ' bootstraps' : 'no error estimate: run with bootstraps for one'} · the profile is not sent to the vault until you decide (question 28)</p>
+      <p className="m-0 text-caption text-muted-foreground">{errors ? 'the band: ± one standard deviation over ' + (record.options.find(o => o.flag === 'nBootstrap')?.value ?? '') + ' bootstraps' : 'no error estimate: run with bootstraps for one'} · the profile is not sent to the vault: the Matrix would read it as a histogram</p>
       <Section label={'Histograms · ' + h!.windows.length + ' windows'} />
       <LineChart series={hist} xLabel="ξ (nm)" yLabel="count" height={220} legend={false} zeroLine={false} />
       <Section label="Overlap of neighbouring windows" />
@@ -239,7 +239,7 @@ function WhamChart({ job, record }: { job: Job; record: RunRecord }) {
         </tbody>
       </table>
       {overlapNotes(ov!.pairs).map(n => <p key={n} className={cn('m-0 text-control', n.includes('do not overlap') ? 'text-destructive' : 'text-muted-foreground')}>{n}</p>)}
-      <p className="m-0 text-caption text-muted-foreground">overlap: the share two neighbours' normalised histograms have in common, 0 to 1 · no threshold is applied until you choose one (question 29)</p>
+      <p className="m-0 text-caption text-muted-foreground">overlap: the share two neighbours' normalised histograms have in common, 0 to 1 · no threshold is applied</p>
     </div>
   )
 }

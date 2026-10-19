@@ -127,7 +127,7 @@ export function Wham({ gmx, draft, setDraft, onStarted }: { gmx: GmxState; draft
         <div className="grid grid-cols-3 gap-4">{FIRST.map(field)}</div>
         {more && <div className="grid grid-cols-3 gap-4">{MORE.map(field)}</div>}
         <button className="self-start text-caption text-coral-strong hover:underline" aria-expanded={more} onClick={() => setMore(m => !m)}>{more ? 'fewer options' : 'more options'}</button>
-        <p className="m-0 text-caption text-muted-foreground">kJ/mol always (gmx wham -unit is not offered) · the histograms go to the vault; the profile stays here until you decide (question 28)</p>
+        <p className="m-0 text-caption text-muted-foreground">kJ/mol always (gmx wham -unit is not offered) · the histograms go to the vault; the profile stays here, since the Matrix would read it as a histogram</p>
       </div>
 
       <aside className="flex min-w-0 flex-col gap-4">
