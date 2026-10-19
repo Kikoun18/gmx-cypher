@@ -51,7 +51,7 @@ async function runStructure(rec: RecordLike): Promise<{ key: string | null; note
 async function loadJob(job: Job): Promise<Result> {
   const rec = await getJson<RecordLike>('/api/jobs/' + job.id + '/record'), xvg = await text('/api/jobs/' + job.id + '/output?kind=xvg')
   const s = await runStructure(rec), stem = String(job.meta?.stem ?? job.title)
-  return { analysis: fromRecord({ id: 'job:' + job.id, kind: 'job', title: job.title, label: stem, source: 'job', record: rec, xvg, struct: s.key, structNote: s.note }), structs: s.structs }
+  return { analysis: fromRecord({ id: 'job:' + job.id, kind: 'job', title: job.name ?? job.title, label: stem, source: 'job', record: rec, xvg, struct: s.key, structNote: s.note }), structs: s.structs }
 }
 
 async function loadRecord(path: string): Promise<Result> {
@@ -103,7 +103,7 @@ export function useAnalyses(refs: SourceRef[], allJobs: Job[], jobsLoaded: boole
   const [done, setDone] = React.useState<Record<string, Result | { error: string }>>({})
   // Only the picked jobs, and only what decides their loading: a running job's progress (an event per frame) changes nothing here.
   const picked = new Set(refs.flatMap(r => (r.kind === 'job' ? [r.id] : [])))
-  const jobsKey = allJobs.filter(j => picked.has(j.id)).map(j => j.id + ':' + j.kind + ':' + j.status + ':' + j.title).join('|')
+  const jobsKey = allJobs.filter(j => picked.has(j.id)).map(j => j.id + ':' + j.kind + ':' + j.status + ':' + (j.name ?? j.title)).join('|')
   const jobs = React.useMemo(() => allJobs.filter(j => picked.has(j.id)), [jobsKey]) // eslint-disable-line react-hooks/exhaustive-deps -- the picked jobs are what their key says
   const started = React.useRef(new Set<string>())
   React.useEffect(() => {
@@ -125,7 +125,7 @@ export function useAnalyses(refs: SourceRef[], allJobs: Job[], jobsLoaded: boole
     const items: Item[] = refs.map(r => {
       const key = refKey(r), d = done[key]
       if (r.kind === 'job') {
-        const j = jobs.find(x => x.id === r.id), name = j?.title ?? r.id
+        const j = jobs.find(x => x.id === r.id), name = j?.name ?? j?.title ?? r.id
         if (d) return 'error' in d ? { key, kind: 'job', name, status: 'error', error: d.error } : { key, kind: 'job', name, status: 'ready', analysis: d.analysis }
         if (!j) return { key, kind: 'job', name, status: jobsLoaded ? 'error' : 'loading', error: jobsLoaded ? 'not among this gmx-cypher\'s jobs' : undefined }
         if (j.kind !== 'rdf') return { key, kind: 'job', name, status: 'error', error: 'not an RDF run' }

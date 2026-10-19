@@ -155,6 +155,14 @@ export function makeApi(ctx: Ctx): Api {
         return { body: { path: v.path, schema: v.schema, compat: v.compat, project: ctx.config.project, projects: (await listProjects(v)).map(p => ({ id: p.id, name: p.name, dir: p.dir, desc: p.desc })) } };
       } catch (e) { return { body: { path: ctx.config.vault, error: (e as Error).message } }; }
     }
+    // The connected project's naming (R3c): its path pattern and columns, which name jobs on the page; null without one.
+    if (is(req, 'GET', url, '/api/naming')) {
+      if (!ctx.config.vault || !ctx.config.project) return { body: null };
+      try {
+        const s = projectSummary(await readProject(await openVault(ctx.config.vault), ctx.config.project));
+        return { body: { project: s.id, pathPattern: s.settings.pathPattern, columns: s.columns } };
+      } catch { return { body: null }; }
+    }
     if (is(req, 'GET', url, '/api/vault/project')) {
       if (!ctx.config.vault) throw new HttpError(409, 'no vault set');
       const v = await openVault(ctx.config.vault);

@@ -276,7 +276,7 @@ function AddPanel({ sources, jobs, allow, vaultPath, vault, loadVault, fileRows,
         <ToggleGroupItem value="jobs">jobs</ToggleGroupItem><ToggleGroupItem value="runs">on disk</ToggleGroupItem><ToggleGroupItem value="vault">vault</ToggleGroupItem><ToggleGroupItem value="files">files</ToggleGroupItem>
       </ToggleGroup>
       {tab === 'jobs' && (rdfJobs.length
-        ? <div className="flex flex-col">{rdfJobs.map(j => row({ kind: 'job', id: j.id }, j.title, <><span className={statusOf(j).className}>{statusOf(j).word}</span> · {jobLine(j)}</>, j.status === 'failed' || j.status === 'cancelled' || j.status === 'interrupted'))}</div>
+        ? <div className="flex flex-col">{rdfJobs.map(j => row({ kind: 'job', id: j.id }, j.name ?? j.title, <><span className={statusOf(j).className}>{statusOf(j).word}</span> · {jobLine(j)}</>, j.status === 'failed' || j.status === 'cancelled' || j.status === 'interrupted'))}</div>
         : <p className="m-0 text-caption text-muted-foreground">no RDF jobs yet · run gmx rdf from the analysis tab</p>)}
       {tab === 'runs' && <RunsTab allow={allow} row={row} />}
       {tab === 'vault' && (!vaultPath

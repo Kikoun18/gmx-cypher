@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsCount, TabsList, TabsTrigger } from './ui/tabs'
 import { ToggleGroup, ToggleGroupItem } from './ui/toggle-group'
 import { getJson, type AppState } from './api'
 import { readThemePref, saveThemePref, themeOf, type ThemePref } from './lib/theme'
-import { useJobs } from './jobs'
+import { useJobs, useNaming } from './jobs'
 import { useDraft } from './draft'
 import { recipeFromRecord } from './lib/record'
 import { BatchView } from './views/Batch'
@@ -74,7 +74,7 @@ export function App() {
   const [error, setError] = React.useState('')
   const [settings, setSettings] = React.useState(false)
   const [tab, setTab] = useTab()
-  const jobs = useJobs()
+  const jobs = useJobs(useNaming(state?.config.vault ?? null, state?.config.project ?? null))
   const [draft, setDraft] = useDraft()
   const groupsStep = commandOf(draft.analysis ?? 'rdf')?.groups ?? true
   const [selectedJob, setSelectedJob] = React.useState<string | null>(null)

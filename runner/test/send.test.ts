@@ -121,6 +121,8 @@ describe('the connected project (R14b, T158)', () => {
     expect((await s.call('/api/vault')).json.project).toBeNull();
     expect((await s.call('/api/config', { project: project.id })).json.config.project).toBe(project.id);
     expect((await s.call('/api/vault')).json.project).toBe(project.id);
+    // Its naming (R3c): the path pattern and the columns, for display names on the page.
+    expect((await s.call('/api/naming')).json).toEqual({ project: project.id, pathPattern: '{method}/{column}/{name}/{*}/{run}', columns: expect.arrayContaining([{ k: 'so4', label: 'SO4' }]) });
     expect((await s.call('/api/config', { project: 'nope123' })).json).toEqual({ error: 'no project nope123 in the vault' });
     expect((await s.call('/api/config', { project: '../x' })).json).toEqual({ error: 'no project ../x in the vault' });
     expect(JSON.parse(readFileSync(join(s.ctx.home, 'config.json'), 'utf8')).project).toBe(project.id);

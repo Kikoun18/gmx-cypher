@@ -3,6 +3,7 @@
 import * as React from 'react'
 import { getJson } from './api'
 import type { Progress } from './lib/progress'
+import { displayNames, type Naming } from './lib/displayName'
 
 export interface Job {
   id: string; kind: string; title: string; file: string; args: string[]; cwd: string; env?: Record<string, string>
@@ -12,6 +13,8 @@ export interface Job {
   meta?: Record<string, unknown>
   /** Found running at start, its end never seen: it runs on, and nothing follows it (R2a). */
   unfollowed?: boolean
+  /** Its display name (R3c), computed on the page from its folder and the connected project; `title` is its own. */
+  name?: string
 }
 
 export const STATUS: Record<Job['status'], { word: string; className: string }> = {
@@ -25,8 +28,8 @@ export const STATUS: Record<Job['status'], { word: string; className: string }> 
 /** A job's state in words: a job found running at start says it is no longer followed (R2a). */
 export const statusOf = (j: Job) => (j.unfollowed ? { word: 'still running, not followed (pid ' + j.pid + ')', className: 'text-muted-foreground' } : STATUS[j.status])
 
-/** Every job, kept current by the server's event stream; a reload or a restart loses nothing (T7). */
-export function useJobs() {
+/** Every job, kept current by the server's event stream; a reload or a restart loses nothing (T7). Each is named by the connected project (R3c). */
+export function useJobs(naming: Naming | null = null) {
   const [jobs, setJobs] = React.useState<Job[]>([])
   const [logs, setLogs] = React.useState<Record<string, string>>({})
   // Whether the list came: until it does, a job (de)Cypher remembers is not yet missing.
@@ -45,7 +48,15 @@ export function useJobs() {
     return () => es.close()
   }, [])
   const loadLog = React.useCallback((id: string) => { getJson<Job>('/api/jobs/' + id).then(j => setLogs(l => ({ ...l, [id]: j.log || '' })), () => {}) }, [])
-  return { jobs, logs, loadLog, loaded }
+  const named = React.useMemo(() => { const n = displayNames(jobs, naming); return jobs.map(j => ({ ...j, name: n.get(j.id) })) }, [jobs, naming])
+  return { jobs: named, logs, loadLog, loaded }
+}
+
+/** The connected project's naming (R3c), read again when the vault or the project changes. */
+export function useNaming(vault: string | null, project: string | null): Naming | null {
+  const [n, setN] = React.useState<Naming | null>(null)
+  React.useEffect(() => { if (vault && project) getJson<Naming | null>('/api/naming').then(setN, () => setN(null)); else setN(null) }, [vault, project])
+  return n
 }
 
 type Estimate = { frames: number; start: number; end: number }
