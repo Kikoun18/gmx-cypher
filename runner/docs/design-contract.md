@@ -1,6 +1,6 @@
 # gmx-cypher — design contract
 
-**Draft (batch 3, Phase 0).** Not yet approved: every line marked *(Q n)* waits for your answer to question n of [`batch-3-phase0.md`](batch-3-phase0.md) §8. Once approved, this is the one page later decisions point to. The machine-checkable parts will live in `src/core/contract.ts` (R1); this page will then quote that module rather than copy it.
+**Approved 2026-10-19** (batch 3, decisions T157–T169). This is the one page later decisions point to. The machine-checkable parts live in `src/core/contract.ts`; where a table here and the module disagree, the module is right and this page is out of date.
 
 Morpheus is the brief; the Matrix is the neighbour. Where gmx-cypher and the Matrix show the same thing (a chart, an export, a key, a word), gmx-cypher matches the Matrix unless this page says otherwise.
 
@@ -10,13 +10,13 @@ Morpheus is the brief; the Matrix is the neighbour. Where gmx-cypher and the Mat
 |---|---|---|
 | **job** | one gmx execution by gmx-cypher | a replicate; what a job produced |
 | **record** | a job's `.run.json` | a job; a vault cell |
-| **run** | the Matrix's replicate slot (a, b, …). As a verb, *run* still starts a job | a job (*run again* → *open in set-up*, *(Q10)*) |
+| **run** | the Matrix's replicate slot (a, b, …). As a verb, *run* still starts a job | a job (*run again* → *open in set-up*,) |
 | **run input** | the `.tpr` (GROMACS's own term; always with *input*) | a run |
 | **result** | what a job produced (an RDF, a profile, …), and its page | a job (*each job* → *each result*) |
 | **analysis** | the Matrix's type of a curve set (RDF, PMF, …), only | a tab or step (*analysis* tab → *command* step) |
 | **command** | a gmx tool gmx-cypher runs (`gmx rdf`), with its options | a result |
 | **first shell** / **maximum** | the two peak rules, always named | — ("peak" never stands alone) |
-| **compare** | the view of several results side by side, `#compare` | — ((de)Cypher stays the name of the HTML export, *(Q10)*) |
+| **compare** | the view of several results side by side, `#compare` | — ((de)Cypher stays the name of the HTML export,) |
 | **send** → **sent** | copy a result into the vault's inbox | — |
 | **archive** → **archived** | move a finished job's log aside; never delete | delete, hide |
 | **on disk** | records found in a folder | the vault |
@@ -25,26 +25,32 @@ Morpheus is the brief; the Matrix is the neighbour. Where gmx-cypher and the Mat
 
 | Role | Token | Light | Dark | Used for | Never used for |
 |---|---|---|---|---|---|
-| UI state | `state` (role layer) = ink *(Q6)* | `#201e1d` | `#f0eeec` | the selected toggle, the primary action, the focus ring, the active tab | data |
-| Error | `destructive` (role layer) *(Q7)* | `#8f1d1d` | `#fd2a6d` | errors, *failed*, armed destructive actions | anything else |
+| UI state | `state` (role layer) = ink | `#201e1d` | `#f0eeec` | the selected toggle, the primary action, the focus ring, the active tab | data |
+| Error | `destructive` (role layer) | `#8f1d1d` | `#fd2a6d` | errors, *failed*, armed destructive actions | anything else |
 | Group | the eight tones, `<tone>-strong` for lines and text | coral `#c62410` … stone `#5c5550` | coral `#ff6a4d` … stone `#b0a79f` | a group, from the picker → record → result → compare → export | UI state |
 | Reference | ink, as an **outline** (chip border, card border, 3D ring) | `#201e1d` | `#f0eeec` | the reference everywhere | — |
 | Source | a numbered badge and a dash; hue only with *colour by result* | ink badge | ink badge | the sources in compare | — |
-| Ordered series | `ramp-0…3` (role layer), interpolated in OKLCH *(Q29)* | `#a5700d #a83903 #891151 #3f1a69` | `#a57710 #e97c48 #fd9cba #e3d6fe` | AWH frames (time), WHAM windows (ξ), RMSF on atoms | categories |
+| Ordered series | `ramp-0…3` (role layer), interpolated in OKLCH | `#a5700d #a83903 #891151 #3f1a69` | `#a57710 #e97c48 #fd9cba #e3d6fe` | AWH frames (time), WHAM windows (ξ), RMSF on atoms | categories |
 | Neutral | `atom-*`, `bond`, `edge` (from the kit's `NEUTRAL`) | kit values | kit values | atoms and bonds outside every group | — |
-| Status | ink icon and word; error in `destructive` *(Q20, Q30)* | — | — | the four status levels | group colours |
+| Status | ink icon and word; error in `destructive` | — | — | the four status levels | group colours |
 
 - **UI state vs reference.** Both are ink; they differ by form: state is an ink **fill** (selected toggle, primary button), the reference is an ink **outline** (chip, card border, ring). Nothing else is outlined in ink.
-- **Where deviations live:** `src/roles.json`, a small layer over a verbatim copy of Morpheus's `tokens.json`, generated into CSS by `scripts/tokens.ts` *(Q6)*.
-- **Stored tones stay** in records; the reference's stored tone is simply not drawn *(Q8)*.
+- **Where deviations live:** `src/roles.json`, a small layer over a verbatim copy of Morpheus's `tokens.json`, generated into CSS by `scripts/tokens.ts`.
+- **Stored tones stay** in records; the reference's stored tone is simply not drawn.
 - **Two curves never differ by hue alone.** With more than eight groups a tone never repeats with the same dash; the dashes are the Matrix's 10, by name.
 - Contrast: text ≥ 4.5:1; curves, atoms and focus rings ≥ 3:1, in both themes and in the print export.
+
+## 2a. Type
+
+- **mononoki** for all text, numbers and controls (400 and 700).
+- **Archivo 800** for the app's name, page titles and card titles, as the Matrix (T160). Nowhere else: not for labels, numbers, buttons or chart text.
+- Labels may be upper-case letter-spaced; **data names and units keep their case** ("r (nm)", "water_O", "kJ/mol").
 
 ## 3. Gestures and keys
 
 | Surface | Gesture | Action |
 |---|---|---|
-| structures | click | this atom; in the picker, in or out of the group being picked *(Q15)* |
+| structures | click | this atom; in the picker, in or out of the group being picked |
 | structures | Shift-click | the whole residue |
 | structures | Alt-click (⌥) | this atom name in every residue of that name |
 | structures | drag · right-drag or Space-drag · scroll | rotate · pan · zoom |
@@ -52,13 +58,13 @@ Morpheus is the brief; the Matrix is the neighbour. Where gmx-cypher and the Mat
 | charts | hover | the readout, highest values first, on every chart |
 | charts | click · ⌘/Ctrl-click · ⌘/Ctrl-Shift-click | mark the nearest point · vertical line · horizontal line (as the Matrix) |
 | charts | ← → · ↑ ↓ · Enter | step along a curve · next curve · mark (as the Matrix) |
-| legends and chips | click · ⌘/Ctrl-click · hover | this one alone (again: all) · show or hide this one · highlight it, dim the rest *(Q16)* |
+| legends and chips | click · ⌘/Ctrl-click · hover | this one alone (again: all) · show or hide this one · highlight it, dim the rest |
 | lists | click · ⌘/Ctrl-click · Shift-click | one · add or remove · a range |
 
 | Key | Action | Where | Rebindable |
 |---|---|---|---|
 | D | compare the selected results | anywhere | yes |
-| E | export the focused chart, in the default format | anywhere *(Q14)* | yes |
+| E | export the focused chart, in the default format | anywhere | yes |
 | ? | the shortcut sheet | anywhere | yes |
 | F · R | fit · reset | structures | yes |
 | B | the box | structures | yes |
@@ -68,7 +74,7 @@ Morpheus is the brief; the Matrix is the neighbour. Where gmx-cypher and the Mat
 | Esc | back / close | everywhere | no |
 
 - Keys are ignored while typing. ⌘ on macOS where other platforms use Ctrl, shown with `Kbd` everywhere.
-- Differences from the Matrix, on purpose: C (held) centres here, where the Matrix's C is compare; D is compare here *(Q14)*.
+- Differences from the Matrix, on purpose: C (held) centres here, where the Matrix's C is compare; D is compare here.
 
 ## 4. Status levels
 
@@ -79,7 +85,7 @@ Morpheus is the brief; the Matrix is the neighbour. Where gmx-cypher and the Mat
 | warning | triangle-alert | check | `foreground` | a result may mislead; look before trusting it | "no atom groups: no record of the job that wrote this file"; "interrupted" |
 | error | circle-x | error / failed | `destructive` | nothing ran or nothing can be read; says how to fix it | "no working gmx: set its path in settings → gmx" |
 
-Icon, word, then the text; an optional *why?* opens the long explanation (HoverCard on hover and focus, or a Dialog). Announced with `aria-live="polite"`. Colour is never the only signal. *(Q20, Q30)*
+Icon, word, then the text; an optional *why?* opens the long explanation (HoverCard on hover and focus, or a Dialog). Announced with `aria-live="polite"`. Colour is never the only signal.
 
 ## 5. The order of a result page
 

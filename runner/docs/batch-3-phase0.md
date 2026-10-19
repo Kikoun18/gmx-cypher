@@ -2,6 +2,8 @@
 
 The plan for [`batch-3.md`](batch-3.md): baseline, the spec checked against the code, the design pass, a plan for each request, the samples I need, size and order, and **one numbered list of questions (§8)**. Nothing in `src/`, `server/` or `test/` changed in Phase 0. The design contract draft is [`design-contract.md`](design-contract.md); the roadmap has a Batch 3 section.
 
+**Answered 2026-10-19:** titles in Archivo 800 (question 9), everything else as recommended; recorded as decisions T157–T169 in [`decisions.md`](decisions.md).
+
 **Branch.** Phase 0 is committed on `cypher-batch-3`, made from `a2b422e`, which tracks `claude/clever-dijkstra-mf14ej` (the branch you named).
 
 ---

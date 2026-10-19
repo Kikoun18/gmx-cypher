@@ -144,7 +144,7 @@ Spec: [`batch-2.md`](batch-2.md). Phase 0 report: [`batch-2-phase0.md`](batch-2-
 
 ## Batch 3
 
-From [`batch-3.md`](batch-3.md) §5: one coherent app, (de)Cypher for every analysis, exports, and a vault space of its own. Baseline `a2b422e`. The Phase 0 report is [`batch-3-phase0.md`](batch-3-phase0.md); the order below is the spec's, with the changes Phase 0 proposes (§7 of the report) marked *proposed* until you answer.
+From [`batch-3.md`](batch-3.md) §5: one coherent app, (de)Cypher for every analysis, exports, and a vault space of its own. Baseline `a2b422e`. The Phase 0 report is [`batch-3-phase0.md`](batch-3-phase0.md); the order below is the spec's, with the three changes Phase 0 proposed and you approved (report §6).
 
 **Why this order:**
 - **Data protection comes first.** It is small, and it protects everything that comes after.
@@ -159,7 +159,7 @@ From [`batch-3.md`](batch-3.md) §5: one coherent app, (de)Cypher for every anal
 - [x] Design pass: plan, review against the brief, screenshots
 - [x] R1a `design-contract.md` drafted
 - [x] Phase 0 report for R1–R16; samples asked for
-- [ ] Questions answered; decisions recorded; order confirmed
+- [x] Questions answered; decisions recorded; order confirmed (T157–T169)
 
 ### Phase 1: Protect data (R2, R3a, R14a)
 - [ ] R2a SIGHUP
@@ -168,11 +168,12 @@ From [`batch-3.md`](batch-3.md) §5: one coherent app, (de)Cypher for every anal
 - [ ] R14a The vault space, and a copy of the record beside each sent result (if agreed)
 
 ### Phase 2: The contract in code (R1, R3, R4, R9c)
-- [ ] R1b `src/core/contract.ts`: the phrases never shown, the role → token map, the default keys, the status levels *(proposed: the module lands first, so each drift test reads it)*
+- [ ] R1b `src/core/contract.ts`: the phrases never shown, the role → token map, the default keys, the status levels
 - [ ] R4a Colour roles; the reference in ink; `destructive` used only for errors
 - [ ] R4b `NEUTRAL` moved into the tokens; no hex outside the tokens
+- [ ] R4c Titles in Archivo 800 (T160)
 - [ ] R3b One set of words on every screen
-- [ ] R14b-1 The connected project, as a setting *(proposed: moved here from Phase 8, because R3c names jobs from it)*
+- [ ] R14b-1 The connected project, as a setting (moved here from Phase 8: R3c names jobs from it)
 - [ ] R3c Display names from the project pattern
 - [ ] R3d Both peak rules, named and shown
 - [ ] R9c One status component, used for every status
@@ -191,7 +192,7 @@ From [`batch-3.md`](batch-3.md) §5: one coherent app, (de)Cypher for every anal
 
 ### Phase 5: Layout and interaction (R8, R9)
 - [ ] R9a Set-up and results; compare as `#compare`; old addresses still work; drops routed by type
-- [ ] R9b One result page layout; (de)Cypher's controls regrouped *(proposed: with the one style menu, so the display menu is built once)*
+- [ ] R9b One result page layout; (de)Cypher's controls regrouped (with the one style menu, so the display menu is built once)
 - [ ] R8a One gesture scheme for structures, charts and legends
 - [ ] R8b Every key in one registry, rebindable, listed by `?`
 
