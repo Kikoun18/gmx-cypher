@@ -10,8 +10,15 @@ export type Rest = 'tinted' | 'grey' | 'ghost'
 export type Arrange = 'side by side' | 'frame positions'
 export type ColorBy = 'group' | 'job'
 
-/** A structure's atoms in file order, each with its GROMACS number (`nr`, 1-based); a subset keeps the numbers. */
-export interface Struct { title: string; n: number; nr: number[]; resnr: number[]; resn: string[]; name: string[]; xyz: number[]; box: [number, number, number] }
+/**
+ * A structure's atoms in file order (R5b), each with its GROMACS number (`nr`, 1-based; a subset keeps the numbers),
+ * its element as the Matrix's elementOf decides it (`virtual` and null are what toPdb leaves out), coordinates in nm,
+ * the box's lengths and the box as the file writes it (`cell`: a .gro's 3 or 9 numbers; a .pdb's a, b, c in nm and
+ * its angles; null when there is none).
+ */
+export interface Struct { title: string; n: number; nr: number[]; resnr: number[]; resn: string[]; name: string[]; el: (string | null)[]; xyz: number[]; box: [number, number, number]; cell: number[] | null }
+/** The Matrix's elementOf: an atom's element from its name, its residue (as toPdb reads it) and a .pdb's element column. */
+export type ElementOf = (name: string, resn: string, column?: string) => string | null
 export interface Peak { r: number; g: number }
 export interface Group { name: string; atoms: number[]; tone: Tone }
 /** A group's curve, with both peak rules (R3d): `peak` is the maximum, `shell` the first shell (none if g(r) never rises above 1). */
@@ -147,6 +154,50 @@ export function decypherKit(data: KitData) {
     return [...out].sort((x, y) => x - y)
   }
 
+  /**
+   * The one parser for .gro and .pdb (R5b): every atom of a .gro, or of a .pdb's first model, in file order. A .gro's
+   * coordinates are read at the width its first atom is written in (more decimals widen them). A .pdb's residue name
+   * is four columns (18-21, as GROMACS writes TIP3); its element is decided on the first three, as toPdb reads them.
+   */
+  function parseStructure(text: string, format: 'gro' | 'pdb', elementOf: ElementOf): Struct {
+    const lines = text.split(/\r?\n/), s: Struct = { title: '', n: 0, nr: [], resnr: [], resn: [], name: [], el: [], xyz: [], box: [0, 0, 0], cell: null }
+    const add = (resnr: number, resn: string, name: string, el: string | null, x: number, y: number, z: number) => {
+      s.n++; s.nr.push(s.n); s.resnr.push(resnr); s.resn.push(resn); s.name.push(name); s.el.push(el); s.xyz.push(x, y, z)
+    }
+    if (format === 'gro') {
+      const n = parseInt(lines[1], 10)
+      if (!(n > 0)) throw new Error('no atom count on line 2')
+      if (lines.length < n + 2) throw new Error('it ends before its ' + n + ' atoms')
+      s.title = lines[0].trim()
+      let w = 8
+      const s0 = lines[2].slice(20), d1 = s0.indexOf('.'), d2 = s0.indexOf('.', d1 + 1)
+      if (d1 >= 0 && d2 > d1) w = d2 - d1
+      for (let i = 0; i < n; i++) {
+        const L = lines[i + 2], resn = L.slice(5, 10).trim(), name = L.slice(10, 15).trim(), at = (k: number) => parseFloat(L.slice(20 + k * w, 20 + (k + 1) * w))
+        add(parseInt(L.slice(0, 5), 10), resn, name, elementOf(name, resn), at(0), at(1), at(2))
+      }
+      const cell = (lines[n + 2] || '').trim().split(/\s+/).filter(Boolean).map(Number)
+      if (cell.length) s.cell = cell
+      s.box = [cell[0] || 0, cell[1] || 0, cell[2] || 0]
+      return s
+    }
+    for (const l of lines) {
+      if (l.startsWith('ENDMDL')) break
+      if (l.startsWith('TITLE') && !s.title) s.title = l.slice(10).trim()
+      if (l.startsWith('CRYST1')) {
+        // A blank field is no number (Number('') would be 0): a line cut short has no cell, it is not a flat one.
+        const num = (a: number, b: number) => { const t = l.slice(a, b).trim(); return t ? Number(t) : NaN }
+        s.cell = [num(6, 15) / 10, num(15, 24) / 10, num(24, 33) / 10, num(33, 40), num(40, 47), num(47, 54)]
+        s.box = [s.cell[0] || 0, s.cell[1] || 0, s.cell[2] || 0]
+      }
+      if (!/^(ATOM  |HETATM)/.test(l)) continue
+      const p = l.padEnd(80), name = p.slice(12, 16).trim()
+      add(parseInt(p.slice(22, 26), 10), p.slice(17, 21).trim(), name, elementOf(name, p.slice(17, 20).trim(), p.slice(76, 78)), parseFloat(p.slice(30, 38)) / 10, parseFloat(p.slice(38, 46)) / 10, parseFloat(p.slice(46, 54)) / 10)
+    }
+    if (!s.n) throw new Error('no ATOM or HETATM lines')
+    return s
+  }
+
   // ---------- colour ----------
   const hexCache: Record<string, number[]> = {}
   function hex(c: string): number[] {
@@ -185,7 +236,7 @@ export function decypherKit(data: KitData) {
    */
   function buildMol(s: Struct, selNrs: Set<number>, refNrs: Set<number>, arrange: Arrange): Mol | null {
     let idx: number[] = [], hidden = 0
-    for (let i = 0; i < s.n; i++) { if (SOLV.has(String(s.resn[i]).toUpperCase())) hidden++; else idx.push(i) }
+    for (let i = 0; i < s.n; i++) { if (SOLV.has(String(s.resn[i]).toUpperCase()) || s.el[i] === 'virtual') hidden++; else idx.push(i) }
     let truncated = false
     if (idx.length > MAX_ATOMS) {
       truncated = true
@@ -201,9 +252,9 @@ export function decypherKit(data: KitData) {
     for (let k = 0; k < n; k++) {
       const i = idx[k]; g2l[s.nr[i]] = k
       raw[3 * k] = s.xyz[3 * i]; raw[3 * k + 1] = s.xyz[3 * i + 1]; raw[3 * k + 2] = s.xyz[3 * i + 2]
-      let e = (String(s.name[i]).replace(/^\d+/, '')[0] || 'X').toUpperCase()
-      if (!'HCNOSP'.includes(e)) e = 'X'
-      el[k] = e
+      // The model's element (an undecided one, such as a coarse-grained bead, is drawn as X).
+      const e = s.el[i]
+      el[k] = e && e.length === 1 && 'HCNOSP'.includes(e) ? e : 'X'
     }
     const [bx, by, bz] = s.box
     const mic = (d: number, L: number) => (L > 0 ? d - L * Math.round(d / L) : d)
@@ -1029,7 +1080,7 @@ export function decypherKit(data: KitData) {
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => redraws.forEach(f => f()))
   }
 
-  return { TONES, DASH, DASH_NAMES, REPS, RESTS, SOLV, palette, toRanges, fromRanges, mix, buildMol, structureView, matchGroup, rdfLooks, buildCurves, looseName, sameButReference, morphWhy, pickRefs, refLabels, niceTicks, valAt, hoverRows, hoverX, chart, mount }
+  return { TONES, DASH, DASH_NAMES, REPS, RESTS, SOLV, palette, toRanges, fromRanges, parseStructure, mix, buildMol, structureView, matchGroup, rdfLooks, buildCurves, looseName, sameButReference, morphWhy, pickRefs, refLabels, niceTicks, valAt, hoverRows, hoverX, chart, mount }
 }
 
 export type Kit = ReturnType<typeof decypherKit>

@@ -1,7 +1,8 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { compactStruct, exportData, exportHtml, exportName } from '../src/decypher/export'
-import { fromFiles, parseGro } from '../src/decypher/parse'
+import { parseStructure } from '../src/core/index'
+import { fromFiles } from '../src/decypher/parse'
 import { themeTokens } from '../src/decypher/tokens'
 import { RUNNER } from './helpers'
 
@@ -13,7 +14,7 @@ const view = { rep: 'ball & stick' as const, rest: 'grey' as const, labels: true
 
 describe('the HTML export: one file, nothing fetched, each job still interactive', () => {
   it('structures go without water and ions, at a .gro\'s precision, keeping the atom numbers', () => {
-    const g = parseGro(readFileSync(F + '9.multiwalker.gro', 'utf8')), c = compactStruct(g, new Set())
+    const g = parseStructure(readFileSync(F + '9.multiwalker.gro', 'utf8'), 'gro'), c = compactStruct(g, new Set())
     expect(c.n).toBe(249)
     expect(c.nr[248]).toBe(249)
     expect(c.resn).not.toContain('SOL')

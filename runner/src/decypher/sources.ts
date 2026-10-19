@@ -6,7 +6,8 @@ import * as React from 'react'
 import { getJson } from '../api'
 import type { Job } from '../jobs'
 import type { Analysis, Struct } from '../core/kit'
-import { basename, fromFiles, fromRecord, fromVault, maxAtom, parseStruct, recordGroups, shortLabels, type FileRow, type LoadedFile, type RecordLike } from './parse'
+import { readStructure } from '../core/index'
+import { basename, fromFiles, fromRecord, fromVault, maxAtom, recordGroups, shortLabels, type FileRow, type LoadedFile, type RecordLike } from './parse'
 import { refKey, type SourceRef } from './state'
 import type { VaultRdfs } from './vaultTypes'
 
@@ -24,7 +25,7 @@ const enc = encodeURIComponent
 // Structures are read once per page: several jobs of one system share theirs.
 const structs = new Map<string, Promise<Struct>>()
 function structAt(key: string, url: string, name: string): Promise<Struct> {
-  if (!structs.has(key)) structs.set(key, text(url).then(t => parseStruct(name, t)))
+  if (!structs.has(key)) structs.set(key, text(url).then(t => readStructure(name, t)))
   const p = structs.get(key)!
   p.catch(() => structs.delete(key))
   return p

@@ -67,7 +67,10 @@ export function findTrajectories(rootPath: string, template: string, recipe: Rec
     let counts: number[] | null = null, atoms: number | null = null;
     if (structure) {
       const text = readFileSync(structure, 'utf8'), format = structFormat(structure, text);
-      if (format) { const table = atomTable(text, format), a = applyRecipe(recipe, table); atoms = table.length; counts = a.counts; problems.push(...a.problems); }
+      if (format) {
+        try { const table = atomTable(text, format), a = applyRecipe(recipe, table); atoms = table.length; counts = a.counts; problems.push(...a.problems); }
+        catch (e) { problems.push(basename(structure) + ': ' + (e as Error).message); }
+      }
       else problems.push(basename(structure) + ' is not a .gro or .pdb');
     }
     return [{ ...m, rel, trajectory: abs, runInput, structure, atoms, counts, problems }];

@@ -213,7 +213,7 @@ export function Groups({ draft, setDraft }: { draft: Draft; setDraft: React.Disp
   return (
     <div className="grid grid-cols-[minmax(0,1fr)_420px] gap-5">
       <div className="flex min-w-0 flex-col gap-3">
-        <Viewer text={structure.text} format={structure.format} atoms={structure.atoms} colour={colour} onPick={onPick} describe={describe} groupOf={groupOf} centreRequest={centreReq} />
+        <Viewer text={structure.text} format={structure.format} model={structure.model} atoms={structure.atoms} colour={colour} onPick={onPick} describe={describe} groupOf={groupOf} centreRequest={centreReq} />
         <p className="m-0 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-caption text-muted-foreground">
           <span className="whitespace-nowrap">click an atom: in or out of <b className={draft.groups[current] ? groupText(draft.groups[current]) : undefined}>{draft.groups[current]?.name}</b></span>
           <span className="whitespace-nowrap"><Kbd>shift</Kbd> click: its residue</span>

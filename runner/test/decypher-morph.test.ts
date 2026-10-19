@@ -1,9 +1,9 @@
 import { readFileSync } from 'node:fs'
 import { afterEach, describe, expect, it } from 'vitest'
 import { cardsOf, cardTitle, exportData, exportHtml } from '../src/decypher/export'
-import { kit } from '../src/core/index'
+import { kit, parseStructure } from '../src/core/index'
 import type { SceneState } from '../src/core/kit'
-import { fromFiles, parseGro } from '../src/decypher/parse'
+import { fromFiles } from '../src/decypher/parse'
 import { activeMorphs, joinMorph, setMorphRefs, splitMorph } from '../src/decypher/state'
 import { themeTokens } from '../src/decypher/tokens'
 import { RUNNER } from './helpers'
@@ -166,7 +166,7 @@ describe('clicking a reference atom, in the structure view', () => {
     const canvas = { width: 0, height: 0, style: {} as Record<string, string>, getContext: () => ctx, addEventListener: (t: string, f: (e: unknown) => void) => { (handlers[t] ||= []).push(f) }, removeEventListener() {}, getBoundingClientRect: () => ({ left: 0, top: 0 }), setPointerCapture() {} }
     const picked: [number, boolean][] = [], hovered: unknown[] = []
     const { analyses: [h, s] } = loaded()
-    const sels = h.sels, struct = parseGro(readFileSync(F + '9.multiwalker.gro', 'utf8'))
+    const sels = h.sels, struct = parseStructure(readFileSync(F + '9.multiwalker.gro', 'utf8'), 'gro')
     const mol = kit.buildMol(struct, new Set(sels.flatMap(x => x.atoms)), new Set([...h.ref!.atoms, ...s.ref!.atoms]), 'side by side')
     const view = kit.structureView(canvas as unknown as HTMLCanvasElement, { clientWidth: 700, clientHeight: 560 } as HTMLElement, { hover: x => hovered.push(x), pick: () => {}, pickRef: pickRef && ((i, add) => { pickRef(i, add); picked.push([i, add]) }) })
     const pal = kit.palette(false, themeTokens(readFileSync(RUNNER + 'src/tokens.json', 'utf8'), readFileSync(RUNNER + 'src/roles.json', 'utf8')).light)

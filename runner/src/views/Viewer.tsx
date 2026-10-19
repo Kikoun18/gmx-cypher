@@ -6,6 +6,7 @@ import { ToggleGroup, ToggleGroupItem } from '../ui/toggle-group'
 import { defaultView, structStyle, toPdb, type Look } from '../../../matrix/src/lib/structFile'
 import { drawnNumbers, type Atom } from '../lib/atoms'
 import type { Tone } from '../lib/tones'
+import type { Struct } from '../core/index'
 import { boxDimensions, boxEdges, outsideBox, parseBox } from '../lib/box'
 import { Status } from '../ui/status'
 
@@ -59,8 +60,8 @@ function useThemeName() {
  * number is drawnNumbers(atoms)[k] (T14). Atoms keep their element colours and a group is a halo in its hue (T141), or
  * the group's atoms are drawn in the hue's strong ink and the rest in grey. C + click sets the centre of rotation (T140).
  */
-export function Viewer({ text, format, atoms, colour, onPick, describe, groupOf, centreRequest }: {
-  text: string; format: 'gro' | 'pdb'; atoms: Atom[]
+export function Viewer({ text, format, model, atoms, colour, onPick, describe, groupOf, centreRequest }: {
+  text: string; format: 'gro' | 'pdb'; model: Struct; atoms: Atom[]
   colour: Map<number, Tone | 'reference'>
   onPick: (nr: number, how: PickHow) => void
   describe: (nr: number) => string
@@ -71,9 +72,9 @@ export function Viewer({ text, format, atoms, colour, onPick, describe, groupOf,
 }) {
   const { pdb, info, unknown } = React.useMemo(() => toPdb(text, format), [text, format])
   // The periodic box the file records (R2, T95): drawn as its twelve edges, with its dimensions and the atoms outside it.
-  const cell = React.useMemo(() => parseBox(text, format), [text, format])
+  const cell = React.useMemo(() => parseBox(model, format), [model, format])
   const dims = React.useMemo(() => (cell.vectors ? boxDimensions(cell.vectors) : null), [cell])
-  const outside = React.useMemo(() => (cell.vectors ? outsideBox(text, format, cell.vectors) : null), [text, format, cell])
+  const outside = React.useMemo(() => (cell.vectors ? outsideBox(model, cell.vectors) : null), [model, cell])
   const [showCell, setShowCell] = React.useState(true)
   const numbers = React.useMemo(() => drawnNumbers(atoms), [atoms])
   const index = React.useMemo(() => new Map(numbers.map((nr, k) => [nr, k])), [numbers])

@@ -20,7 +20,7 @@ export function compactStruct(s: Struct, keep: Set<number>, max = 4000): Struct 
   const r3 = (v: number) => Math.round(v * 1000) / 1000
   return {
     title: s.title, n: idx.length, nr: idx.map(i => s.nr[i]), resnr: idx.map(i => s.resnr[i]), resn: idx.map(i => s.resn[i]), name: idx.map(i => s.name[i]),
-    xyz: idx.flatMap(i => [r3(s.xyz[3 * i]), r3(s.xyz[3 * i + 1]), r3(s.xyz[3 * i + 2])]), box: s.box,
+    el: idx.map(i => s.el[i]), xyz: idx.flatMap(i => [r3(s.xyz[3 * i]), r3(s.xyz[3 * i + 1]), r3(s.xyz[3 * i + 2])]), box: s.box, cell: s.cell,
   }
 }
 

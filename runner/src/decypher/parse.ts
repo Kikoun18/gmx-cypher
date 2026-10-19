@@ -3,56 +3,14 @@
 // x and y come from the Matrix's own parseTable; a curve's peak is its highest point (T152), not the first shell's (T27).
 
 import { parseTable } from '../../../matrix/src/lib/seq'
-import { structFormat } from '../../../matrix/src/lib/structFile'
 import { parseNdx } from '../lib/ndx'
 import { peaks } from '../lib/rdf'
-import { fromRanges, TONES } from '../core/index'
+import { fromRanges, readStructure, TONES } from '../core/index'
 import type { Analysis, Group, Peak, Sel, Struct, Tone } from '../core/kit'
 
 const toneOf = (t: unknown, i: number): Tone => (TONES.includes(t as Tone) ? (t as Tone) : TONES[i % TONES.length])
 export const basename = (s: string) => String(s || '').replace(/['"]/g, '').split(/[\\/]/).pop() || ''
 export const stemOf = (n: string) => n.replace(/\.run\.json$/i, '').replace(/\.(xvg|ndx|gro|pdb|json)$/i, '')
-
-// ---------- structures ----------
-export function parseGro(text: string): Struct {
-  const lines = text.split(/\r?\n/), n = parseInt(lines[1], 10)
-  if (!(n > 0)) throw new Error('no atom count on line 2')
-  if (lines.length < n + 2) throw new Error('it ends before its ' + n + ' atoms')
-  const nr: number[] = new Array(n), resnr: number[] = new Array(n), resn: string[] = new Array(n), name: string[] = new Array(n), xyz: number[] = new Array(3 * n)
-  // Coordinates are fixed-width; a .gro written with more decimals widens them, read from the first atom.
-  let w = 8
-  const s0 = lines[2].slice(20), d1 = s0.indexOf('.'), d2 = s0.indexOf('.', d1 + 1)
-  if (d1 >= 0 && d2 > d1) w = d2 - d1
-  for (let i = 0; i < n; i++) {
-    const L = lines[i + 2]
-    nr[i] = i + 1; resnr[i] = parseInt(L.slice(0, 5), 10); resn[i] = L.slice(5, 10).trim(); name[i] = L.slice(10, 15).trim()
-    for (let k = 0; k < 3; k++) xyz[3 * i + k] = parseFloat(L.slice(20 + k * w, 20 + (k + 1) * w))
-  }
-  const box = (lines[n + 2] || '').trim().split(/\s+/).map(Number)
-  return { title: lines[0].trim(), n, nr, resnr, resn, name, xyz, box: [box[0] || 0, box[1] || 0, box[2] || 0] }
-}
-
-/** A .pdb's first model, in nm like a .gro; its box from CRYST1. */
-export function parsePdb(text: string): Struct {
-  const s: Struct = { title: '', n: 0, nr: [], resnr: [], resn: [], name: [], xyz: [], box: [0, 0, 0] }
-  for (const l of text.split(/\r?\n/)) {
-    if (l.startsWith('ENDMDL')) break
-    if (l.startsWith('TITLE') && !s.title) s.title = l.slice(10).trim()
-    if (l.startsWith('CRYST1')) s.box = [parseFloat(l.slice(6, 15)) / 10 || 0, parseFloat(l.slice(15, 24)) / 10 || 0, parseFloat(l.slice(24, 33)) / 10 || 0]
-    if (!/^(ATOM  |HETATM)/.test(l)) continue
-    const p = l.padEnd(80)
-    s.n++; s.nr.push(s.n); s.name.push(p.slice(12, 16).trim()); s.resn.push(p.slice(17, 21).trim()); s.resnr.push(parseInt(p.slice(22, 26), 10))
-    s.xyz.push(parseFloat(p.slice(30, 38)) / 10, parseFloat(p.slice(38, 46)) / 10, parseFloat(p.slice(46, 54)) / 10)
-  }
-  if (!s.n) throw new Error('no ATOM or HETATM lines')
-  return s
-}
-
-export function parseStruct(name: string, text: string): Struct {
-  const f = structFormat(name, text)
-  if (!f) throw new Error(basename(name) + ' is not a .gro or .pdb')
-  return f === 'gro' ? parseGro(text) : parsePdb(text)
-}
 
 // ---------- g(r) ----------
 export interface Xvg { x: number[]; ys: number[][]; legends: string[]; xlabel: string; ylabel: string; ndxName: string | null; refIdx: number | null; selIdx: number[] | null }
@@ -194,7 +152,7 @@ export function fromFiles(files: LoadedFile[]): { analyses: Analysis[]; structs:
     const kind: FileRow['kind'] = /\.json$/i.test(name) ? 'run' : /\.(gro|pdb)$/i.test(name) ? 'gro' : /\.ndx$/i.test(name) ? 'ndx' : /\.xvg$/i.test(name) ? 'xvg' : 'file'
     const p: P = { path: f.path, name, dir, kind, data: null, error: null, status: '' }
     try {
-      if (kind === 'gro') { const s = parseStruct(name, f.text); p.data = s; p.status = s.n + ' atoms' }
+      if (kind === 'gro') { const s = readStructure(name, f.text); p.data = s; p.status = s.n + ' atoms' }
       else if (kind === 'ndx') { const g = parseNdx(f.text); if (!g.length) throw new Error('no [ groups ]'); p.data = g; p.status = g.length + ' groups' }
       else if (kind === 'xvg') { const x = parseXvg(f.text); p.data = x; p.status = x.ys.length + ' curves · ' + x.x.length + ' points' }
       else if (kind === 'run') {

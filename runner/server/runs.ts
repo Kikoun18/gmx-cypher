@@ -167,7 +167,9 @@ function groupsAtoms(cmd: CommandDef, req: RunRequest, roots: string[]): { atoms
   if (!format) throw new HttpError(400, path + ' is not a .gro or .pdb');
   const count = roleProblems(cmd, Array.isArray(req.groups) ? req.groups.length : 0);
   if (count.length) throw new HttpError(400, count.join('\n'));
-  const names = req.groups.map(g => g.name), atoms = atomTable(text, format);
+  let atoms: Atom[];
+  try { atoms = atomTable(text, format); } catch (e) { throw new HttpError(400, path + ': ' + (e as Error).message); }
+  const names = req.groups.map(g => g.name);
   const sets = req.groups.map((g, i) => {
     const bad = nameProblem(g.name, names.filter((_, j) => j !== i));
     if (bad) throw new HttpError(400, g.name + ': ' + bad);

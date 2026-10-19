@@ -1,6 +1,8 @@
 // The periodic box of a structure file (R2, T95): what the file says, the cell's edges, its dimensions and how
 // many atoms lie outside it. Everything here is in nm; the viewer converts to Å for the drawing.
 
+import type { Struct } from '../core/index';
+
 export type Vec = [number, number, number];
 export type Vectors = [Vec, Vec, Vec];
 export interface Box { vectors: Vectors | null; problems: string[] }
@@ -9,33 +11,28 @@ const none = (problem: string): Box => ({ vectors: null, problems: [problem] });
 const clean = (x: number) => (Math.abs(x) < 1e-12 ? 0 : x);
 
 /**
- * A .gro box: the last line, three numbers (rectangular) or nine (triclinic, in GROMACS's order: v1x v2y v3z v1y
- * v1z v2x v2z v3x v3y). A .pdb box: the CRYST1 line (a, b, c in Å; alpha, beta, gamma in degrees), with a along x
- * and b in the xy plane, as the PDB format defines it.
+ * The box of a structure (the core's model, R5b): a .gro's box line, three numbers (rectangular) or nine (triclinic,
+ * in GROMACS's order: v1x v2y v3z v1y v1z v2x v2z v3x v3y); a .pdb's CRYST1 line (a, b, c; alpha, beta, gamma in
+ * degrees), with a along x and b in the xy plane, as the PDB format defines it.
  */
-export function parseBox(text: string, format: 'gro' | 'pdb'): Box {
+export function parseBox(s: Struct, format: 'gro' | 'pdb'): Box {
+  const c = s.cell;
   if (format === 'pdb') {
-    const line = text.split(/\r?\n/).find(l => l.startsWith('CRYST1'));
-    if (!line) return none('no CRYST1 line in this file: no box to draw');
-    // A blank field is no number (Number('') would be 0): a line cut short has no cell, it is not a flat one.
-    const num = (from: number, to: number) => { const t = line.slice(from, to).trim(); return t ? Number(t) : NaN; };
-    const [a, b, c] = [num(6, 15), num(15, 24), num(24, 33)].map(x => x / 10);
-    const [al, be, ga] = [num(33, 40), num(40, 47), num(47, 54)].map(x => (x * Math.PI) / 180);
+    if (!c) return none('no CRYST1 line in this file: no box to draw');
+    const [a, b, cc] = c, [al, be, ga] = c.slice(3).map(x => (x * Math.PI) / 180);
     const bad = none('the CRYST1 line has no usable cell (a, b, c in Å and three angles in degrees)');
-    if (![a, b, c, al, be, ga].every(Number.isFinite) || a <= 0 || b <= 0 || c <= 0 || [al, be, ga].some(x => x <= 0 || x >= Math.PI)) return bad;
+    if (![a, b, cc, al, be, ga].every(Number.isFinite) || a <= 0 || b <= 0 || cc <= 0 || [al, be, ga].some(x => x <= 0 || x >= Math.PI)) return bad;
     const cosA = Math.cos(al), cosB = Math.cos(be), cosG = Math.cos(ga), sinG = Math.sin(ga);
-    const cx = c * cosB, cy = (c * (cosA - cosB * cosG)) / sinG, cz2 = c * c - cx * cx - cy * cy;
+    const cx = cc * cosB, cy = (cc * (cosA - cosB * cosG)) / sinG, cz2 = cc * cc - cx * cx - cy * cy;
     // Angles that close no cell leave the third vector no height.
     if (!(cz2 > 1e-12)) return bad;
     const vectors: Vectors = [[a, 0, 0], [b * cosG, b * sinG, 0], [cx, cy, Math.sqrt(cz2)]];
     return { vectors: vectors.map(v => v.map(clean)) as Vectors, problems: [] };
   }
-  const lines = text.split(/\r?\n/).filter(l => l.trim() !== '');
-  if (lines.length < 3) return none('the .gro file has no box line');
-  const values = lines[lines.length - 1].trim().split(/\s+/).map(Number);
-  if (values.some(v => !Number.isFinite(v)) || (values.length !== 3 && values.length !== 9)) return none('the last line of the .gro is not a box (three or nine numbers, in nm)');
-  if (values.every(v => v === 0)) return none('the box is all zeros: no box in this file');
-  const v = values;
+  if (!c) return none('the .gro file has no box line');
+  if (c.some(v => !Number.isFinite(v)) || (c.length !== 3 && c.length !== 9)) return none('the last line of the .gro is not a box (three or nine numbers, in nm)');
+  if (c.every(v => v === 0)) return none('the box is all zeros: no box in this file');
+  const v = c;
   const vectors: Vectors = v.length === 3
     ? [[v[0], 0, 0], [0, v[1], 0], [0, 0, v[2]]]
     : [[v[0], v[3], v[4]], [v[5], v[1], v[6]], [v[7], v[8], v[2]]];
@@ -65,19 +62,9 @@ export function boxEdges(v: Vectors): [Vec, Vec][] {
   return edges;
 }
 
-/** The atom positions of a .gro or .pdb text, in nm. */
-export function atomCoords(text: string, format: 'gro' | 'pdb'): Vec[] {
-  const lines = text.split(/\r?\n/);
-  if (format === 'gro') {
-    const n = parseInt(lines[1], 10) || 0;
-    return lines.slice(2, 2 + n).map(l => [l.slice(20, 28), l.slice(28, 36), l.slice(36, 44)].map(Number) as Vec);
-  }
-  return lines.filter(l => /^(ATOM  |HETATM)/.test(l)).map(l => [l.slice(30, 38), l.slice(38, 46), l.slice(46, 54)].map(x => Number(x) / 10) as Vec);
-}
-
 /** How many atoms lie strictly outside the cell (a fractional coordinate below 0 or above 1; a point on a face is in), out of how many. */
-export function outsideBox(text: string, format: 'gro' | 'pdb', v: Vectors): { count: number; total: number } {
-  const coords = atomCoords(text, format), d = det(v[0], v[1], v[2]);
+export function outsideBox(s: Struct, v: Vectors): { count: number; total: number } {
+  const coords = s.nr.map((_, i) => s.xyz.slice(3 * i, 3 * i + 3) as Vec), d = det(v[0], v[1], v[2]);
   const fraction = (r: Vec): Vec => [det(r, v[1], v[2]) / d, det(v[0], r, v[2]) / d, det(v[0], v[1], r) / d];
   const count = coords.filter(r => fraction(r).some(f => f < 0 || f > 1)).length;
   return { count, total: coords.length };

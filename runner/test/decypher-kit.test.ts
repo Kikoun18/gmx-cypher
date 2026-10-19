@@ -1,8 +1,8 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { KIT_DATA, kit } from '../src/core/index'
+import { KIT_DATA, kit, parseStructure } from '../src/core/index'
 import { decypherKit, type Analysis, type VNode } from '../src/core/kit'
-import { fromFiles, fromRecord, fromVault, parseGro, parsePdb, parseXvg, peakOf, shortLabels, type RecordLike } from '../src/decypher/parse'
+import { fromFiles, fromRecord, fromVault, parseXvg, peakOf, shortLabels, type RecordLike } from '../src/decypher/parse'
 import { themeTokens } from '../src/decypher/tokens'
 import { RUNNER } from './helpers'
 
@@ -99,10 +99,10 @@ describe('(de)Cypher reads your runs as the RDF Explorer design does', () => {
   })
 
   it('structures: a .gro in nm, a .pdb from Å, and the drawable molecule without solvent', () => {
-    const g = parseGro(read('9.multiwalker.gro'))
+    const g = parseStructure(read('9.multiwalker.gro'), 'gro')
     expect(g).toMatchObject({ n: 279, box: [6.95022, 6.95022, 6.95022] })
     expect(g.nr[278]).toBe(279)
-    const p = parsePdb('CRYST1   30.000   30.000   30.000  90.00  90.00  90.00 P 1\nATOM      1  N   MET A   1      -4.700  -2.470   5.000  1.00  0.00           N\nATOM      2  CA  MET A   1      -3.700  -2.470   5.000  1.00  0.00           C\nEND\n')
+    const p = parseStructure('CRYST1   30.000   30.000   30.000  90.00  90.00  90.00 P 1\nATOM      1  N   MET A   1      -4.700  -2.470   5.000  1.00  0.00           N\nATOM      2  CA  MET A   1      -3.700  -2.470   5.000  1.00  0.00           C\nEND\n', 'pdb')
     expect(p).toMatchObject({ n: 2, box: [3, 3, 3], name: ['N', 'CA'], resn: ['MET', 'MET'] })
     expect(p.xyz[0]).toBeCloseTo(-0.47)
     const mol = kit.buildMol(g, new Set([10]), new Set([125]), 'side by side')!
@@ -157,7 +157,7 @@ describe('(de)Cypher reads your runs as the RDF Explorer design does', () => {
     const src = decypherKit.toString()
     expect(src).not.toMatch(/<\/script/i)
     const again = new Function('return (' + src + ')(' + JSON.stringify(KIT_DATA) + ')')() as typeof kit
-    const g = parseGro(read('9.multiwalker.gro'))
+    const g = parseStructure(read('9.multiwalker.gro'), 'gro')
     expect(again.fromRanges('43-49:3, 5')).toEqual([5, 43, 46, 49])
     expect(again.DASH).toEqual(kit.DASH)
     const a = again.buildMol(g, new Set([10]), new Set(), 'side by side')!, b = kit.buildMol(g, new Set([10]), new Set(), 'side by side')!
