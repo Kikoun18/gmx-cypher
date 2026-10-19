@@ -3,7 +3,8 @@ import { TriangleAlert } from 'lucide-react'
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert'
 import { Button } from '../ui/button'
 import { Stat } from '../ui/card'
-import { DASH, LineChart, type ChartSeries } from '../ui/line-chart'
+import { DASH, TONES } from '../core/index'
+import { LineChart, type ChartSeries } from '../ui/line-chart'
 import { Section } from '../ui/separator'
 import { getJson } from '../api'
 import { estimateOf, type Job } from '../jobs'
@@ -127,7 +128,6 @@ function RdfChart({ job, record }: { job: Job; record: RunRecord }) {
 
 const fmt = (x: number | null) => (x != null && Number.isFinite(x) ? x.toLocaleString('en', { maximumSignificantDigits: 5 }) : '—')
 
-const TONES_FOR_TERMS: Tone[] = ['coral', 'sky', 'mint', 'butter', 'lilac', 'aqua', 'rose', 'stone']
 
 /**
  * gmx energy's result (R4): a chart per term, since terms differ by orders of magnitude (Bond ≈ 10², Potential ≈ −10⁴
@@ -145,8 +145,8 @@ function EnergyChart({ job, record }: { job: Job; record: RunRecord }) {
       <div className="grid grid-cols-[repeat(auto-fill,minmax(420px,1fr))] gap-4">
         {curves.map((c, i) => (
           <div key={c.label} className="flex min-w-0 flex-col gap-1">
-            <span className={cn('text-label uppercase', toneText[TONES_FOR_TERMS[i % TONES_FOR_TERMS.length]])}>{c.label}</span>
-            <LineChart series={[{ label: c.label, points: c.points, tone: TONES_FOR_TERMS[i % TONES_FOR_TERMS.length] }]} xLabel="time (ps)" yLabel={rows.find(r => r.name === c.label)?.unit ?? ''} height={180} legend={false} />
+            <span className={cn('text-label uppercase', toneText[TONES[i % TONES.length]])}>{c.label}</span>
+            <LineChart series={[{ label: c.label, points: c.points, tone: TONES[i % TONES.length] }]} xLabel="time (ps)" yLabel={rows.find(r => r.name === c.label)?.unit ?? ''} height={180} legend={false} />
           </div>
         ))}
       </div>
@@ -183,7 +183,7 @@ function AwhChart({ job, record }: { job: Job; record: RunRecord }) {
   }, [job.id, shown])
   if (shown.some(n => texts[n] == null)) return <p className="m-0 text-caption text-muted-foreground" aria-live="polite">reading {shown.length} PMF file{shown.length > 1 ? 's' : ''}…</p>
   const time = (n: string) => /_t(-?\d+(?:\.\d+)?)\.xvg$/.exec(n)?.[1] ?? '?'
-  const series: ChartSeries[] = shown.map((n, i) => ({ label: 't = ' + time(n) + ' ps', points: resultSeries(texts[n])[0]?.points ?? [], tone: TONES_FOR_TERMS[i % 8], dash: Math.floor(i / 8) }))
+  const series: ChartSeries[] = shown.map((n, i) => ({ label: 't = ' + time(n) + ' ps', points: resultSeries(texts[n])[0]?.points ?? [], tone: TONES[i % 8], dash: Math.floor(i / 8) }))
   const last = texts[shown[shown.length - 1]], target = awhTargetError(last), xLabel = parseTable(last).head.xLabel || 'coordinate'
   return (
     <div className="flex flex-col gap-3">
@@ -225,7 +225,7 @@ function WhamChart({ job, record }: { job: Job; record: RunRecord }) {
   const prof = resultSeries(profile)[0]?.points ?? [], bs = parseBootstrap(bsres)
   // The band is the bootstrap's standard deviation at each point of the profile (the same bins).
   const errors = bs.length === prof.length ? bs.map(b => b[2]) : undefined
-  const hist: ChartSeries[] = h!.windows.map((c, j) => ({ label: 'window ' + label(j + 1), points: h!.x.map((x, i) => [x, c[i]] as [number, number]), tone: TONES_FOR_TERMS[j % 8], dash: Math.floor(j / 8) }))
+  const hist: ChartSeries[] = h!.windows.map((c, j) => ({ label: 'window ' + label(j + 1), points: h!.x.map((x, i) => [x, c[i]] as [number, number]), tone: TONES[j % 8], dash: Math.floor(j / 8) }))
   return (
     <div className="flex flex-col gap-3">
       <LineChart series={[{ label: 'profile', points: prof, tone: 'coral', ...(errors ? { errors } : {}) }]} xLabel="ξ (nm)" yLabel="E (kJ/mol)" height={260} legend={false} />
@@ -326,7 +326,7 @@ function HbondChart({ job, record }: { job: Job; record: RunRecord }) {
 function GroupSeries({ job, groups, yLabel, unit, note }: { job: Job; groups: { name: string; tone: Tone }[]; yLabel: string; unit: string; note: string }) {
   const xvg = useOutput(job.id, 'xvg')
   if (xvg == null) return <p className="m-0 text-caption text-muted-foreground" aria-live="polite">reading the result…</p>
-  const curves = resultSeries(xvg), at = (i: number) => groups[i] ?? { name: curves[i].label, tone: TONES_FOR_TERMS[i % 8] }
+  const curves = resultSeries(xvg), at = (i: number) => groups[i] ?? { name: curves[i].label, tone: TONES[i % 8] }
   return (
     <div className="flex flex-col gap-3">
       <LineChart series={curves.map((c, i) => ({ label: at(i).name, points: c.points, tone: at(i).tone }))} xLabel="time (ps)" yLabel={yLabel} height={240} legend={curves.length > 1} zeroLine={false} />
@@ -379,7 +379,7 @@ function GyrateChart({ job, record }: { job: Job; record: RunRecord }) {
   const stats = curves.map(c => curveStats(c.points))
   return (
     <div className="flex flex-col gap-3">
-      <LineChart series={curves.map((c, i) => ({ label: label(i), points: c.points, tone: i ? TONES_FOR_TERMS[i] : g?.tone ?? 'coral', ...(i ? { dash: 1, state: 'dim' as const } : {}) }))} xLabel="time (ps)" yLabel="radius (nm)" height={240} legend zeroLine={false} />
+      <LineChart series={curves.map((c, i) => ({ label: label(i), points: c.points, tone: i ? TONES[i] : g?.tone ?? 'coral', ...(i ? { dash: 1, state: 'dim' as const } : {}) }))} xLabel="time (ps)" yLabel="radius (nm)" height={240} legend zeroLine={false} />
       <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3">
         {stats[0] && <Stat label={'Rg · ' + g?.name + ' · mean'} value={stats[0].mean.toFixed(3) + ' nm'} hint={'± ' + stats[0].sd.toFixed(3) + ' (standard deviation) · last ' + stats[0].last.toFixed(3) + ' · ' + stats[0].frames + ' frames'} />}
         {stats.length === 4 && <Stat label="about x, y, z · mean" value={stats.slice(1).map(x => x!.mean.toFixed(3)).join(' · ')} hint="nm" />}
@@ -396,7 +396,7 @@ function MindistChart({ job, record }: { job: Job; record: RunRecord }) {
   const xvg = useOutput(job.id, 'xvg'), contacts = useNamed(job.id, record.outputs.map(o => o.path.split('/').pop()!).find(n => n.endsWith('_contacts.xvg')) ?? null)
   if (xvg == null || contacts == null) return <p className="m-0 text-caption text-muted-foreground" aria-live="polite">reading the result…</p>
   const [ref, ...others] = record.groups, d = record.options.find(o => o.flag === 'd')?.value ?? 0.6
-  const named = (t: string) => resultSeries(t).map((c, i) => ({ label: others[i]?.name ?? c.label, points: c.points, tone: others[i]?.tone ?? TONES_FOR_TERMS[i % 8] }))
+  const named = (t: string) => resultSeries(t).map((c, i) => ({ label: others[i]?.name ?? c.label, points: c.points, tone: others[i]?.tone ?? TONES[i % 8] }))
   const curves = named(xvg)
   return (
     <div className="flex flex-col gap-3">

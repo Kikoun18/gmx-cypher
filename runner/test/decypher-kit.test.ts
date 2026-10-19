@@ -1,11 +1,11 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { decypherKit, type Analysis, type VNode } from '../src/decypher/kit'
+import { KIT_DATA, kit } from '../src/core/index'
+import { decypherKit, type Analysis, type VNode } from '../src/core/kit'
 import { fromFiles, fromRecord, fromVault, parseGro, parsePdb, parseXvg, peakOf, shortLabels, type RecordLike } from '../src/decypher/parse'
 import { themeTokens } from '../src/decypher/tokens'
 import { RUNNER } from './helpers'
 
-const kit = decypherKit()
 const F = RUNNER + 'test/fixtures/decypher/'
 const read = (n: string) => readFileSync(F + n, 'utf8')
 const NAMES = ['9.multiwalker.gro', 'mmmmmmmm.gro', 'rdf_o111_Methionine_H.ndx', 'rdf_o111_Methionine_H.run.json', 'rdf_o111_Methionine_H.xvg', 'rdf_o111_Methionine_S.ndx', 'rdf_o111_Methionine_S.run.json', 'rdf_o111_Methionine_S.xvg']
@@ -156,9 +156,10 @@ describe('(de)Cypher reads your runs as the RDF Explorer design does', () => {
   it('is self-contained: its source text alone makes the same kit (the HTML export carries it)', () => {
     const src = decypherKit.toString()
     expect(src).not.toMatch(/<\/script/i)
-    const again = new Function('return (' + src + ')()')() as typeof kit
+    const again = new Function('return (' + src + ')(' + JSON.stringify(KIT_DATA) + ')')() as typeof kit
     const g = parseGro(read('9.multiwalker.gro'))
-    expect(again.ranges('43-49:3, 5')).toEqual([43, 46, 49, 5])
+    expect(again.fromRanges('43-49:3, 5')).toEqual([5, 43, 46, 49])
+    expect(again.DASH).toEqual(kit.DASH)
     const a = again.buildMol(g, new Set([10]), new Set(), 'side by side')!, b = kit.buildMol(g, new Set([10]), new Set(), 'side by side')!
     expect(Array.from(a.local)).toEqual(Array.from(b.local))
     const [h] = files().analyses as Analysis[]

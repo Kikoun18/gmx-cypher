@@ -1,10 +1,8 @@
 import * as React from "react"
 
 import { cn } from "../lib/utils"
-import { TONES, toneVar, type Tone } from "../lib/tones"
-
-/** Dash patterns for the curves of one series, in order (the codebase's DASH list). */
-export const DASH = ["none", "5 4", "2 3", "8 3 2 3", "1 3", "10 4", "4 2 1 2", "6 6", "3 5", "12 3 3 3"]
+import { DASH, niceTicks, TONES } from "../core/index"
+import { toneVar, type Tone } from "../lib/tones"
 
 export interface ChartSeries {
   label: string
@@ -35,20 +33,6 @@ export interface LineChartProps extends Omit<React.ComponentProps<"figure">, "ch
   /** A dashed rule at y = 0. */
   zeroLine?: boolean
   legend?: boolean
-}
-
-function niceTicks(min: number, max: number, count = 5) {
-  if (min === max) {
-    min -= 1
-    max += 1
-  }
-  const raw = (max - min) / count
-  const mag = Math.pow(10, Math.floor(Math.log10(raw)))
-  const err = raw / mag
-  const step = (err >= 7.5 ? 10 : err >= 3.5 ? 5 : err >= 1.5 ? 2 : 1) * mag
-  const ticks: number[] = []
-  for (let v = Math.ceil(min / step) * step; v <= max + step * 1e-9; v += step) ticks.push(+v.toFixed(10))
-  return { ticks, decimals: Math.max(0, -Math.floor(Math.log10(step) + 1e-9)) }
 }
 
 function useWidth(fallback: number) {

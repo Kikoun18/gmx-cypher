@@ -1,7 +1,8 @@
 // The run record (R5, T31): one JSON file next to the outputs that says exactly what ran, on what, with
 // which groups and options, and what it wrote. It goes back into the form for "run again" (section 11.4).
 
-import { toRanges, type Atom } from './atoms';
+import { toRanges } from '../core/index';
+import type { Atom } from './atoms';
 import type { HelpOption } from './gmxText';
 import { groupAtoms, type Group } from './groups';
 import type { Slot } from './inputs';

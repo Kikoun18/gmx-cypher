@@ -30,27 +30,3 @@ export function atomTable(text: string, format: 'gro' | 'pdb'): Atom[] {
 }
 
 export const drawnNumbers = (atoms: Atom[]) => atoms.filter(a => a.drawn).map(a => a.nr);
-
-/** Sorted atom numbers as `43-3239:4, 5`: runs of three or more with one step, else single numbers. */
-export function toRanges(numbers: number[]): string {
-  const n = [...new Set(numbers)].sort((a, b) => a - b), parts: string[] = [];
-  for (let i = 0; i < n.length;) {
-    const step = n[i + 1] - n[i];
-    let j = i + 1;
-    while (j + 1 < n.length && n[j + 1] - n[j] === step) j++;
-    if (j - i >= 2) { parts.push(n[i] + '-' + n[j] + (step === 1 ? '' : ':' + step)); i = j + 1; }
-    else { parts.push(String(n[i])); i++; }
-  }
-  return parts.join(', ');
-}
-
-export function fromRanges(text: string): number[] {
-  const out = new Set<number>();
-  for (const part of text.split(',').map(p => p.trim()).filter(Boolean)) {
-    const m = /^(\d+)(?:-(\d+)(?::(\d+))?)?$/.exec(part);
-    const a = m ? Number(m[1]) : 0, b = m?.[2] ? Number(m[2]) : a, step = m?.[3] ? Number(m[3]) : 1;
-    if (!m || a < 1 || b < a || step < 1) throw new Error('not an atom number or range: ' + part);
-    for (let x = a; x <= b; x += step) out.add(x);
-  }
-  return [...out].sort((x, y) => x - y);
-}

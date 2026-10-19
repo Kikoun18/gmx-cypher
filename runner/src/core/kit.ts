@@ -1,7 +1,8 @@
-// (de)Cypher's kit: the structure view, the chart and the curves, shared by the page and by its HTML export.
-// Everything lives inside decypherKit() and uses no name from outside it, so an export carries this very code
-// as its source text (decypherKit.toString()) and draws exactly what the page draws. Ported from the RDF
-// Explorer design (v3): rdf-lib.js's structure builder, its canvas drawing and its chart.
+// The visualization core's kit (R5): the structure view, the chart and the curves, shared by the page and by its
+// HTML export. Everything lives inside decypherKit() and uses no name from outside it, so an export carries this
+// very code as its source text (decypherKit.toString()) and draws exactly what the page draws; what it can't
+// import (the tones' order, the Matrix's dashes) it is given as data (KitData), and the export writes that data
+// beside it. Ported from the RDF Explorer design (v3): rdf-lib.js's structure builder, its canvas drawing and its chart.
 
 export type Tone = 'coral' | 'sky' | 'mint' | 'butter' | 'lilac' | 'aqua' | 'rose' | 'stone'
 export type Rep = 'ball & stick' | 'licorice' | 'spacefill'
@@ -94,10 +95,11 @@ export interface ExportData {
   view: { rep: Rep; rest: Rest; labels: boolean; hydrogens: boolean; arrange: Arrange }
 }
 
-export function decypherKit() {
-  const TONES: Tone[] = ['coral', 'sky', 'mint', 'butter', 'lilac', 'aqua', 'rose', 'stone']
-  /** Morpheus's dashes for several curves of one series, in order. */
-  const DASH = ['none', '5 4', '2 3', '8 3 2 3', '1 3', '10 4']
+/** What the kit is made from (src/core/index.ts): the tones in palette order, and the Matrix's dashes with their names. */
+export interface KitData { tones: readonly Tone[]; dash: readonly string[]; dashNames: readonly string[] }
+
+export function decypherKit(data: KitData) {
+  const { tones: TONES, dash: DASH, dashNames: DASH_NAMES } = data
   const REPS: Rep[] = ['ball & stick', 'licorice', 'spacefill']
   const RESTS: Rest[] = ['tinted', 'grey', 'ghost']
   /** Water and ions: never drawn, so the view shows the molecules the groups are about. */
@@ -121,16 +123,28 @@ export function decypherKit() {
     return { dark, bg: t.background, fg: t.foreground, card: t.card, secondary: t.secondary, muted: t['muted-foreground'], border: t.border, input: t.input, ring: t.ring, bond: t.bond, edge: t.edge, hl: dark ? HL.dark : HL.light, neutral, hues }
   }
 
-  /** `43-3239:4, 5` as atom numbers. */
-  function ranges(s: string): number[] {
-    const out: number[] = []
-    String(s || '').split(',').forEach(t => {
-      const m = t.trim().match(/^(\d+)(?:-(\d+))?(?::(\d+))?$/)
-      if (!m) return
-      const a = +m[1], b = m[2] ? +m[2] : a, st = m[3] ? +m[3] : 1
-      for (let v = a; v <= b; v += st) out.push(v)
-    })
-    return out
+  /** Sorted atom numbers as `43-3239:4, 5`: runs of three or more with one step, else single numbers. */
+  function toRanges(numbers: number[]): string {
+    const n = [...new Set(numbers)].sort((a, b) => a - b), parts: string[] = []
+    for (let i = 0; i < n.length;) {
+      const step = n[i + 1] - n[i]
+      let j = i + 1
+      while (j + 1 < n.length && n[j + 1] - n[j] === step) j++
+      if (j - i >= 2) { parts.push(n[i] + '-' + n[j] + (step === 1 ? '' : ':' + step)); i = j + 1 }
+      else { parts.push(String(n[i])); i++ }
+    }
+    return parts.join(', ')
+  }
+  /** `43-3239:4, 5` as sorted atom numbers; anything else is refused in words. */
+  function fromRanges(text: string): number[] {
+    const out = new Set<number>()
+    for (const part of text.split(',').map(p => p.trim()).filter(Boolean)) {
+      const m = /^(\d+)(?:-(\d+)(?::(\d+))?)?$/.exec(part)
+      const a = m ? Number(m[1]) : 0, b = m?.[2] ? Number(m[2]) : a, step = m?.[3] ? Number(m[3]) : 1
+      if (!m || a < 1 || b < a || step < 1) throw new Error('not an atom number or range: ' + part)
+      for (let x = a; x <= b; x += step) out.add(x)
+    }
+    return [...out].sort((x, y) => x - y)
   }
 
   // ---------- colour ----------
@@ -649,29 +663,43 @@ export function decypherKit() {
   }
 
   /**
+   * How each RDF of one graph is told apart, for its curves and its legend. By group: a dash each, and past the
+   * Matrix's ten dashes a lighter shade as well. By job: its tone, and when an RDF before it had that tone, the
+   * next dashes along, so two curves never share both colour and dash.
+   */
+  function rdfLooks(plotted: Analysis[], tones: Record<string, Tone>, groups: number) {
+    const seen: Record<string, number> = {}
+    return plotted.map((an, mi) => {
+      const tone = tones[an.id] || TONES[mi % TONES.length], rep = seen[tone] || 0
+      seen[tone] = rep + 1
+      return { tone, jobDash: rep * Math.max(1, groups), groupDash: mi % DASH.length, shade: mi < DASH.length ? Math.min(0.6, 0.3 * mi) : 0.45, round: Math.floor(mi / DASH.length) }
+    })
+  }
+
+  /**
    * The curves to draw: each plotted group of `focus` in every analysis of `plotted` (focus first) that has it.
    * By group: the group's hue, lighter for later analyses, a dash per analysis. By job: the analysis's hue,
-   * lighter for later groups, a dash per group. Two curves never differ by hue alone.
+   * lighter for later groups, a dash per group. Two curves never differ by hue alone (rdfLooks).
    */
   function buildCurves(o: { focus: Analysis; plotted: Analysis[]; selected: string[]; colorBy: ColorBy; pal: Palette; tones: Record<string, Tone> }): Curve[] {
     const { focus, plotted, pal } = o, dark = pal.dark, out: Curve[] = [], toneCount: Record<string, number> = {}
-    const names = o.selected.filter(n => focus.sels.some(g => g.name === n))
+    const names = o.selected.filter(n => focus.sels.some(g => g.name === n)), looks = rdfLooks(plotted, o.tones, names.length)
     names.forEach((name, gi) => {
       const g0 = focus.sels.find(g => g.name === name)!, tn = pal.hues[g0.tone]
       const kk = toneCount[g0.tone] || 0; toneCount[g0.tone] = kk + 1
       plotted.forEach((an, mi) => {
-        const gg = matchGroup(g0, an, focus)
+        const gg = matchGroup(g0, an, focus), look = looks[mi]
         if (!gg) return
         let color: string, dash: string
         if (o.colorBy === 'job') {
-          const mt = pal.hues[o.tones[an.id] || TONES[mi % TONES.length]], ink = dark ? mt.base : mt.fg
+          const mt = pal.hues[look.tone], ink = dark ? mt.base : mt.fg
           color = gi === 0 ? mt.strong : mix(mt.strong, ink, Math.min(0.7, 0.35 * gi))
-          dash = DASH[gi % DASH.length]
+          dash = DASH[(look.jobDash + gi) % DASH.length]
         } else {
           const ink = dark ? tn.base : tn.fg
           color = kk === 0 ? tn.strong : mix(tn.strong, ink, Math.min(0.75, 0.45 * kk))
-          if (mi > 0) color = mix(color, ink, Math.min(0.6, 0.3 * mi))
-          dash = DASH[mi % DASH.length]
+          if (mi > 0) color = mix(color, ink, look.shade)
+          dash = DASH[look.groupDash]
         }
         out.push({ key: an.id + '|' + gg.name + '|' + name, name, source: an.label, analysis: an.id, x: an.x, y: gg.y, color, dash, peak: gg.peak, shell: gg.shell ?? null, atoms: gg.atoms.length })
       })
@@ -777,8 +805,8 @@ export function decypherKit() {
     const pal = () => pals[theme]
     const analyses: Analysis[] = data.analyses.map(a => ({
       id: a.id, kind: 'job', title: a.title, label: a.label, sub: a.sub, x: a.x, xlabel: a.xlabel, ylabel: a.ylabel,
-      ref: a.ref ? { name: a.ref.name, atoms: ranges(a.ref.atoms), tone: a.ref.tone } : null,
-      sels: a.sels.map(s => ({ name: s.name, atoms: ranges(s.atoms), tone: s.tone, y: s.y, peak: s.peak, shell: s.shell ?? null })), struct: a.struct, structNote: a.structNote,
+      ref: a.ref ? { name: a.ref.name, atoms: fromRanges(a.ref.atoms), tone: a.ref.tone } : null,
+      sels: a.sels.map(s => ({ name: s.name, atoms: fromRanges(s.atoms), tone: s.tone, y: s.y, peak: s.peak, shell: s.shell ?? null })), struct: a.struct, structNote: a.structNote,
     }))
     const tones: Record<string, Tone> = {}
     data.analyses.forEach(a => { tones[a.id] = a.tone })
@@ -1001,7 +1029,7 @@ export function decypherKit() {
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => redraws.forEach(f => f()))
   }
 
-  return { TONES, DASH, REPS, RESTS, SOLV, palette, ranges, mix, buildMol, structureView, matchGroup, buildCurves, looseName, sameButReference, morphWhy, pickRefs, refLabels, niceTicks, valAt, hoverRows, hoverX, chart, mount }
+  return { TONES, DASH, DASH_NAMES, REPS, RESTS, SOLV, palette, toRanges, fromRanges, mix, buildMol, structureView, matchGroup, rdfLooks, buildCurves, looseName, sameButReference, morphWhy, pickRefs, refLabels, niceTicks, valAt, hoverRows, hoverX, chart, mount }
 }
 
 export type Kit = ReturnType<typeof decypherKit>

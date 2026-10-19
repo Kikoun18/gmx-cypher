@@ -6,7 +6,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { basename, dirname, isAbsolute, join } from 'node:path';
 import { TOKENS } from '../../matrix/src/lib/seq';
 import { inputRole, suggestInputs } from '../src/lib/inputs';
-import { fromRanges } from '../src/lib/atoms';
+import { fromRanges } from '../src/core/index';
 import { nameProblem } from '../src/lib/groups';
 import { checkInputs, checkSizes } from './check';
 import { awhScan } from './awh';

@@ -50,6 +50,8 @@ describe('the HTML export: one file, nothing fetched, each job still interactive
     expect(html).toContain('[data-theme="dark"]{--background:#141312')
     expect(html).toContain('src:url(data:font/woff2;base64,AAAA)')
     expect(html).toContain('kit.mount(document.getElementById("app")')
+    // The kit's data, which it can't import, is written beside its source (R5a): the Matrix's ten dashes.
+    expect(html).toContain('"dashNames":["solid","dashed","dotted"')
     expect(html.match(/<\/script>/g)).toHaveLength(2)
     const json = /<script type="application\/json" id="dc-data">(.*?)<\/script>/s.exec(html)![1]
     expect(JSON.parse(json).analyses[0].title).toBe(a.title)

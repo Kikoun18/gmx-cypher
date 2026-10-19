@@ -1,7 +1,7 @@
 // The design contract's machine-checkable parts (docs/design-contract.md, R1): the tests, the shortcut sheet and the
 // page read them from here, and the contract quotes this module.
 
-import { TONES } from '../lib/tones'
+import { TONES } from './index'
 export { TONES }
 
 /**

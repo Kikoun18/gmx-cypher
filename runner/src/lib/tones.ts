@@ -1,7 +1,8 @@
-// The eight column hues, in palette order. Class strings are written out in full
-// so Tailwind sees every one of them.
-export const TONES = ["coral", "sky", "mint", "butter", "lilac", "aqua", "rose", "stone"] as const
-export type Tone = (typeof TONES)[number]
+// The eight column hues' Tailwind classes (the hues themselves, in palette order, are the core's TONES). Class
+// strings are written out in full so Tailwind sees every one of them.
+import type { Tone } from "../core/kit"
+
+export type { Tone }
 
 /** The pastel with its ink: solid chips, selected column chips, bars. */
 export const toneSolid: Record<Tone, string> = {

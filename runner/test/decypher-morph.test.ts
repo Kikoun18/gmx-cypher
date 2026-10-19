@@ -1,7 +1,8 @@
 import { readFileSync } from 'node:fs'
 import { afterEach, describe, expect, it } from 'vitest'
 import { cardsOf, cardTitle, exportData, exportHtml } from '../src/decypher/export'
-import { decypherKit, type SceneState } from '../src/decypher/kit'
+import { kit } from '../src/core/index'
+import type { SceneState } from '../src/core/kit'
 import { fromFiles, parseGro } from '../src/decypher/parse'
 import { activeMorphs, joinMorph, setMorphRefs, splitMorph } from '../src/decypher/state'
 import { themeTokens } from '../src/decypher/tokens'
@@ -9,7 +10,6 @@ import { RUNNER } from './helpers'
 
 // RDFs that differ only in their reference: your Methionine runs (the same peptide structure and groups, the
 // references the hydrogens in one and the sulfurs in the other), shown as one card.
-const kit = decypherKit()
 const F = RUNNER + 'test/fixtures/decypher/'
 const NAMES = ['9.multiwalker.gro', 'rdf_o111_Methionine_H.ndx', 'rdf_o111_Methionine_H.run.json', 'rdf_o111_Methionine_H.xvg', 'rdf_o111_Methionine_S.ndx', 'rdf_o111_Methionine_S.run.json', 'rdf_o111_Methionine_S.xvg']
 const loaded = () => fromFiles(NAMES.map(n => ({ path: 'o111/' + n, text: readFileSync(F + n, 'utf8') })))

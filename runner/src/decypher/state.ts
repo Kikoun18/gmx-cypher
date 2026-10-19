@@ -2,7 +2,7 @@
 // and how you last looked at them. Files from disk are read in the page and not kept.
 
 import * as React from 'react'
-import type { ColorBy, Arrange, Marks, Rep, Rest } from './kit'
+import type { ColorBy, Arrange, Marks, Rep, Rest } from '../core/kit'
 
 export type SourceRef =
   | { kind: 'job'; id: string }

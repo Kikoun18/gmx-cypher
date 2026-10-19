@@ -6,10 +6,9 @@ import { parseTable } from '../../../matrix/src/lib/seq'
 import { structFormat } from '../../../matrix/src/lib/structFile'
 import { parseNdx } from '../lib/ndx'
 import { peaks } from '../lib/rdf'
-import { decypherKit, type Analysis, type Group, type Peak, type Sel, type Struct, type Tone } from './kit'
+import { fromRanges, TONES } from '../core/index'
+import type { Analysis, Group, Peak, Sel, Struct, Tone } from '../core/kit'
 
-const kit = decypherKit()
-export const TONES = kit.TONES
 const toneOf = (t: unknown, i: number): Tone => (TONES.includes(t as Tone) ? (t as Tone) : TONES[i % TONES.length])
 export const basename = (s: string) => String(s || '').replace(/['"]/g, '').split(/[\\/]/).pop() || ''
 export const stemOf = (n: string) => n.replace(/\.run\.json$/i, '').replace(/\.(xvg|ndx|gro|pdb|json)$/i, '')
@@ -112,7 +111,7 @@ export interface RecordLike {
 
 /** A record's reference and selections, atoms from its ranges. */
 export function recordGroups(r: RecordLike): { ref: Group | null; sels: Group[] } {
-  const conv = (g: RecordGroup, i: number): Group => ({ name: g.name, atoms: kit.ranges(g.atoms), tone: toneOf(g.tone, i) })
+  const conv = (g: RecordGroup, i: number): Group => ({ name: g.name, atoms: fromRanges(g.atoms), tone: toneOf(g.tone, i) })
   const r0 = r.groups.find(g => g.role === 'reference')
   return { ref: r0 ? conv(r0, 0) : null, sels: r.groups.filter(g => g.role === 'selection').map(conv) }
 }
@@ -224,7 +223,7 @@ export function fromFiles(files: LoadedFile[]): { analyses: Analysis[]; structs:
       // The record's groups, atoms from the index when it holds the same group at the same place.
       const conv = (g: RecordGroup, i: number): Group => {
         const hit = g.index != null && ng[g.index]?.name === g.name ? ng[g.index] : byName(g.name)
-        return { name: g.name, tone: toneOf(g.tone, i), atoms: hit ? hit.atoms : kit.ranges(g.atoms) }
+        return { name: g.name, tone: toneOf(g.tone, i), atoms: hit ? hit.atoms : fromRanges(g.atoms) }
       }
       const r0 = rec.groups.find(g => g.role === 'reference')
       ref = r0 ? conv(r0, 0) : null

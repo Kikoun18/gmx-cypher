@@ -4,10 +4,11 @@
 import * as React from 'react'
 import tokensText from '../tokens.json?raw'
 import rolesText from '../roles.json?raw'
-import { decypherKit, type Palette } from './kit'
+import { kit } from '../core/index'
+import type { Palette } from '../core/kit'
 import { themeTokens } from './tokens'
 
-export const kit = decypherKit()
+export { kit }
 const TOKENS = themeTokens(tokensText, rolesText)
 export const PALETTES: Record<'light' | 'dark', Palette> = { light: kit.palette(false, TOKENS.light), dark: kit.palette(true, TOKENS.dark) }
 export const TOKENS_BY_THEME = TOKENS

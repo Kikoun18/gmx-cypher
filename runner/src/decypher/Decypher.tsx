@@ -17,7 +17,7 @@ import { getJson, postJson } from '../api'
 import { jobLine, statusOf, type Job } from '../jobs'
 import { Status } from '../ui/status'
 import { cn } from '../lib/utils'
-import type { Analysis, Curve, Mol, Palette, Struct, Tone } from './kit'
+import type { Analysis, Curve, Mol, Palette, Struct, Tone } from '../core/kit'
 import { ChartPanel, CurveTable, GroupChips, StructurePanel, Swatch, type StructureHandle } from './panels'
 import type { LoadedFile } from './parse'
 import { useAnalyses, type Item } from './sources'
@@ -200,12 +200,12 @@ function CompareView({ shown, focus, setFocus, mols, pal, view, patch, selected,
       <section aria-label="one graph" className="flex min-w-0 flex-col rounded-xl border border-border bg-card">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-border px-4 py-2">
           <span className="text-label uppercase text-muted-foreground">One graph · {plural(plotted.length, 'RDF')}</span>
-          {plotted.map((a, k) => (
+          {kit.rdfLooks(plotted, tones, idx.length).map((look, k) => { const a = plotted[k]; return (
             <span key={a.id} className="inline-flex items-center gap-1.5 text-caption" title={a.title}>
-              <Swatch color={view.colorBy === 'job' ? pal.hues[tones[a.id] ?? 'coral'].strong : pal.fg} dash={view.colorBy === 'job' ? 'none' : kit.DASH[k % kit.DASH.length]} />
+              <Swatch color={view.colorBy === 'job' ? pal.hues[look.tone].strong : look.round ? pal.muted : pal.fg} dash={kit.DASH[(view.colorBy === 'job' ? look.jobDash : look.groupDash) % kit.DASH.length]} />
               <span className={k === 0 ? 'font-bold' : ''}>{a.label}</span>
             </span>
-          ))}
+          ) })}
           <span className="flex-1" />
           <Seg label="color by" value={view.colorBy} options={['group', 'job'] as const} labels={{ job: 'result' }} onChange={v => patch({ colorBy: v })} />
         </div>

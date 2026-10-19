@@ -4,7 +4,7 @@
 
 import * as React from 'react'
 import { cn } from '../lib/utils'
-import type { AtomHover, ChartGeom, Curve, Group, Marks, Mol, Palette, SceneState, VNode } from './kit'
+import type { AtomHover, ChartGeom, Curve, Group, Marks, Mol, Palette, SceneState, VNode } from '../core/kit'
 import type { View } from './state'
 import { kit } from './theme'
 

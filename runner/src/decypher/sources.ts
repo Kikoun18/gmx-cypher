@@ -5,7 +5,7 @@
 import * as React from 'react'
 import { getJson } from '../api'
 import type { Job } from '../jobs'
-import type { Analysis, Struct } from './kit'
+import type { Analysis, Struct } from '../core/kit'
 import { basename, fromFiles, fromRecord, fromVault, maxAtom, parseStruct, recordGroups, shortLabels, type FileRow, type LoadedFile, type RecordLike } from './parse'
 import { refKey, type SourceRef } from './state'
 import type { VaultRdfs } from './vaultTypes'

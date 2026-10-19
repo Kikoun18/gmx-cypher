@@ -3,7 +3,8 @@ import { commandOf, rdfCommand, roleProblems, withCommand } from './commands';
 // possible, hand-picked atoms as ranges), the name template and output folder. One recipe serves other
 // trajectories of the same system, and is checked against each system before it runs there.
 
-import { toRanges, type Atom } from './atoms';
+import { toRanges } from '../core/index';
+import type { Atom } from './atoms';
 import { groupAtoms, type Group } from './groups';
 import type { Options } from './rdf';
 import { safeFileName } from '../../../matrix/src/lib/storage/path';

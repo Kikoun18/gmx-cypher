@@ -3,11 +3,10 @@
 // job's g(r) and groups, its structure without solvent, and the comparison graph as it was. Paths of this
 // machine stay out: structures and jobs are named s1, a1….
 
-import { toRanges } from '../lib/atoms'
-import { decypherKit, type Analysis, type ColorBy, type ExportAnalysis, type ExportData, type Struct, type Tone } from './kit'
+import { KIT_DATA, kit, toRanges } from '../core/index'
+import { decypherKit, type Analysis, type ColorBy, type ExportAnalysis, type ExportData, type Struct, type Tone } from '../core/kit'
 import type { ThemeTokens } from './tokens'
 
-const kit = decypherKit()
 
 /** A structure's atoms without water and ions, at the 3 decimals of a .gro; over 4000, the groups' atoms first. */
 export function compactStruct(s: Struct, keep: Set<number>, max = 4000): Struct {
@@ -170,7 +169,7 @@ export function exportHtml(data: ExportData, fonts: Fonts = {}): string {
     + ':root,[data-theme="light"]{' + vars(data.tokens.light) + ';color-scheme:light}\n[data-theme="dark"]{' + vars(data.tokens.dark) + ';color-scheme:dark}\n' + CSS + '\n</style>\n</head>\n<body>\n'
     + '<div id="app"><p style="padding:20px">This page draws with JavaScript: turn it on to see the structures and charts.</p></div>\n'
     + '<script type="application/json" id="dc-data">' + JSON.stringify(data).replace(/</g, '\\u003c') + '</script>\n'
-    + '<script>\n(function () {\nvar kit = (' + src + ')();\nkit.mount(document.getElementById("app"), JSON.parse(document.getElementById("dc-data").textContent));\n})();\n</script>\n</body>\n</html>\n'
+    + '<script>\n(function () {\nvar kit = (' + src + ')(' + JSON.stringify(KIT_DATA).replace(/</g, '\\u003c') + ');\nkit.mount(document.getElementById("app"), JSON.parse(document.getElementById("dc-data").textContent));\n})();\n</script>\n</body>\n</html>\n'
 }
 
 /** The page's fonts as base64: mononoki 400 and 700, and Archivo 800 for titles (T160), latin and latin-ext. */

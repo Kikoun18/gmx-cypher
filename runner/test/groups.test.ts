@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { atomTable, toRanges } from '../src/lib/atoms';
+import { toRanges } from '../src/core/index';
+import { atomTable } from '../src/lib/atoms';
 import { clickStep, groupAtoms, groupHolding, nameProblem, ruleText, shared, type Rule, type Step } from '../src/lib/groups';
 
 const nvt = atomTable(readFileSync(new URL('./fixtures/nvt/nvt.gro', import.meta.url), 'utf8'), 'gro');
