@@ -1,19 +1,14 @@
-// The two halves of an analysis in (de)Cypher: its structure (the kit's canvas view) and its g(r) (the kit's
-// chart, rendered by React, with a rule and a card of values under the pointer). Both draw with the same code
-// as the exported page.
+// The structure half of an analysis in (de)Cypher (the kit's canvas view) and the table under its g(r); the chart
+// itself is the core's ChartPanel. Both draw with the same code as the exported page.
 
 import * as React from 'react'
 import { cn } from '../lib/utils'
-import type { AtomHover, ChartGeom, Curve, Group, Marks, Mol, Palette, SceneState, VNode } from '../core/kit'
+import { Swatch } from '../core/Chart'
+import type { AtomHover, Curve, Group, Mol, Palette, SceneState } from '../core/kit'
 import type { View } from './state'
-import { kit } from './theme'
+import { kit } from '../core/theme'
 
 export interface StructureHandle { fit: () => void; reset: () => void; where: (nr: number) => { x: number; y: number } | null }
-
-/** A line of a curve in its colour and dash, for legends, tables and hover cards. */
-export function Swatch({ color, dash, width = 22 }: { color: string; dash: string; width?: number }) {
-  return <svg width={width} height={6} aria-hidden className="shrink-0"><line x1={1} x2={width - 1} y1={3} y2={3} stroke={color} strokeWidth={2.5} strokeLinecap="round" strokeDasharray={dash === 'none' ? undefined : dash} /></svg>
-}
 
 export const StructurePanel = React.forwardRef<StructureHandle, {
   mol: Mol | null; pal: Palette; view: View; sels: Group[]; selected: number[]; refs: { label: string; atoms: number[]; on?: boolean }[]
@@ -61,59 +56,6 @@ export const StructurePanel = React.forwardRef<StructureHandle, {
     </div>
   )
 })
-
-/** A kit chart tree as React elements. */
-function toReact(n: VNode | string, i: number): React.ReactNode {
-  if (typeof n === 'string') return n
-  const [tag, { key, ...attrs }, ...kids] = n
-  return React.createElement(tag, { ...attrs, key: (key as string | undefined) ?? i }, ...kids.map((c, j) => toReact(c, j)))
-}
-
-/** The chart, filling its box; under the pointer, a rule, a dot on each curve and their values. */
-export function ChartPanel({ curves, grid, xlabel, ylabel, pal, marks, className, empty }: {
-  curves: Curve[]; grid: number[]; xlabel: string; ylabel: string; pal: Palette; marks: Marks; className?: string; empty?: { title: string; hint: string } | null
-}) {
-  const box = React.useRef<HTMLDivElement>(null)
-  const [size, setSize] = React.useState({ w: 0, h: 0 })
-  const [hover, setHover] = React.useState<number | null>(null)
-  React.useLayoutEffect(() => {
-    const el = box.current
-    if (!el) return
-    const ro = new ResizeObserver(() => setSize(s => (s.w === el.clientWidth && s.h === el.clientHeight ? s : { w: el.clientWidth, h: el.clientHeight })))
-    ro.observe(el)
-    return () => ro.disconnect()
-  }, [])
-  const out = React.useMemo(() => (size.w && size.h ? kit.chart({ W: size.w, H: size.h, curves, grid, xlabel, ylabel, hover, marks, pal, animate: true }) : null), [size, curves, grid, xlabel, ylabel, hover, marks, pal])
-  const geom: ChartGeom | null = out?.geom ?? null
-  const xv = geom && hover != null ? geom.m.l + ((hover - geom.x0) / (geom.x1 - geom.x0 || 1)) * geom.iw : 0
-  return (
-    <div ref={box} className={cn('relative min-h-[260px]', className)}
-      onMouseMove={e => { if (!geom) return; const r = kit.hoverX(geom, e.clientX - e.currentTarget.getBoundingClientRect().left); if (r !== hover) setHover(r) }}
-      onMouseLeave={() => setHover(null)}>
-      <div className="absolute inset-0">{out && toReact(out.tree, 0)}</div>
-      {empty && (
-        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-1.5 px-6 text-center">
-          <div className="text-heading font-bold">{empty.title}</div>
-          <div className="max-w-[46ch] text-caption text-muted-foreground">{empty.hint}</div>
-        </div>
-      )}
-      {geom && hover != null && curves.length > 0 && (
-        <div className="pointer-events-none absolute flex w-[300px] flex-col gap-1 rounded-lg border border-border bg-popover px-2.5 py-2 shadow-menu" style={{ left: Math.max(0, xv + 314 > size.w ? xv - 314 : xv + 14), top: geom.m.t + 4 }}>
-          <div className="text-caption text-muted-foreground">{(ylabel || 'g(r)')} at r = {hover.toFixed(3)} nm</div>
-          {kit.hoverRows(curves, hover).slice(0, 14).map(({ curve: c, v }) => (
-            <div key={c.key} className="grid grid-cols-[22px_minmax(0,1fr)_auto_auto] items-center gap-[7px] text-caption">
-              <Swatch color={c.color} dash={c.dash} />
-              <span className="truncate font-bold" style={{ color: c.color }}>{c.name}</span>
-              <span className="truncate text-muted-foreground">{c.source}</span>
-              <span>{v.toFixed(2)}</span>
-            </div>
-          ))}
-          {curves.length > 14 && <div className="text-caption text-muted-foreground">+ {curves.length - 14} more</div>}
-        </div>
-      )}
-    </div>
-  )
-}
 
 /** The curves under a chart: series, source, atoms, both peak rules (R3d); × takes a group off the plot. */
 export function CurveTable({ curves, onRemove, onHover, source = true }: { curves: Curve[]; onRemove: (name: string) => void; onHover: (c: Curve | null) => void; source?: boolean }) {

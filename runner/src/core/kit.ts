@@ -82,11 +82,14 @@ export interface Curve {
   key: string; name: string; source: string; analysis: string
   x: number[]; y: number[]; color: string; dash: string; peak: Peak | null; shell?: Peak | null; atoms: number
   hot?: boolean; dim?: boolean
+  /** ± per point, drawn as a band in the curve's colour (WHAM's bootstrap error). */
+  err?: number[]
 }
 
 /** A chart as data: [tag, attributes, ...children]. The page renders it with React, the export with the DOM. */
 export type VNode = [string, Record<string, unknown>, ...(VNode | string)[]]
-export interface ChartGeom { m: { l: number; r: number; t: number; b: number }; iw: number; ih: number; x0: number; x1: number; y1: number; grid: number[] }
+/** Where a chart drew: margins, plot size, the x and y domains, the grid the pointer snaps to, and the digits its x values and readings need. */
+export interface ChartGeom { m: { l: number; r: number; t: number; b: number }; iw: number; ih: number; x0: number; x1: number; y0: number; y1: number; grid: number[]; xDigits: number; yDigits: number }
 
 /** One job as an export carries it: atoms as ranges, y values rounded, its selection when exported. */
 export interface ExportAnalysis { id: string; title: string; label: string; sub: string; x: number[]; xlabel: string; ylabel: string; ref: { name: string; atoms: string; tone: Tone } | null; sels: { name: string; atoms: string; tone: Tone; y: number[]; peak: Peak | null; shell?: Peak | null }[]; struct: string | null; structNote: string; selected: string[]; tone: Tone }
@@ -767,10 +770,16 @@ export function decypherKit(data: KitData) {
     for (let v = Math.ceil(min / step) * step; v <= max + step * 1e-9; v += step) ticks.push(+v.toFixed(10))
     return { ticks, decimals: Math.max(0, -Math.floor(Math.log10(step) + 1e-9)) }
   }
-  /** The value of a curve at the grid point nearest r. */
+  /** The index of the x nearest r (x ascending, evenly spaced or not: atom numbers, residues). */
+  function nearest(x: number[], r: number): number {
+    let lo = 0, hi = x.length - 1
+    if (hi < 0) return -1
+    while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (x[mid] <= r) lo = mid; else hi = mid }
+    return Math.abs(x[hi] - r) < Math.abs(r - x[lo]) ? hi : lo
+  }
+  /** The value of a curve at the point nearest r. */
   function valAt(x: number[], y: number[], r: number) {
-    const i = Math.max(0, Math.min(x.length - 1, Math.round((r - x[0]) / (x[1] - x[0] || 1))))
-    return y[i] || 0
+    return y[nearest(x, r)] || 0
   }
   /** The values under the pointer at r, highest first (equal values keep the curves' order). */
   function hoverRows(curves: Curve[], r: number): { curve: Curve; v: number }[] {
@@ -780,36 +789,54 @@ export function decypherKit(data: KitData) {
   function hoverX(geom: ChartGeom, px: number): number | null {
     const t = (px - geom.m.l) / geom.iw, X = geom.grid
     if (t < 0 || t > 1 || X.length < 2) return null
-    const r0 = geom.x0 + t * (geom.x1 - geom.x0)
-    return X[Math.max(0, Math.min(X.length - 1, Math.round((r0 - X[0]) / (X[1] - X[0] || 1))))]
+    return X[nearest(X, geom.x0 + t * (geom.x1 - geom.x0))]
   }
+  /** The readout's heading: `g(r) at r = 0.374 nm`, the unit from the x label's parentheses, x at its own precision. */
+  function readoutTitle(geom: ChartGeom, xlabel: string, ylabel: string, x: number) {
+    const u = /^(.*?)\s*\(([^()]*)\)\s*$/.exec(xlabel)
+    return ylabel + ' at ' + ((u ? u[1] : xlabel) || 'x') + ' = ' + x.toFixed(geom.xDigits) + (u ? ' ' + u[2] : '')
+  }
+  /** The decimals a number is written with (at most 6): 0.374 → 3, 12 → 0. */
+  const decimalsOf = (v: number) => { const t = String(+v.toFixed(6)), i = t.indexOf('.'); return i < 0 ? 0 : t.length - i - 1 }
 
   /**
-   * g(r) as an SVG tree: gridlines in `border`, axes in `foreground`, the dashed g = 1 line, each curve in its
-   * colour and dash with its highest point dotted and labelled, and at `hover` a rule with a dot on each curve.
+   * A chart as an SVG tree (R5c: every chart of gmx-cypher and of the export): gridlines in `border`, axes in
+   * `foreground`, a dashed rule (g = 1 for an RDF, 0 for a signed quantity, when inside the range), each curve in its
+   * colour and dash, clipped to the plot, with its error band, its maximum dotted and labelled and its first shell
+   * hollow, and at `hover` a rule with a dot on each curve. The y range starts at 0 (`zero`: g(r), counts) or is the
+   * data's own (`data`). Axis labels keep their case: data names and units are not shouted.
    */
-  function chart(o: { W: number; H: number; curves: Curve[]; grid: number[]; xlabel: string; ylabel: string; hover: number | null; marks: Marks; pal: Palette; animate?: boolean }): { tree: VNode; geom: ChartGeom } {
-    const th = o.pal, W = o.W, H = o.H, m = { l: 48, r: 20, t: 24, b: 40 }
+  function chart(o: { W: number; H: number; curves: Curve[]; grid: number[]; xlabel: string; ylabel: string; hover: number | null; marks: Marks; pal: Palette; animate?: boolean; y?: 'zero' | 'data'; rule?: number | null; id?: string; xDigits?: number }): { tree: VNode; geom: ChartGeom } {
+    const th = o.pal, W = o.W, H = o.H, m = { l: 48, r: 20, t: 24, b: 40 }, rule = o.rule === undefined ? 1 : o.rule, clip = o.id || 'dc-plot'
     const iw = Math.max(20, W - m.l - m.r), ih = Math.max(20, H - m.t - m.b)
     const grid = o.curves.length ? o.curves[0].x : o.grid
     let x0 = grid.length ? grid[0] : 0, x1 = grid.length ? grid[grid.length - 1] : 1
-    o.curves.forEach(c => { x0 = Math.min(x0, c.x[0]); x1 = Math.max(x1, c.x[c.x.length - 1]) })
-    let ymax = 1
-    o.curves.forEach(c => c.y.forEach(v => { if (v > ymax) ymax = v }))
-    const y1 = ymax * 1.12
-    const sx = (v: number) => m.l + ((v - x0) / (x1 - x0 || 1)) * iw, sy = (v: number) => m.t + ih - (v / y1) * ih
-    const xt = niceTicks(x0, x1, Math.max(3, Math.round(iw / 90))), yt = niceTicks(0, y1, Math.max(3, Math.round(ih / 48)))
+    o.curves.forEach(c => { if (c.x.length) { x0 = Math.min(x0, c.x[0]); x1 = Math.max(x1, c.x[c.x.length - 1]) } })
+    // The y range: every point, its error band, and the rule when it is g = 1.
+    let lo = Infinity, hi = -Infinity
+    o.curves.forEach(c => c.y.forEach((v, j) => { const e = c.err ? c.err[j] || 0 : 0; if (v - e < lo) lo = v - e; if (v + e > hi) hi = v + e }))
+    if (!Number.isFinite(lo)) { lo = 0; hi = 1 }
+    let y0: number, y1: number
+    if ((o.y || 'zero') === 'zero') { y0 = 0; y1 = Math.max(hi, rule != null && rule > 0 ? rule : 0) * 1.12 || 1 }
+    else { const pad = (hi - lo) * 0.06 || Math.abs(hi) * 0.06 || 1; y0 = lo - pad; y1 = hi + pad * (o.marks === 'none' ? 1 : 2) }
+    const sx = (v: number) => m.l + ((v - x0) / (x1 - x0 || 1)) * iw, sy = (v: number) => m.t + ih - ((v - y0) / (y1 - y0 || 1)) * ih
+    const xt = niceTicks(x0, x1, Math.max(3, Math.round(iw / 90))), yt = niceTicks(y0, y1, Math.max(3, Math.round(ih / 48)))
+    // x as the grid's values are written (an atom number, a time; at most 4 decimals), unless asked (an RDF's r: 3, as its tables).
+    let xDigits = o.xDigits ?? 0
+    if (o.xDigits == null) for (let i = 0; i < Math.min(grid.length, 50); i++) xDigits = Math.min(4, Math.max(xDigits, decimalsOf(grid[i])))
+    const yDigits = Math.max(2, yt.decimals + 1)
     const F = 'mononoki, ui-monospace, monospace', BG = th.card, ease = 'cubic-bezier(.2,.7,.2,1)'
-    const cap = { fontFamily: F, fontSize: '11px', fill: th.muted }, lab = { fontFamily: F, fontSize: '10px', letterSpacing: '0.12em', fill: th.muted }
+    const cap = { fontFamily: F, fontSize: '11px', fill: th.muted }, lab = { fontFamily: F, fontSize: '11px', fill: th.muted }
     const k: VNode[] = []
-    k.push(['text', { key: 'yl', x: 0, y: 10, style: lab }, (o.ylabel || 'g(r)').toUpperCase()])
+    k.push(['defs', { key: 'defs' }, ['clipPath', { id: clip }, ['rect', { x: m.l, y: m.t, width: iw, height: ih }]]])
+    k.push(['text', { key: 'yl', x: 0, y: 10, style: lab }, o.ylabel])
     xt.ticks.forEach(t => k.push(['line', { key: 'gx' + t, x1: sx(t), x2: sx(t), y1: m.t, y2: m.t + ih, stroke: th.border, strokeWidth: 1 }]))
     yt.ticks.forEach(t => k.push(['line', { key: 'gy' + t, x1: m.l, x2: m.l + iw, y1: sy(t), y2: sy(t), stroke: th.border, strokeWidth: 1 }]))
-    if (o.curves.length) k.push(['line', { key: 'one', x1: m.l, x2: m.l + iw, y1: sy(1), y2: sy(1), stroke: th.input, strokeWidth: 1, strokeDasharray: '3 3' }])
+    if (o.curves.length && rule != null && rule >= y0 && rule <= y1) k.push(['line', { key: 'rule', x1: m.l, x2: m.l + iw, y1: sy(rule), y2: sy(rule), stroke: th.input, strokeWidth: 1, strokeDasharray: '3 3' }])
     k.push(['path', { key: 'ax', d: 'M' + m.l + ',' + m.t + 'V' + (m.t + ih) + 'H' + (m.l + iw), fill: 'none', stroke: th.fg, strokeWidth: 1.5 }])
     xt.ticks.forEach(t => k.push(['text', { key: 'tx' + t, x: sx(t), y: m.t + ih + 16, textAnchor: 'middle', style: cap }, t.toFixed(xt.decimals)]))
     yt.ticks.forEach(t => k.push(['text', { key: 'ty' + t, x: m.l - 8, y: sy(t) + 4, textAnchor: 'end', style: cap }, t.toFixed(yt.decimals)]))
-    k.push(['text', { key: 'xl', x: m.l + iw, y: H - 2, textAnchor: 'end', style: lab }, (o.xlabel || 'r (nm)').toUpperCase()])
+    k.push(['text', { key: 'xl', x: m.l + iw, y: H - 2, textAnchor: 'end', style: lab }, o.xlabel])
     // Peak labels never overlap: one that would is moved up a line or two, else left out (its dot stays, the hover reads it).
     const placed: { x0: number; x1: number; y0: number; y1: number }[] = []
     const labelAt = (x: number, y: number, text: string): number | null => {
@@ -824,11 +851,20 @@ export function decypherKit(data: KitData) {
     }
     o.curves.forEach(c => {
       const d = c.y.map((v, j) => (j ? 'L' : 'M') + sx(c.x[j]).toFixed(1) + ',' + sy(v).toFixed(1)).join('')
-      const g: VNode[] = [['path', { key: 'p', d, fill: 'none', stroke: c.color, strokeWidth: c.hot ? 2.8 : 2, strokeLinejoin: 'round', strokeLinecap: 'round', strokeDasharray: c.dash === 'none' ? undefined : c.dash, style: o.animate ? { d: 'path("' + d + '")', transition: 'd 360ms ' + ease + ', stroke 200ms ease' } : undefined }]]
+      const g: VNode[] = []
+      // The error band and the curve inside the plot only; the marks sit on the data.
+      const line: VNode = ['g', { key: 'in', clipPath: 'url(#' + clip + ')' }]
+      if (c.err) {
+        const up = c.y.map((v, j) => (j ? 'L' : 'M') + sx(c.x[j]).toFixed(1) + ',' + sy(v + (c.err![j] || 0)).toFixed(1)).join('')
+        const down = c.y.map((v, j) => 'L' + sx(c.x[j]).toFixed(1) + ',' + sy(v - (c.err![j] || 0)).toFixed(1)).reverse().join('')
+        line.push(['path', { key: 'band', d: up + down + 'Z', fill: c.color, fillOpacity: 0.18, stroke: 'none' }])
+      }
+      line.push(['path', { key: 'p', d, fill: 'none', stroke: c.color, strokeWidth: c.hot ? 2.8 : 2, strokeLinejoin: 'round', strokeLinecap: 'round', strokeDasharray: c.dash === 'none' ? undefined : c.dash, style: o.animate ? { d: 'path("' + d + '")', transition: 'd 360ms ' + ease + ', stroke 200ms ease' } : undefined }])
+      g.push(line)
       // The first shell, hollow and unlabelled (R3d); the maximum below it, filled, with its r.
       if ((o.marks === 'both' || o.marks === 'first shell') && c.shell) g.push(['circle', { key: 'sh', cx: sx(c.shell.r), cy: sy(c.shell.g), r: 3.6, fill: BG, stroke: c.color, strokeWidth: 1.8 }])
       if ((o.marks === 'both' || o.marks === 'maximum') && c.peak) {
-        const pk = c.peak, px = sx(pk.r), py = sy(pk.g), text = pk.r.toFixed(3), ty = c.dim ? null : labelAt(px, py, text)
+        const pk = c.peak, px = sx(pk.r), py = sy(pk.g), text = pk.r.toFixed(xDigits), ty = c.dim ? null : labelAt(px, py, text)
         const mark: VNode = ['g', { key: 'pk', style: { transform: 'translate(' + px.toFixed(1) + 'px,' + py.toFixed(1) + 'px)', transition: o.animate ? 'transform 360ms ' + ease : undefined } },
           ['circle', { key: 'c', cx: 0, cy: 0, r: 4, fill: c.color }]]
         if (ty != null) mark.push(['text', { key: 't', x: 8, y: ty, style: { fontFamily: F, fontSize: '11px', fill: th.fg, stroke: BG, strokeWidth: '3px', paintOrder: 'stroke', strokeLinejoin: 'round' } }, text])
@@ -842,8 +878,8 @@ export function decypherKit(data: KitData) {
       o.curves.forEach(c => k.push(['circle', { key: 'hd' + c.key, cx: xv, cy: sy(valAt(c.x, c.y, o.hover!)), r: 3.5, fill: c.color, stroke: BG, strokeWidth: 1.5 }]))
     }
     return {
-      tree: ['svg', { width: W, height: H, viewBox: '0 0 ' + W + ' ' + H, role: 'img', 'aria-label': (o.ylabel || 'g(r)') + ' against ' + (o.xlabel || 'r (nm)'), style: { display: 'block', overflow: 'visible' } }, ...k],
-      geom: { m, iw, ih, x0, x1, y1, grid },
+      tree: ['svg', { width: W, height: H, viewBox: '0 0 ' + W + ' ' + H, role: 'img', 'aria-label': o.ylabel + ' against ' + o.xlabel, style: { display: 'block', overflow: 'visible' } }, ...k],
+      geom: { m, iw, ih, x0, x1, y0, y1, grid, xDigits, yDigits },
     }
   }
 
@@ -899,14 +935,15 @@ export function decypherKit(data: KitData) {
     const swatch = (color: string, dash: string) => svg(['svg', { width: 22, height: 6, 'aria-hidden': 'true' }, ['line', { x1: 1, x2: 21, y1: 3, y2: 3, stroke: color, strokeWidth: 2.5, strokeLinecap: 'round', strokeDasharray: dash === 'none' ? undefined : dash }]])
 
     /** A chart that fills its box, redrawn on resize, with a rule and a card of values under the pointer. */
+    let charts = 0
     function chartBox(get: () => { curves: Curve[]; grid: number[]; xlabel: string; ylabel: string }) {
-      const box = h('div', { class: 'dc-chart' }), card = h('div', { class: 'dc-hover', hidden: true })
+      const box = h('div', { class: 'dc-chart' }), card = h('div', { class: 'dc-hover', hidden: true }), id = 'dc-plot-' + ++charts
       const wrap = h('div', { class: 'dc-chart-wrap' }, box, card)
       let hover: number | null = null, geom: ChartGeom | null = null
       const render = () => {
         const W = box.clientWidth, H = box.clientHeight
         if (!W || !H) return
-        const g = get(), out = chart({ W, H, curves: g.curves, grid: g.grid, xlabel: g.xlabel, ylabel: g.ylabel, hover, marks: 'both', pal: pal() })
+        const g = get(), out = chart({ W, H, curves: g.curves, grid: g.grid, xlabel: g.xlabel, ylabel: g.ylabel, hover, marks: 'both', pal: pal(), id, xDigits: 3 })
         geom = out.geom
         box.replaceChildren(svg(out.tree))
         if (hover == null || !g.curves.length) { card.hidden = true; return }
@@ -914,8 +951,8 @@ export function decypherKit(data: KitData) {
         card.hidden = false
         card.style.left = Math.max(0, xv + 294 > W ? xv - 294 : xv + 14) + 'px'
         card.style.top = geom.m.t + 4 + 'px'
-        card.replaceChildren(h('div', { class: 'dc-cap' }, (g.ylabel || 'g(r)') + ' at r = ' + hover.toFixed(3) + ' nm'),
-          ...hoverRows(g.curves, hover).slice(0, 14).map(({ curve: c, v }) => h('div', { class: 'dc-hrow' }, swatch(c.color, c.dash), h('b', { style: { color: c.color } }, c.name), h('span', { class: 'dc-cap' }, c.source), h('span', null, v.toFixed(2)))),
+        card.replaceChildren(h('div', { class: 'dc-cap' }, readoutTitle(geom, g.xlabel, g.ylabel, hover)),
+          ...hoverRows(g.curves, hover).slice(0, 14).map(({ curve: c, v }) => h('div', { class: 'dc-hrow' }, swatch(c.color, c.dash), h('b', { style: { color: c.color } }, c.name), h('span', { class: 'dc-cap' }, c.source), h('span', null, v.toFixed(geom!.yDigits)))),
           ...(g.curves.length > 14 ? [h('div', { class: 'dc-cap' }, '+ ' + (g.curves.length - 14) + ' more')] : []))
       }
       wrap.addEventListener('mousemove', e => {
@@ -1080,7 +1117,7 @@ export function decypherKit(data: KitData) {
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => redraws.forEach(f => f()))
   }
 
-  return { TONES, DASH, DASH_NAMES, REPS, RESTS, SOLV, palette, toRanges, fromRanges, parseStructure, mix, buildMol, structureView, matchGroup, rdfLooks, buildCurves, looseName, sameButReference, morphWhy, pickRefs, refLabels, niceTicks, valAt, hoverRows, hoverX, chart, mount }
+  return { TONES, DASH, DASH_NAMES, REPS, RESTS, SOLV, palette, toRanges, fromRanges, parseStructure, mix, buildMol, structureView, matchGroup, rdfLooks, buildCurves, looseName, sameButReference, morphWhy, pickRefs, refLabels, niceTicks, valAt, hoverRows, hoverX, readoutTitle, chart, mount }
 }
 
 export type Kit = ReturnType<typeof decypherKit>

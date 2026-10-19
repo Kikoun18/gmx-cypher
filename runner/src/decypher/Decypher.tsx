@@ -18,11 +18,12 @@ import { jobLine, statusOf, type Job } from '../jobs'
 import { Status } from '../ui/status'
 import { cn } from '../lib/utils'
 import type { Analysis, Curve, Mol, Palette, Struct, Tone } from '../core/kit'
-import { ChartPanel, CurveTable, GroupChips, StructurePanel, Swatch, type StructureHandle } from './panels'
+import { ChartPanel, Swatch } from '../core/Chart'
+import { CurveTable, GroupChips, StructurePanel, type StructureHandle } from './panels'
 import type { LoadedFile } from './parse'
 import { useAnalyses, type Item } from './sources'
 import { activeMorphs, joinMorph, pickGroup, refKey, setMorphRefs, splitMorph, useView, type ActiveMorph, type DecypherSources, type SourceRef, type View } from './state'
-import { kit, PALETTES, TOKENS_BY_THEME, usePageTheme } from './theme'
+import { kit, PALETTES, TOKENS_BY_THEME, usePageTheme } from '../core/theme'
 import type { VaultRdfs } from './vaultTypes'
 import { cardsOf, cardTitle, DEFAULT_HEADER, download, exportData, exportHtml, exportName, fontData } from './export'
 
@@ -138,7 +139,7 @@ function AnalysisCard({ members, on, tone, mol, pal, view, selected, tones, cand
           onPick={(i, add) => onSelect(pickGroup(selected, a.sels[i].name, add))} onPickRef={pickRef} onActive={onActive}
           empty={<><span className="text-heading font-bold">No structure</span><span className="max-w-[40ch] text-caption text-muted-foreground">{a.structNote}</span></>} />
         <div className="flex min-w-0 flex-col gap-3 p-4">
-          <ChartPanel className="h-[300px] flex-none" curves={curves} grid={a.x} xlabel={a.xlabel} ylabel={a.ylabel} pal={pal} marks={view.marks}
+          <ChartPanel className="h-[300px] flex-none" curves={curves} grid={a.x} xlabel={a.xlabel} ylabel={a.ylabel} pal={pal} marks={view.marks} xDigits={3}
             empty={curves.length ? null : { title: 'Pick an atom group', hint: 'Click atoms in the structure or a chip below. ⌘-click adds more groups to the plot.' }} />
           <Section label={'Groups ' + pad(a.sels.length) + ' · plotted ' + pad(idx.length)}>
             <Button variant="ghost" size="sm" onClick={() => onSelect(a.sels.map(g => g.name))}>all</Button>
@@ -209,7 +210,7 @@ function CompareView({ shown, focus, setFocus, mols, pal, view, patch, selected,
           <span className="flex-1" />
           <Seg label="color by" value={view.colorBy} options={['group', 'job'] as const} labels={{ job: 'result' }} onChange={v => patch({ colorBy: v })} />
         </div>
-        <ChartPanel className="mx-4 mb-1.5 mt-3.5 flex-1" curves={curves} grid={focus.x} xlabel={focus.xlabel} ylabel={focus.ylabel} pal={pal} marks={view.marks}
+        <ChartPanel className="mx-4 mb-1.5 mt-3.5 flex-1" curves={curves} grid={focus.x} xlabel={focus.xlabel} ylabel={focus.ylabel} pal={pal} marks={view.marks} xDigits={3}
           empty={curves.length ? null : { title: 'Pick an atom group', hint: 'Each group you pick is drawn for every result that has it: the same atoms of the same structure, else the same name.' }} />
         <div className="border-t border-border px-4 pb-3.5 pt-2.5">
           <CurveTable curves={curves} onRemove={n => onSelect(selected.filter(x => x !== n))} onHover={c => { setHot(c?.key ?? null); setHover(c?.name ?? null) }} />

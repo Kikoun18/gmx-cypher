@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { compactStruct, exportData, exportHtml, exportName } from '../src/decypher/export'
 import { parseStructure } from '../src/core/index'
 import { fromFiles } from '../src/decypher/parse'
-import { themeTokens } from '../src/decypher/tokens'
+import { themeTokens } from '../src/core/tokens'
 import { RUNNER } from './helpers'
 
 const F = RUNNER + 'test/fixtures/decypher/'

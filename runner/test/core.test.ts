@@ -6,7 +6,7 @@ import { DASH as MATRIX_DASH, DASH_NAMES as MATRIX_DASH_NAMES } from '../../matr
 import { elementOf, structFormat, toPdb } from '../../matrix/src/lib/structFile'
 import { DASH, DASH_NAMES, fromRanges, kit, niceTicks, parseStructure, readStructure, toRanges, TONES } from '../src/core/index'
 import type { Analysis } from '../src/core/kit'
-import { themeTokens } from '../src/decypher/tokens'
+import { themeTokens } from '../src/core/tokens'
 import { RUNNER } from './helpers'
 
 // The visualization core (R5): one copy of each shared rule, in src/core/, and the kit made from the Matrix's data.

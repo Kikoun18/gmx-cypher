@@ -4,7 +4,7 @@
 
 import { DASH as MATRIX_DASH, DASH_NAMES as MATRIX_DASH_NAMES } from '../../../matrix/src/lib/graph'
 import { elementOf, structFormat } from '../../../matrix/src/lib/structFile'
-import { decypherKit, type KitData, type Struct, type Tone } from './kit'
+import { decypherKit, type Curve, type KitData, type Palette, type Peak, type Struct, type Tone } from './kit'
 
 export type { Struct, Tone }
 /** The eight group and column hues, in palette order. */
@@ -23,3 +23,11 @@ export function readStructure(name: string, text: string): Struct {
   if (!format) throw new Error(name.split(/[\\/]/).pop() + ' is not a .gro or .pdb')
   return parseStructure(text, format)
 }
+
+/** One curve of a result as its view states it: label, points as read, tone, dash, and what the chart marks on it. */
+export interface Series { label: string; points: [number, number][]; tone: Tone; dash?: number; dim?: boolean; err?: number[]; peak?: Peak | null; shell?: Peak | null }
+/** A result's series as the core's curves (R5c): x and y exactly as read, each in its tone's strong ink and its dash. */
+export const curvesOf = (series: Series[], pal: Palette): Curve[] => series.map((s, i) => ({
+  key: String(i), name: s.label, source: '', analysis: '', x: s.points.map(p => p[0]), y: s.points.map(p => p[1]), color: pal.hues[s.tone].strong,
+  dash: DASH[(s.dash ?? 0) % DASH.length], peak: s.peak ?? null, shell: s.shell ?? null, atoms: 0, dim: s.dim, ...(s.err ? { err: s.err } : {}),
+}))

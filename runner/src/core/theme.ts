@@ -1,11 +1,11 @@
-// (de)Cypher's colours: Morpheus's tokens of this page (src/tokens.json, with the role layer src/roles.json) per theme, and the page's theme,
-// <html data-theme>, followed live.
+// The core's colours (R5c): Morpheus's tokens of this page (src/tokens.json, with the role layer src/roles.json) per
+// theme, for every chart and structure view, and the page's theme, <html data-theme>, followed live.
 
 import * as React from 'react'
 import tokensText from '../tokens.json?raw'
 import rolesText from '../roles.json?raw'
-import { kit } from '../core/index'
-import type { Palette } from '../core/kit'
+import { kit } from './index'
+import type { Palette } from './kit'
 import { themeTokens } from './tokens'
 
 export { kit }

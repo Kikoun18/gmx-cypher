@@ -5,7 +5,7 @@ import { kit, parseStructure } from '../src/core/index'
 import type { SceneState } from '../src/core/kit'
 import { fromFiles } from '../src/decypher/parse'
 import { activeMorphs, joinMorph, setMorphRefs, splitMorph } from '../src/decypher/state'
-import { themeTokens } from '../src/decypher/tokens'
+import { themeTokens } from '../src/core/tokens'
 import { RUNNER } from './helpers'
 
 // RDFs that differ only in their reference: your Methionine runs (the same peptide structure and groups, the

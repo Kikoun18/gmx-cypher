@@ -5,7 +5,7 @@
 
 import { KIT_DATA, kit, toRanges } from '../core/index'
 import { decypherKit, type Analysis, type ColorBy, type ExportAnalysis, type ExportData, type Struct, type Tone } from '../core/kit'
-import type { ThemeTokens } from './tokens'
+import type { ThemeTokens } from '../core/tokens'
 
 
 /** A structure's atoms without water and ions, at the 3 decimals of a .gro; over 4000, the groups' atoms first. */

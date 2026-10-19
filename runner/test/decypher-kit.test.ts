@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { KIT_DATA, kit, parseStructure } from '../src/core/index'
 import { decypherKit, type Analysis, type VNode } from '../src/core/kit'
 import { fromFiles, fromRecord, fromVault, parseXvg, peakOf, shortLabels, type RecordLike } from '../src/decypher/parse'
-import { themeTokens } from '../src/decypher/tokens'
+import { themeTokens } from '../src/core/tokens'
 import { RUNNER } from './helpers'
 
 const F = RUNNER + 'test/fixtures/decypher/'
@@ -137,7 +137,7 @@ describe('(de)Cypher reads your runs as the RDF Explorer design does', () => {
     expect(tree[0]).toBe('svg')
     expect(nodes(tree, 'path')).toHaveLength(2)
     expect(nodes(tree, 'circle')).toHaveLength(2)
-    expect(nodes(tree, 'text').map(t => t[2])).toContain('R (NM)')
+    expect(nodes(tree, 'text').map(t => t[2])).toContain('r (nm)')
     expect(kit.hoverX(geom, geom.m.l)).toBe(h.x[0])
     expect(kit.hoverX(geom, geom.m.l + geom.iw + 5)).toBeNull()
     expect(kit.valAt(h.x, h.sels[2].y, h.x[10])).toBe(h.sels[2].y[10])
@@ -147,7 +147,7 @@ describe('(de)Cypher reads your runs as the RDF Explorer design does', () => {
     const [h] = files().analyses
     const one = kit.buildCurves({ focus: h, plotted: [h], selected: ['O5...S'], colorBy: 'group', pal, tones: {} })[0]
     const curves = [0, 1, 2, 3].map(i => ({ ...one, key: 'k' + i }))
-    const { tree } = kit.chart({ W: 600, H: 360, curves, grid: h.x, xlabel: '', ylabel: '', hover: null, marks: 'maximum', pal })
+    const { tree } = kit.chart({ W: 600, H: 360, curves, grid: h.x, xlabel: '', ylabel: '', hover: null, marks: 'maximum', pal, xDigits: 3 })
     const labels = nodes(tree, 'text').filter(t => t[2] === one.peak!.r.toFixed(3))
     expect(labels.map(t => t[1].y)).toEqual([-8, -21, -34])
     expect(nodes(tree, 'circle')).toHaveLength(4)

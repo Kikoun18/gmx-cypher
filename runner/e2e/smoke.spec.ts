@@ -65,7 +65,18 @@ test('pick inputs, make groups, run, see the chart', async ({ page }) => {
 
   // Jobs: it runs, ends, and shows its chart, first peak and record.
   await expect(page.getByRole('heading', { name: /rdf_nvt · sulfur → water_O/ })).toBeVisible()
-  await expect(page.locator('figure[data-slot=line-chart]').first()).toBeVisible({ timeout: 30_000 })
+  const chart = page.locator('[data-slot=chart]').first()
+  await expect(chart.locator('svg')).toBeVisible({ timeout: 30_000 })
+  // The core chart's readout (R5c): under the pointer, every curve's value, highest first.
+  const box = (await chart.boundingBox())!
+  await page.mouse.move(box.x + box.width * 0.3, box.y + box.height / 2)
+  const readout = chart.locator('[data-slot=readout]')
+  await expect(readout).toBeVisible()
+  await expect(readout.locator('div').first()).toHaveText(/^g\(r\) at r = \d\.\d{3} nm$/)
+  const rows = readout.locator('div.grid')
+  expect(await rows.count()).toBeGreaterThan(0)
+  const values = (await rows.locator('span:last-child').allTextContents()).map(Number)
+  expect(values).toEqual([...values].sort((a, b) => b - a))
   await expect(page.getByText('first shell · water_O')).toBeVisible()
   await expect(page.getByText('maximum · water_O')).toBeVisible()
   // Here the first shell is the maximum: both stats read 0.374 nm.
