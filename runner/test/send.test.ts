@@ -114,3 +114,22 @@ describe('the link to the project in the Matrix (T36)', () => {
     await s.close();
   });
 });
+
+describe('the connected project (R14b, T158)', () => {
+  it('is one project of the vault, set in settings: shown with the vault, refused when it is not there, forgotten with the vault', async () => {
+    const { s, vdir, project } = await setup();
+    expect((await s.call('/api/vault')).json.project).toBeNull();
+    expect((await s.call('/api/config', { project: project.id })).json.config.project).toBe(project.id);
+    expect((await s.call('/api/vault')).json.project).toBe(project.id);
+    expect((await s.call('/api/config', { project: 'nope123' })).json).toEqual({ error: 'no project nope123 in the vault' });
+    expect((await s.call('/api/config', { project: '../x' })).json).toEqual({ error: 'no project ../x in the vault' });
+    expect(JSON.parse(readFileSync(join(s.ctx.home, 'config.json'), 'utf8')).project).toBe(project.id);
+    // Another vault (or none): the project was the old vault's, so it is no longer connected.
+    expect((await s.call('/api/config', { vault: null })).json.config.project).toBeNull();
+    expect((await s.call('/api/config', { project: project.id })).json).toEqual({ error: 'set a vault first: a project is one of its projects' });
+    await s.call('/api/config', { vault: vdir, project: project.id });
+    expect((await s.call('/api/config', { project: null })).json.config.project).toBeNull();
+    await s.close();
+  });
+});
+

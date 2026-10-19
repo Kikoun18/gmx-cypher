@@ -49,7 +49,7 @@ function events(jobs: Jobs, batches: Batches, res: ServerResponse) {
 }
 
 /** What the GUI may change (T5); anything else is refused. */
-const SETTABLE: (keyof Config)[] = ['gmx', 'allow', 'vault', 'pmfUrl', 'qq', 'gmxEta'];
+const SETTABLE: (keyof Config)[] = ['gmx', 'allow', 'vault', 'project', 'pmfUrl', 'qq', 'gmxEta'];
 
 /** Allowed folders as real paths; each must exist and be a folder. */
 export function realFolders(paths: string[]): string[] {
@@ -149,10 +149,10 @@ export function makeApi(ctx: Ctx): Api {
       return { body: await checkSizes(ctx.gmx, runInput, groups, ctx.home) };
     }
     if (is(req, 'GET', url, '/api/vault')) {
-      if (!ctx.config.vault) return { body: { path: null } };
+      if (!ctx.config.vault) return { body: { path: null, project: null } };
       try {
         const v = await openVault(ctx.config.vault);
-        return { body: { path: v.path, schema: v.schema, compat: v.compat, projects: (await listProjects(v)).map(p => ({ id: p.id, name: p.name, dir: p.dir, desc: p.desc })) } };
+        return { body: { path: v.path, schema: v.schema, compat: v.compat, project: ctx.config.project, projects: (await listProjects(v)).map(p => ({ id: p.id, name: p.name, dir: p.dir, desc: p.desc })) } };
       } catch (e) { return { body: { path: ctx.config.vault, error: (e as Error).message } }; }
     }
     if (is(req, 'GET', url, '/api/vault/project')) {
@@ -282,6 +282,13 @@ export function makeApi(ctx: Ctx): Api {
       }
       // A vault is checked before it is kept: the Matrix's manifest, schemas 1–4 (T32, T142).
       if (patch.vault) patch.vault = (await openVault(patch.vault).catch(e => { throw new HttpError(400, (e as Error).message); })).path;
+      // The connected project is one of the vault's (R14b): another vault, or none, leaves none connected unless one is given.
+      if ('vault' in patch && !('project' in patch)) patch.project = null;
+      if (patch.project != null) {
+        const vault = 'vault' in patch ? patch.vault : ctx.config.vault;
+        if (!vault) throw new HttpError(400, 'set a vault first: a project is one of its projects');
+        if (typeof patch.project !== 'string' || !(await listProjects(await openVault(vault))).some(p => p.id === patch.project)) throw new HttpError(400, 'no project ' + patch.project + ' in the vault');
+      }
       ctx.config = { ...ctx.config, ...patch };
       saveConfig(ctx.home, ctx.config);
       if ('gmx' in patch) ctx.gmx = await detectGmx(ctx.config.gmx);

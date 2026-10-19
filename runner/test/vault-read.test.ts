@@ -77,7 +77,7 @@ describe('the vault over HTTP', () => {
   it('is set once in the config (checked), then lists projects and a project summary', async () => {
     const { apiServer } = await import('./helpers');
     const dir = await madeVault(), s = await apiServer();
-    expect((await s.call('/api/vault')).json).toEqual({ path: null });
+    expect((await s.call('/api/vault')).json).toEqual({ path: null, project: null });
     expect((await s.call('/api/config', { vault: tmp('not-a-vault') })).json.error).toContain('is not a Matrix vault');
     expect((await s.call('/api/config', { vault: dir })).json.config.vault).toBe(dir);
     const v = await s.call('/api/vault');

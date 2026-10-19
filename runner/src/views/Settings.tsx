@@ -5,7 +5,8 @@ import { Input } from '../ui/input'
 import { Field, FieldHint, Label } from '../ui/label'
 import { Kbd } from '../ui/kbd'
 import { Section } from '../ui/separator'
-import { postJson, type AppState } from '../api'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
+import { getJson, postJson, type AppState } from '../api'
 import { bindingOf, DEFAULT_BINDINGS, keyLabel, keyProblem, useBindings } from '../lib/shortcuts'
 
 /** The key that opens and closes (de)Cypher: change it by pressing the new one; Escape keeps the old one. */
@@ -51,6 +52,11 @@ export function Settings({ state, open, onOpenChange, onState, returnFocus }: { 
   const saveTools = async () => { try { onState(await postJson<AppState>('/api/config', { qq: tools.qq.trim() || null, gmxEta: tools.gmxEta.trim() || null })); setToolsError('') } catch (e) { setToolsError((e as Error).message) } }
   const toolsChanged = tools.qq.trim() !== (state.config.qq || '') || tools.gmxEta.trim() !== (state.config.gmxEta || '')
   const savePmfUrl = async () => { try { onState(await postJson<AppState>('/api/config', { pmfUrl: pmfUrl.trim() || null })); setPmfError('') } catch (e) { setPmfError((e as Error).message) } }
+  // The vault's projects, for the connected one (R14b): read again when the vault changes.
+  const [projects, setProjects] = React.useState<{ id: string; name: string }[]>([])
+  const [projectError, setProjectError] = React.useState('')
+  React.useEffect(() => { if (state.config.vault) getJson<{ projects?: { id: string; name: string }[] }>('/api/vault').then(v => setProjects(v.projects ?? []), () => setProjects([])); else setProjects([]) }, [state.config.vault])
+  const chooseProject = async (id: string | null) => { try { onState(await postJson<AppState>('/api/config', { project: id })); setProjectError('') } catch (e) { setProjectError((e as Error).message) } }
   const chooseVault = async (path: string | null) => {
     try { onState(await postJson<AppState>('/api/config', { vault: path })); setVaultError(''); if (!path) setVault('') } catch (e) { setVaultError((e as Error).message) }
   }
@@ -108,8 +114,21 @@ export function Settings({ state, open, onOpenChange, onState, returnFocus }: { 
               {state.config.vault && <Button variant="ghost" onClick={() => chooseVault(null)}>forget</Button>}
             </div>
             {vaultError ? <FieldHint error>✗ {vaultError}</FieldHint> : state.config.vault && <FieldHint>✓ {state.config.vault}</FieldHint>}
-            <FieldHint>Read only: projects, rows and patterns, for where a result lands. A result you send goes into the project's _inbox folder; nothing else in the vault is ever written.</FieldHint>
+            <FieldHint>Read only: projects, rows and patterns, for where a result lands. A result you send goes into the project's _inbox folder, and its record into gmx-cypher's own folder at the vault's top; nothing else in the vault is ever written.</FieldHint>
           </Field>
+          {state.config.vault && (
+            <Field>
+              <Label htmlFor="project">connected project</Label>
+              <Select value={state.config.project ?? 'none'} onValueChange={v => chooseProject(v === 'none' ? null : v)}>
+                <SelectTrigger id="project" size="sm" className="w-80"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">none</SelectItem>
+                  {projects.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              {projectError ? <FieldHint error>✗ {projectError}</FieldHint> : <FieldHint>Its pattern names your jobs from their folders; sends go to it unless you choose another.</FieldHint>}
+            </Field>
+          )}
           <Field>
             <Label htmlFor="pmf-url">The Matrix address · optional</Label>
             <div className="flex gap-2">

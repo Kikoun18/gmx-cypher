@@ -11,7 +11,7 @@ import { getJson, postJson } from '../api'
 import type { Job } from '../jobs'
 import { typeSource, type Fields, type Landing, type Source } from '../lib/landing'
 
-interface VaultInfo { path: string; projects: { id: string; name: string; dir: string }[]; error?: string }
+interface VaultInfo { path: string; project?: string | null; projects: { id: string; name: string; dir: string }[]; error?: string }
 interface Sent { path: string; name: string; renamed: boolean; next: string[]; link?: string }
 interface Preview {
   project: { id: string; name: string; dir: string }; pattern: string; pathPattern: string
@@ -34,7 +34,7 @@ export function SendDialog({ job, open, onOpenChange, returnFocus }: { job: Job;
   const [sendError, setSendError] = React.useState('')
   React.useEffect(() => {
     if (!open) return
-    getJson<VaultInfo>('/api/vault').then(v => { setVault(v); setProject(id => id ?? v.projects?.[0]?.id ?? null) }, e => setVault({ path: '', projects: [], error: (e as Error).message }))
+    getJson<VaultInfo>('/api/vault').then(v => { setVault(v); setProject(id => id ?? v.project ?? v.projects?.[0]?.id ?? null) }, e => setVault({ path: '', projects: [], error: (e as Error).message }))
   }, [open])
   const body = { job: job.id, project, ...(fields ? { fields } : {}), ...(name != null ? { name } : {}) }, key = JSON.stringify(body)
   React.useEffect(() => {
