@@ -13,7 +13,7 @@ const kit = decypherKit()
 const F = RUNNER + 'test/fixtures/decypher/'
 const NAMES = ['9.multiwalker.gro', 'rdf_o111_Methionine_H.ndx', 'rdf_o111_Methionine_H.run.json', 'rdf_o111_Methionine_H.xvg', 'rdf_o111_Methionine_S.ndx', 'rdf_o111_Methionine_S.run.json', 'rdf_o111_Methionine_S.xvg']
 const loaded = () => fromFiles(NAMES.map(n => ({ path: 'o111/' + n, text: readFileSync(F + n, 'utf8') })))
-const tokens = themeTokens(readFileSync(RUNNER + 'src/tokens.json', 'utf8'))
+const tokens = themeTokens(readFileSync(RUNNER + 'src/tokens.json', 'utf8'), readFileSync(RUNNER + 'src/roles.json', 'utf8'))
 const view = { rep: 'ball & stick' as const, rest: 'grey' as const, labels: true, hydrogens: true, arrange: 'side by side' as const }
 
 describe('which RDFs can be morphed: those that have the same groups', () => {
@@ -169,7 +169,7 @@ describe('clicking a reference atom, in the structure view', () => {
     const sels = h.sels, struct = parseGro(readFileSync(F + '9.multiwalker.gro', 'utf8'))
     const mol = kit.buildMol(struct, new Set(sels.flatMap(x => x.atoms)), new Set([...h.ref!.atoms, ...s.ref!.atoms]), 'side by side')
     const view = kit.structureView(canvas as unknown as HTMLCanvasElement, { clientWidth: 700, clientHeight: 560 } as HTMLElement, { hover: x => hovered.push(x), pick: () => {}, pickRef: pickRef && ((i, add) => { pickRef(i, add); picked.push([i, add]) }) })
-    const pal = kit.palette(false, themeTokens(readFileSync(RUNNER + 'src/tokens.json', 'utf8')).light)
+    const pal = kit.palette(false, themeTokens(readFileSync(RUNNER + 'src/tokens.json', 'utf8'), readFileSync(RUNNER + 'src/roles.json', 'utf8')).light)
     const state = (on: boolean[]): SceneState => ({ mol, pal, rep: 'ball & stick', rest: 'grey', labels: true, hydrogens: true, sels, selected: [0], refs: [{ label: 'S', atoms: s.ref!.atoms, on: on[0] }, { label: 'H', atoms: h.ref!.atoms, on: on[1] }], hoverSel: -1, hoverRef: -1 })
     const click = (x: number, y: number, add = false) => {
       const e = { clientX: x, clientY: y, button: 0, pointerId: 1, altKey: false, metaKey: add, ctrlKey: false, shiftKey: false }

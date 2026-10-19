@@ -10,7 +10,7 @@ const F = RUNNER + 'test/fixtures/decypher/'
 const read = (n: string) => readFileSync(F + n, 'utf8')
 const NAMES = ['9.multiwalker.gro', 'mmmmmmmm.gro', 'rdf_o111_Methionine_H.ndx', 'rdf_o111_Methionine_H.run.json', 'rdf_o111_Methionine_H.xvg', 'rdf_o111_Methionine_S.ndx', 'rdf_o111_Methionine_S.run.json', 'rdf_o111_Methionine_S.xvg']
 const files = () => fromFiles(NAMES.map(n => ({ path: 'o111/' + n, text: read(n) })))
-const TOKENS = themeTokens(read('../../../src/tokens.json'))
+const TOKENS = themeTokens(read('../../../src/tokens.json'), read('../../../src/roles.json'))
 const tokens = (dark: boolean) => TOKENS[dark ? 'dark' : 'light']
 const pal = kit.palette(true, tokens(true))
 /** Every node of a chart tree with its tag. */

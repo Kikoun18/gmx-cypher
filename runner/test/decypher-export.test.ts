@@ -8,7 +8,7 @@ import { RUNNER } from './helpers'
 const F = RUNNER + 'test/fixtures/decypher/'
 const NAMES = ['9.multiwalker.gro', 'rdf_o111_Methionine_H.ndx', 'rdf_o111_Methionine_H.run.json', 'rdf_o111_Methionine_H.xvg', 'rdf_o111_Methionine_S.ndx', 'rdf_o111_Methionine_S.run.json', 'rdf_o111_Methionine_S.xvg']
 const loaded = () => fromFiles(NAMES.map(n => ({ path: '/home/me/sims/o111/' + n, text: readFileSync(F + n, 'utf8') })))
-const tokens = themeTokens(readFileSync(RUNNER + 'src/tokens.json', 'utf8'))
+const tokens = themeTokens(readFileSync(RUNNER + 'src/tokens.json', 'utf8'), readFileSync(RUNNER + 'src/roles.json', 'utf8'))
 const view = { rep: 'ball & stick' as const, rest: 'grey' as const, labels: true, hydrogens: true, arrange: 'side by side' as const }
 
 describe('the HTML export: one file, nothing fetched, each job still interactive', () => {
