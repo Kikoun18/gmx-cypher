@@ -23,6 +23,7 @@ import { usePlan, type PlanView } from '../plan'
 import { useStructure } from '../structure'
 import { Code } from './Code'
 import { Recipes } from './Recipes'
+import { Status } from '../ui/status'
 
 interface Help { gmx: string; version: string; options: HelpOption[] }
 
@@ -191,7 +192,7 @@ export function GroupCommand({ command, gmx, draft, setDraft, onStarted }: ViewP
         <Recipes draft={draft} setDraft={setDraft} />
         <Section label="Command" />
         {!trajectory || !runInput ? <p className="m-0 text-control text-muted-foreground">pick a trajectory and a run input in inputs</p>
-          : planned?.error ? <FieldHint error>✗ {planned.error}</FieldHint>
+          : planned?.error ? <Status level="error">{planned.error}</Status>
           : plan ? <Code label="command line" text={commandText({ cwd: plan.cwd, file: plan.file, args: plan.argv, env: plan.env })} />
           : <p className="m-0 text-control text-muted-foreground" aria-live="polite">choosing names…</p>}
         {/* The tools that ask for their groups get them on stdin: part of what runs (review). */}

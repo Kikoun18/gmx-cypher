@@ -14,6 +14,7 @@ import { commandText } from '../lib/command'
 import { WHAM_FORM } from '../lib/wham'
 import { usePlan } from '../plan'
 import { Code } from './Code'
+import { Status } from '../ui/status'
 
 interface Found { rel: string; tpr: string; pull: string | null }
 type Pull = 'pullx' | 'pullf'
@@ -48,7 +49,7 @@ export function Wham({ gmx, draft, setDraft, onStarted }: { gmx: GmxState; draft
       setFound(r.windows); setUnread(r.unread)
       // Every window with its pull file is used until you leave it out.
       setWham({ root, glob, pull, windows: r.windows.filter(x => x.pull).map(x => ({ tpr: x.tpr, pull: x.pull! })) })
-    } catch (e) { toast.error('✗ ' + (e as Error).message) }
+    } catch (e) { toast.error((e as Error).message) }
     finally { setFinding(false) }
   }
   const used = new Set(w.windows.map(x => x.tpr))
@@ -113,7 +114,7 @@ export function Wham({ gmx, draft, setDraft, onStarted }: { gmx: GmxState; draft
                     <td className="py-1 pr-3"><Checkbox aria-label={'use ' + f.rel} checked={n >= 0} disabled={!f.pull || !found} onCheckedChange={() => toggle(f)} /></td>
                     <td className="pr-3 text-muted-foreground">{n >= 0 ? n + 1 : '—'}</td>
                     <td className="pr-3">{f.rel}</td>
-                    <td className={f.pull ? 'text-muted-foreground' : 'text-destructive'}>{f.pull ? '✓ ' + f.pull.split('/').pop() : '✗ none beside it'}</td>
+                    <td>{f.pull ? <Status inline level="ok" word={f.pull.split('/').pop()!} /> : <Status inline level="warning" word="none beside it" />}</td>
                   </tr>
                 )
               })}

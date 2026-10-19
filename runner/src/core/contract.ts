@@ -37,3 +37,16 @@ export const COLOUR_FILES = ['src/tokens.json', 'src/roles.json']
 
 /** The tokens of UI state: never a data tone (contract §2). */
 export const UI_STATE = ROLES['ui state']
+
+/** The four status levels (R9c, contract §4): an icon and a word before the text, so colour is never the only signal. */
+export type Level = 'ok' | 'info' | 'warning' | 'error'
+export const STATUS: Record<Level, { icon: string; word: string; token: string; when: string }> = {
+  ok: { icon: 'circle-check', word: 'ok', token: 'foreground', when: 'a check passed' },
+  info: { icon: 'info', word: 'note', token: 'foreground', when: 'worth knowing; nothing to do' },
+  warning: { icon: 'triangle-alert', word: 'check', token: 'foreground', when: 'a result may mislead: look before trusting it' },
+  error: { icon: 'circle-x', word: 'error', token: 'destructive', when: 'nothing ran or nothing can be read; it says how to fix it' },
+}
+
+/** The only files whose classes may colour text or a ground `destructive` (R4a, R9c): the status component and destructive buttons. */
+export const DESTRUCTIVE_FILES = ['src/ui/status.tsx', 'src/ui/button.tsx']
+

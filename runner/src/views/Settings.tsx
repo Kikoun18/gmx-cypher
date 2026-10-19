@@ -8,6 +8,7 @@ import { Section } from '../ui/separator'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
 import { getJson, postJson, type AppState } from '../api'
 import { bindingOf, DEFAULT_BINDINGS, keyLabel, keyProblem, useBindings } from '../lib/shortcuts'
+import { Status } from '../ui/status'
 
 /** The key that opens and closes (de)Cypher: change it by pressing the new one; Escape keeps the old one. */
 function KeyField() {
@@ -32,7 +33,7 @@ function KeyField() {
         {b && <Button variant="ghost" size="sm" onClick={() => setBindings({ ...bindings, decypher: null })}>no key</Button>}
         {keyLabel(b) !== keyLabel(DEFAULT_BINDINGS.decypher) && <Button variant="ghost" size="sm" onClick={() => setBindings(DEFAULT_BINDINGS)}>back to {keyLabel(DEFAULT_BINDINGS.decypher)}</Button>}
       </div>
-      {problem ? <FieldHint error>✗ {problem}</FieldHint> : <FieldHint>{b ? keyLabel(b) + ' anywhere but in a field; the jobs tab has the same as a button.' : 'no key: open compare from the jobs tab.'} Inside it, F fits the plotted groups, R resets the view and [ ] step through results. Kept in this browser.</FieldHint>}
+      {problem ? <Status level="error">{problem}</Status> : <FieldHint>{b ? keyLabel(b) + ' anywhere but in a field; the jobs tab has the same as a button.' : 'no key: open compare from the jobs tab.'} Inside it, F fits the plotted groups, R resets the view and [ ] step through results. Kept in this browser.</FieldHint>}
     </Field>
   )
 }
@@ -86,7 +87,7 @@ export function Settings({ state, open, onOpenChange, onState, returnFocus }: { 
               <Input id="gmx" size="sm" value={gmx} placeholder="gmx_mpi, then gmx, on PATH" onChange={e => setGmx(e.target.value)} onKeyDown={e => e.key === 'Enter' && check()} />
               <Button variant="outline" onClick={check} disabled={busy}>{busy ? 'checking…' : 'check'}</Button>
             </div>
-            <FieldHint error={!state.gmx.ok}>{state.gmx.ok ? '✓ ' + state.gmx.path + ' · ' + state.gmx.version : '✗ ' + state.gmx.error}</FieldHint>
+            {state.gmx.ok ? <Status level="ok">{state.gmx.path + ' · ' + state.gmx.version}</Status> : <Status level="error">{state.gmx.error}</Status>}
             <FieldHint>A name on PATH or a path. Start gmx-cypher after module add, so it finds gmx and its libraries.</FieldHint>
           </Field>
           <Section label="Allowed folders" />
@@ -103,7 +104,7 @@ export function Settings({ state, open, onOpenChange, onState, returnFocus }: { 
               <Input id="folder" size="sm" value={folder} placeholder="/home/you/simulations" onChange={e => setFolder(e.target.value)} onKeyDown={e => e.key === 'Enter' && folder.trim() && setAllow([...state.config.allow, folder.trim()])} />
               <Button variant="outline" onClick={() => setAllow([...state.config.allow, folder.trim()])} disabled={!folder.trim()}>add</Button>
             </div>
-            {folderError && <FieldHint error>✗ {folderError}</FieldHint>}
+            {folderError && <Status level="error">{folderError}</Status>}
           </Field>
           <Section label="Matrix vault" />
           <Field>
@@ -113,7 +114,7 @@ export function Settings({ state, open, onOpenChange, onState, returnFocus }: { 
               <Button variant="outline" onClick={() => chooseVault(vault.trim())} disabled={!vault.trim() || vault.trim() === state.config.vault}>use</Button>
               {state.config.vault && <Button variant="ghost" onClick={() => chooseVault(null)}>forget</Button>}
             </div>
-            {vaultError ? <FieldHint error>✗ {vaultError}</FieldHint> : state.config.vault && <FieldHint>✓ {state.config.vault}</FieldHint>}
+            {vaultError ? <Status level="error">{vaultError}</Status> : state.config.vault && <Status level="ok">{state.config.vault}</Status>}
             <FieldHint>Read only: projects, rows and patterns, for where a result lands. A result you send goes into the project's _inbox folder, and its record into gmx-cypher's own folder at the vault's top; nothing else in the vault is ever written.</FieldHint>
           </Field>
           {state.config.vault && (
@@ -126,7 +127,7 @@ export function Settings({ state, open, onOpenChange, onState, returnFocus }: { 
                   {projects.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
                 </SelectContent>
               </Select>
-              {projectError ? <FieldHint error>✗ {projectError}</FieldHint> : <FieldHint>Its pattern names your jobs from their folders; sends go to it unless you choose another.</FieldHint>}
+              {projectError ? <Status level="error">{projectError}</Status> : <FieldHint>Its pattern names your jobs from their folders; sends go to it unless you choose another.</FieldHint>}
             </Field>
           )}
           <Field>
@@ -135,7 +136,7 @@ export function Settings({ state, open, onOpenChange, onState, returnFocus }: { 
               <Input id="pmf-url" size="sm" value={pmfUrl} placeholder="http://localhost:5173/" onChange={e => setPmfUrl(e.target.value)} onKeyDown={e => e.key === 'Enter' && savePmfUrl()} />
               <Button variant="outline" onClick={savePmfUrl} disabled={pmfUrl.trim() === (state.config.pmfUrl || '')}>save</Button>
             </div>
-            {pmfError ? <FieldHint error>✗ {pmfError}</FieldHint> : <FieldHint>Where you open the Matrix; after sending, gmx-cypher links to the project there.</FieldHint>}
+            {pmfError ? <Status level="error">{pmfError}</Status> : <FieldHint>Where you open the Matrix; after sending, gmx-cypher links to the project there.</FieldHint>}
           </Field>
           <Section label="Keyboard" />
           <KeyField />
@@ -152,7 +153,7 @@ export function Settings({ state, open, onOpenChange, onState, returnFocus }: { 
           </div>
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" onClick={saveTools} disabled={!toolsChanged}>save</Button>
-            {toolsError ? <FieldHint error>✗ {toolsError}</FieldHint> : <FieldHint>The cluster view runs qq jobs and gmx-eta -a on this machine, as you would after kinit. Watch only: it never kills or submits a job.</FieldHint>}
+            {toolsError ? <Status level="error">{toolsError}</Status> : <FieldHint>The cluster view runs qq jobs and gmx-eta -a on this machine, as you would after kinit. Watch only: it never kills or submits a job.</FieldHint>}
           </div>
         </DialogBody>
         <DialogFooter><Button variant="ghost" onClick={() => onOpenChange(false)}>close</Button></DialogFooter>

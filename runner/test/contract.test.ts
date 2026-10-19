@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import { COLOUR_FILES, INTERNAL_REFERENCE, NEVER_SHOWN } from '../src/core/contract';
+import { COLOUR_FILES, DESTRUCTIVE_FILES, INTERNAL_REFERENCE, NEVER_SHOWN, ROLES, STATUS } from '../src/core/contract';
 import { RUNNER } from './helpers';
 import { stringsOf, uiStrings } from './ui-strings';
 
@@ -34,6 +34,24 @@ describe('colours come from the tokens (R4b)', () => {
 describe('one set of words (R3b)', () => {
   it('no UI string uses a word the contract keeps for something else', () => {
     const hits = uiStrings().flatMap(s => NEVER_SHOWN.filter(n => n.phrase.test(s.text)).map(n => s.file + ':' + s.line + '  ' + s.text.trim().slice(0, 100) + '  → ' + n.instead));
+    expect(hits).toEqual([]);
+  });
+});
+
+describe('one status component (R9c)', () => {
+  const walk = (d: string): string[] => readdirSync(d).flatMap(n => { const p = join(d, n); return statSync(p).isDirectory() ? walk(p) : [p.slice(RUNNER.length)]; });
+  it('every level has an icon, a word, a token of a role and a rule for when it is used', () => {
+    expect(Object.keys(STATUS)).toEqual(['ok', 'info', 'warning', 'error']);
+    const tokens = new Set(Object.values(ROLES).flat());
+    for (const l of Object.values(STATUS)) { expect(l.icon && l.word && l.when).toBeTruthy(); expect(tokens.has(l.token)).toBe(true); }
+    expect(new Set(Object.values(STATUS).map(l => l.word)).size).toBe(4);
+  });
+  it('no status is a ✓, ✗ or ⚠ caption in the page any more', () => {
+    expect(uiStrings().filter(s => s.file.startsWith('src/') && /[✓✗⚠]/.test(s.text)).map(s => s.file + ':' + s.line + '  ' + s.text.trim())).toEqual([]);
+  });
+  it('red text and grounds only in the status component and destructive buttons', () => {
+    const hits = walk(RUNNER + 'src').filter(f => /\.tsx?$/.test(f) && !DESTRUCTIVE_FILES.includes(f))
+      .flatMap(f => readFileSync(RUNNER + f, 'utf8').split('\n').flatMap((l, i) => (/\b(text|bg)-destructive\b/.test(l) ? [f + ':' + (i + 1)] : [])));
     expect(hits).toEqual([]);
   });
 });

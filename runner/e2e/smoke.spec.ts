@@ -32,7 +32,7 @@ test('pick inputs, make groups, run, see the chart', async ({ page }) => {
 
   // Inputs: the trajectory brings the rest, and gmx (fake) agrees on the atom counts.
   await page.getByRole('button', { name: 'nvt.xtc' }).click()
-  await expect(page.getByText('✓ the inputs agree')).toBeVisible()
+  await expect(page.getByText('the inputs agree')).toBeVisible()
   await page.getByRole('button', { name: 'use these inputs' }).click()
 
   // Groups: sulfur as the reference, water oxygens as the selection, both by rule.
@@ -82,7 +82,7 @@ test('Shift+Enter adds a rule and keeps the form open in the same group, with th
   page.on('pageerror', e => errors.push(e.message))
   await page.goto(url)
   await page.getByRole('button', { name: 'nvt.xtc' }).click()
-  await expect(page.getByText('✓ the inputs agree')).toBeVisible()
+  await expect(page.getByText('the inputs agree')).toBeVisible()
   await page.getByRole('button', { name: 'use these inputs' }).click()
   await expect(page.locator('canvas')).toBeVisible()
 

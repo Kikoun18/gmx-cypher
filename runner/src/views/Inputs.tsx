@@ -15,6 +15,7 @@ import { inputRole, type Role, type Slot } from '../lib/inputs'
 import { useAwhScan, useTerms } from '../terms'
 import { cn } from '../lib/utils'
 import { fmtBytes } from '../../../matrix/src/lib/structFile'
+import { Status } from '../ui/status'
 
 interface Entry { name: string; kind: 'dir' | 'file'; size: number; mtime: number; role: Role | 'output' | null }
 interface Listing { path: string; parent: string | null; entries: Entry[]; hidden: number }
@@ -54,7 +55,7 @@ function Browser({ roots, path, onPath, used, onFile }: { roots: string[]; path:
         <span className="flex-1" />
         {listing && <span className="text-caption text-muted-foreground">{listing.entries.filter(e => e.kind === 'file').length} files{listing.hidden ? ' · ' + listing.hidden + ' other files not shown' : ''}</span>}
       </div>
-      {error && <p className="m-0 px-4 py-3 text-control text-destructive">✗ {error}</p>}
+      {error && <Status level="error" className="px-4 py-3 text-control">{error}</Status>}
       {listing && (
         <table className="w-full text-control">
           <thead><tr className="text-left text-label uppercase text-muted-foreground"><th className="px-4 py-2 font-normal">name</th><th className="font-normal">kind</th><th className="font-normal">size</th><th className="pr-4 font-normal">modified</th></tr></thead>
@@ -119,7 +120,7 @@ function Checks({ check, busy }: ReturnType<typeof useInputCheck>) {
         {check.index && <tr><td className="py-1 text-muted-foreground">index</td><td className="text-caption text-muted-foreground">{check.index.groups} groups</td><td className="text-right font-bold">atoms ≤ {check.index.maxAtom}</td></tr>}
       </tbody></table>
       {check.ok ? (
-        <p className="m-0 text-control text-mint-strong">✓ the inputs agree{check.estimate ? ' · ≈' + check.estimate.frames + ' frames, ' + check.estimate.start + '–' + check.estimate.end + ' ps (from the run input)' : ''}</p>
+        <Status level="ok" className="text-control">the inputs agree{check.estimate ? ' · ≈' + check.estimate.frames + ' frames, ' + check.estimate.start + '–' + check.estimate.end + ' ps (from the run input)' : ''}</Status>
       ) : (
         <Alert variant="destructive"><X /><AlertTitle>these inputs can't run together</AlertTitle><AlertDescription>{check.problems.map(p => <p key={p}>{p}</p>)}</AlertDescription></Alert>
       )}
@@ -151,24 +152,24 @@ export function Inputs({ state, draft, setDraft, onSettings, onNext }: { state: 
   const assign = async (p: string, role: Role | 'output' | null) => {
     const slot = picking || (role && role !== 'output' ? SLOT_OF[role] : undefined)
     const ok = slot && SLOTS.find(s => s.slot === slot)!.accepts.includes(role as Role)
-    if (!slot || !ok) { toast.error('✗ ' + p.split('/').pop() + ' is not a ' + (picking ? SLOTS.find(s => s.slot === picking)!.label : 'GROMACS input')); return }
-    if (!command.inputs.includes(slot)) { toast.error('✗ ' + p.split('/').pop() + ' is a ' + role + ': gmx ' + command.tool + ' takes ' + slots.map(s => s.label).join(' and ')); return }
+    if (!slot || !ok) { toast.error(p.split('/').pop() + ' is not a ' + (picking ? SLOTS.find(s => s.slot === picking)!.label : 'GROMACS input')); return }
+    if (!command.inputs.includes(slot)) { toast.error(p.split('/').pop() + ' is a ' + role + ': gmx ' + command.tool + ' takes ' + slots.map(s => s.label).join(' and ')); return }
     setPicking(null)
     if (slot !== 'trajectory') { set(slot, { path: p, why: 'picked' }); return }
     try { setDraft(d => ({ ...d, inputs: others(d.inputs) })); const s = await getJson<Draft['inputs']>('/api/suggest?trajectory=' + encodeURIComponent(p)); setDraft(d => ({ ...d, inputs: { ...others(d.inputs), ...s } })) }
-    catch (e) { toast.error('✗ ' + (e as Error).message) }
+    catch (e) { toast.error((e as Error).message) }
   }
   const upload = async (files: File[]) => {
     for (const f of files) {
       const role = inputRole(f.name)
-      if (!role || role === 'output') { toast.error('✗ ' + f.name + ' is not a GROMACS input (.xtc .trr .tng .tpr .gro .pdb .ndx .edr); not uploaded'); continue }
+      if (!role || role === 'output') { toast.error(f.name + ' is not a GROMACS input (.xtc .trr .tng .tpr .gro .pdb .ndx .edr); not uploaded'); continue }
       try {
         const r = await fetch('/api/upload?name=' + encodeURIComponent(f.name), { method: 'POST', body: f })
         const body = await r.json()
         if (!r.ok) throw new Error(body.error)
-        toast('✓ ' + f.name + ' uploaded · ' + fmtBytes(body.size))
+        toast(f.name + ' uploaded · ' + fmtBytes(body.size))
         await assign(body.path, role)
-      } catch (e) { toast.error('✗ ' + f.name + ': ' + (e as Error).message) }
+      } catch (e) { toast.error(f.name + ': ' + (e as Error).message) }
     }
   }
 
@@ -208,13 +209,17 @@ export function Inputs({ state, draft, setDraft, onSettings, onNext }: { state: 
         })}
         <Section label="Checks" />
         {command.tool === 'energy'
-          ? <p className="m-0 text-control" aria-live="polite">{draft.inputs.edr ? energy?.terms ? '✓ ' + energy.terms.length + ' terms · read by gmx energy' : energy?.error ? '✗ ' + energy.error : 'reading the terms…' : 'pick an energy file'}</p>
+          ? !draft.inputs.edr ? <p className="m-0 text-control">pick an energy file</p>
+            : energy?.terms ? <Status level="ok" className="text-control">{energy.terms.length + ' terms · read by gmx energy'}</Status>
+            : energy?.error ? <Status level="error" className="text-control">{energy.error}</Status> : <p className="m-0 text-control" aria-live="polite">reading the terms…</p>
           : command.tool === 'wham'
           ? <p className="m-0 text-control text-muted-foreground">gmx wham reads umbrella windows, not these inputs: find them in the command tab</p>
           : command.tool === 'awh'
-          ? <p className="m-0 text-control" aria-live="polite">{!draft.inputs.edr || !draft.inputs.runInput ? 'pick the energy file and its run input'
-            : awh?.error ? '✗ ' + awh.error : !frames ? 'reading the AWH frames…' : !frames.length ? '✗ no AWH data in this energy file'
-            : '✓ ' + frames.length + ' AWH frames, ' + frames[0].time + '–' + frames[frames.length - 1].time + ' ps · read by gmx awh'}</p>
+          ? !draft.inputs.edr || !draft.inputs.runInput ? <p className="m-0 text-control">pick the energy file and its run input</p>
+            : awh?.error ? <Status level="error" className="text-control">{awh.error}</Status>
+            : !frames ? <p className="m-0 text-control" aria-live="polite">reading the AWH frames…</p>
+            : !frames.length ? <Status level="error" className="text-control">no AWH data in this energy file</Status>
+            : <Status level="ok" className="text-control">{frames.length + ' AWH frames, ' + frames[0].time + '–' + frames[frames.length - 1].time + ' ps · read by gmx awh'}</Status>
           : <Checks {...checked} />}
         {onNext && <Button size="lg" className="self-start" disabled={!ready || !state.gmx.ok} onClick={onNext}>use these inputs</Button>}
       </div>

@@ -195,14 +195,14 @@ export function fromFiles(files: LoadedFile[]): { analyses: Analysis[]; structs:
     const kind: FileRow['kind'] = /\.json$/i.test(name) ? 'run' : /\.(gro|pdb)$/i.test(name) ? 'gro' : /\.ndx$/i.test(name) ? 'ndx' : /\.xvg$/i.test(name) ? 'xvg' : 'file'
     const p: P = { path: f.path, name, dir, kind, data: null, error: null, status: '' }
     try {
-      if (kind === 'gro') { const s = parseStruct(name, f.text); p.data = s; p.status = '✓ ' + s.n + ' atoms' }
-      else if (kind === 'ndx') { const g = parseNdx(f.text); if (!g.length) throw new Error('no [ groups ]'); p.data = g; p.status = '✓ ' + g.length + ' groups' }
-      else if (kind === 'xvg') { const x = parseXvg(f.text); p.data = x; p.status = '✓ ' + x.ys.length + ' curves · ' + x.x.length + ' points' }
+      if (kind === 'gro') { const s = parseStruct(name, f.text); p.data = s; p.status = s.n + ' atoms' }
+      else if (kind === 'ndx') { const g = parseNdx(f.text); if (!g.length) throw new Error('no [ groups ]'); p.data = g; p.status = g.length + ' groups' }
+      else if (kind === 'xvg') { const x = parseXvg(f.text); p.data = x; p.status = x.ys.length + ' curves · ' + x.x.length + ' points' }
       else if (kind === 'run') {
         const r = JSON.parse(f.text) as RecordLike
         if (!r || !Array.isArray(r.groups)) throw new Error('no groups')
         if (r.complete === false || r.status === 'running') { p.error = "an incomplete record: its job didn't finish"; return p }
-        p.data = r; p.status = '✓ ' + (r.analysis || 'rdf') + (r.frames ? ' · ' + r.frames.analysed + ' frames' : '')
+        p.data = r; p.status = (r.analysis || 'rdf') + (r.frames ? ' · ' + r.frames.analysed + ' frames' : '')
       } else p.error = 'not a gro, pdb, ndx, xvg or run.json'
     } catch (e) { p.error = 'not a valid ' + kind + ' (' + (e as Error).message + ')' }
     return p
@@ -261,7 +261,7 @@ export function fromFiles(files: LoadedFile[]): { analyses: Analysis[]; structs:
   const order = { gro: 0, ndx: 1, xvg: 2, run: 3, file: 4 }
   const rows: FileRow[] = parsed.slice().sort((p, q) => order[p.kind] - order[q.kind] || p.path.localeCompare(q.path)).map(p => ({
     path: p.path, kind: p.kind, error: !!p.error,
-    status: p.error ? '✗ ' + p.error : p.status + (linked[p.path] ?? (xvgs.length && !used.has(p.path) ? ' · not linked' : '')),
+    status: p.error ? p.error : p.status + (linked[p.path] ?? (xvgs.length && !used.has(p.path) ? ' · not linked' : '')),
   }))
   return { analyses, structs, files: rows }
 }

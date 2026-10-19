@@ -8,6 +8,7 @@ import { ToggleGroup, ToggleGroupItem } from './ui/toggle-group'
 import { getJson, type AppState } from './api'
 import { readThemePref, saveThemePref, themeOf, type ThemePref } from './lib/theme'
 import { useJobs, useNaming } from './jobs'
+import { Status } from './ui/status'
 import { useDraft } from './draft'
 import { recipeFromRecord } from './lib/record'
 import { BatchView } from './views/Batch'
@@ -59,13 +60,13 @@ function VaultStatus({ path }: { path: string | null }) {
     return () => { alive = false }
   }, [path])
   if (!path || !v) return null
-  return v.error ? <span className="text-caption text-destructive" title={v.error}>✗ vault</span> : <span className="text-caption text-muted-foreground">vault · {v.path.split('/').pop()}</span>
+  return v.error ? <Status inline level="error" word="vault" why={v.error} className="text-caption" /> : <span className="text-caption text-muted-foreground">vault · {v.path.split('/').pop()}</span>
 }
 
 function GmxStatus({ gmx }: { gmx: AppState['gmx'] }) {
   return gmx.ok
-    ? <span className="text-caption text-muted-foreground">{gmx.name} {gmx.version} · <span className="text-mint-strong">✓ ready</span></span>
-    : <span className="text-caption text-destructive">✗ no gmx</span>
+    ? <span className="text-caption text-muted-foreground">{gmx.name} {gmx.version} · <Status inline level="ok" word="ready" className="text-caption" /></span>
+    : <Status inline level="error" word="no gmx" className="text-caption" />
 }
 
 export function App() {

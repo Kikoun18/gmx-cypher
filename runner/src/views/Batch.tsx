@@ -10,9 +10,9 @@ import { Section } from '../ui/separator'
 import { getJson, postJson, type AppState } from '../api'
 import type { Draft } from '../draft'
 import { statusOf, type Job } from '../jobs'
+import { Status } from '../ui/status'
 import { batchSummary, sentSummary } from '../lib/batch'
 import { recipeFromDraft, type Recipe } from '../lib/recipe'
-import { cn } from '../lib/utils'
 import { FIELD_LABEL } from '../../../matrix/src/lib/seq'
 
 interface Item { rel: string; fields: Record<string, string>; run: number | null; runInput: string | null; structure: string | null; counts: number[] | null; problems: string[] }
@@ -43,8 +43,8 @@ function BatchCard({ b, jobs, vault, onOpenJob }: { b: Batch; jobs: Job[]; vault
   React.useEffect(() => { if (vault) getJson<{ projects?: { id: string; name: string }[] }>('/api/vault').then(v => { setProjects(v.projects || []); setProject(p => p ?? v.projects?.[0]?.id ?? null) }, () => {}) }, [vault])
   const job = (id?: string) => jobs.find(j => j.id === id)
   const word = (i: Batch['items'][number]) => {
-    if (i.status === 'started') { const j = job(i.job); return j ? statusOf(j) : { word: 'started', className: '' } }
-    return { word: { queued: 'queued', starting: 'checking groups…', refused: '✗ refused', cancelled: 'cancelled' }[i.status] || i.status, className: i.status === 'refused' ? 'text-destructive' : 'text-muted-foreground' }
+    if (i.status === 'started') { const j = job(i.job); return j ? statusOf(j) : { level: 'info' as const, word: 'started' } }
+    return { level: i.status === 'refused' ? 'error' as const : 'info' as const, word: { queued: 'queued', starting: 'checking groups…', refused: 'refused', cancelled: 'cancelled' }[i.status] || i.status }
   }
   const running = b.items.some(i => i.status === 'queued' || i.status === 'starting' || (i.status === 'started' && job(i.job)?.status === 'running'))
   const done = b.items.filter(i => job(i.job)?.status === 'done').length
@@ -63,8 +63,8 @@ function BatchCard({ b, jobs, vault, onOpenJob }: { b: Batch; jobs: Job[]; vault
           return (
             <tr key={i.rel} className="align-top">
               <td className="py-0.5 pr-3 break-all">{i.job ? <button className="text-left underline-offset-[3px] hover:underline" onClick={() => onOpenJob(i.job!)}>{i.rel}</button> : i.rel}</td>
-              <td className={cn('whitespace-nowrap pr-3 text-caption', w.className)}>{w.word}</td>
-              <td className="text-caption text-muted-foreground">{i.error ? i.error.split('\n')[0] : s ? (s.sent ? '✓ sent to ' + s.sent : 'not sent: ' + s.skipped) : ''}</td>
+              <td className="whitespace-nowrap pr-3 text-caption"><Status inline level={w.level} word={w.word} /></td>
+              <td className="text-caption text-muted-foreground">{i.error ? i.error.split('\n')[0] : s ? (s.sent ? <Status inline level="ok" word="sent">to {s.sent}</Status> : <Status inline level="warning" word="not sent">{s.skipped}</Status>) : ''}</td>
             </tr>
           )
         })}
@@ -77,11 +77,11 @@ function BatchCard({ b, jobs, vault, onOpenJob }: { b: Batch; jobs: Job[]; vault
               <SelectContent>{projects.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent>
             </Select>
           )}
-          <Button variant="outline" size="sm" disabled={!project || !!sent} onClick={sendAll}>{sent ? '✓ sent' : 'send all to vault'}</Button>
+          <Button variant="outline" size="sm" disabled={!project || !!sent} onClick={sendAll}>{sent ? 'sent' : 'send all to vault'}</Button>
           <span className="text-caption text-muted-foreground" aria-live="polite">{sent ? sentSummary(sent) : 'each by the rule of a single send: only where the Matrix would put it where its path says; the rest are listed'}</span>
         </div>
       )}
-      {error && <FieldHint error>✗ {error}</FieldHint>}
+      {error && <Status level="error">{error}</Status>}
     </section>
   )
 }
@@ -144,7 +144,7 @@ export function BatchView({ state, draft, jobs, onOpenJob }: { state: AppState; 
       <div className="flex items-center gap-3">
         <Button variant="outline" disabled={!root || !template || busy} onClick={preview}>{busy && !items ? 'looking…' : 'preview'}</Button>
         {items && state.gmx.ok && <Button size="lg" disabled={!chosen.size || busy} onClick={run}>{busy ? 'starting…' : 'run ' + chosen.size + ' of ' + items.length}</Button>}
-        {items && !state.gmx.ok && <span className="text-control text-destructive">✗ no working gmx: set it in settings to run these</span>}
+        {items && !state.gmx.ok && <Status level="error" className="text-control">no working gmx: set it in settings to run these</Status>}
         <span className="text-caption text-muted-foreground" aria-live="polite">{items ? items.length + ' trajectories match · nothing runs until you press run' : 'nothing runs until you have seen the preview'}</span>
       </div>
       {error && <Alert variant="destructive"><X /><AlertTitle>no batch</AlertTitle><AlertDescription><p className="whitespace-pre-line">{error}</p></AlertDescription></Alert>}
@@ -163,7 +163,7 @@ export function BatchView({ state, draft, jobs, onOpenJob }: { state: AppState; 
                 <td className="pr-3 text-caption">{Object.entries(i.fields).filter(([k]) => k !== 'run').map(([k, v]) => (FIELD_LABEL[k as keyof typeof FIELD_LABEL] || k) + ' ' + v).concat(i.run ? ['run ' + i.run] : []).join(' · ')}</td>
                 <td className="pr-3 text-caption text-muted-foreground">{[i.runInput, i.structure].filter(Boolean).map(p => p!.split('/').pop()).join(' · ')}</td>
                 <td className="pr-3 text-caption">{i.counts?.join(' · ')}</td>
-                <td className="text-caption text-destructive">{i.problems.join('; ')}</td>
+                <td className="text-caption"><Status inline level="error" word="not run">{i.problems.join('; ')}</Status></td>
               </tr>
             ))}
           </tbody>

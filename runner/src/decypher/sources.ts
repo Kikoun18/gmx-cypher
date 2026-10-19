@@ -129,7 +129,7 @@ export function useAnalyses(refs: SourceRef[], allJobs: Job[], jobsLoaded: boole
         if (d) return 'error' in d ? { key, kind: 'job', name, status: 'error', error: d.error } : { key, kind: 'job', name, status: 'ready', analysis: d.analysis }
         if (!j) return { key, kind: 'job', name, status: jobsLoaded ? 'error' : 'loading', error: jobsLoaded ? 'not among this gmx-cypher\'s jobs' : undefined }
         if (j.kind !== 'rdf') return { key, kind: 'job', name, status: 'error', error: 'not an RDF run' }
-        if (j.status === 'running') return { key, kind: 'job', name, status: 'waiting', error: 'running… it opens here when it ends' }
+        if (j.status === 'running') return { key, kind: 'job', name, status: 'waiting', error: 'running · it opens here when it ends' }
         if (j.status !== 'done') return { key, kind: 'job', name, status: 'error', error: j.status + ': no g(r) to show' }
         return { key, kind: 'job', name, status: 'loading' }
       }

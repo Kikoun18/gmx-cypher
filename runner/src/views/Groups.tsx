@@ -3,7 +3,6 @@ import { Plus, TriangleAlert, X } from 'lucide-react'
 import { Alert, AlertActions, AlertDescription, AlertTitle } from '../ui/alert'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
-import { FieldHint } from '../ui/label'
 import { Kbd } from '../ui/kbd'
 import { altName, browserPlatform } from '../lib/platform'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
@@ -19,6 +18,7 @@ import type { NdxGroup } from '../lib/ndx'
 import { groupChip, groupText, TONES, type Tone } from '../lib/tones'
 import { cn } from '../lib/utils'
 import { Viewer, type Centre, type PickHow } from './Viewer'
+import { Status } from '../ui/status'
 
 type Kind = 'resname' | 'resnr' | 'name' | 'element' | 'index'
 const KINDS: { kind: Kind; label: string }[] = [
@@ -108,8 +108,8 @@ function RuleForm({ atoms, index, onStep }: { atoms: Atom[]; index: { file: stri
       </div>
       {kind === 'name' && <NameMenu atoms={atoms} resn={within.trim()} value={value} onChange={setValue} />}
       {kind === 'name' && <p className="m-0 text-caption text-muted-foreground"><Kbd>Enter</Kbd> adds the rule and closes it · <Kbd>Shift</Kbd>+<Kbd>Enter</Kbd> adds it and keeps this form open for another rule in this group, with the same residue name</p>}
-      {value.trim() && names?.problems.map(p => <FieldHint key={p} error>✗ {p}</FieldHint>)}
-      {unknown.length > 0 && <FieldHint error>✗ 0 atoms: {unknown.join(', ')}{within.trim() ? ' in ' + within.trim() : ' in this structure'}</FieldHint>}
+      {value.trim() && names?.problems.map(p => <Status key={p} level="warning">{p}</Status>)}
+      {unknown.length > 0 && <Status level="warning">0 atoms: {unknown.join(', ')}{within.trim() ? ' in ' + within.trim() : ' in this structure'}</Status>}
       {r && <span className="text-caption text-muted-foreground">{picked ? picked.label + ' · ' + picked.atoms.length + ' atoms' : ruleText(r) + ' · ' + groupAtoms(atoms, [{ op: 'add', rule: r }]).length + ' atoms'}</span>}
     </div>
   )
@@ -152,7 +152,7 @@ function GroupCard({ group, atoms, index, nrs, others, current, onCurrent, onCha
         <Button variant="ghost" size="sm" disabled={!nrs.length} onClick={onCentre} title="rotate the 3D view around this group" aria-label={'rotate around ' + group.name}>centre</Button>
         {onRemove && <Button variant="ghost" size="sm" onClick={() => (armed ? onRemove() : setArmed(true))}>{armed ? 'click again to remove' : 'remove'}</Button>}
       </div>
-      {problem && <FieldHint error>✗ {problem}</FieldHint>}
+      {problem && <Status level="error">{problem}</Status>}
       {group.steps.length > 0 && (
         <ul className="m-0 flex list-none flex-col gap-0.5 p-0 text-caption">
           {group.steps.map((s, i) => (
@@ -166,8 +166,8 @@ function GroupCard({ group, atoms, index, nrs, others, current, onCurrent, onCha
       )}
       <Input size="sm" value={typed ?? toRanges(nrs)} placeholder="atoms, e.g. 5-30:5, 47" aria-label={group.name + ' atoms'} aria-invalid={!!typedError}
         onChange={e => setTyped(e.target.value)} onBlur={commitTyped} onKeyDown={e => { if (e.key === 'Enter') commitTyped(); if (e.key === 'Escape') setTyped(null) }} />
-      {typedError && <FieldHint error>✗ {typedError}</FieldHint>}
-      {beyond.length > 0 && <FieldHint error>✗ atoms {toRanges(beyond)} are beyond the structure's {atoms.length}</FieldHint>}
+      {typedError && <Status level="error">{typedError}</Status>}
+      {beyond.length > 0 && <Status level="error">atoms {toRanges(beyond)} are beyond the structure's {atoms.length}</Status>}
       {rule ? <RuleForm atoms={atoms} index={index} onStep={(s, keep) => { steps([...group.steps, s]); setRule(!!keep) }} /> : <Button variant="ghost" size="sm" className="self-start" onClick={() => setRule(true)}>+ rule</Button>}
     </section>
   )
@@ -203,7 +203,7 @@ export function Groups({ draft, setDraft }: { draft: Draft; setDraft: React.Disp
 
   if (!draft.inputs.structure) return <p className="m-0 text-control text-muted-foreground">pick a structure in inputs first</p>
   if (!structure) return <p className="m-0 text-control text-muted-foreground" aria-live="polite">reading the structure…</p>
-  if ('error' in structure) return <p className="m-0 text-control text-destructive">✗ {structure.error}</p>
+  if ('error' in structure) return <Status level="error" className="text-control">{structure.error}</Status>
   const ref = draft.groups[0], names = (i: number) => draft.groups.filter((_, j) => j !== i).map(g => g.name)
   // What the picked command calls its groups, and how many it takes after the first (R9: gmx rmsf takes one).
   const command = commandOf(draft.analysis ?? 'rdf') ?? rdfCommand, roles = rolesOf(command), others = draft.groups.length - 1
@@ -241,7 +241,7 @@ export function Groups({ draft, setDraft }: { draft: Draft; setDraft: React.Disp
               <AlertTitle>{ref.name} and {g.name} share {both.length} atom{both.length > 1 ? 's' : ''}</AlertTitle>
               <AlertDescription><p>Self-pairs at r = 0 and bonded neighbours distort g(r) of {g.name}. Exclusions don't change the normalisation.</p></AlertDescription>
               <AlertActions>
-                <Button variant="outline" size="sm" disabled={draft.options.excl === true} onClick={() => setDraft(d => ({ ...d, options: { ...d.options, excl: true } }))}>{draft.options.excl === true ? '✓ exclusions on (-excl)' : 'use exclusions (-excl)'}</Button>
+                <Button variant="outline" size="sm" disabled={draft.options.excl === true} onClick={() => setDraft(d => ({ ...d, options: { ...d.options, excl: true } }))}>{draft.options.excl === true ? 'exclusions on (-excl)' : 'use exclusions (-excl)'}</Button>
                 <Button variant="ghost" size="sm" onClick={() => setGroup(k + 1, { ...g, steps: [...g.steps, { op: 'remove', rule: { kind: 'atoms', atoms: toRanges(both) }, note: 'shared with ' + ref.name }] })}>remove the {both.length} from {g.name}</Button>
               </AlertActions>
             </Alert>
@@ -273,7 +273,7 @@ function SizeCheck({ draft, sets }: { draft: Draft; sets: number[][] }) {
         <Button variant="outline" size="sm" disabled={!runInput || busy || body.groups.some(g => !g.atoms)} onClick={run}>{busy ? 'counting…' : 'check sizes with gmx'}</Button>
         <span className="text-caption text-muted-foreground">{runInput ? 'gmx select on ' + runInput.split('/').pop() : 'needs a run input'}</span>
       </div>
-      {r?.sizes?.ok && <p className="m-0 text-control text-mint-strong">✓ gmx counts the same: {draft.groups.map((g, i) => g.name + ' ' + r.sizes!.sizes![i]).join(' · ')}</p>}
+      {r?.sizes?.ok && <Status level="ok" className="text-control">gmx counts the same: {draft.groups.map((g, i) => g.name + ' ' + r.sizes!.sizes![i]).join(' · ')}</Status>}
       {r && !r.sizes?.ok && (
         <Alert variant="destructive"><X /><AlertTitle>these groups can't run</AlertTitle><AlertDescription>{(r.sizes?.problems || [r.error]).map(p => <p key={p} className="whitespace-pre-line">{p}</p>)}</AlertDescription></Alert>
       )}

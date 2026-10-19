@@ -14,6 +14,7 @@ import { cn } from '../lib/utils'
 import { Code } from './Code'
 import { useTerms } from '../terms'
 import { usePlan } from '../plan'
+import { Status } from '../ui/status'
 
 /** The energy command's own view (R4): its terms picked by number, its first and last time, and what will run. */
 export function Energy({ gmx, draft, setDraft, onStarted }: { gmx: GmxState; draft: Draft; setDraft: React.Dispatch<React.SetStateAction<Draft>>; onStarted: (id: string) => void }) {
@@ -102,7 +103,7 @@ export function Energy({ gmx, draft, setDraft, onStarted }: { gmx: GmxState; dra
           })}
           <button className="self-start text-caption text-foreground underline underline-offset-[3px] hover:decoration-2" aria-expanded={more} onClick={() => setMore(m => !m)}>{more ? 'fewer options' : 'more options'}</button>
         </div>
-        {last > 0 && first >= last && <p className="m-0 text-caption text-destructive">-e must be after -b</p>}
+        {last > 0 && first >= last && <Status level="error">-e must be after -b</Status>}
       </div>
 
       <aside className="flex min-w-0 flex-col gap-4">

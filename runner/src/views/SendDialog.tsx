@@ -10,6 +10,7 @@ import { Section } from '../ui/separator'
 import { getJson, postJson } from '../api'
 import type { Job } from '../jobs'
 import { typeSource, type Fields, type Landing, type Source } from '../lib/landing'
+import { Status } from '../ui/status'
 
 interface VaultInfo { path: string; project?: string | null; projects: { id: string; name: string; dir: string }[]; error?: string }
 interface Sent { path: string; name: string; renamed: boolean; next: string[]; link?: string }
@@ -77,7 +78,7 @@ export function SendDialog({ job, open, onOpenChange, returnFocus }: { job: Job;
           </DialogBody>
         ) : (
         <DialogBody>
-          {vault?.error && <FieldHint error>✗ {vault.error}</FieldHint>}
+          {vault?.error && <Status level="error">{vault.error}</Status>}
           {vault && vault.projects.length > 1 && (
             <Field>
               <Label htmlFor="project">project</Label>
@@ -103,18 +104,18 @@ export function SendDialog({ job, open, onOpenChange, returnFocus }: { job: Job;
             <Field>
               <Label htmlFor="f-file">file name</Label>
               <Input id="f-file" size="sm" value={name ?? pv.name} onChange={e => setName(e.target.value)} />
-              {pv.missing.length > 0 ? <FieldHint error>✗ the project's pattern {pv.pattern} needs {pv.missing.join(', ')}: type it above</FieldHint>
+              {pv.missing.length > 0 ? <Status level="warning">the project's pattern {pv.pattern} needs {pv.missing.join(', ')}: type it above</Status>
                 : <FieldHint>{name != null ? 'typed · ' : ''}the project's pattern {pv.pattern}, filled from the fields above</FieldHint>}
             </Field>
           )}
           <Section label="Landing preview"><span className="text-caption text-muted-foreground">The Matrix's own planBatch on this file</span></Section>
-          {r?.error && <FieldHint error>✗ {r.error}</FieldHint>}
+          {r?.error && <Status level="error">{r.error}</Status>}
           {!r && <p className="m-0 text-control text-muted-foreground" aria-live="polite">asking the Matrix's planner…</p>}
           {l && (
             <div className="flex flex-col gap-3" aria-live="polite">
               <p className="m-0 text-control">
                 {l.row ? <>The Matrix will put it at <b>{l.row} × {l.col.label}</b> · run {l.run} · {l.type.label} ({typeSource(l.type.how)}){l.rowNew && ' · new row'}{l.col.isNew && ' · new column'}{l.replaces && ' · replaces the RDF there'}</> : 'The Matrix would not know where to put it'}
-                {' · '}{pv.reasons.length ? <span className="text-destructive">✗ not what you chose: {pv.reasons.join(', ')}</span> : <span className="text-mint-strong">✓ matches what you chose</span>}
+                {' · '}{pv.reasons.length ? <Status inline level="warning" word="not what you chose">{pv.reasons.join(', ')}</Status> : <Status inline level="ok" word="matches what you chose" />}
               </p>
               {(l.problems.length > 0 || pv.reasons.length > 0) && (
                 <Alert variant="destructive"><X /><AlertTitle>it would not land where you chose</AlertTitle>
@@ -137,7 +138,7 @@ export function SendDialog({ job, open, onOpenChange, returnFocus }: { job: Job;
             </div>
           )}
           {pv && <FieldHint>copies to {pv.project.dir}/_inbox/{fileName} · only g(r), not the cumulative number · nothing else in the vault changes</FieldHint>}
-          {sendError && <FieldHint error>✗ {sendError}</FieldHint>}
+          {sendError && <Status level="error">{sendError}</Status>}
         </DialogBody>
         )}
         <DialogFooter>

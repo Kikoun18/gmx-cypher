@@ -22,12 +22,12 @@ function Field({ className, ...props }: React.ComponentProps<"div">) {
   return <div data-slot="field" className={cn("flex min-w-0 flex-col gap-[5px]", className)} {...props} />
 }
 
-/** One line of help or error under a field. */
-function FieldHint({ className, error, ...props }: React.ComponentProps<"p"> & { error?: boolean }) {
+/** One line of help under a field; an error under one is a Status (R9c). */
+function FieldHint({ className, ...props }: React.ComponentProps<"p">) {
   return (
     <p
       data-slot="field-hint"
-      className={cn("m-0 text-caption", error ? "text-destructive" : "text-muted-foreground", className)}
+      className={cn("m-0 text-caption text-muted-foreground", className)}
       {...props}
     />
   )

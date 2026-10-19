@@ -7,6 +7,7 @@ import { defaultView, structStyle, toPdb, type Look } from '../../../matrix/src/
 import { drawnNumbers, type Atom } from '../lib/atoms'
 import type { Tone } from '../lib/tones'
 import { boxDimensions, boxEdges, outsideBox, parseBox } from '../lib/box'
+import { Status } from '../ui/status'
 
 export type PickHow = 'atom' | 'residue' | 'name'
 
@@ -188,9 +189,11 @@ export function Viewer({ text, format, atoms, colour, onPick, describe, groupOf,
         {structStyle(info, look, solvent).note && ' · ' + structStyle(info, look, solvent).note}
       </p>
       <p className="m-0 text-caption text-muted-foreground" aria-live="polite">
-        {cell.vectors && dims ? <>box of the structure file · a {dims.a.toFixed(2)} · b {dims.b.toFixed(2)} · c {dims.c.toFixed(2)} nm · α {degrees(dims.alpha)}° β {degrees(dims.beta)}° γ {degrees(dims.gamma)}° · V {dims.volume.toFixed(3)} nm³{outside && outside.count ? ' · ' + outside.count + ' of ' + outside.total + ' atoms lie outside it, as recorded' : ''}</> : 'no box: ' + cell.problems.join(' ')}
+        {cell.vectors && dims ? <>box of the structure file · a {dims.a.toFixed(2)} · b {dims.b.toFixed(2)} · c {dims.c.toFixed(2)} nm · α {degrees(dims.alpha)}° β {degrees(dims.beta)}° γ {degrees(dims.gamma)}° · V {dims.volume.toFixed(3)} nm³</> : 'no box: ' + cell.problems.join(' ')}
       </p>
-      {cell.vectors && <p className="m-0 text-caption text-muted-foreground">a molecule that crosses an edge looks broken: that is periodicity, not an error</p>}
+      {cell.vectors && (outside?.count
+        ? <Status level="info" why="A molecule that crosses an edge looks broken: that is periodicity, not an error. gmx works with the box as recorded.">{outside.count} of {outside.total} atoms lie outside the box, as recorded</Status>
+        : <p className="m-0 text-caption text-muted-foreground">a molecule that crosses an edge looks broken: that is periodicity, not an error</p>)}
       {colour.size > 0 && <p className="m-0 text-caption text-muted-foreground">{colourBy === 'element' ? 'group atoms keep their element colours and carry a halo in their group’s hue' : 'group atoms are drawn in their group’s hue, the rest in grey'}</p>}
       <p className="m-0 flex flex-wrap items-center gap-x-3 text-caption text-muted-foreground" aria-live="polite">
         <span>{centre ? <>rotating around <b className="text-foreground">{centre.label}</b>{centre.count > 1 ? ' · ' + centre.count + ' atoms' : ''}</> : 'rotating around the middle of the structure'}</span>

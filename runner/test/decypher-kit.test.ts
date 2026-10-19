@@ -32,15 +32,15 @@ describe('(de)Cypher reads your runs as the RDF Explorer design does', () => {
     // The peptide alone has 139 atoms; the groups reach atom 246: only the system's structure fits.
     expect(h.struct).toBe('file:o111/9.multiwalker.gro')
     expect(h.sub).toBe('files · 51 frames · bin 0.03 nm · ref H_Met')
-    expect(rows.find(r => r.path.endsWith('mmmmmmmm.gro'))!.status).toBe('✓ 139 atoms · not linked')
-    expect(rows.find(r => r.path.endsWith('Methionine_H.xvg'))!.status).toBe('✓ 13 curves · 115 points → rdf_o111_Methionine_H.run.json, rdf_o111_Methionine_H.ndx, 9.multiwalker.gro')
+    expect(rows.find(r => r.path.endsWith('mmmmmmmm.gro'))!.status).toBe('139 atoms · not linked')
+    expect(rows.find(r => r.path.endsWith('Methionine_H.xvg'))!.status).toBe('13 curves · 115 points → rdf_o111_Methionine_H.run.json, rdf_o111_Methionine_H.ndx, 9.multiwalker.gro')
     expect(shortLabels(analyses.map(a => a.label))).toEqual(['Methionine_H', 'Methionine_S'])
   })
 
   it("a dropped record whose job didn't finish is not used: its row says so (R2b)", () => {
     const rec = JSON.parse(read('rdf_o111_Methionine_H.run.json'))
     const { files } = fromFiles([{ path: 'cut.run.json', text: JSON.stringify({ ...rec, status: 'running', complete: false }) }])
-    expect(files[0].status).toBe("✗ an incomplete record: its job didn't finish")
+    expect(files[0].status).toBe("an incomplete record: its job didn't finish")
   })
 
   it('a peak is the highest point of the curve, not the first shell\'s; an index without a record names the groups by the legends', () => {

@@ -77,7 +77,7 @@ test('tick two jobs, see them side by side and on one graph, export them as one 
   // Export: one file that draws on its own, from file://, with nothing fetched.
   await dialog.getByRole('button', { name: 'export' }).click()
   const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: '+ Export html' }).click()])
-  await expect(page.getByText(/✓ exported decypher_2-RDFs_/)).toBeVisible()
+  await expect(page.getByText(/^decypher_2-RDFs_/)).toBeVisible()
   const file = join(mkdtempSync(join(tmpdir(), 'gmxc-e2e-export-')), download.suggestedFilename())
   await download.saveAs(file)
   const html = readFileSync(file, 'utf8')

@@ -4,6 +4,7 @@ import * as React from 'react'
 import { getJson } from './api'
 import type { Progress } from './lib/progress'
 import { displayNames, type Naming } from './lib/displayName'
+import type { Level } from './core/contract'
 
 export interface Job {
   id: string; kind: string; title: string; file: string; args: string[]; cwd: string; env?: Record<string, string>
@@ -17,16 +18,17 @@ export interface Job {
   name?: string
 }
 
-export const STATUS: Record<Job['status'], { word: string; className: string }> = {
-  running: { word: 'running…', className: 'text-butter-strong' },
-  done: { word: '✓ done', className: 'text-mint-strong' },
-  failed: { word: '✗ failed', className: 'text-destructive' },
-  cancelled: { word: 'cancelled', className: 'text-muted-foreground' },
-  interrupted: { word: 'interrupted', className: 'text-muted-foreground' },
+/** A job's state as a status level and its word (R9c, contract §4). */
+export const STATUS: Record<Job['status'], { level: Level; word: string }> = {
+  running: { level: 'info', word: 'running' },
+  done: { level: 'ok', word: 'done' },
+  failed: { level: 'error', word: 'failed' },
+  cancelled: { level: 'info', word: 'cancelled' },
+  interrupted: { level: 'warning', word: 'interrupted' },
 }
 
-/** A job's state in words: a job found running at start says it is no longer followed (R2a). */
-export const statusOf = (j: Job) => (j.unfollowed ? { word: 'still running, not followed (pid ' + j.pid + ')', className: 'text-muted-foreground' } : STATUS[j.status])
+/** A job's state: a job found running at start says it is no longer followed (R2a). */
+export const statusOf = (j: Job): { level: Level; word: string } => (j.unfollowed ? { level: 'warning', word: 'still running, not followed (pid ' + j.pid + ')' } : STATUS[j.status])
 
 /** Every job, kept current by the server's event stream; a reload or a restart loses nothing (T7). Each is named by the connected project (R3c). */
 export function useJobs(naming: Naming | null = null) {

@@ -1,7 +1,6 @@
 import * as React from 'react'
 import { X } from 'lucide-react'
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert'
-import { Badge } from '../ui/badge'
 import { Button } from '../ui/button'
 import { Checkbox } from '../ui/checkbox'
 import type { DecypherSources, SourceRef } from '../decypher/state'
@@ -9,6 +8,7 @@ import { Kbd } from '../ui/kbd'
 import { Section } from '../ui/separator'
 import { postJson } from '../api'
 import { clock, fraction, jobLine, progressText, statusOf, type Job, type useJobs } from '../jobs'
+import { Status } from '../ui/status'
 import { commandText } from '../lib/command'
 import { asTerminal } from '../lib/progress'
 import { cn } from '../lib/utils'
@@ -44,7 +44,7 @@ function JobDetail({ job, log, onRunAgain, vault, decypher }: { job: Job; log: s
     <div className="flex min-w-0 flex-col gap-4">
       <div className="flex items-center gap-3">
         <h2 className="m-0 text-title font-bold">{job.name ?? job.title}</h2>
-        <Badge tone={job.status === 'running' ? 'butter' : job.status === 'done' ? 'mint' : 'stone'} variant={job.status === 'failed' ? 'destructive' : undefined}>{s.word}</Badge>
+        <Status inline level={s.level} word={s.word} className="text-control" />
         <span className="flex-1" />
         {job.kind === 'rdf' && job.status === 'done' && <Button variant="outline" onClick={() => decypher.open([{ kind: 'job', id: job.id }])}>compare</Button>}
         {job.status === 'running' && !job.unfollowed && <Button variant="destructive" onClick={cancel}>{armed ? 'click again to cancel' : 'cancel'}</Button>}
@@ -55,7 +55,7 @@ function JobDetail({ job, log, onRunAgain, vault, decypher }: { job: Job; log: s
       )}
       {running && f != null && (
         <div role="progressbar" aria-label="frames read" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(f * 100)} className="h-2 overflow-hidden rounded-full bg-muted">
-          <div className="h-full rounded-full bg-butter transition-[width] duration-300" style={{ width: f * 100 + '%' }} />
+          <div className="h-full rounded-full bg-state transition-[width] duration-300" style={{ width: f * 100 + '%' }} />
         </div>
       )}
       {job.unfollowed && <p className="m-0 text-caption text-muted-foreground">gmx-cypher restarted while this job ran: it still runs (pid {job.pid}), but its output and its end are no longer read here, and its record is not completed</p>}
@@ -97,7 +97,7 @@ export function JobsView({ jobs, logs, loadLog, selected, onSelect, onRunAgain, 
                 : anyRdf && <span className="ml-2.5 w-[13px] shrink-0" />}
               <button onClick={() => onSelect(j.id)} aria-current={j.id === job?.id ? 'true' : undefined} className={cn('flex min-w-0 flex-1 flex-col items-start gap-0.5 py-2 pr-3 text-left', anyRdf ? 'pl-1.5' : 'pl-3')}>
                 <span className="text-control font-bold">{j.name ?? j.title}</span>
-                <span className="block w-full truncate text-caption"><span className={statusOf(j).className}>{statusOf(j).word}</span> <span className="text-muted-foreground">· {jobLine(j)}</span></span>
+                <span className="block w-full truncate text-caption"><Status inline level={statusOf(j).level} word={statusOf(j).word} /> <span className="text-muted-foreground">· {jobLine(j)}</span></span>
               </button>
             </div>
           )

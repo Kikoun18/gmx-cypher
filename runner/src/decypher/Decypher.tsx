@@ -15,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { ToggleGroup, ToggleGroupItem } from '../ui/toggle-group'
 import { getJson, postJson } from '../api'
 import { jobLine, statusOf, type Job } from '../jobs'
+import { Status } from '../ui/status'
 import { cn } from '../lib/utils'
 import type { Analysis, Curve, Mol, Palette, Struct, Tone } from './kit'
 import { ChartPanel, CurveTable, GroupChips, StructurePanel, Swatch, type StructureHandle } from './panels'
@@ -212,7 +213,7 @@ function CompareView({ shown, focus, setFocus, mols, pal, view, patch, selected,
           empty={curves.length ? null : { title: 'Pick an atom group', hint: 'Each group you pick is drawn for every result that has it: the same atoms of the same structure, else the same name.' }} />
         <div className="border-t border-border px-4 pb-3.5 pt-2.5">
           <CurveTable curves={curves} onRemove={n => onSelect(selected.filter(x => x !== n))} onHover={c => { setHot(c?.key ?? null); setHover(c?.name ?? null) }} />
-          {unmatched.map(u => <p key={u.an.id} className="m-0 text-caption text-butter-strong">{u.an.label}: no group to match {u.names.join(', ')} · groups are matched by their atoms, then their name (case, punctuation and a trailing "…x" ignored), then their place in a list as long</p>)}
+          {unmatched.map(u => <Status key={u.an.id} level="warning" why={'Groups are matched by their atoms, then their name (case, punctuation and a trailing "…x" ignored), then their place in a list as long.'}>{u.an.label}: no group to match {u.names.join(', ')}</Status>)}
           {!curves.length && <p className="m-0 text-caption text-muted-foreground">{view.colorBy === 'group' ? 'by group: each group its hue, each result its dash' : 'by result: each result its hue, each group its dash'}</p>}
         </div>
       </section>
@@ -239,11 +240,11 @@ function RunsTab({ allow, row }: { allow: string[]; row: (ref: SourceRef, title:
         <Button variant="outline" size="sm" className="h-8" onClick={find} disabled={!root.trim() || busy}>{busy ? 'looking…' : 'find'}</Button>
       </div>
       <p className="m-0 text-caption text-muted-foreground">every RDF record (.run.json) under this folder, newest first, with the structure each ran on</p>
-      {found && 'error' in found && <p className="m-0 text-caption text-destructive">✗ {found.error}</p>}
+      {found && 'error' in found && <Status level="error">{found.error}</Status>}
       {found && 'runs' in found && (found.runs.length
         ? <div className="flex flex-col">{found.runs.map(r => row({ kind: 'record', path: r.path }, r.stem, [r.frames != null ? r.frames + ' frames' : null, r.reference ? 'ref ' + r.reference : null, plural(Math.max(0, r.groups - 1), 'group'), rel(r.path, found.root).split('/').slice(0, -1).join('/') || null].filter(Boolean).join(' · ')))}</div>
         : <p className="m-0 text-caption text-muted-foreground">no RDF records under {found.root}</p>)}
-      {found && 'runs' in found && found.more && <p className="m-0 text-caption text-butter-strong">the first {found.runs.length} only · look in a folder further down</p>}
+      {found && 'runs' in found && found.more && <Status level="info">the first {found.runs.length} only · look in a folder further down</Status>}
       {found && 'runs' in found && found.unread.length > 0 && <p className="m-0 text-caption text-muted-foreground">couldn't look into {found.unread.length === 1 ? found.unread[0] : plural(found.unread.length, 'folder')}</p>}
     </div>
   )
@@ -276,13 +277,13 @@ function AddPanel({ sources, jobs, allow, vaultPath, vault, loadVault, fileRows,
         <ToggleGroupItem value="jobs">jobs</ToggleGroupItem><ToggleGroupItem value="runs">on disk</ToggleGroupItem><ToggleGroupItem value="vault">vault</ToggleGroupItem><ToggleGroupItem value="files">files</ToggleGroupItem>
       </ToggleGroup>
       {tab === 'jobs' && (rdfJobs.length
-        ? <div className="flex flex-col">{rdfJobs.map(j => row({ kind: 'job', id: j.id }, j.name ?? j.title, <><span className={statusOf(j).className}>{statusOf(j).word}</span> · {jobLine(j)}</>, j.status === 'failed' || j.status === 'cancelled' || j.status === 'interrupted'))}</div>
+        ? <div className="flex flex-col">{rdfJobs.map(j => row({ kind: 'job', id: j.id }, j.name ?? j.title, <><Status inline level={statusOf(j).level} word={statusOf(j).word} /> · {jobLine(j)}</>, j.status === 'failed' || j.status === 'cancelled' || j.status === 'interrupted'))}</div>
         : <p className="m-0 text-caption text-muted-foreground">no RDF jobs yet · run gmx rdf from the analysis tab</p>)}
       {tab === 'runs' && <RunsTab allow={allow} row={row} />}
       {tab === 'vault' && (!vaultPath
         ? <p className="m-0 text-caption text-muted-foreground">no vault set · choose the Matrix vault in settings, then its RDFs come here with each row's structure</p>
         : !vault ? <p className="m-0 text-caption text-muted-foreground" aria-live="polite">reading the vault…</p>
-        : vault?.error ? <div className="flex flex-col gap-1.5"><p className="m-0 text-caption text-destructive">✗ {vault.error}</p><Button variant="outline" size="sm" className="w-fit" onClick={loadVault}><RefreshCw /> try again</Button></div>
+        : vault?.error ? <div className="flex flex-col gap-1.5"><Status level="error">{vault.error}</Status><Button variant="outline" size="sm" className="w-fit" onClick={loadVault}><RefreshCw /> try again</Button></div>
         : vault?.list && (
           <div className="flex flex-col gap-2">
             <div className="flex items-center gap-2"><span className="min-w-0 flex-1 truncate text-caption text-muted-foreground">vault · {vault.list.path.split('/').pop()}</span><Button variant="ghost" size="sm" onClick={loadVault}><RefreshCw /> refresh</Button></div>
@@ -291,7 +292,7 @@ function AddPanel({ sources, jobs, allow, vaultPath, vault, loadVault, fileRows,
               <div key={p.id} className="flex flex-col gap-0.5">
                 <span className="text-label uppercase text-muted-foreground">{p.name}</span>
                 {p.rows.map(r => r.rdfs.map(a => row({ kind: 'vault', project: p.id, row: r.id, rdf: a.id }, r.name + ' × ' + a.column + ' · run ' + a.slot,
-                  plural(a.curves.length, 'curve') + ' · ' + (a.run ? '✓ groups from ' + a.run.title.split(' · ')[0] : 'no atom groups') + ' · ' + (r.structures.map(s => s.name).join(', ') || 'no structure in the row'))))}
+                  <>{plural(a.curves.length, 'curve')} · {a.run ? 'groups from ' + a.run.title.split(' · ')[0] : <Status inline level="warning" word="no atom groups" why="No record of the job that wrote this file: its curves come with their names, but not with their atoms." />} · {r.structures.map(s => s.name).join(', ') || 'no structure in the row'}</>)))}
               </div>
             ))}
           </div>
@@ -312,7 +313,7 @@ function AddPanel({ sources, jobs, allow, vaultPath, vault, loadVault, fileRows,
               <Badge tone={({ gro: 'stone', ndx: 'sky', xvg: 'coral', run: 'lilac', file: 'stone' } as Record<string, Tone>)[f.kind]} className="justify-self-start">{f.kind === 'run' ? 'run.json' : f.kind}</Badge>
               <div className="flex min-w-0 flex-col">
                 <span className="truncate text-control">{f.path}</span>
-                <span className={cn('truncate text-caption', f.error ? 'text-destructive' : 'text-muted-foreground')}>{f.status}</span>
+                {f.error ? <Status inline level="error" className="truncate text-caption">{f.status}</Status> : <span className="truncate text-caption text-muted-foreground">{f.status}</span>}
               </div>
             </div>
           ))}
@@ -348,7 +349,7 @@ function ExportDialog({ open, onOpenChange, analyses, structs, view, theme, tone
     try {
       const file = (name.trim() || exportName(picked)).replace(/\.html?$/i, '') + '.html'
       download(file, exportHtml(build({ header, titles }), await fontData()))
-      setDone('✓ exported ' + file)
+      setDone(file)
     } finally { setBusy(false) }
   }
   return (
@@ -400,7 +401,7 @@ function ExportDialog({ open, onOpenChange, analyses, structs, view, theme, tone
           </Field>
         </DialogBody>
         <DialogFooter>
-          {done && <span className="mr-auto text-caption text-mint-strong" aria-live="polite">{done}</span>}
+          {done && <Status level="ok" word="exported" className="mr-auto">{done}</Status>}
           <Button variant="ghost" onClick={() => onOpenChange(false)}>close</Button>
           <Button onClick={go} disabled={!data || busy}>{busy ? 'exporting…' : '+ Export html'}</Button>
         </DialogFooter>
@@ -571,9 +572,9 @@ function SourceRow({ it, tone, pal, hidden, onShow, onRemove, focus }: { it: Ite
       <span className="mt-[5px] size-2 shrink-0 rounded-full" style={{ background: pal.hues[tone].strong }} />
       <label htmlFor={id} className="flex min-w-0 flex-1 flex-col">
         <span className={cn('truncate text-control font-bold', hidden && 'font-normal text-muted-foreground')}>{a?.label ?? it.name}</span>
-        <span className={cn('truncate text-caption', it.status === 'error' ? 'text-destructive' : it.status === 'waiting' ? 'text-butter-strong' : 'text-muted-foreground')} title={line}>
-          {it.status === 'error' ? '✗ ' : ''}{it.kind}{line ? ' · ' + line.replace(/^(job|files|vault) · /, '') : ''}
-        </span>
+        {it.status === 'error' || it.status === 'waiting'
+          ? <Status inline level={it.status === 'error' ? 'error' : 'info'} word={it.kind} className="truncate text-caption">{line.replace(/^(job|files|vault) · /, '')}</Status>
+          : <span className="truncate text-caption text-muted-foreground" title={line}>{it.kind}{line ? ' · ' + line.replace(/^(job|files|vault) · /, '') : ''}</span>}
       </label>
       {onRemove && <button type="button" aria-label={'remove ' + (a?.title ?? it.name)} onClick={onRemove} className="grid size-[22px] shrink-0 place-items-center rounded-full text-muted-foreground hover:bg-accent hover:text-foreground">×</button>}
     </div>

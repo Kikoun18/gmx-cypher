@@ -18,6 +18,7 @@ import type { RunRecord } from '../lib/record'
 import { groupText, toneText, toneVar, type Tone } from '../lib/tones'
 import { cn } from '../lib/utils'
 import { SendDialog } from './SendDialog'
+import { Status } from '../ui/status'
 
 const size = (n: number) => (n < 1024 ? n + ' B' : n < 1048576 ? (n / 1024).toFixed(1) + ' kB' : (n / 1048576).toFixed(1) + ' MB')
 
@@ -155,7 +156,7 @@ function EnergyChart({ job, record }: { job: Job; record: RunRecord }) {
         ))}
         {stats && <Stat label="frames" value={String(stats.frames)} hint={stats.t0 + '–' + stats.t1 + ' ps · ' + stats.steps + ' steps'} />}
       </div>
-      {flagged.length > 0 && <p className="m-0 text-control text-butter-strong">{flagged.map(r => r.name).join(', ')}: the drift is larger than the error estimate, so the average is not steady within its error</p>}
+      {flagged.length > 0 && <Status level="warning" className="text-control">{flagged.map(r => r.name).join(', ')}: the drift is larger than the error estimate, so the average is not steady within its error</Status>}
       <p className="m-0 text-caption text-muted-foreground">{b > 0 ? 'first ' + b + ' ps left out · ' : ''}{record.options.filter(o => !o.isDefault && o.flag !== 'b').map(o => '-' + o.flag + (o.value === true ? '' : ' ' + o.value)).join(' · ') || 'gmx energy defaults'}</p>
     </div>
   )
@@ -239,12 +240,12 @@ function WhamChart({ job, record }: { job: Job; record: RunRecord }) {
             <tr key={p.a + '-' + p.b} className="border-t border-border">
               <td className="py-0.5 pr-4">{label(p.a)} – {label(p.b)}</td>
               <td className="pr-4 text-muted-foreground">{ov!.peaks[p.a - 1].toFixed(3)} – {ov!.peaks[p.b - 1].toFixed(3)} nm</td>
-              <td className={cn('font-bold', p.overlap === 0 && 'text-destructive')}>{p.overlap.toFixed(3)}</td>
+              <td className="font-bold">{p.overlap === 0 ? <Status inline level="error" word={p.overlap.toFixed(3)} /> : p.overlap.toFixed(3)}</td>
             </tr>
           ))}
         </tbody>
       </table>
-      {overlapNotes(ov!.pairs).map(n => <p key={n} className={cn('m-0 text-control', n.includes('do not overlap') ? 'text-destructive' : 'text-muted-foreground')}>{n}</p>)}
+      {overlapNotes(ov!.pairs).map(n => (n.includes('do not overlap') ? <Status key={n} level="error" className="text-control">{n}</Status> : <p key={n} className="m-0 text-control text-muted-foreground">{n}</p>))}
       <p className="m-0 text-caption text-muted-foreground">overlap: the share two neighbours' normalised histograms have in common, 0 to 1 · no threshold is applied</p>
     </div>
   )
@@ -438,7 +439,7 @@ export function RunResult({ job, onRunAgain, vault }: { job: Job; onRunAgain: (r
             <td className="py-0.5 pr-4 text-muted-foreground">group {g.index}</td>
             <td className={cn('pr-4 font-bold', groupText(g))}>{g.name}</td>
             <td className="pr-4 text-right">{g.count} atoms</td>
-            <td className="text-caption text-muted-foreground">{g.gmxCount === g.count ? '✓ gmx agrees' : 'gmx: ' + g.gmxCount} · {g.atoms.length > 40 ? g.atoms.slice(0, 40) + '…' : g.atoms}</td>
+            <td className="text-caption text-muted-foreground"> {g.gmxCount === g.count ? <Status inline level="ok" word="gmx agrees" /> : <Status inline level="warning" word={'gmx: ' + g.gmxCount} />} · {g.atoms.length > 40 ? g.atoms.slice(0, 40) + '…' : g.atoms}</td>
           </tr>
         ))}
       </tbody></table>}

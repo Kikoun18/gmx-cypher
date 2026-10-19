@@ -168,7 +168,7 @@ From [`batch-3.md`](batch-3.md) §5: one coherent app, (de)Cypher for every anal
 - [x] R14a The vault space, and a copy of the record beside each sent result
 
 ### Phase 2: The contract in code (R1, R3, R4, R9c)
-- [ ] R1b `src/core/contract.ts`: the phrases never shown, the role → token map, the default keys, the status levels
+- [x] R1b `src/core/contract.ts`: the phrases never shown, the role → token map, the status levels (the default keys land with R8b)
 - [x] R4a Colour roles; the reference in ink; `destructive` used only for errors (the class-usage scan lands with R9c, when the status component exists)
 - [x] R4b `NEUTRAL` moved into the tokens; no hex outside the tokens
 - [x] R4c Titles in Archivo 800 (T160)
@@ -176,7 +176,7 @@ From [`batch-3.md`](batch-3.md) §5: one coherent app, (de)Cypher for every anal
 - [x] R14b-1 The connected project, as a setting (moved here from Phase 8: R3c names jobs from it)
 - [x] R3c Display names from the project pattern
 - [x] R3d Both peak rules, named and shown (in the CSV with R6a)
-- [ ] R9c One status component, used for every status
+- [x] R9c One status component, used for every status
 
 ### Phase 3: One visualization core (R5, R6)
 - [ ] R5a One copy each of tones, dashes (the Matrix's 10, with names), ticks and atom ranges
