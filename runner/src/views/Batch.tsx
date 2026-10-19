@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Section } from '../ui/separator'
 import { getJson, postJson, type AppState } from '../api'
 import type { Draft } from '../draft'
-import { STATUS, type Job } from '../jobs'
+import { statusOf, type Job } from '../jobs'
 import { batchSummary, sentSummary } from '../lib/batch'
 import { recipeFromDraft, type Recipe } from '../lib/recipe'
 import { cn } from '../lib/utils'
@@ -43,7 +43,7 @@ function BatchCard({ b, jobs, vault, onOpenJob }: { b: Batch; jobs: Job[]; vault
   React.useEffect(() => { if (vault) getJson<{ projects?: { id: string; name: string }[] }>('/api/vault').then(v => { setProjects(v.projects || []); setProject(p => p ?? v.projects?.[0]?.id ?? null) }, () => {}) }, [vault])
   const job = (id?: string) => jobs.find(j => j.id === id)
   const word = (i: Batch['items'][number]) => {
-    if (i.status === 'started') { const j = job(i.job); return j ? STATUS[j.status] : { word: 'started', className: '' } }
+    if (i.status === 'started') { const j = job(i.job); return j ? statusOf(j) : { word: 'started', className: '' } }
     return { word: { queued: 'queued', starting: 'checking groups…', refused: '✗ refused', cancelled: 'cancelled' }[i.status] || i.status, className: i.status === 'refused' ? 'text-destructive' : 'text-muted-foreground' }
   }
   const running = b.items.some(i => i.status === 'queued' || i.status === 'starting' || (i.status === 'started' && job(i.job)?.status === 'running'))

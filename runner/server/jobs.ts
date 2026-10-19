@@ -2,10 +2,10 @@
 // started. Its life is an append-only event log, <home>/jobs/<id>.ndjson, replayed at start: a reload
 // or a restart loses nothing, and a job a crash left behind shows as interrupted.
 
-import { spawn, type ChildProcess } from 'node:child_process';
+import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
 import { EventEmitter } from 'node:events';
 import { appendFileSync, mkdirSync, readdirSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { gmxError, parseProgress, type Progress } from '../src/lib/progress';
 
 export interface JobSpec { kind: string; title: string; file: string; args: string[]; cwd: string; env?: Record<string, string>; meta?: Record<string, unknown>; /** Answers the program reads from stdin (T99). */ stdin?: string }
@@ -21,6 +21,8 @@ export interface Job extends JobSpec {
   progress: Progress;
   error?: string;
   log: string;
+  /** Found running at start, its end never seen: it runs on, and nothing here follows it (R2a). */
+  unfollowed?: boolean;
 }
 
 type Event =
@@ -47,6 +49,24 @@ function fold(id: string, events: Event[]): Job | null {
   return j;
 }
 
+/**
+ * Whether a process's command line is this job's: the job's program (or a script its interpreter runs, #!) followed
+ * by exactly the job's arguments. An empty command line (a process gone, or a zombie) is never the job (R2a).
+ */
+export function sameProgram(cmdline: string[], spec: { file: string; args: string[] }): boolean {
+  const at = cmdline.length - spec.args.length;
+  if (at < 1 || cmdline.slice(at).some((a, i) => a !== spec.args[i])) return false;
+  return cmdline.slice(0, at).some(a => a === spec.file || basename(a) === basename(spec.file));
+}
+
+/** A live process's command line: /proc on Linux; ps elsewhere (split at spaces, so a path with one never matches). */
+function commandLine(pid: number): string[] {
+  try {
+    if (process.platform === 'linux') return readFileSync('/proc/' + pid + '/cmdline', 'utf8').split('\0').filter((a, i, all) => a || i < all.length - 1);
+    return execFileSync('ps', ['-p', String(pid), '-o', 'command='], { encoding: 'utf8' }).trim().split(/\s+/).filter(Boolean);
+  } catch { return []; }
+}
+
 const SIGKILL_AFTER_MS = 5000;
 
 export class Jobs extends EventEmitter {
@@ -65,8 +85,11 @@ export class Jobs extends EventEmitter {
       const j = fold(id, events);
       if (!j) continue;
       this.jobs.set(id, j);
-      // Started and never ended: the runner stopped without seeing the end.
-      if (!j.ended) this.end(id, 'interrupted', null, null, 'gmx-cypher stopped while this job ran' + (j.pid ? ' (pid ' + j.pid + ')' : ''));
+      // Started and never ended: the runner stopped without seeing the end. A process still running this job's
+      // command runs on, not followed (R2a): gmx-cypher never invents its end. Otherwise the job was interrupted.
+      if (j.ended) continue;
+      if (j.pid && sameProgram(commandLine(j.pid), j)) j.unfollowed = true;
+      else this.end(id, 'interrupted', null, null, 'gmx-cypher stopped while this job ran' + (j.pid ? ' (pid ' + j.pid + ')' : ''));
     }
   }
 

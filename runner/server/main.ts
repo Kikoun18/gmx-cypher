@@ -49,6 +49,12 @@ console.log('gmx-cypher ' + VERSION + (dev ? ' (development)' : '') + ' is runni
 console.log(gmx.ok ? 'gmx: ' + gmx.path + ' · ' + gmx.version : 'gmx: ✗ ' + gmx.error);
 console.log('Through an SSH tunnel: ssh -L ' + actual + ':127.0.0.1:' + actual + ' <this machine>, then the same address.');
 
+// SIGHUP, the terminal or SSH session closed (R2a, T157): the runner keeps going, so its jobs finish and get their
+// records (a job writes to pipes the runner holds, and would die with it). Writing to a terminal that is gone fails,
+// and that must not stop the runner either.
+for (const s of [process.stdout, process.stderr]) s.on('error', () => {});
+process.on('SIGHUP', () => console.log('SIGHUP: the terminal closed; gmx-cypher keeps running (pid ' + process.pid + '). Stop it with: kill ' + process.pid));
+
 // Stopping the runner cancels its jobs first, so none is left running unrecorded (T6).
 const stop = async () => { server.close(); await jobs.stopAll(); process.exit(0); };
 process.on('SIGINT', stop);

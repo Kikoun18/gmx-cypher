@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { api, FAKE_GMX, startRunner, type Started } from './helpers';
+import { copyFileSync, existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { api, FAKE_GMX, RUNNER, startRunner, tmp, type Started } from './helpers';
 
 let running: Started[] = [];
 afterEach(() => { for (const r of running) r.proc.kill('SIGTERM'); running = []; });
@@ -43,3 +44,33 @@ describe('gmx in the running server', () => {
     expect((await api(r, '/api/config', { shell: '/bin/sh' })).status).toBe(400);
   });
 });
+
+describe('SIGHUP: the terminal or SSH session closed (R2a, T157)', () => {
+  it('keeps the runner going: it says so, still answers when its terminal is gone, and the job ends done with its record', async () => {
+    const dir = tmp('nvt');
+    for (const f of ['nvt.tpr', 'nvt.gro', 'nvt.xtc']) copyFileSync(RUNNER + 'test/fixtures/nvt/' + f, join(dir, f));
+    const r = await startRunner(['--gmx', FAKE_GMX, '--allow', dir], { FAKE_GMX_SLOW: '150' });
+    running.push(r);
+    const groups = [
+      { role: 'reference', name: 'sulfur', tone: 'coral', steps: [{ op: 'add', rule: { kind: 'name', value: 'S1' } }] },
+      { role: 'selection', name: 'water_O', tone: 'sky', steps: [{ op: 'add', rule: { kind: 'name', value: 'OW1', resn: 'SOL' } }] },
+    ];
+    const started = await api<{ id: string }>(r, '/api/runs', { inputs: { trajectory: join(dir, 'nvt.xtc'), runInput: join(dir, 'nvt.tpr'), structure: join(dir, 'nvt.gro') }, groups, options: {} });
+    expect(started.status).toBe(200);
+    r.proc.kill('SIGHUP');
+    await new Promise(res => setTimeout(res, 300));
+    expect(r.out()).toContain('SIGHUP: the terminal closed; gmx-cypher keeps running');
+    // The terminal is gone: writing to it fails (EPIPE here), and the runner must not die of that.
+    r.proc.stdout!.destroy(); r.proc.stderr!.destroy();
+    r.proc.kill('SIGHUP');
+    let job: { status: string } | undefined;
+    for (let i = 0; i < 100 && job?.status !== 'done'; i++) {
+      await new Promise(res => setTimeout(res, 100));
+      job = (await api<{ id: string; status: string }[]>(r, '/api/jobs')).json.find(j => j.id === started.json.id);
+    }
+    expect(r.proc.exitCode).toBeNull();
+    expect(job?.status).toBe('done');
+    expect(existsSync(join(dir, 'rdf/rdf_nvt.run.json'))).toBe(true);
+  }, 30_000);
+});
+

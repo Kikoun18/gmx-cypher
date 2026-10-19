@@ -8,7 +8,7 @@ import type { DecypherSources, SourceRef } from '../decypher/state'
 import { Kbd } from '../ui/kbd'
 import { Section } from '../ui/separator'
 import { postJson } from '../api'
-import { clock, fraction, jobLine, progressText, STATUS, type Job, type useJobs } from '../jobs'
+import { clock, fraction, jobLine, progressText, statusOf, type Job, type useJobs } from '../jobs'
 import { commandText } from '../lib/command'
 import { asTerminal } from '../lib/progress'
 import { cn } from '../lib/utils'
@@ -38,7 +38,7 @@ function JobDetail({ job, log, onRunAgain, vault, decypher }: { job: Job; log: s
   const logRef = React.useRef<HTMLDivElement>(null)
   React.useEffect(() => { const el = logRef.current?.querySelector('pre'); if (el) el.scrollTop = el.scrollHeight }, [log])
   const cancel = () => { if (press()) postJson('/api/jobs/' + job.id + '/cancel', {}).catch(() => {}) }
-  const s = STATUS[job.status], running = job.status === 'running', now = useNow(running), f = fraction(job)
+  const s = statusOf(job), running = job.status === 'running', now = useNow(running), f = fraction(job)
   const took = job.started ? clock((job.ended ? Date.parse(job.ended) : now) - Date.parse(job.started)) : ''
   return (
     <div className="flex min-w-0 flex-col gap-4">
@@ -47,7 +47,7 @@ function JobDetail({ job, log, onRunAgain, vault, decypher }: { job: Job; log: s
         <Badge tone={job.status === 'running' ? 'butter' : job.status === 'done' ? 'mint' : 'stone'} variant={job.status === 'failed' ? 'destructive' : undefined}>{s.word}</Badge>
         <span className="flex-1" />
         {job.kind === 'rdf' && job.status === 'done' && <Button variant="outline" onClick={() => decypher.open([{ kind: 'job', id: job.id }])}>open in (de)Cypher</Button>}
-        {job.status === 'running' && <Button variant="destructive" onClick={cancel}>{armed ? 'click again to cancel' : 'cancel'}</Button>}
+        {job.status === 'running' && !job.unfollowed && <Button variant="destructive" onClick={cancel}>{armed ? 'click again to cancel' : 'cancel'}</Button>}
       </div>
       {job.status === 'failed' && job.error && (
         <Alert variant="destructive"><X /><AlertTitle>gmx stopped with an error</AlertTitle><AlertDescription><p className="whitespace-pre-wrap">{job.error}</p></AlertDescription></Alert>
@@ -95,7 +95,7 @@ export function JobsView({ jobs, logs, loadLog, selected, onSelect, onRunAgain, 
                 : anyRdf && <span className="ml-2.5 w-[13px] shrink-0" />}
               <button onClick={() => onSelect(j.id)} aria-current={j.id === job?.id ? 'true' : undefined} className={cn('flex min-w-0 flex-1 flex-col items-start gap-0.5 py-2 pr-3 text-left', anyRdf ? 'pl-1.5' : 'pl-3')}>
                 <span className="text-control font-bold">{j.title}</span>
-                <span className="block w-full truncate text-caption"><span className={STATUS[j.status].className}>{STATUS[j.status].word}</span> <span className="text-muted-foreground">· {jobLine(j)}</span></span>
+                <span className="block w-full truncate text-caption"><span className={statusOf(j).className}>{statusOf(j).word}</span> <span className="text-muted-foreground">· {jobLine(j)}</span></span>
               </button>
             </div>
           )

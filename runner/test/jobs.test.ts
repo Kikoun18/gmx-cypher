@@ -1,8 +1,8 @@
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { Jobs, type Job } from '../server/jobs';
+import { Jobs, sameProgram, type Job } from '../server/jobs';
 import { FAKE_GMX, tmp } from './helpers';
 
 const NDX = '[ sulfur ]\n   5\n[ water_O ]\n  43\n';
@@ -83,3 +83,44 @@ describe('jobs', () => {
     expect(await ended(jobs, j.id)).toMatchObject({ status: 'failed', error: expect.stringContaining('ENOENT') });
   });
 });
+
+describe('a job the runner did not see end (R2a)', () => {
+  const unended = (dir: string, spec: object, pid: number) => {
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'j1.ndjson'), JSON.stringify({ t: 'created', at: '2026-10-19T10:00:00.000Z', spec }) + '\n' + JSON.stringify({ t: 'started', at: '2026-10-19T10:00:01.000Z', pid }) + '\n');
+  };
+  const live = (file: string, args: string[]) => { const p = spawn(file, args, { stdio: 'ignore' }); return p; };
+
+  it('a live pid that is another program now: interrupted, as before', () => {
+    const { home } = setup(), dir = join(home, 'jobs');
+    const other = live('sleep', ['30']);
+    try {
+      unended(dir, { kind: 'rdf', title: 'old', file: FAKE_GMX, args: ['rdf', '-f', 'nvt.xtc'], cwd: '/' }, other.pid!);
+      expect(new Jobs(dir).get('j1')).toMatchObject({ status: 'interrupted', error: 'gmx-cypher stopped while this job ran (pid ' + other.pid + ')' });
+    } finally { other.kill(); }
+  });
+
+  it("a live pid with the job's own command line: still running, not followed; its end is not invented", () => {
+    const { home } = setup(), dir = join(home, 'jobs');
+    const args = ['-e', 'setTimeout(() => {}, 30000)'], same = live(process.execPath, args);
+    try {
+      unended(dir, { kind: 'test', title: 'long', file: process.execPath, args, cwd: '/' }, same.pid!);
+      const j = new Jobs(dir).get('j1')!;
+      expect(j).toMatchObject({ status: 'running', pid: same.pid, unfollowed: true });
+      expect(j.ended).toBeUndefined();
+      expect(readFileSync(join(dir, 'j1.ndjson'), 'utf8').trim().split('\n')).toHaveLength(2);
+    } finally { same.kill(); }
+  });
+
+  it.each([
+    ['the same program and arguments', ['/usr/bin/gmx', 'rdf', '-f', 'a b.xtc'], true],
+    ['a script run by its interpreter (#!/usr/bin/env node)', ['/opt/node/bin/node', '/x/fake-gmx.mjs', 'rdf', '-f', 'a b.xtc'], true],
+    ['another program', ['/usr/bin/sleep', '30'], false],
+    ['the same program with other arguments', ['/usr/bin/gmx', 'rdf', '-f', 'other.xtc'], false],
+    ['a zombie or a process gone (no command line)', [], false],
+  ])('sameProgram: %s', (_, cmdline, expected) => {
+    const spec = cmdline[1] === '/x/fake-gmx.mjs' ? { file: '/x/fake-gmx.mjs', args: ['rdf', '-f', 'a b.xtc'] } : { file: '/usr/bin/gmx', args: ['rdf', '-f', 'a b.xtc'] };
+    expect(sameProgram(cmdline as string[], spec)).toBe(expected);
+  });
+});
+

@@ -10,6 +10,8 @@ export interface Job {
   created: string; started?: string; ended?: string; pid?: number
   exit?: { code: number | null; signal: string | null }; progress: Progress; error?: string; log?: string
   meta?: Record<string, unknown>
+  /** Found running at start, its end never seen: it runs on, and nothing follows it (R2a). */
+  unfollowed?: boolean
 }
 
 export const STATUS: Record<Job['status'], { word: string; className: string }> = {
@@ -19,6 +21,9 @@ export const STATUS: Record<Job['status'], { word: string; className: string }> 
   cancelled: { word: 'cancelled', className: 'text-muted-foreground' },
   interrupted: { word: 'interrupted', className: 'text-muted-foreground' },
 }
+
+/** A job's state in words: a job found running at start says it is no longer followed (R2a). */
+export const statusOf = (j: Job) => (j.unfollowed ? { word: 'still running, not followed (pid ' + j.pid + ')', className: 'text-muted-foreground' } : STATUS[j.status])
 
 /** Every job, kept current by the server's event stream; a reload or a restart loses nothing (T7). */
 export function useJobs() {
