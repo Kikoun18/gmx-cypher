@@ -11,7 +11,7 @@ function Tabs({ className, ...props }: React.ComponentProps<typeof TabsPrimitive
 const tabsListVariants = cva("group/tabs-list inline-flex w-fit items-center", {
   variants: {
     variant: {
-      // Page bar: text tabs over a hairline, the current one underlined in coral.
+      // Page bar: text tabs over a hairline, the current one underlined in ink (UI state, T159).
       line: "w-full items-end gap-0.5 overflow-x-auto border-b border-border",
       // Pills with counts, e.g. "PMF 1 · RDF 3": the current one is primary.
       chips: "flex-wrap gap-2",
@@ -41,7 +41,7 @@ function TabsTrigger({ className, ...props }: React.ComponentProps<typeof TabsPr
       data-slot="tabs-trigger"
       className={cn(
         "inline-flex shrink-0 items-baseline justify-center gap-[7px] whitespace-nowrap text-control text-muted-foreground transition-[background-color,border-color,color,box-shadow] duration-[120ms] ease-out hover:text-foreground disabled:pointer-events-none disabled:opacity-45 data-[state=active]:font-bold data-[state=active]:text-foreground [&_svg]:size-3.5 [&_svg]:self-center",
-        "group-data-[variant=line]/tabs-list:rounded-t-sm group-data-[variant=line]/tabs-list:px-3 group-data-[variant=line]/tabs-list:pb-[9px] group-data-[variant=line]/tabs-list:pt-2.5 group-data-[variant=line]/tabs-list:hover:bg-accent group-data-[variant=line]/tabs-list:data-[state=active]:shadow-[inset_0_-2px_0_var(--coral-strong)]",
+        "group-data-[variant=line]/tabs-list:rounded-t-sm group-data-[variant=line]/tabs-list:px-3 group-data-[variant=line]/tabs-list:pb-[9px] group-data-[variant=line]/tabs-list:pt-2.5 group-data-[variant=line]/tabs-list:hover:bg-accent group-data-[variant=line]/tabs-list:data-[state=active]:shadow-[inset_0_-2px_0_var(--state)]",
         "group-data-[variant=chips]/tabs-list:h-[30px] group-data-[variant=chips]/tabs-list:items-center group-data-[variant=chips]/tabs-list:rounded-full group-data-[variant=chips]/tabs-list:border group-data-[variant=chips]/tabs-list:border-border group-data-[variant=chips]/tabs-list:px-3.5 group-data-[variant=chips]/tabs-list:text-caption group-data-[variant=chips]/tabs-list:text-foreground group-data-[variant=chips]/tabs-list:hover:bg-accent group-data-[variant=chips]/tabs-list:data-[state=active]:border-transparent group-data-[variant=chips]/tabs-list:data-[state=active]:bg-primary group-data-[variant=chips]/tabs-list:data-[state=active]:text-primary-foreground",
         "group-data-[variant=segmented]/tabs-list:h-[26px] group-data-[variant=segmented]/tabs-list:items-center group-data-[variant=segmented]/tabs-list:rounded-[7px] group-data-[variant=segmented]/tabs-list:px-3 group-data-[variant=segmented]/tabs-list:text-caption group-data-[variant=segmented]/tabs-list:data-[state=active]:bg-background group-data-[variant=segmented]/tabs-list:data-[state=active]:shadow-raised",
         className

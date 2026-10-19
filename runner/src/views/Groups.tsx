@@ -16,7 +16,7 @@ import { atomNameCounts, clickStep, groupAtoms, groupHolding, nameProblem, parse
 import { commandOf, rdfCommand, rolesOf } from '../lib/commands'
 import { fitKeys, initialKeys, removeKey } from '../lib/keys'
 import type { NdxGroup } from '../lib/ndx'
-import { TONES, toneSolid, toneText, type Tone } from '../lib/tones'
+import { groupChip, groupText, TONES, type Tone } from '../lib/tones'
 import { cn } from '../lib/utils'
 import { Viewer, type Centre, type PickHow } from './Viewer'
 
@@ -142,13 +142,13 @@ function GroupCard({ group, atoms, index, nrs, others, current, onCurrent, onCha
   let typedError = ''
   if (typed != null) { try { fromRanges(typed) } catch (e) { typedError = (e as Error).message } }
   return (
-    <section className={cn('flex flex-col gap-2 rounded-lg border bg-card p-3', current ? 'border-ring' : 'border-border')} aria-label={group.role + ' ' + group.name}>
+    <section className={cn('flex flex-col gap-2 rounded-lg border bg-card p-3', group.role === 'reference' ? 'border-foreground' : 'border-border', current && 'ring-1 ring-ring')} aria-label={group.role + ' ' + group.name}>
       <div className="flex items-center gap-2">
-        <span className={cn('rounded-full px-2.5 py-px text-caption font-bold', toneSolid[group.tone])}>{group.role === 'reference' ? 'ref' : 'sel'}</span>
+        <span className={cn('rounded-full px-2.5 py-px text-caption font-bold', groupChip(group))}>{group.role === 'reference' ? 'ref' : 'sel'}</span>
         <Input size="sm" value={group.name} aria-invalid={!!problem} aria-label={group.role + ' name'} className="h-7 w-36 font-bold" onChange={e => onChange({ ...group, name: e.target.value.trim() })} />
-        <span className={cn('whitespace-nowrap text-control font-bold', toneText[group.tone])}>{nrs.length} atoms</span>
+        <span className={cn('whitespace-nowrap text-control font-bold', groupText(group))}>{nrs.length} atoms</span>
         <span className="flex-1" />
-        <Button variant={current ? 'secondary' : 'ghost'} size="sm" aria-pressed={current} onClick={onCurrent}>{current ? 'picking' : 'pick'}</Button>
+        <Button variant={current ? 'default' : 'ghost'} size="sm" aria-pressed={current} onClick={onCurrent}>{current ? 'picking' : 'pick'}</Button>
         <Button variant="ghost" size="sm" disabled={!nrs.length} onClick={onCentre} title="rotate the 3D view around this group" aria-label={'rotate around ' + group.name}>centre</Button>
         {onRemove && <Button variant="ghost" size="sm" onClick={() => (armed ? onRemove() : setArmed(true))}>{armed ? 'click again to remove' : 'remove'}</Button>}
       </div>
@@ -185,9 +185,9 @@ export function Groups({ draft, setDraft }: { draft: Draft; setDraft: React.Disp
   const atoms = structure && !('error' in structure) ? structure.atoms : null
   const sets = React.useMemo(() => (atoms ? draft.groups.map(g => groupAtoms(atoms, g.steps)) : []), [atoms, draft.groups])
   const colour = React.useMemo(() => {
-    const m = new Map<number, Tone>()
-    // Selections in order, then the reference: an atom in both shows the reference's hue.
-    for (const i of [...sets.keys()].slice(1).concat(0)) for (const nr of sets[i] || []) m.set(nr, draft.groups[i].tone)
+    const m = new Map<number, Tone | 'reference'>()
+    // Selections in order, then the reference (in ink, T159): an atom in both shows as the reference.
+    for (const i of [...sets.keys()].slice(1).concat(0)) for (const nr of sets[i] || []) m.set(nr, draft.groups[i].role === 'reference' ? 'reference' : draft.groups[i].tone)
     return m
   }, [sets, draft.groups])
   const setGroup = (i: number, g: Group) => setDraft(d => ({ ...d, groups: d.groups.map((x, j) => (j === i ? g : x)) }))
@@ -214,7 +214,7 @@ export function Groups({ draft, setDraft }: { draft: Draft; setDraft: React.Disp
       <div className="flex min-w-0 flex-col gap-3">
         <Viewer text={structure.text} format={structure.format} atoms={structure.atoms} colour={colour} onPick={onPick} describe={describe} groupOf={groupOf} centreRequest={centreReq} />
         <p className="m-0 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-caption text-muted-foreground">
-          <span className="whitespace-nowrap">click an atom: in or out of <b className={toneText[draft.groups[current]?.tone || 'coral']}>{draft.groups[current]?.name}</b></span>
+          <span className="whitespace-nowrap">click an atom: in or out of <b className={draft.groups[current] ? groupText(draft.groups[current]) : undefined}>{draft.groups[current]?.name}</b></span>
           <span className="whitespace-nowrap"><Kbd>shift</Kbd> click: its residue</span>
           <span className="whitespace-nowrap"><Kbd>{altName(browserPlatform())}</Kbd> click: its atom name in every residue of that name</span>
           <span className="whitespace-nowrap"><Kbd>C</Kbd> click: rotate around its group (or the atom, in none)</span>

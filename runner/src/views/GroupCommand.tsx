@@ -17,7 +17,7 @@ import type { HelpOption } from '../lib/gmxText'
 import { groupAtoms, nameProblem } from '../lib/groups'
 import { DEFAULT_TEMPLATE, NAME_TOKENS } from '../lib/names'
 import { isDefault } from '../lib/rdf'
-import { toneText } from '../lib/tones'
+import { groupText } from '../lib/tones'
 import { cn } from '../lib/utils'
 import { usePlan, type PlanView } from '../plan'
 import { useStructure } from '../structure'
@@ -209,7 +209,7 @@ export function GroupCommand({ command, gmx, draft, setDraft, onStarted }: ViewP
             {draft.groups.map((g, i) => (
               <tr key={i}>
                 <td className="py-0.5 pr-4 text-muted-foreground">group {i}</td>
-                <td className={cn('pr-4 font-bold', toneText[g.tone])}>{g.name}</td>
+                <td className={cn('pr-4 font-bold', groupText(g))}>{g.name}</td>
                 <td className="text-right">{counts ? counts[i] + ' atoms' : '…'}</td>
                 <td className="pl-3 text-caption text-muted-foreground">{i === 0 ? roles.first : roles.rest}</td>
               </tr>

@@ -53,6 +53,13 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  /* The role layer (src/roles.json, T159): UI state in ink, the ordered-series ramp. */
+  --color-state: var(--state);
+  --color-state-foreground: var(--state-foreground);
+  --color-ramp-0: var(--ramp-0);
+  --color-ramp-1: var(--ramp-1);
+  --color-ramp-2: var(--ramp-2);
+  --color-ramp-3: var(--ramp-3);
   --color-field: var(--field);
   --color-scrim: var(--scrim);
   --color-coral: var(--coral);

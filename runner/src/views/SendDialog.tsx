@@ -73,7 +73,7 @@ export function SendDialog({ job, open, onOpenChange, returnFocus }: { job: Job;
             </Alert>
             <Section label="In the Matrix" />
             <ol className="m-0 flex list-decimal flex-col gap-1 pl-5 text-control">{sent.next.map(x => <li key={x}>{x}</li>)}</ol>
-            {sent.link && <a className="self-start text-control text-coral-strong underline-offset-[3px] hover:underline" href={sent.link} target="_blank" rel="noopener noreferrer">open {pv?.project.name} in the Matrix ↗</a>}
+            {sent.link && <a className="self-start text-control text-foreground underline underline-offset-[3px] hover:decoration-2" href={sent.link} target="_blank" rel="noopener noreferrer">open {pv?.project.name} in the Matrix ↗</a>}
           </DialogBody>
         ) : (
         <DialogBody>

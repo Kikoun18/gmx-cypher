@@ -60,7 +60,7 @@ function useThemeName() {
  */
 export function Viewer({ text, format, atoms, colour, onPick, describe, groupOf, centreRequest }: {
   text: string; format: 'gro' | 'pdb'; atoms: Atom[]
-  colour: Map<number, Tone>
+  colour: Map<number, Tone | 'reference'>
   onPick: (nr: number, how: PickHow) => void
   describe: (nr: number) => string
   /** The group C + click rotates around for an atom (T140); null: the atom alone. */
@@ -141,15 +141,17 @@ export function Viewer({ text, format, atoms, colour, onPick, describe, groupOf,
     const hues = colourBy === 'group' && colour.size > 0, rest = hues ? cssVar('--input') : null
     for (const [sel, style] of structStyle(info, look, solvent).styles) m.setStyle(sel as never, (rest ? neutral(style, rest) : style) as never)
     if (!hydrogens) m.setStyle({ elem: 'H' } as never, {} as never)
-    const byTone = new Map<Tone, number[]>()
+    const byTone = new Map<Tone | 'reference', number[]>()
+    // A group's strong hue; the reference in ink (T159).
+    const ink = (t: Tone | 'reference') => cssVar(t === 'reference' ? '--foreground' : '--' + t + '-strong')
     for (const [nr, tone] of colour) { const k = index.get(nr); if (k != null) { if (!byTone.has(tone)) byTone.set(tone, []); byTone.get(tone)!.push(k) } }
     // Group atoms are drawn in the look itself and always shown (hydrogens and water included): in their hue, or by element.
-    for (const [tone, ks] of byTone) m.setStyle({ index: ks } as never, groupStyle(look, hues ? cssVar('--' + tone + '-strong') : undefined) as never)
+    for (const [tone, ks] of byTone) m.setStyle({ index: ks } as never, groupStyle(look, hues ? ink(tone) : undefined) as never)
     // By element, a group is a halo in its hue round its atoms: a second model, made when first needed and never clickable.
     if (!hues && byTone.size && !halo.current) halo.current = viewer.addModel(pdb, 'pdb', { keepH: true })
     if (halo.current) {
       halo.current.setStyle({}, {})
-      if (!hues) for (const [tone, ks] of byTone) halo.current.setStyle({ index: ks } as never, haloStyle(look, cssVar('--' + tone + '-strong')) as never)
+      if (!hues) for (const [tone, ks] of byTone) halo.current.setStyle({ index: ks } as never, haloStyle(look, ink(tone)) as never)
     }
     viewer.render()
   }, [viewer, pdb, info, look, solvent, hydrogens, colour, colourBy, index, theme])

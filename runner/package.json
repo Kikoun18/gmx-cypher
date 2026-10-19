@@ -7,7 +7,7 @@
     "node": ">=22.18"
   },
   "scripts": {
-    "tokens": "node scripts/tokens.ts src/tokens.json src/tokens.css",
+    "tokens": "node scripts/tokens.ts src/tokens.json src/tokens.css src/roles.json",
     "dev": "npm run tokens && node --import ./server/register.mjs server/main.ts --dev",
     "build": "npm run tokens && tsc -b && vite build",
     "start": "npm run build && node --import ./server/register.mjs server/main.ts",

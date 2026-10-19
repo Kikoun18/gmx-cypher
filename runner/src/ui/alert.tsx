@@ -12,7 +12,7 @@ const alertVariants = cva(
         info: "border-sky-strong/30 bg-sky-soft text-sky-strong",
         success: "border-mint-strong/30 bg-mint-soft text-mint-strong",
         warning: "border-butter-strong/30 bg-butter-soft text-butter-strong",
-        destructive: "border-destructive/40 bg-coral-soft text-destructive",
+        destructive: "border-destructive/50 bg-card text-destructive",
       },
     },
     defaultVariants: { variant: "default" },

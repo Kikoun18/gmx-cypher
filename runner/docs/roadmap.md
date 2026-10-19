@@ -169,7 +169,7 @@ From [`batch-3.md`](batch-3.md) §5: one coherent app, (de)Cypher for every anal
 
 ### Phase 2: The contract in code (R1, R3, R4, R9c)
 - [ ] R1b `src/core/contract.ts`: the phrases never shown, the role → token map, the default keys, the status levels
-- [ ] R4a Colour roles; the reference in ink; `destructive` used only for errors
+- [x] R4a Colour roles; the reference in ink; `destructive` used only for errors (the class-usage scan lands with R9c, when the status component exists)
 - [ ] R4b `NEUTRAL` moved into the tokens; no hex outside the tokens
 - [ ] R4c Titles in Archivo 800 (T160)
 - [ ] R3b One set of words on every screen

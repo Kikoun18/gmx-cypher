@@ -1,13 +1,14 @@
-// (de)Cypher's colours: Morpheus's tokens of this page (src/tokens.json) per theme, and the page's theme,
+// (de)Cypher's colours: Morpheus's tokens of this page (src/tokens.json, with the role layer src/roles.json) per theme, and the page's theme,
 // <html data-theme>, followed live.
 
 import * as React from 'react'
 import tokensText from '../tokens.json?raw'
+import rolesText from '../roles.json?raw'
 import { decypherKit, type Palette } from './kit'
 import { themeTokens } from './tokens'
 
 export const kit = decypherKit()
-const TOKENS = themeTokens(tokensText)
+const TOKENS = themeTokens(tokensText, rolesText)
 export const PALETTES: Record<'light' | 'dark', Palette> = { light: kit.palette(false, TOKENS.light), dark: kit.palette(true, TOKENS.dark) }
 export const TOKENS_BY_THEME = TOKENS
 

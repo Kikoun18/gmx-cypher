@@ -32,7 +32,7 @@ function Dropzone({ title, description, action, onFiles, className, ...props }: 
         onFiles(Array.from(e.dataTransfer.files))
       }}
       className={cn(
-        "flex w-full max-w-[560px] flex-col items-start gap-3.5 rounded-2xl border-2 border-dashed border-input bg-card px-10 py-[46px] text-left transition-[border-color,background-color] duration-[120ms] data-[dragging]:border-ring data-[dragging]:bg-coral-soft",
+        "flex w-full max-w-[560px] flex-col items-start gap-3.5 rounded-2xl border-2 border-dashed border-input bg-card px-10 py-[46px] text-left transition-[border-color,background-color] duration-[120ms] data-[dragging]:border-ring data-[dragging]:bg-secondary",
         className
       )}
       {...props}

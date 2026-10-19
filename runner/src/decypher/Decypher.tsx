@@ -30,11 +30,11 @@ const plural = (n: number, one: string, many = one + 's') => n + ' ' + (n === 1 
 const WANTED = /\.(gro|pdb|ndx|xvg|json)$/i
 const NO_MORPHS: ActiveMorph[] = []
 
-/** A toggle chip: coral when on, its state also in weight and in aria-pressed. */
+/** A toggle chip: an ink fill when on (UI state, T159), its state also in weight and in aria-pressed. */
 function Chip({ on, onClick, children, title }: { on: boolean; onClick: () => void; children: React.ReactNode; title?: string }) {
   return (
     <button type="button" aria-pressed={on} title={title} onClick={onClick}
-      className={cn('h-[26px] whitespace-nowrap rounded-full border px-3 text-caption transition-colors duration-[120ms]', on ? 'border-coral-strong bg-coral-soft font-bold text-coral-strong' : 'border-border text-muted-foreground hover:bg-accent hover:text-foreground')}>
+      className={cn('h-[26px] whitespace-nowrap rounded-full border px-3 text-caption transition-colors duration-[120ms]', on ? 'border-state bg-state font-bold text-state-foreground' : 'border-border text-muted-foreground hover:bg-accent hover:text-foreground')}>
       {children}
     </button>
   )
@@ -550,7 +550,7 @@ export function Decypher({ open, onOpenChange, sources, jobs, jobsLoaded, allow,
           </div>
         </div>
         {drag && (
-          <div className="pointer-events-none fixed inset-3 z-50 flex flex-col items-center justify-center gap-1.5 rounded-2xl border-2 border-dashed border-ring bg-coral-soft/90">
+          <div className="pointer-events-none fixed inset-3 z-50 flex flex-col items-center justify-center gap-1.5 rounded-2xl border-2 border-dashed border-ring bg-secondary/90">
             <span className="text-display font-bold">Drop files or a folder</span>
             <span className="text-control text-muted-foreground">gro, pdb, ndx, xvg and run.json · each .xvg finds its record, index and structure</span>
           </div>

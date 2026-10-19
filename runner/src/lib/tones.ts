@@ -51,5 +51,15 @@ export const toneOn: Record<Tone, string> = {
   stone: "data-[state=on]:bg-stone data-[state=on]:text-stone-foreground",
 }
 
+/**
+ * The reference (T159): ink as an outline, never a tone, so it reads neither as a group nor as a selected toggle
+ * (state is an ink fill). Its stored tone stays in records and is simply not drawn.
+ */
+export const refChip = "border border-foreground bg-transparent text-foreground"
+export const refText = "text-foreground"
+/** A group's chip and its name's ink: the reference in ink, a selection in its tone. */
+export const groupChip = (g: { role?: string; tone: Tone }) => (g.role === "reference" ? refChip : toneSolid[g.tone])
+export const groupText = (g: { role?: string; tone: Tone }) => (g.role === "reference" ? refText : toneText[g.tone])
+
 /** CSS colour of a hue's strong ink, for SVG strokes and fills. */
 export const toneVar = (t: Tone) => `var(--${t}-strong)`

@@ -15,7 +15,7 @@ import { curveStats } from '../lib/curves'
 import { firstPeak, resultSeries } from '../lib/rdf'
 import { parseTable } from '../../../matrix/src/lib/seq'
 import type { RunRecord } from '../lib/record'
-import { toneText, toneVar, type Tone } from '../lib/tones'
+import { groupText, toneText, toneVar, type Tone } from '../lib/tones'
 import { cn } from '../lib/utils'
 import { SendDialog } from './SendDialog'
 
@@ -430,7 +430,7 @@ export function RunResult({ job, onRunAgain, vault }: { job: Job; onRunAgain: (r
         {rec.groups.map(g => (
           <tr key={g.index}>
             <td className="py-0.5 pr-4 text-muted-foreground">group {g.index}</td>
-            <td className={cn('pr-4 font-bold', toneText[g.tone])}>{g.name}</td>
+            <td className={cn('pr-4 font-bold', groupText(g))}>{g.name}</td>
             <td className="pr-4 text-right">{g.count} atoms</td>
             <td className="text-caption text-muted-foreground">{g.gmxCount === g.count ? '✓ gmx agrees' : 'gmx: ' + g.gmxCount} · {g.atoms.length > 40 ? g.atoms.slice(0, 40) + '…' : g.atoms}</td>
           </tr>

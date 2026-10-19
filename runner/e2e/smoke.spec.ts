@@ -51,6 +51,12 @@ test('pick inputs, make groups, run, see the chart', async ({ page }) => {
   await expect(page.getByText('6 atoms')).toBeVisible()
   await rule('selection', 'water_O', 'OW1', 'SOL')
   await expect(page.getByText('800 atoms')).toBeVisible()
+  // The reference in ink (R4a, T159): its card's border, its chip and its count, never a group's hue.
+  const ink = await page.evaluate(() => getComputedStyle(document.body).color)
+  const refCard = page.locator('section[aria-label^="reference "]')
+  expect(await refCard.evaluate(e => getComputedStyle(e).borderTopColor)).toBe(ink)
+  expect(await refCard.getByText('ref', { exact: true }).evaluate(e => [getComputedStyle(e).color, getComputedStyle(e).borderTopColor])).toEqual([ink, ink])
+  expect(await refCard.getByText('6 atoms').evaluate(e => getComputedStyle(e).color)).toBe(ink)
 
   // RDF: the command is the planned one; run it.
   await page.getByRole('tab', { name: 'analysis' }).click()
@@ -63,6 +69,8 @@ test('pick inputs, make groups, run, see the chart', async ({ page }) => {
   await expect(page.getByText('first peak · water_O')).toBeVisible()
   await expect(page.getByText('0.374 nm')).toBeVisible()
   await expect(page.getByText('rdf_nvt.run.json')).toBeVisible()
+  // The result's group table: the reference's name in ink too.
+  expect(await page.getByRole('cell', { name: 'sulfur', exact: true }).evaluate(e => getComputedStyle(e).color)).toBe(ink)
   expect(errors).toEqual([])
 })
 

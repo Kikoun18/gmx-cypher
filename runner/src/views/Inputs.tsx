@@ -49,7 +49,7 @@ function Browser({ roots, path, onPath, used, onFile }: { roots: string[]; path:
         {crumbs.map((c, i) => {
           const to = i === 0 ? c : root + '/' + crumbs.slice(1, i + 1).join('/')
           const label = i === 0 ? c.split('/').pop() : c
-          return <React.Fragment key={to}>{i > 0 && <span className="text-muted-foreground">/</span>}{i < crumbs.length - 1 ? <button className="text-coral-strong hover:underline" title={to} onClick={() => onPath(to)}>{label}</button> : <span className="font-bold" title={to}>{label}</span>}</React.Fragment>
+          return <React.Fragment key={to}>{i > 0 && <span className="text-muted-foreground">/</span>}{i < crumbs.length - 1 ? <button className="text-foreground underline underline-offset-[3px] hover:decoration-2" title={to} onClick={() => onPath(to)}>{label}</button> : <span className="font-bold" title={to}>{label}</span>}</React.Fragment>
         })}
         <span className="flex-1" />
         {listing && <span className="text-caption text-muted-foreground">{listing.entries.filter(e => e.kind === 'file').length} files{listing.hidden ? ' · ' + listing.hidden + ' other files not shown' : ''}</span>}
@@ -181,7 +181,7 @@ export function Inputs({ state, draft, setDraft, onSettings, onNext }: { state: 
             {roots.map(r => <button key={r} onClick={() => setPath(r)}><Badge tone={path?.startsWith(r) ? 'stone' : undefined} appearance="solid" variant="outline">{r}</Badge></button>)}
           </div>
         ) : <p className="m-0 text-control text-muted-foreground">no folder is allowed yet · add one in settings, or start with --allow &lt;folder&gt;</p>}
-        {picking && <p className="m-0 text-control" aria-live="polite">pick the {SLOTS.find(s => s.slot === picking)!.label} · <button className="text-coral-strong hover:underline" onClick={() => setPicking(null)}>stop picking</button></p>}
+        {picking && <p className="m-0 text-control" aria-live="polite">pick the {SLOTS.find(s => s.slot === picking)!.label} · <button className="text-foreground underline underline-offset-[3px] hover:decoration-2" onClick={() => setPicking(null)}>stop picking</button></p>}
         {path && <Browser roots={[...roots, ...Object.values(draft.inputs).map(p => p!.path.slice(0, p!.path.lastIndexOf('/')))]} path={path} onPath={setPath} used={used} onFile={(p, e) => assign(p, e.role)} />}
         <input ref={fileRef} type="file" multiple hidden onChange={e => { upload(Array.from(e.target.files || [])); e.target.value = '' }} />
         <Dropzone className="max-w-none py-6" title="Drop files here" description="any GROMACS input, by upload into gmx-cypher's own folder · large trajectories are better picked by path, where they are"
