@@ -186,7 +186,7 @@ From [`batch-3.md`](batch-3.md) §5: one coherent app, (de)Cypher for every anal
 - [x] R6b Export settings (T174)
 
 ### Phase 4: AWH and WHAM (R7)
-- [ ] R7a Ramps for ordered curves
+- [x] R7a Ramps for ordered curves (T175)
 - [ ] R7b AWH convergence
 - [ ] R7c The AWH axis unit, from the run input (needs your `gmx dump -s` samples)
 
