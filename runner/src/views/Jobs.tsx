@@ -13,6 +13,8 @@ import { RunResult } from './Result'
 import type { RunRecord } from '../lib/record'
 import type { Route } from '../lib/route'
 import { modsOf, pickInList } from '../core/gestures'
+import { filterJobs, type JobFilter } from '../lib/jobFilter'
+import { JobFilters } from './JobFilters'
 
 /** Destructive actions arm on the first click and act on the second, within 2.6 s. */
 function useArmed(): [boolean, () => boolean] {
@@ -65,19 +67,22 @@ type ResultsRoute = Extract<Route, { view: 'results' | 'compare' }>
  * range), and a detail pane: the result for one job, compare for several. The selection is in the address.
  */
 export function JobsView({ jobs, logs, loadLog, route, go, onRunAgain, vault, allow, compare, keyName }: ReturnType<typeof useJobs> & {
-  route: ResultsRoute; go: (r: Route) => void; onRunAgain: (r: RunRecord) => void; vault: string | null; allow: string[]; compare: React.ReactNode; keyName: string | null
+  route: ResultsRoute; go: (r: Route, o?: { replace?: boolean }) => void; onRunAgain: (r: RunRecord) => void; vault: string | null; allow: string[]; compare: React.ReactNode; keyName: string | null
 }) {
-  const job = route.view === 'results' ? jobs.find(j => j.id === route.job) || jobs[0] : undefined
+  // The list as searched and filtered (R12b); the filter goes with every address the list writes.
+  const filter = React.useMemo(() => route.filter ?? {}, [route.filter]), listed = React.useMemo(() => filterJobs(jobs, filter), [jobs, filter])
+  const job = route.view === 'results' ? jobs.find(j => j.id === route.job) || listed[0] : undefined
   const selected = route.view === 'compare' ? route.jobs : job ? [job.id] : []
   const anchor = React.useRef<string | null>(selected[0] ?? null)
   React.useEffect(() => { if (job && !(job.id in logs)) loadLog(job.id) }, [job, logs, loadLog])
   // In compare, a change of selection stays in compare; elsewhere, two or more open it.
   const pick = (id: string, m: { shift?: boolean; add?: boolean }) => {
-    const next = pickInList(jobs.map(j => j.id), selected, anchor.current, id, m)
+    const next = pickInList(listed.map(j => j.id), selected, anchor.current, id, m)
     if (!m.shift) anchor.current = id
-    go(route.view === 'compare' && (m.add || m.shift) ? { view: 'compare', jobs: next } : next.length > 1 ? { view: 'compare', jobs: next } : { view: 'results', job: next[0] ?? null })
+    go(route.view === 'compare' && (m.add || m.shift) ? { view: 'compare', jobs: next, filter } : next.length > 1 ? { view: 'compare', jobs: next, filter } : { view: 'results', job: next[0] ?? null, filter })
   }
-  const openCompare = <Button variant="outline" size="sm" className="mb-1 justify-between" onClick={() => go({ view: 'compare', jobs: selected })} aria-current={route.view === 'compare' ? 'page' : undefined}
+  const onFilter = (f: JobFilter, typing?: boolean) => go(route.view === 'compare' ? { view: 'compare', jobs: route.jobs, filter: f } : { view: 'results', job: route.job, filter: f }, { replace: typing })
+  const openCompare = <Button variant="outline" size="sm" className="mb-1 justify-between" onClick={() => go({ view: 'compare', jobs: selected, filter })} aria-current={route.view === 'compare' ? 'page' : undefined}
     title={(keyName ? keyName + ' opens it too (settings → keyboard) · ' : 'set a key in settings → keyboard · ') + '⌘/Ctrl-click or tick jobs to compare them'}>
     <span>compare{selected.length > 1 ? ' · ' + String(selected.length).padStart(2, '0') : ''}</span>{keyName && <Kbd>{keyName}</Kbd>}
   </Button>
@@ -85,9 +90,11 @@ export function JobsView({ jobs, logs, loadLog, route, go, onRunAgain, vault, al
     <div className="grid grid-cols-[220px_minmax(0,1fr)] gap-5">
       <nav className="flex flex-col gap-1" aria-label="jobs">
         <Section label={'Jobs ' + String(jobs.length).padStart(2, '0')} />
+        {jobs.length > 0 && <JobFilters jobs={jobs} filter={filter} onFilter={onFilter} shown={listed.length} allow={allow} />}
         {openCompare}
         {!jobs.length && <p className="m-0 text-control text-muted-foreground">no jobs yet</p>}
-        {jobs.map(j => {
+        {jobs.length > 0 && !listed.length && <p className="m-0 text-control text-muted-foreground">no job matches · <button type="button" className="underline underline-offset-2" onClick={() => onFilter({})}>clear the filters</button></p>}
+        {listed.map(j => {
           const on = selected.includes(j.id)
           return (
             <div key={j.id} className={cn('flex items-start gap-1 rounded-lg hover:bg-muted', on && 'bg-muted ring-1 ring-inset ring-border')}>
@@ -100,7 +107,7 @@ export function JobsView({ jobs, logs, loadLog, route, go, onRunAgain, vault, al
           )
         })}
       </nav>
-      {route.view === 'compare' ? compare : job && <JobDetail key={job.id} job={job} log={logs[job.id]} onAllLog={() => loadLog(job.id, true)} onRunAgain={onRunAgain} vault={vault} allow={allow} onCompare={() => go({ view: 'compare', jobs: [job.id] })} />}
+      {route.view === 'compare' ? compare : job && <JobDetail key={job.id} job={job} log={logs[job.id]} onAllLog={() => loadLog(job.id, true)} onRunAgain={onRunAgain} vault={vault} allow={allow} onCompare={() => go({ view: 'compare', jobs: [job.id], filter })} />}
     </div>
   )
 }

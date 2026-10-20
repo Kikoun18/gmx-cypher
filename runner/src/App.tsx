@@ -29,11 +29,12 @@ import { ShortcutSheet } from './ui/shortcut-sheet'
 const Decypher = React.lazy(() => import('./decypher/Decypher').then(m => ({ default: m.Decypher })))
 
 /** The view in the address (R9a): a reload keeps it, back and forward move through it, an old address is written anew. */
-function useRoute(): [Route, (r: Route) => void] {
+function useRoute(): [Route, (r: Route, o?: { replace?: boolean }) => void] {
   const read = () => { const p = parseRoute(location.hash); if (p.redirect) history.replaceState(null, '', formatRoute(p.route)); return p.route }
   const [route, setRoute] = React.useState<Route>(read)
   React.useEffect(() => { const on = () => setRoute(read()); window.addEventListener('hashchange', on); return () => window.removeEventListener('hashchange', on) }, [])
-  return [route, r => { const h = formatRoute(r); if (h !== location.hash) location.hash = h }]
+  // A replace (a search being typed) changes the address without a step back for each key.
+  return [route, (r, o) => { const h = formatRoute(r); if (h === location.hash) return; if (o?.replace) { history.replaceState(null, '', h); setRoute(r) } else location.hash = h }]
 }
 
 /** Whether a dialog is open: its keys and drops are its own. */

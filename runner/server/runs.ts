@@ -41,6 +41,8 @@ export interface RunRequest {
   names?: Record<string, string>;
   /** A batch run whose names were taken meanwhile takes the next free stem instead of stopping (review finding 5). */
   retryNames?: boolean;
+  /** The batch that started it (R12b): its id and its recipe's name, kept with the job for the jobs list's filter. */
+  batch?: { id: string; name: string };
   /** gmx wham's windows (R6): each window's run input and pull file, in the order of the lists. */
   windows?: { tpr: string; pull: string }[];
   /** gmx wham: positions (pullx) or forces (pullf). */
@@ -267,7 +269,7 @@ export async function startRun(ctx: Ctx, req: RunRequest, roots: string[]): Prom
   const json = (r: RunRecord) => JSON.stringify(r, null, 2) + '\n';
   const job = ctx.jobs.start({
     kind: plan.tool, title: !cmd.groups ? plan.stem + ' · gmx ' + plan.tool : plan.stem + ' · ' + req.groups[0].name + (req.groups.length > 1 ? ' → ' + req.groups.slice(1).map(g => g.name).join(', ') : ''),
-    file: plan.file, args: plan.argv, cwd: plan.cwd, env: plan.env, meta: { stem: plan.stem, outDir: plan.outDir, record: recordPath, names: plan.names, estimate },
+    file: plan.file, args: plan.argv, cwd: plan.cwd, env: plan.env, meta: { stem: plan.stem, outDir: plan.outDir, record: recordPath, names: plan.names, estimate, ...(req.batch ? { batch: req.batch.id, batchName: req.batch.name } : {}) },
     ...(plan.stdin != null ? { stdin: plan.stdin } : {}),
   });
   // The record from the start (R2b): what is known now, the job running. A command with groups writes it new under its
