@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { getJson, postJson, type AppState } from '../api'
 import { bindingOf, DEFAULT_BINDINGS, keyLabel, keyProblem, useBindings } from '../lib/shortcuts'
 import { Status } from '../ui/status'
+import { ExportSettings } from './ExportSettings'
 
 /** The key that opens and closes (de)Cypher: change it by pressing the new one; Escape keeps the old one. */
 function KeyField() {
@@ -138,6 +139,8 @@ export function Settings({ state, open, onOpenChange, onState, returnFocus }: { 
             </div>
             {pmfError ? <Status level="error">{pmfError}</Status> : <FieldHint>Where you open the Matrix; after sending, gmx-cypher links to the project there.</FieldHint>}
           </Field>
+          <Section label="Export" />
+          <ExportSettings />
           <Section label="Keyboard" />
           <KeyField />
           <Section label="Cluster" />

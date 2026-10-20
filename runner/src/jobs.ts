@@ -3,7 +3,7 @@
 import * as React from 'react'
 import { getJson } from './api'
 import type { Progress } from './lib/progress'
-import { displayNames, type Naming } from './lib/displayName'
+import { displayNames, nameFields, type Naming } from './lib/displayName'
 import type { Level } from './core/contract'
 
 export interface Job {
@@ -16,6 +16,8 @@ export interface Job {
   unfollowed?: boolean
   /** Its display name (R3c), computed on the page from its folder and the connected project; `title` is its own. */
   name?: string
+  /** Its place in the connected project, for export file names (R6b). */
+  fields?: { project: string; sequence: string; column: string; run: string }
 }
 
 /** A job's state as a status level and its word (R9c, contract §4). */
@@ -50,7 +52,7 @@ export function useJobs(naming: Naming | null = null) {
     return () => es.close()
   }, [])
   const loadLog = React.useCallback((id: string) => { getJson<Job>('/api/jobs/' + id).then(j => setLogs(l => ({ ...l, [id]: j.log || '' })), () => {}) }, [])
-  const named = React.useMemo(() => { const n = displayNames(jobs, naming); return jobs.map(j => ({ ...j, name: n.get(j.id) })) }, [jobs, naming])
+  const named = React.useMemo(() => { const n = displayNames(jobs, naming); return jobs.map(j => ({ ...j, name: n.get(j.id), fields: nameFields(j, naming) })) }, [jobs, naming])
   return { jobs: named, logs, loadLog, loaded }
 }
 

@@ -20,7 +20,9 @@ import { cn } from '../lib/utils'
 import type { Analysis, Curve, Mol, Palette, Struct, Tone } from '../core/kit'
 import { ChartPanel, ExportMenu, Swatch, type ChartExport } from '../core/Chart'
 import { curvesCsv } from '../lib/csv'
-import { download as downloadBlob } from '../../../matrix/src/lib/export'
+import { download as downloadBlob, renderBatch } from '../../../matrix/src/lib/export'
+import { graphData } from '../core/export'
+import { fileName, useExportPrefs } from '../core/exportPrefs'
 import { fileBase } from '../../../matrix/src/lib/exportPrefs'
 import { CurveTable, GroupChips, StructurePanel, type StructureHandle } from './panels'
 import type { LoadedFile } from './parse'
@@ -122,7 +124,7 @@ function AnalysisCard({ members, on, tone, mol, pal, view, selected, tones, cand
   const title = cardTitle(members)
   // The chart's export (R6a): the curves in the export theme's palette; its CSV, each curve named with its source.
   const curvesIn = (p: Palette) => kit.buildCurves({ focus: a, plotted: members, selected, colorBy: 'group', pal: p, tones }).filter(c => on.includes(c.analysis)).map(c => { const m = members.find(x => x.id === c.analysis)!; return { ...c, source: many ? (m.ref ? 'ref ' + names[m.id] : names[m.id]) : '' } })
-  const exp: ChartExport = { file: a.label, title, csv: () => curvesCsv(curvesIn(pal).map(c => ({ ...c, name: c.source ? c.name + ' · ' + c.source : c.name })), a.xlabel, a.ylabel) }
+  const exp: ChartExport = { file: a.label, fields: { command: 'rdf' }, title, csv: () => curvesCsv(curvesIn(pal).map(c => ({ ...c, name: c.source ? c.name + ' · ' + c.source : c.name })), a.xlabel, a.ylabel) }
   return (
     <section aria-label={title} className="flex flex-col overflow-hidden rounded-xl border border-border bg-card" onMouseEnter={onActive}>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-border px-4 py-2.5">
@@ -188,7 +190,7 @@ function CompareView({ shown, focus, setFocus, mols, pal, view, patch, selected,
   const i = shown.indexOf(focus), step = (d: number) => setFocus(shown[(i + d + shown.length) % shown.length].id)
   // One graph's export (R6a): every curve, named with its RDF, in the export theme's palette.
   const curvesIn = (p: Palette) => kit.buildCurves({ focus, plotted, selected, colorBy: view.colorBy, pal: p, tones })
-  const exp: ChartExport = { file: 'one-graph_' + plotted.length + '-RDFs', title: 'One graph · ' + plural(plotted.length, 'RDF'), csv: () => curvesCsv(curvesIn(pal).map(c => ({ ...c, name: c.name + ' · ' + c.source })), focus.xlabel, focus.ylabel) }
+  const exp: ChartExport = { file: 'one-graph_' + plotted.length + '-RDFs', fields: { command: 'rdf' }, title: 'One graph · ' + plural(plotted.length, 'RDF'), csv: () => curvesCsv(curvesIn(pal).map(c => ({ ...c, name: c.name + ' · ' + c.source })), focus.xlabel, focus.ylabel) }
   return (
     <div className="grid min-h-[660px] grid-cols-[repeat(auto-fit,minmax(min(100%,460px),1fr))] gap-4">
       <section aria-label="structure" className="flex min-w-0 flex-col rounded-xl border border-border bg-card" onMouseEnter={onActive}>
@@ -372,13 +374,33 @@ function ExportDialog({ open, onOpenChange, analyses, structs, view, theme, tone
       setDone(file)
     } finally { setBusy(false) }
   }
+  // The same RDFs as figures (R6b): each card's chart, then the one graph, laid out as the export settings say (one PDF,
+  // a file each, or one grid), in the settings' format, theme and size.
+  const [prefs] = useExportPrefs()
+  const figures = async () => {
+    setBusy(true)
+    try {
+      const pal = PALETTES[prefs.theme === 'dark' ? 'dark' : 'light'], taken = new Set<string>(), ext = prefs.layout === 'pdf' ? 'pdf' : prefs.format
+      const fig = (title: string, file: string, a: Analysis, curves: Curve[]) => ({ data: graphData({ title, file, xlabel: a.xlabel, ylabel: a.ylabel, curves, marks: view.marks, xDigits: 3 }, prefs.theme), name: fileName(prefs.name, { file, command: 'rdf' }, ext, taken) })
+      const gs = cards.map(c => fig((titles[c.lead.id] ?? '').trim() || cardTitle(c.members), c.lead.label, c.lead,
+        kit.buildCurves({ focus: c.lead, plotted: c.members, selected: selectedOf(c.lead), colorBy: 'group', pal, tones }).filter(x => c.on.includes(x.analysis))))
+      if (withCompare && picked.length > 1) {
+        const focus = picked.find(a => a.id === compare?.focus) ?? picked[0]
+        gs.push(fig('One graph · ' + plural(picked.length, 'RDF'), 'one-graph_' + picked.length + '-RDFs', focus,
+          kit.buildCurves({ focus, plotted: [focus, ...picked.filter(a => a !== focus)], selected: compare?.selected ?? selectedOf(focus), colorBy: view.colorBy, pal, tones }).map(x => ({ ...x, name: x.name + ' · ' + x.source }))))
+      }
+      const out = await renderBatch(gs.filter(g => g.data.series.length), prefs, fileName(prefs.name, { file: (name.trim() || exportName(picked)).replace(/\.html?$/i, ''), command: 'rdf' }, 'x').replace(/\.x$/, ''))
+      out.forEach(f => downloadBlob(f.blob, f.name))
+      setDone(out.length === 1 ? out[0].name + (out[0].note ? ' · ' + out[0].note : '') : plural(out.length, 'file'))
+    } finally { setBusy(false) }
+  }
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent data-decypher-export="">
         <DialogHeader>
           <DialogHeading>
             <DialogTitle>Export</DialogTitle>
-            <DialogDescription>one html file · opens in any browser, offline · each result stays interactive</DialogDescription>
+            <DialogDescription>one html file · opens in any browser, offline · each result stays interactive · or the charts as figures, laid out as settings → export says</DialogDescription>
           </DialogHeading>
         </DialogHeader>
         <DialogBody>
@@ -423,6 +445,7 @@ function ExportDialog({ open, onOpenChange, analyses, structs, view, theme, tone
         <DialogFooter>
           {done && <Status level="ok" word="exported" className="mr-auto">{done}</Status>}
           <Button variant="ghost" onClick={() => onOpenChange(false)}>close</Button>
+          <Button variant="outline" onClick={figures} disabled={!data || busy} title={'each card\'s chart' + (withCompare && picked.length > 1 ? ' and the one graph' : '') + ' as ' + (prefs.layout === 'pdf' ? 'one PDF, a page each' : prefs.layout === 'grid' ? 'one ' + prefs.format + ' grid of ' + prefs.gridCols + ' columns' : 'a ' + prefs.format + ' each') + ' (settings → export)'}>+ Export figures</Button>
           <Button onClick={go} disabled={!data || busy}>{busy ? 'exporting…' : '+ Export html'}</Button>
         </DialogFooter>
       </DialogContent>

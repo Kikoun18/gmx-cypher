@@ -61,6 +61,7 @@ const outName = (job: Job, r: RunRecord, which: 'xvg' | 'cn' | string = 'xvg') =
 function chartExport(job: Job, record: RunRecord, source: string, parts: { text: string; col: number; name: string }[], xlabel: string, ylabel: string, part = ''): ChartExport {
   return {
     file: source.replace(/\.xvg$/i, '') + (part ? '_' + part : ''), title: (job.name ?? job.title) + (part ? ' · ' + part : ''),
+    fields: { ...job.fields, command: job.kind, group: record.groups[0]?.name ?? '' },
     csv: () => xvgCsv(parts, xlabel, ylabel, csvMeta(record, String(job.meta?.record ?? ''), source, g => g.name)),
   }
 }

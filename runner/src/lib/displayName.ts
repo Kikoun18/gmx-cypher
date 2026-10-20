@@ -4,19 +4,24 @@
 
 import { parsePath } from '../../../matrix/src/lib/seq'
 
-/** The connected project's naming: its path pattern and its columns (a folder name is shown as its column's label). */
-export interface Naming { project: string; pathPattern: string; columns: { k: string; label: string }[] }
+/** The connected project's naming: its id and name, its path pattern and its columns (a folder name is shown as its column's label). */
+export interface Naming { project: string; name?: string; pathPattern: string; columns: { k: string; label: string }[] }
 export interface Nameable { id: string; title: string; kind: string; cwd: string; created: string; meta?: Record<string, unknown> }
 
 const same = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase()
 
+/** A job's place in the connected project (for file names too, R6b): the project's name, the row, the column (its label) and the run; empty where nothing matches. */
+export function nameFields(j: Nameable, n: Naming | null): { project: string; sequence: string; column: string; run: string } {
+  const m = n?.pathPattern ? parsePath(j.cwd, n.pathPattern) : null, f = m?.matched ? m.fields : {} as Record<string, string | undefined>
+  const row = f.name || f.seq || ''
+  const col = row && f.col ? n!.columns.find(c => same(c.k, f.col!) || same(c.label, f.col!))?.label ?? f.col : ''
+  return { project: n?.name ?? '', sequence: row, column: col, run: row ? f.run ?? '' : '' }
+}
+
 export function displayName(j: Nameable, n: Naming | null): string {
-  if (!n?.pathPattern) return j.title
-  const m = parsePath(j.cwd, n.pathPattern), f = m.fields
-  const row = m.matched ? f.name || f.seq : ''
-  if (!row) return j.title
-  const col = f.col && (n.columns.find(c => same(c.k, f.col!) || same(c.label, f.col!))?.label ?? f.col)
-  return [row, col, f.run && 'run ' + f.run, j.kind].filter(Boolean).join(' · ')
+  const f = nameFields(j, n)
+  if (!f.sequence) return j.title
+  return [f.sequence, f.column, f.run && 'run ' + f.run, j.kind].filter(Boolean).join(' · ')
 }
 
 /** The local time a job started, for telling names apart: hours and minutes, with seconds when asked. */

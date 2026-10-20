@@ -160,7 +160,7 @@ export function makeApi(ctx: Ctx): Api {
       if (!ctx.config.vault || !ctx.config.project) return { body: null };
       try {
         const s = projectSummary(await readProject(await openVault(ctx.config.vault), ctx.config.project));
-        return { body: { project: s.id, pathPattern: s.settings.pathPattern, columns: s.columns } };
+        return { body: { project: s.id, name: s.name, pathPattern: s.settings.pathPattern, columns: s.columns } };
       } catch { return { body: null }; }
     }
     if (is(req, 'GET', url, '/api/vault/project')) {

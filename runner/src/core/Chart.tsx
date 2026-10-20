@@ -5,10 +5,11 @@
 import * as React from 'react'
 import { Download } from 'lucide-react'
 import { download } from '../../../matrix/src/lib/export'
-import { EXPORT_DEFAULTS, fileBase, formatHints } from '../../../matrix/src/lib/exportPrefs'
+import { formatHints } from '../../../matrix/src/lib/exportPrefs'
 import { Select, SelectContent, SelectItem, SelectTrigger } from '../ui/select'
 import { cn } from '../lib/utils'
 import { figureFile, resultAnalysis } from './export'
+import { fileName, useExportPrefs, type NameFields } from './exportPrefs'
 import { curvesOf, kit, type Series } from './index'
 import type { ChartGeom, Curve, Marks, Palette, VNode } from './kit'
 import { PALETTES, TOKENS_BY_THEME, usePageTheme } from './theme'
@@ -81,8 +82,8 @@ export function ChartPanel({ curves, grid, xlabel, ylabel, pal, marks, y, rule, 
   )
 }
 
-/** What a chart exports under (R6a): its file name, its title, its data as CSV, and (when it can be one) an HTML page. */
-export interface ChartExport { file: string; title: string; sub?: string; csv: () => string; html?: (() => Promise<string>) | null; why?: string }
+/** What a chart exports under (R6a): its file's own name and the fields of the name template (R6b), its title, its data as CSV, and (when it can be one) an HTML page. */
+export interface ChartExport { file: string; fields?: NameFields; title: string; sub?: string; csv: () => string; html?: (() => Promise<string>) | null; why?: string }
 
 /**
  * A chart's export menu (R6a): SVG, PDF and PNG through the Matrix's figures, in the export theme's palette; CSV at
@@ -91,11 +92,11 @@ export interface ChartExport { file: string; title: string; sub?: string; csv: (
 export function ExportMenu({ exp, curves, xlabel, ylabel, marks, className, ...o }: ChartOptions & {
   exp: ChartExport; curves: (pal: Palette) => Curve[]; xlabel: string; ylabel: string; marks: Marks; className?: string
 }) {
-  const [busy, setBusy] = React.useState(false), prefs = EXPORT_DEFAULTS, hints = formatHints(prefs, '')
+  const [busy, setBusy] = React.useState(false), [prefs] = useExportPrefs(), hints = formatHints(prefs, '')
   const go = async (f: string) => {
     setBusy(true)
     try {
-      const name = (ext: string) => fileBase(exp.file) + '.' + ext
+      const name = (ext: string) => fileName(prefs.name, { ...exp.fields, file: exp.file }, ext)
       if (f === 'csv') download(new Blob([exp.csv()], { type: 'text/csv;charset=utf-8' }), name('csv'))
       else if (f === 'html') { if (exp.html) download(new Blob([await exp.html()], { type: 'text/html;charset=utf-8' }), name('html')) }
       else if (f === 'svg' || f === 'pdf' || f === 'png') {
@@ -110,9 +111,7 @@ export function ExportMenu({ exp, curves, xlabel, ylabel, marks, className, ...o
         <Download className="size-3.5" />{busy ? 'exporting…' : 'export'}
       </SelectTrigger>
       <SelectContent align="end">
-        <SelectItem value="svg">svg · {hints.svg}</SelectItem>
-        <SelectItem value="pdf">pdf · {hints.pdf}</SelectItem>
-        <SelectItem value="png">png · {hints.png}</SelectItem>
+        {(['svg', 'pdf', 'png'] as const).map(f => <SelectItem key={f} value={f}>{f} · {hints[f]}{prefs.format === f ? ' · default' : ''}</SelectItem>)}
         <SelectItem value="csv">csv · every point as gmx wrote it</SelectItem>
         {exp.html !== undefined && <SelectItem value="html" disabled={!exp.html}>html · {exp.html ? 'interactive page, one file' : exp.why}</SelectItem>}
       </SelectContent>

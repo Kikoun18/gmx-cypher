@@ -80,6 +80,12 @@ test('tick two jobs, see them side by side and on one graph, export them as one 
   await expect(page.getByText(/^decypher_2-RDFs_/)).toBeVisible()
   const file = join(mkdtempSync(join(tmpdir(), 'gmxc-e2e-export-')), download.suggestedFilename())
   await download.saveAs(file)
+  // The same RDFs as figures (R6b): by default one PDF, a page for each card and one for the one graph.
+  const [figures] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: '+ Export figures' }).click()])
+  const pdfFile = join(mkdtempSync(join(tmpdir(), 'gmxc-e2e-export-')), figures.suggestedFilename())
+  await figures.saveAs(pdfFile)
+  const pdf = readFileSync(pdfFile, 'latin1')
+  expect([pdf.slice(0, 8), /\/Type \/Pages [^>]*\/Count (\d+)/.exec(pdf)?.[1], pdfFile.endsWith('.pdf')]).toEqual(['%PDF-1.4', '3', true])
   const html = readFileSync(file, 'utf8')
   expect(html).not.toContain(sim)
   const exported = await context.newPage(), exportErrors = watch(exported), requests: string[] = []
