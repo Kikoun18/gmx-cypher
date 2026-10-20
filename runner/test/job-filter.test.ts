@@ -44,6 +44,8 @@ describe('search and filters (R12b)', () => {
     expect(f).toEqual({ status: 'failed', command: 'rdf', q: 'water o', from: '2026-10-01' })
     expect(filterQuery(f)).toBe('q=water+o&command=rdf&status=failed&from=2026-10-01')
     expect(filterQuery({})).toBe('')
+    // The archived jobs (R12c): archive=1 only.
+    expect([parseFilter(new URLSearchParams('archive=1&q=x')), parseFilter(new URLSearchParams('archive=yes'))]).toEqual([{ archive: '1', q: 'x' }, {}])
   })
 
   it('in the results\' and compare\'s addresses alike', () => {

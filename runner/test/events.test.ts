@@ -67,6 +67,18 @@ describe('jobs over HTTP', () => {
     const log = await (await fetch(base + '/api/jobs/' + id + '/log?from=0', { headers })).json();
     expect([log.text, log.from, log.size]).toEqual([expect.stringContaining('Analyzed 11 frames'), 0, one.logSize]);
     expect((await fetch(base + '/api/jobs/' + id + '/log?from=x', { headers })).status).toBe(400);
+    // Archived (R12c): gone from the list and its events, listed with ?archived=1; unarchived, a job again.
+    const post = (path: string) => fetch(base + path, { method: 'POST', headers: { ...headers, 'content-type': 'application/json', origin: base }, body: '{}' });
+    const gone = listen((name, d) => name === 'gone' && (d as { id: string }).id === id);
+    await new Promise(r => setTimeout(r, 100));
+    expect((await post('/api/jobs/' + id + '/archive')).status).toBe(200);
+    await gone;
+    const ids = async (q = '') => ((await (await fetch(base + '/api/jobs' + q, { headers })).json()) as { id: string }[]).map(j => j.id);
+    expect([(await ids()).includes(id), await ids('?archived=1')]).toEqual([false, [id]]);
+    const again = await post('/api/jobs/' + id + '/archive');
+    expect([again.status, (await again.json()).error]).toEqual([409, 'no job ' + id]);
+    expect((await post('/api/jobs/' + id + '/unarchive')).status).toBe(200);
+    expect([(await ids()).includes(id), await ids('?archived=1')]).toEqual([true, []]);
   });
 
   it('cancels a running job by its id, and refuses an unknown one', async () => {

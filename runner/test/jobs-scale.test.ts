@@ -1,6 +1,6 @@
 // A jobs list that scales (R12a): a job is folded from its events without its log, which stays on disk and is read
 // on demand, its tail by default.
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { foldFile, foldJob, Jobs, LOG_TAIL } from '../server/jobs';
@@ -71,5 +71,49 @@ describe('the log, read from disk on demand (R12a)', () => {
     const jobs = new Jobs(dir), tail = jobs.logRange('j2');
     expect([tail.from, tail.to, tail.size, tail.text]).toEqual([big.length - LOG_TAIL, big.length, big.length, big.slice(-LOG_TAIL)]);
     expect(jobs.logRange('j2', 0).text).toBe(big);
+  });
+});
+
+describe('archive (R12c)', () => {
+  const write = (dir: string, id: string, events: Ev[]) => { mkdirSync(dir, { recursive: true }); writeFileSync(join(dir, id + '.ndjson'), events.map(e => JSON.stringify(e)).join('\n') + '\n'); };
+  const setup = () => {
+    const dir = join(tmp('archive'), 'jobs');
+    write(dir, 'jdone1', [created, started, out('done one'), ended('done', 0)]);
+    write(dir, 'jfail1', [created, started, out('failed one'), ended('failed', 1, 'x')]);
+    write(dir, 'jrun01', [created, started, out(frames(0, 3))]);
+    return dir;
+  };
+  it('moves a finished job\'s file into archive/, as it was; the list and the next start leave it out', () => {
+    const dir = setup(), bytes = readFileSync(join(dir, 'jdone1.ndjson'), 'utf8'), jobs = new Jobs(dir);
+    jobs.archive('jdone1');
+    expect([existsSync(join(dir, 'jdone1.ndjson')), readFileSync(join(dir, 'archive', 'jdone1.ndjson'), 'utf8')]).toEqual([false, bytes]);
+    expect(jobs.list().map(j => j.id)).not.toContain('jdone1');
+    expect(new Jobs(dir).list().map(j => j.id)).not.toContain('jdone1');
+    expect(jobs.archived().map(j => [j.id, j.status])).toEqual([['jdone1', 'done']]);
+  });
+  it('moves it back on unarchiving, and it is a job again', () => {
+    const dir = setup(), jobs = new Jobs(dir), bytes = readFileSync(join(dir, 'jfail1.ndjson'), 'utf8');
+    jobs.archive('jfail1');
+    jobs.unarchive('jfail1');
+    expect([readFileSync(join(dir, 'jfail1.ndjson'), 'utf8'), existsSync(join(dir, 'archive', 'jfail1.ndjson'))]).toEqual([bytes, false]);
+    expect(jobs.get('jfail1')).toMatchObject({ status: 'failed', error: 'x' });
+    expect(jobs.archived()).toEqual([]);
+  });
+  it('refuses a running job, one it does not know, and a collision, either way: nothing is overwritten', async () => {
+    const dir = setup(), jobs = new Jobs(dir), slow = jobs.start({ kind: 'test', title: 'slow', file: process.execPath, args: ['-e', 'setTimeout(() => {}, 30000)'], cwd: tmp('cwd') });
+    expect(() => jobs.archive(slow.id)).toThrow('a running job is not archived');
+    const gone = new Promise(r => jobs.on('job', (j: { id: string; ended?: string }) => { if (j.id === slow.id && j.ended) r(null); }));
+    jobs.cancel(slow.id);
+    await gone;
+    expect(() => jobs.archive('jnone1')).toThrow('no job jnone1');
+    mkdirSync(join(dir, 'archive'), { recursive: true });
+    writeFileSync(join(dir, 'archive', 'jdone1.ndjson'), 'already here\n');
+    expect(() => jobs.archive('jdone1')).toThrow('archive/jdone1.ndjson exists');
+    expect([readFileSync(join(dir, 'archive', 'jdone1.ndjson'), 'utf8'), existsSync(join(dir, 'jdone1.ndjson')), !!jobs.get('jdone1')]).toEqual(['already here\n', true, true]);
+    jobs.archive('jfail1');
+    write(dir, 'jfail1', [created]);
+    expect(() => jobs.unarchive('jfail1')).toThrow('jfail1.ndjson exists');
+    expect(existsSync(join(dir, 'archive', 'jfail1.ndjson'))).toBe(true);
+    expect(() => jobs.unarchive('jnone1')).toThrow('no archived job jnone1');
   });
 });

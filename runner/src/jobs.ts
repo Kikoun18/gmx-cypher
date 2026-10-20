@@ -50,6 +50,8 @@ export function useJobs(naming: Naming | null = null) {
       const j = JSON.parse((e as MessageEvent).data) as Job
       setJobs(list => [j, ...list.filter(x => x.id !== j.id)].sort((a, b) => b.created.localeCompare(a.created)))
     })
+    // An archived job leaves the list (R12c); unarchived, it comes back as a job event.
+    es.addEventListener('gone', e => { const { id } = JSON.parse((e as MessageEvent).data) as { id: string }; setJobs(list => list.filter(j => j.id !== id)) })
     es.addEventListener('out', e => {
       const { id, s } = JSON.parse((e as MessageEvent).data) as { id: string; s: string }
       setLogs(l => (id in l ? { ...l, [id]: { ...l[id], text: l[id].text + s, size: l[id].size + s.length } } : l))

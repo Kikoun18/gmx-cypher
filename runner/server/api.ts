@@ -39,12 +39,13 @@ function events(jobs: Jobs, batches: Batches, res: ServerResponse) {
   res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-store', connection: 'keep-alive' });
   const send = (name: string, data: unknown) => res.write('event: ' + name + '\ndata: ' + JSON.stringify(data) + '\n\n');
   const onJob = (j: Job) => send('job', summary(j)), onOut = (id: string, s: string) => send('out', { id, s });
-  const onBatch = (b: unknown) => send('batch', b);
+  const onBatch = (b: unknown) => send('batch', b), onGone = (id: string) => send('gone', { id });
   jobs.on('job', onJob);
+  jobs.on('gone', onGone);
   jobs.on('out', onOut);
   batches.on('batch', onBatch);
   const ping = setInterval(() => res.write(': ping\n\n'), 25_000);
-  res.on('close', () => { clearInterval(ping); jobs.off('job', onJob); jobs.off('out', onOut); batches.off('batch', onBatch); });
+  res.on('close', () => { clearInterval(ping); jobs.off('job', onJob); jobs.off('gone', onGone); jobs.off('out', onOut); batches.off('batch', onBatch); });
   send('hello', {});
 }
 
@@ -76,7 +77,8 @@ export function makeApi(ctx: Ctx): Api {
   return async (req, url, res) => {
     if (is(req, 'GET', url, '/api/state')) return { body: state() };
     if (is(req, 'GET', url, '/api/events')) { events(ctx.jobs, batches, res); return 'handled'; }
-    if (is(req, 'GET', url, '/api/jobs')) return { body: ctx.jobs.list().map(summary) };
+    // The jobs, or with ?archived=1 the archived ones (R12c), read from archive/ when asked.
+    if (is(req, 'GET', url, '/api/jobs')) return { body: (url.searchParams.get('archived') === '1' ? ctx.jobs.archived() : ctx.jobs.list()).map(summary) };
     if (is(req, 'GET', url, '/api/commands')) {
       // Which commands this gmx runs, and as which of its tools (R8: gmx hbond is another tool before 2024); [] without a gmx.
       if (!ctx.gmx.ok) return { body: [] };
@@ -246,6 +248,12 @@ export function makeApi(ctx: Ctx): Api {
       const name = url.searchParams.get('name') || 'upload', role = inputRole(name);
       if (!role || role === 'output') throw new HttpError(400, name + ' is not a GROMACS input (.xtc .trr .tng .tpr .gro .pdb .ndx .edr); not uploaded');
       return { body: await saveUpload(req, ctx.home, name) };
+    }
+    // Archive and unarchive (R12c): the job's file moved, never over another; refusals in words.
+    const shelf = /^\/api\/jobs\/([\w-]+)\/(archive|unarchive)$/.exec(url.pathname);
+    if (shelf && req.method === 'POST') {
+      try { if (shelf[2] === 'archive') ctx.jobs.archive(shelf[1]); else ctx.jobs.unarchive(shelf[1]); } catch (e) { throw new HttpError(409, (e as Error).message); }
+      return { body: { ok: true } };
     }
     const job = /^\/api\/jobs\/([\w-]+)(\/cancel|\/record|\/output|\/awh-convergence|\/log)?$/.exec(url.pathname);
     if (job) {

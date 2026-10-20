@@ -28,7 +28,7 @@ export function JobFilters({ jobs, filter, onFilter, shown, allow }: {
   onFilter: (f: JobFilter, typing?: boolean) => void
 }) {
   const set = (k: keyof JobFilter, v: string, typing = false) => { const { [k]: _, ...rest } = filter; onFilter(v ? { ...rest, [k]: v } : rest, typing) }
-  const others = Object.keys(filter).filter(k => k !== 'q').length
+  const others = Object.keys(filter).filter(k => k !== 'q' && k !== 'archive').length
   const [open, setOpen] = React.useState(others > 0)
   const o = React.useMemo(() => filterOptions(jobs), [jobs])
   const n = (c: number) => ' · ' + c
@@ -37,6 +37,8 @@ export function JobFilters({ jobs, filter, onFilter, shown, allow }: {
       <Input type="search" className="h-8" value={filter.q ?? ''} placeholder="search names, groups, folders" aria-label="search jobs" onChange={e => set('q', e.target.value, true)} />
       <div className="flex items-center gap-2 text-caption text-muted-foreground">
         <button type="button" aria-expanded={open} className="underline underline-offset-2 hover:text-foreground" onClick={() => setOpen(x => !x)}>filters{others ? ' · ' + others : ''}</button>
+        <button type="button" aria-pressed={!!filter.archive} className={'underline underline-offset-2 hover:text-foreground' + (filter.archive ? ' font-bold text-foreground' : '')} onClick={() => set('archive', filter.archive ? '' : '1')}
+          title="the archived jobs: their files in the jobs folder's archive/, not read at start">archived</button>
         <span className="flex-1" />
         {Object.keys(filter).length > 0 && <><span>{shown} of {jobs.length}</span><button type="button" className="underline underline-offset-2 hover:text-foreground" onClick={() => onFilter({})}>clear</button></>}
       </div>

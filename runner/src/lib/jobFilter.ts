@@ -1,16 +1,18 @@
 // The jobs list's search and filters (R12b): by command, status, batch, folder and day; free text over the display name
 // (R3c), the title (its groups) and the folder, every word to match. Kept in the address (#results?status=failed).
 
-export interface JobFilter { q?: string; command?: string; status?: string; batch?: string; folder?: string; from?: string; to?: string }
+export interface JobFilter { q?: string; command?: string; status?: string; batch?: string; folder?: string; from?: string; to?: string
+  /** '1': the archived jobs (R12c), listed only so. */
+  archive?: string }
 type Filterable = { id: string; kind: string; status: string; cwd: string; created: string; title: string; name?: string; meta?: Record<string, unknown> }
 
-const KEYS = ['q', 'command', 'status', 'batch', 'folder', 'from', 'to'] as const
+const KEYS = ['archive', 'q', 'command', 'status', 'batch', 'folder', 'from', 'to'] as const
 const DAY = /^\d{4}-\d{2}-\d{2}$/
 
 /** A filter from an address's query: known keys with a value, days as YYYY-MM-DD. */
 export function parseFilter(q: URLSearchParams): JobFilter {
   const f: JobFilter = {}
-  for (const k of KEYS) { const v = q.get(k)?.trim(); if (v && ((k !== 'from' && k !== 'to') || DAY.test(v))) f[k] = v }
+  for (const k of KEYS) { const v = q.get(k)?.trim(); if (v && ((k !== 'from' && k !== 'to') || DAY.test(v)) && (k !== 'archive' || v === '1')) f[k] = v }
   return f
 }
 

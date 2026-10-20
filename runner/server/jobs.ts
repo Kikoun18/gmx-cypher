@@ -5,7 +5,7 @@
 
 import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
 import { EventEmitter } from 'node:events';
-import { appendFileSync, mkdirSync, readdirSync, readFileSync } from 'node:fs';
+import { appendFileSync, existsSync, linkSync, mkdirSync, readdirSync, readFileSync, unlinkSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { gmxError, parseProgress, type Progress } from '../src/lib/progress';
 
@@ -108,6 +108,12 @@ function commandLine(pid: number): string[] {
 
 const SIGKILL_AFTER_MS = 5000;
 
+/** A file to a new name that must not exist: linked there (EEXIST: refused), then its old name removed. */
+function move(from: string, to: string, shown: string) {
+  try { linkSync(from, to); } catch (e) { throw new Error((e as NodeJS.ErrnoException).code === 'EEXIST' ? shown + ' exists: nothing was moved' : (e as Error).message); }
+  unlinkSync(from);
+}
+
 export class Jobs extends EventEmitter {
   private readonly dir: string;
   private readonly jobs = new Map<string, Job>();
@@ -139,6 +145,35 @@ export class Jobs extends EventEmitter {
   list(): Job[] { return [...this.jobs.values()].sort((a, b) => b.created.localeCompare(a.created)); }
   get(id: string): Job | undefined { return this.jobs.get(id); }
   running(): Job[] { return this.list().filter(j => j.status === 'running'); }
+
+  /**
+   * Archive (R12c): a finished job's file moves into archive/, as it is, and the job leaves the list; nothing is deleted.
+   * The move is a link then the old name's removal, so a file already there is never overwritten: a collision is refused.
+   */
+  archive(id: string) {
+    const j = this.jobs.get(id);
+    if (!j) throw new Error('no job ' + id);
+    if (!j.ended || j.unfollowed) throw new Error('a running job is not archived: ' + (j.unfollowed ? 'it runs on, not followed' : 'cancel it, or wait for its end'));
+    mkdirSync(join(this.dir, 'archive'), { recursive: true });
+    move(join(this.dir, id + '.ndjson'), join(this.dir, 'archive', id + '.ndjson'), 'archive/' + id + '.ndjson');
+    this.jobs.delete(id);
+    this.emit('gone', id);
+  }
+  /** Unarchive (R12c): its file back from archive/, never over one that is there, and the job in the list again. */
+  unarchive(id: string) {
+    const from = join(this.dir, 'archive', id + '.ndjson');
+    if (!/^[\w-]+$/.test(id) || !existsSync(from)) throw new Error('no archived job ' + id);
+    move(from, join(this.dir, id + '.ndjson'), id + '.ndjson');
+    const f = foldFile(id, readFileSync(join(this.dir, id + '.ndjson'), 'utf8'));
+    if (f) { this.jobs.set(id, f.job); this.changed(f.job); }
+  }
+  /** The archived jobs, read when asked for (never at start), newest first. */
+  archived(): Job[] {
+    const dir = join(this.dir, 'archive');
+    if (!existsSync(dir)) return [];
+    return readdirSync(dir).filter(n => n.endsWith('.ndjson')).flatMap(n => { const f = foldFile(n.slice(0, -7), readFileSync(join(dir, n), 'utf8')); return f ? [f.job] : []; })
+      .sort((a, b) => b.created.localeCompare(a.created));
+  }
 
   /** A job's whole log, read from its file. */
   logText(id: string): string { return readEvents(join(this.dir, id + '.ndjson')).map(e => (e.t === 'out' ? e.s : '')).join(''); }
