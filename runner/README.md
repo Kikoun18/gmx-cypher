@@ -1,15 +1,16 @@
 # gmx-cypher
 
-A local tool that runs GROMACS analyses on your trajectories and energy files: `gmx rdf`, `distance`,
-`hbond`, `rms`, `rmsf`, `gyrate`, `mindist`, `energy`, `awh` and `wham`. You pick atom groups in 3D or by
-rule, see the exact command before it runs, get every output with a run record, and hand results to
-**the Matrix** through its vault, where they land in the right row, column and run. A *cluster* tab
-shows your cluster jobs (`qq jobs` with `gmx-eta -a`). **(de)Cypher** shows the RDFs of several jobs at once, each with the
-structure its groups are atoms of, side by side or on one graph, also RDFs from the Matrix vault with their rows'
-structures, and exports them as one interactive HTML file.
+A local tool that runs GROMACS analyses on your trajectories and energy files: `gmx rdf`, `distance`, `hbond`, `rms`,
+`rmsf`, `gyrate`, `mindist`, `density`, `order`, `energy`, `awh` and `wham`. You pick atom groups in 3D or by rule, see
+the exact command before it runs, get every output with its record, compare results of any command side by side or on
+one graph, export any chart, and hand results to **the Matrix** through its vault, where they land in the right row,
+column and run. A *cluster* tab shows your cluster jobs (`qq jobs` with `gmx-eta -a`).
 
-It runs on your machine (or the machine that has the trajectories), serves its page on 127.0.0.1 only,
-and never deletes or overwrites a file.
+It runs on your machine (or the machine that has the trajectories), serves its page on 127.0.0.1 only, and never
+deletes or overwrites a file.
+
+How it looks and behaves (words, colours, keys, the order of a result page) is fixed in the design contract:
+[`docs/design-contract.md`](docs/design-contract.md), enforced by tests from `src/core/contract.ts`.
 
 ## Start
 
@@ -23,7 +24,7 @@ npm start                       # builds the page, then starts the server
 ```
 
 In a clone you already have, `git submodule update --init` fetches `matrix/` (do it once, and again after a pull that
-moves it). `matrix/` is the Matrix, whose own code gmx-cypher reads vaults with; see *The Matrix* under Development.
+moves it). `matrix/` is the Matrix, whose own code gmx-cypher reads vaults with; see *The Matrix* below.
 
 It prints an address with a one-time token. Open it in Chrome:
 
@@ -37,345 +38,296 @@ gmx: /software/gromacs/2025.4/bin/gmx_mpi · 2025.4
 
 The token goes into a cookie and leaves the address bar; a new start prints a new token.
 
-**Finding `gmx`.** gmx-cypher uses the `gmx` set in *settings*, or else the first of `gmx_mpi` and `gmx`
-on your `PATH` that answers `--version`. If GROMACS comes from a module, load it first, in the shell you
-start gmx-cypher from, so it inherits the paths and libraries:
+**Finding `gmx`.** gmx-cypher uses the `gmx` set in *settings*, or else the first of `gmx_mpi` and `gmx` on your `PATH`
+that answers `--version`. If GROMACS comes from a module, load it first, in the shell you start gmx-cypher from, so it
+inherits the paths and libraries (`module add gromacs/2025.4-cuda`, then `npm start`).
 
-```sh
-module add gromacs/2025.4-cuda
-npm start
-```
+**Options.** `--port 8765` (another port), `--gmx <name or path>` (saved in settings), `--allow <folder>` (a folder the
+file browser may show; repeat it for several), `--dev` (development mode with hot reload). `GMX_CYPHER_HOME` moves the
+state folder (default `~/.gmx-cypher`).
 
-**Options.** `--port 8765` (another port), `--gmx <name or path>` (saved in settings), `--allow <folder>`
-(a folder the file browser may show; repeat it for several), `--dev` (development mode with hot reload).
-`GMX_CYPHER_HOME` moves the state folder (default `~/.gmx-cypher`).
+**On another machine** (a workstation that has the trajectories): start it there and open it through an SSH tunnel; it
+says so when it starts: `ssh -L 8765:127.0.0.1:8765 workstation`, then the same address here.
 
-**On another machine** (a workstation that has the trajectories): start it there and open it through an
-SSH tunnel; it says so when it starts:
+**Closing the terminal.** When the terminal or SSH session closes (SIGHUP), gmx-cypher keeps running, so its jobs
+finish and get their records; it logs `SIGHUP: the terminal closed; gmx-cypher keeps running (pid N). Stop it with:
+kill N`. Its page stays where it was. To stop it: Ctrl-C in its terminal, or `kill <pid>`; that cancels its running
+jobs first. To start it detached from the outset, `nohup npm start > gmx-cypher.log 2>&1 &` (or inside `tmux`).
 
-```sh
-ssh -L 8765:127.0.0.1:8765 workstation      # then open the same address here
-```
+## Set-up
 
-## A first RDF, step by step
+Three steps, **inputs · groups · command**, each at an address of its own (`#setup/inputs`, …), so a reload keeps the
+step and back and forward work. *one trajectory* or *batch* switches the mode.
 
-1. **Settings.** Check that `gmx` reads *✓ ready*. Add the folders with your simulations under *allowed
-   folders*; the file browser shows only those. To send results to the Matrix, set your *vault folder*
-   (and, optionally, the address where you open the Matrix).
-2. **inputs.** Browse to a run and click its trajectory (`.xtc`, `.trr`, `.tng`). The run input (`.tpr`),
-   structure (`.gro` or `.pdb`) and an index (`.ndx`), if any, are suggested from the same folder, each
-   with its reason; change any with *pick*. Small GROMACS inputs can also be uploaded. gmx-cypher then checks that
-   the structure, the run input (`gmx dump`) and the trajectory (`gmx check`) have the same number of
-   atoms, and that an index fits. *use these inputs* opens groups.
-3. **groups.** One reference and one or more selections, each with a name (the curve's label in PMF
-   Sequences; one word) and a hue (see *Atom picking* below; other commands name their groups otherwise,
-   and some take one group only):
-   - *click* an atom in 3D to add or remove it, *shift*-click for its residue, *alt*-click for that atom
-     name in every residue of its name, into the group marked *picking*;
-   - *+ rule*: residue name, residue numbers, atom names (a list, in every residue of a name), element, or
-     a group of your index file;
-   - or type atom numbers (`43-3239:4, 5`).
+1. **Settings.** Check that `gmx` reads *ready*. Add the folders with your simulations under *allowed folders*; the
+   file browser shows only those. To send results to the Matrix, set your *vault folder* and the *connected project*:
+   its folder pattern names your jobs (`WRWYCR · HA · walker 1 · rdf`), it is the default for sends, and it owns the
+   saved compare views. The address where you open the Matrix gives the link after a send.
+2. **inputs.** Browse to a run and click its trajectory (`.xtc`, `.trr`, `.tng`). The run input (`.tpr`), structure
+   (`.gro` or `.pdb`) and an index (`.ndx`), if any, are suggested from the same folder, each with its reason; change
+   any with *pick*. Small GROMACS inputs can also be uploaded or dropped anywhere on the page (a drop is split by kind:
+   inputs go here, results go to compare, and the page says where each went). gmx-cypher checks that the structure,
+   the run input (`gmx dump`) and the trajectory (`gmx check`) have the same number of atoms, and that an index fits.
+3. **groups.** What the command calls them: a reference and selections for most, one group for `rmsf` and `gyrate`,
+   the fit group then measured groups for `rms`, the carbons in tail order for `order`. Each has a name (one word, the
+   curve's name) and a hue; the reference is drawn in ink.
+   - *click* an atom in 3D to add or remove it, *shift*-click for its residue, *alt*-click for that atom name in every
+     residue of its name, into the group being picked;
+   - *+ rule*: residue name, residue numbers, atom names (`OH1, OH2 OH3 and OH4`, in every residue of a name), element,
+     or a group of your index file; or type atom numbers (`43-3239:4, 5`). Shift+Enter adds a rule and keeps the form
+     open for the next one in the same group.
+   - For rdf, atoms shared by the reference and a selection are flagged, with `-excl` or removing them offered. *check
+     sizes with gmx* counts every group with `gmx select`.
+4. **command.** Pick the command (see *Commands*). Every option the form offers comes from your `gmx <tool> -h`, with
+   its default and what it changes; a changed one shows *changed · default …* (click to reset). Options gmx would
+   refuse are named before you run. The command on the right is exactly what will run, with the answers it reads on
+   stdin. *run* confirms each group with `gmx select`, writes the index, and starts gmx; the job keeps going if you
+   close the page.
 
-   For rdf, shared atoms between the reference and a selection are flagged, with `-excl` or removing them
-   offered. *check sizes with gmx* counts every group with `gmx select` against the run input.
-4. **analysis.** Pick the command (rdf here; the others are under *Commands* below). Every option the
-   form offers, from your `gmx rdf -h`, its default, and what it changes. Changed options show
-   *changed · default …* (click it to reset). Options gmx would refuse are named before you run. The
-   command on the right is exactly what will run, in the trajectory's folder.
-5. **run.** gmx-cypher checks that the structure has the run input's atom count (the groups are numbered
-   from it), confirms each group's size with `gmx select`, writes the index, and starts gmx.
-   *jobs* shows the frames read against the estimate, the live log, and *cancel* (click twice). A run
-   keeps going if you close the page.
-6. **result.** g(r) per selection in its group's hue (click a name: shown → dimmed → hidden), the first
-   peak and frames, the options that change g(r), and the cumulative number if you asked for it.
-7. **send to vault…** (needs a vault in settings). Choose the project; the dialog fills sequence, column,
-   group and run as the project's folder pattern reads them from the run's folder, names the file by the
-   project's file pattern, and shows where the Matrix itself will put it (its own `planBatch` on this
-   file), including which curves it will import. *send to vault* copies the g(r) file into
-   `<project folder>/_inbox/`.
-8. **In the Matrix:** open the project, *Vault → Check folder now* (or reload the page), then
-   *Vault → Untracked files → attach*. Its upload dialog shows the same landing.
+**Recipes** (command step): save the options, groups, file name and folder under a name, load them again for another
+trajectory of the same system, export or import them as JSON.
 
-**Recipes** (in the analysis tab, for commands with groups): save the options, groups, file name and folder under a name, load them again for
-another trajectory of the same system, export or import them as JSON. Saving under a name that is taken
-asks first (*click again to replace*).
+**Batch** (set-up, *batch* mode): one recipe over every trajectory a path template finds under a root, for example
+`hmr+fast+6/{column}/{seq}/9.multiwalker/{run}/07_md.xtc`. *preview* lists every match, its fields, the inputs beside
+it, each group's atom count there, and any problem; nothing runs until you press *run*. The queue runs a few at a time
+(2 by default); *cancel all* stops them; *send all to vault* sends each by the same rule as a single send.
 
-**Batches** (batch tab): one recipe of a command with groups over every trajectory a path template finds under a root, for
-example `hmr+fast+6/{column}/{seq}/9.multiwalker/{run}/07_md.xtc`. *preview* lists every match, its
-fields, the inputs beside it, each group's atom count there, and any problem (no run input, a structure
-whose atom count isn't the run input's, a file-name token the path doesn't give); nothing runs until you
-press *run*. Linked folders inside the allowed ones are followed; a place it could not look into (an
-unreadable folder, a link out of the allowed folders or to nothing) is named above the list. The queue runs a few at a time (2 by default), each as an ordinary run with its own record;
-runs that share an output folder each take the next free name. *cancel all* stops them; *send all to
-vault* sends each by the same rule as a single send.
+## Results
+
+*results* is the jobs list and, beside it, the selected job's result (`#results/<job>`).
+
+- **The list**: a display name per job (from the connected project's pattern, else the job's title), its status in
+  words, and its progress. Search names, groups and folders; filter by command, status, batch, folder and day made;
+  the filter is in the address. Click one; ⌘/Ctrl-click or its box adds or removes one; Shift-click takes a range.
+  Two or more open compare in the detail pane; **D** does too, from anywhere.
+- **A result page**, the same order for every command: the actions (*compare*, *compare with…*, *send to vault…*,
+  *open in set-up*, *export*), the charts with their numbers, the settings and the groups as gmx counted them, then,
+  folded, the files, the command and the log. A finished RDF shows both peak rules, named: the **maximum** (a filled
+  dot) and the **first shell** (hollow: the highest point of the first stretch where g(r) is above 1). The log shows its last 64 kB, with *show all*.
+- **Labels**: a group can be given a label (its name in charts, compare, CSVs and exports); the record, the index, the
+  `.xvg` and anything sent keep gmx's names.
+- **Run diff**: with two jobs selected, *diff* shows only what differs between their records (options with their
+  defaults, frames, inputs, groups with the atoms added and removed, gmx and its environment); the equal fields are
+  counted and shown on asking. A result's *compare with…* does the same against another job, a record on disk, or a
+  record copy in the vault. An input moved but the same (by SHA-256, else size and time) is equal.
+- **Archive**: select jobs that have ended and press *archive*: their files move to the jobs folder's `archive/`
+  (a move, never a copy or a delete, never over another file), and they are not read at start. *archived* lists them,
+  each with *unarchive*.
 
 ## Commands
 
-Each command runs from one definition: the inputs it needs, the options it offers (each with its default
-from your `gmx <tool> -h` and a note on what it changes), its file names, what gmx would refuse (said
-before anything runs), and which file goes to the vault, typed as the Matrix types it (checked with
-the Matrix's own `detectAna` on real GROMACS output). Where GROMACS 2024 replaced a tool (`hbond`,
-`gyrate`), the picker greys out the one your gmx doesn't have, with the reason. Times are in ps and files
-keep xmgrace's `@` lines (gmx's defaults; no form offers others): the Matrix reads both.
+Each command runs from one definition: the inputs it needs, the options it offers, its file names, what gmx would
+refuse (said before anything runs), and which file goes to the vault, typed as the Matrix types it (checked with the
+Matrix's own `detectAna` on real GROMACS output). Where GROMACS 2024 replaced a tool (`hbond`, `gyrate`), the picker
+greys out the one your gmx doesn't have, with the reason. Times are in ps and files keep xmgrace's `@` lines.
 
-**Trajectory and groups** (a trajectory, a run input, a structure for the groups):
+**Trajectory and groups:**
 
-- **`gmx rdf`**: g(r) of each selection around the reference. Options that change the numbers: `-bin`,
-  `-rmax`, `-norm`, `-selrpos`/`-seltype`, `-excl`, `-cut`, `-xy`, `-surf`, `-b`/`-e`/`-dt`. Vault: g(r),
-  typed RDF; the cumulative number (`-cn`) stays here (the Matrix would read its title as another RDF).
-- **`gmx distance`**: from the reference to each selection over time, between centres of mass or of
-  geometry, or atom by atom (*pairs*: as many atoms in each; unequal sizes are refused, gmx would pair
-  them silently). Vault: the averages (`-oav`), typed Distance (the Matrix reads the first curve).
-  Every distance, x/y/z and the histogram when asked; the histogram stays here.
-- **`gmx hbond`** (GROMACS 2024 and later): H-bonds between the reference and one target, by its own
-  criteria (`-hbr`, `-hba`, `-cutoff` ≥ 0.35 nm and ≥ `-hbr`, donor and acceptor elements). Reference and
-  target must be the same atoms or share none. Vault: the count over time, typed H-bonds; the distance and
-  angle distributions (densities) and the donor and acceptor counts stay here. The donors and acceptors
-  gmx found are in the record and the result.
-- **`gmx hbond-legacy`**: the old tool, offered only where `gmx hbond` is the old one (GROMACS before
-  2024, where it runs as `gmx hbond`): its own criteria (`-r`, `-a`, `-da`, `-merge`), never mixed with
-  the new ones; the groups are answered on stdin. The angle distribution needs merging off.
-- **`gmx rms`**: the RMSD over time of the fit group (fitted onto the run input's structure) and of any
-  further groups after the same fit (`-fit`, `-mw`, `-prev`). Vault: typed RMSD (the first curve, the fit
-  group's).
-- **`gmx rmsf`**: one group's fluctuation per atom, or per residue (`-res`), fitted unless `-nofit`. Vault:
-  typed RMSF; its x is the atom's number in the system, which the Matrix labels "Residue".
-- **`gmx gyrate`** (2024 and later; `gyrate-legacy` where it is missing): one group's radius of gyration
-  over time, total and about x, y and z, weighted by mass (or charge, or geometry). The two tools agree on
-  one molecule and not on a group of several, so they are never mixed. Vault: typed Rg (the total).
-- **`gmx mindist`**: the minimum distance from the reference to each group over time; the contacts within
-  `-d` when asked (a second file, which the Matrix gives no type: it stays here). Vault: typed Distance.
+- **`gmx rdf`**: g(r) of each selection around the reference (`-bin`, `-rmax`, `-norm`, `-selrpos`/`-seltype`, `-excl`,
+  `-cut`, `-xy`, `-surf`, frames). Vault: g(r), typed RDF; the cumulative number (`-cn`) stays here.
+- **`gmx distance`**: from the reference to each selection over time, between centres of mass or of geometry, or atom
+  by atom. Vault: the averages, typed Distance. The histogram and every distance stay here.
+- **`gmx hbond`** (GROMACS 2024 and later) and **`gmx hbond-legacy`** (before): H-bonds between the reference and one
+  target, each tool by its own criteria, never mixed. Vault: the count over time, typed H-bonds.
+- **`gmx rms`**: the RMSD of the fit group and of further groups after the same fit. Vault: typed RMSD.
+- **`gmx rmsf`**: one group's fluctuation per atom or per residue. Vault: typed RMSF. Compare paints it on the structure.
+- **`gmx gyrate`** (2024 and later; `gyrate-legacy` where it is missing): one group's radius of gyration over time.
+  Vault: typed Rg.
+- **`gmx mindist`**: the minimum distance from the reference to each group; the contacts within `-d` when asked (kept
+  here). Vault: typed Distance.
+- **`gmx density`**: the density of each group along one box axis (`-d` X, Y or Z), in slices (`-sl`); by mass,
+  number or charge, or electron density once an electrons file (`-ei`, its whole path) is given. `-center` bins around
+  the first group's centre each frame (a bilayer stays put while the box breathes); `-symm` symmetrises the profile.
+  One curve per group, the units as gmx writes them. Vault: typed Density (every curve).
+- **`gmx order`**: S_CD per carbon of a lipid tail. The groups are the carbons in tail order, one per carbon (at least
+  three); with an index file in inputs, *take the N groups of <index>* makes them in one click. gmx gives S_CD for the
+  carbons between the first and the last (each from its neighbours). Vault: S_CD (`-od`), typed Order parameters; the
+  order tensor (`-o`) stays here. Its own known issues, quoted on the result: it suits saturated carbons and
+  united-atom force fields.
 
 **An energy file:**
 
-- **`gmx energy`**: pick terms from the file's own menu (sent by number); `-b` cuts the first ps as
-  equilibration. The result shows each term's average, error estimate, RMSD and drift, as gmx prints
-  them, and flags a drift larger than its error estimate. The run input is optional. Vault: typed Energy,
-  from its file name (which must contain "energy"; the default does). Outputs go to `energy/` beside the
-  energy file.
-- **`gmx awh`**: the PMF of each stored frame, from the energy file and its run input. Choose the last
-  frame (the default), every N-th, or all; the page says how many files each choice writes. Files are
-  `<stem>_t<time>.xvg` (the Matrix's own name pattern); the last frame goes to the vault, typed PMF, in
-  kJ/mol.
+- **`gmx energy`**: terms from the file's own menu; each term's average, error estimate, RMSD and drift, a drift larger
+  than its error flagged. Vault: typed Energy.
+- **`gmx awh`**: the PMF of each stored frame (the last, every N-th, or all), drawn along a ramp from the oldest to the
+  newest, with its **convergence**: how far each frame moved from the one before and from the final one (frames aligned
+  by their mean; no threshold). The axis unit is read from the run input with `gmx dump -s` when the job starts, or the
+  page says why it keeps gmx's label. Vault: the last frame, typed PMF, in kJ/mol.
 
 **Window lists:**
 
-- **`gmx wham`**: umbrella windows found with a folder template (`*/umbrella.tpr`, each with its pull file
-  beside it); leave any out. gmx-cypher writes the two lists gmx wham reads beside the outputs, reads the
-  temperature from the run inputs (gmx wham would assume 298 K), and shows `-b` as each window's
-  equilibration. The result shows the profile with its bootstrap band, the histograms, and the overlap of
-  each pair of neighbouring windows, gaps named. Vault: the histograms, typed Histogram; the profile stays
-  here (the Matrix would type it Histogram too, or as a PMF give it the AWH correction).
+- **`gmx wham`**: umbrella windows found with a folder template; the temperature read from the run inputs. The profile
+  with its bootstrap band, the histograms along a ramp in their order along ξ, and the overlap of each pair of
+  neighbouring windows, gaps named. Vault: the histograms, typed Histogram; the profile stays here.
+
+## Compare
+
+`#compare?jobs=…`: the results of any command, side by side (*each result*) or on one graph (*one graph*, like
+quantities only: the same x and the same y unit, else the reason in words). Sources: *jobs* (the list's selection),
+*on disk* (records found under a folder of the allowed ones), *vault* (the Matrix vault's RDFs, each with its row's
+structure) and *files* (dropped or picked, never kept).
+
+- **Each result**: a card per result with its structure beside its chart. RDF cards plot groups (click a group's atom
+  or chip; ⌘/Ctrl-click adds); RMSF is painted on the structure; H-bond pairs, distance and mindist lines are drawn on
+  it; `gmx rms` names its fit group. RDFs whose groups match can be morphed into one card (*morph with…*).
+- **Same scale** (x, y, or both) makes like charts share their axes; a card can keep its own.
+- **Line styles**: each curve's dash, width and shade, from its legend; kept with the view.
+- **Marks and lines**: click a chart to mark the nearest point, ⌘/Ctrl-click for a vertical line, ⌘/Ctrl-Shift-click
+  for a horizontal one (as in the Matrix); each with a note; carried into every export and the CSV.
+- **Saved views**: *views* saves what compare shows (its sources, how it shows them, the labels and marks) by name,
+  with the connected project, in the vault's gmx-cypher folder; *open* brings one back. A name is used once: nothing is
+  replaced. Without a connected project the working state stays in this browser only.
+- **A vault RDF** gets its groups' atoms from the job that wrote it: one of this gmx-cypher's, found by the file's
+  SHA-256, else the record copy the sending gmx-cypher kept in the vault (*groups from … (its record in the vault)*).
+
+## Exports
+
+Every chart has *export*: **SVG, PDF and PNG** drawn by the Matrix's own figure code (so they look like the Matrix's),
+**CSV** (every curve at gmx's own precision, with `#` lines for the command, gmx version, record, source SHA-256, the
+groups' labels and atoms, and the marks), and **HTML** (the interactive page, offline, carrying its data and the code
+that draws it: *(de)Cypher*). **E** exports the chart you hover or focus. A result page's *export* takes all its charts;
+compare's *export* takes every card's chart and the one graph.
+
+*Settings → export* (the Matrix's own export preferences): the default format, the size and text size, the theme (light,
+dark or print), where the legend goes, the PNG resolution, several charts as one PDF of pages, a file each or one grid,
+and the file name template (`{file} {project} {sequence} {column} {run} {command} {group} {date}`).
+A structure exports as a PNG of the view as drawn.
+
+## Keys
+
+Press **?** anywhere for every key, from the one registry; *settings → keyboard* rebinds any of them (a clash is said
+in words; Escape keeps the old key). The usual ones: **D** compare, **E** export, **?** this list; on a structure **F**
+fit, **R** reset, **B** box, **H** hydrogens, **C** held + click to rotate around a group; in compare **L** labels and
+**[ ]** to step through the one graph's lead. Keys are ignored while typing.
 
 ## Atom picking
 
-- **Atom names as a list:** `OH1, OH2 OH3 and OH4` (commas, spaces or `and`) means atoms named OH1, OH2,
-  OH3 or OH4; the rule says so in words, with its atom count, and a name the structure lacks shows
-  "0 atoms". The menu beside the field lists the names in the chosen residue name, with counts.
-- **Shift+Enter** in the name field adds the rule and keeps the form open for the next one, in the same
-  group and the same residue name (OH1, then OH2 in every SUG), the field focused. **Enter** adds the rule
-  and closes it. A new group is *+ group*.
-- **alt-click** (option-click on macOS) toggles that atom name in every residue of its name; the hint
-  under the 3D view says so, and the group shows its new atom count. Every rule can also be typed, so all of this
-  works from the keyboard.
-- **Colours:** by default atoms keep their element colours and a group is a translucent halo in its hue
-  round its atoms, so clicking and selecting never repaints them. *group hues* draws the group's atoms in
-  its hue and the rest in grey, as before; the choice is remembered.
-- **Centre of rotation:** hold **C** and click an atom to rotate the view around its whole group (the group
-  being picked if it holds the atom, else the first that does, the reference first); an atom in no group
-  is the centre itself. The middle of the group's extent becomes the pivot, the caption says what the view
-  rotates around, and *reset* goes back to the middle of the structure. Each group card has a *centre*
-  button for the same, from the keyboard. C typed in a field is only a letter.
-
-## The periodic box
-
-The 3D view draws the structure file's own box: a `.gro`'s last line (rectangular or triclinic) or a
-`.pdb`'s `CRYST1`, with its lengths, angles and volume, and how many atoms lie outside it. *box* (or **B**
-while the view has focus) shows or hides it. A file without a usable box says why instead; a placeholder
-box is drawn as recorded, with its atoms outside said in words.
-
-## (de)Cypher
-
-The RDFs of several runs at once, each beside the structure its groups are atoms of: the RDF Explorer design, in
-Morpheus, as a view of gmx-cypher.
-
-**Opening it.** In *jobs*, tick the RDF jobs you want (the box before each RDF job) and press *(de)Cypher*; a finished
-RDF job also has *open in (de)Cypher*. Or press **D** anywhere but in a field: *settings → keyboard* changes the key
-(press the new one; Escape keeps the old), or takes it away. D, Escape or × closes it; what you picked stays picked.
-
-**Where the RDFs come from** (*add*, on the left):
-
-- *jobs*: this gmx-cypher's RDF runs. A running one waits and opens when it ends.
-- *runs*: RDF runs gmx-cypher wrote before, found by their records (`*.run.json`) under a folder of the allowed ones:
-  another home's, another machine's. Each opens with its groups and the structure it ran on.
-- *vault*: the RDF analyses of your Matrix vault (*settings → vault*), by project and row. Each comes with its
-  **row's structure** (the `.gro` or `.pdb` the Matrix keeps with the sequence) when that has the atoms the groups
-  reach; else with the structure the run used, and the note says why (`mmmmmmmm.gro has 139 atoms; the groups reach
-  atom 246`). The groups' atoms come from the gmx-cypher run that wrote the file, found by its SHA-256 among this
-  runner's jobs (the Matrix keeps files byte for byte); an RDF no run of this gmx-cypher wrote still shows its curves,
-  without atoms.
-- *files*: gro, pdb, ndx, xvg and run.json files, or a folder of them, dropped anywhere on (de)Cypher or picked. Each
-  .xvg finds its record (by the record's `-o`, else by its name), its index (the record's `-n`, the .xvg's command line,
-  the same name, or the only one) and a structure with enough atoms (the record's first). Files are read in the
-  browser and never kept.
-
-**Each job**: a card per RDF: its structure (water and ions hidden; the molecules laid out side by side, those with
-plotted groups first) beside its g(r), its groups as chips and its curves with their peaks: a curve's peak is its
-highest point, wherever it is (the result view keeps gmx-cypher's first-shell rule). Click a group's atom or chip to plot it alone, ⌘, Ctrl or Shift-click to add it; the plotted
-groups glow in their hues, the reference is ringed. *link groups* picks the same group in every job.
-
-**One graph**: every shown RDF on one chart, led by one whose structure and groups are shown (‹ › or [ ] step through
-them). A group you pick is drawn for each RDF that has it: the same atoms of the same structure, else the same name,
-else the same place in a list as long (a name is matched exactly, then loosely: case, punctuation and a trailing "…x" ignored; a group an RDF has no match for is said under the chart). *color by group*: each group its hue, each RDF its dash; *by job*: each RDF its
-hue, each group its dash. The other RDFs' references on the same structure are ringed dashed.
-
-**Morphing**: an RDF whose groups another has too (each group by its atoms where both stand on the same structure,
-else by its name: case, punctuation and a trailing "…x" ignored) can be morphed with it. *morph with…* is in every card's
-header while other RDFs are shown; those that can't join are greyed, with the reason. Choosing one puts them in one card: one structure with every reference ringed
-(the first solid, the others dashed), one chart with a curve per group and reference (a dash per reference), and the
-references as chips under the graph. Click a reference's atom or its chip to plot that reference alone; a second click
-on it plots them all again; ⌘, Ctrl or Shift-click adds or takes one (never none). A reference not plotted is drawn
-faint. An RDF whose reference isn't known (a vault RDF written by a run this gmx-cypher doesn't know) has a chip named
-for the RDF instead. *split* shows the RDFs one by one again. Morphed cards are kept in this browser, and the export carries them.
-
-**The structure view**: drag to rotate, right- or Alt-drag to pan, scroll to zoom, double-click or **F** to fit the
-plotted groups, **R** to reset. *style* (ball & stick, licorice, spacefill), *not plotted* (tinted in their group's hue,
-grey, or ghost), *molecules* (side by side, or as in the frame), *labels*, *hydrogens* and *peaks*. A view keeps up
-to 4000 atoms (the groups' first). The chart shows each curve's value under the pointer, the highest first.
-
-**Export**: one HTML file that opens in any browser, offline, with nothing to install or fetch: each RDF with its
-structure (rotate, zoom, click a group to plot it), its chart (values under the pointer, highest first) and its groups and peaks; and,
-for two or more, the one graph (*color by*, each curve shown → dimmed → hidden). It carries mononoki, both themes
-(with a light/dark switch), the data and the very code (de)Cypher draws with. Paths of this machine stay out of it.
-The export dialog's *Headings* are yours: the page's heading (*(de)Cypher* if left empty, also the tab's title) and a
-heading for each card (a morphed card is one, named for its first RDF); left empty, a card keeps its own title.
-
-What (de)Cypher remembers (the picked jobs, runs and vault RDFs, the plotted groups, the style, the key) is kept in
-this browser, like the theme; it writes nothing on the server.
+- **Atom names as a list:** `OH1, OH2 OH3 and OH4` (commas, spaces or `and`); the rule says so in words, with its atom
+  count, and a name the structure lacks shows "0 atoms".
+- **Colours:** atoms keep their element colours and a group is a halo in its hue; *group hues* draws the group's atoms
+  in its hue and the rest in grey.
+- **Styles:** ball & stick · sticks · spheres · lines · cartoon, the same names in every 3D view; one a view can't draw
+  is shown disabled, with the reason.
+- **Centre of rotation:** hold **C** and click an atom to rotate around its whole group; each group card's *centre*
+  does the same from the keyboard.
+- **The periodic box:** the structure file's own box, with how many atoms lie outside it; **B** shows or hides it.
 
 ## The cluster view
 
-The *cluster* tab lists your cluster jobs: `qq jobs` (`qq jobs -a` with *show finished*) merged by job
-number with `gmx-eta -a`'s time left. Each job: state in words and hue (queued purple, running blue,
-finished green), CPUs, GPUs and nodes, runtime and walltime, the ETA and when it finishes in your time
-zone, a warning in words when it needs more than its walltime left, and "—" with the reason when there is
-no ETA.
+The *cluster* tab lists your cluster jobs: `qq jobs -e` (`qq jobs -a` with *show finished*) merged by job number with
+`gmx-eta -a`'s time left. Each job: its state in words and hue, CPUs, GPUs and nodes, runtime and walltime (a day reads
+`1d 00:00:00`), the input folder `qq jobs -e` printed, the ETA and when it finishes in your time zone, and a warning in
+words when it needs more than its walltime left.
 
-- **Set-up:** both run on this machine, as you run them, so start gmx-cypher where `qq jobs` works, after
-  `kinit`. If they are not on `PATH`, set their paths in *settings*.
-- **How often:** once when the tab opens, then every minute while it is open and the page is visible,
-  one read at a time, less often after a failure. *refresh* reads now.
-- **What it never does:** kill or submit a job, or run anything but those three commands. An expired
-  ticket, a missing tool or a slow cluster is said in words; the other tool's column still fills.
+- **A job that ended**: running at one read and gone at the next, it is *no longer running* (*finished* only when
+  `qq jobs -a` says so). It offers *run <recipe> on <its input folder>* when that folder is inside the allowed ones
+  (else it says why): one click opens set-up in batch mode with that folder and recipe. Nothing runs until you press
+  *run*.
+- **Set-up:** both tools run on this machine, as you run them: start gmx-cypher where `qq jobs` works, after `kinit`.
+  If they are not on `PATH`, set their paths in *settings*.
+- **How often:** once when the tab opens, then every minute while it is open and the page is visible, one read at a
+  time, less often after a failure. *refresh* reads now.
+- **What it never does:** kill or submit a job, or run anything but those three commands.
 
 ## Where files go
 
 | What | Where |
 |---|---|
-| A run's outputs | `<trajectory folder>/<tool>/<stem>.xvg`, its other files (`<stem>_cn.xvg`, `<stem>_t<time>.xvg`, …), `<stem>.ndx`, `<stem>.run.json`, or another allowed folder you choose (not inside the vault) |
+| A job's outputs | `<trajectory folder>/<tool>/<stem>.xvg`, its other files, `<stem>.ndx`, `<stem>.run.json`, or another allowed folder you choose (not inside the vault) |
 | Energy and AWH outputs | `<energy file's folder>/<tool>/` |
-| gmx wham's window lists | beside its outputs: `<stem>_tpr-files.dat`, `<stem>_pull-files.dat` |
 | Outputs of uploaded inputs | `~/.gmx-cypher/workspace/` |
-| Uploads | `~/.gmx-cypher/uploads/<time>-<id>/<name>` |
-| Group size checks | `~/.gmx-cypher/checks/<time>-<id>/` (`groups.ndx`, `sizes.xvg`) |
-| Jobs (an event log each) | `~/.gmx-cypher/jobs/<id>.ndjson` |
-| Recipes | `~/.gmx-cypher/recipes/<name>.json` |
-| Settings | `~/.gmx-cypher/config.json` |
+| Uploads, group size checks | `~/.gmx-cypher/uploads/…`, `~/.gmx-cypher/checks/…` |
+| Jobs (an event log each) | `~/.gmx-cypher/jobs/<id>.ndjson`; archived: `~/.gmx-cypher/jobs/archive/<id>.ndjson` |
+| Recipes, settings | `~/.gmx-cypher/recipes/<name>.json`, `~/.gmx-cypher/config.json` |
 | A sent result | `<vault>/<project folder>/_inbox/<name>` |
+| Its record's copy | `<vault>/gmx-cypher/records/<sha256 of the sent file>.run.json` |
+| Saved compare views | `<vault>/gmx-cypher/projects/<project id>/views/<name>.json` |
 
-The stem comes from the file-name template (`{analysis}_{trajectory}` by default, so `rdf_nvt`). It is
-made safe with the Matrix's `safeFileName` and free for all of a run's files with its `uniqueName`: if
-`rdf_nvt.xvg` (or any of its files, in any case) exists, the run is `rdf_nvt (2)`. The names are checked
-again just before gmx starts, and the stem is claimed by creating its `.ndx` (or, for a command without
-groups, its record). gmx runs with
-`GMX_MAXBACKUP=99` (shown in the command), so a file that appears under one of its names during the run
-is backed up by GROMACS and named in the record, even where your shell sets `GMX_MAXBACKUP=-1`.
+The stem comes from the file-name template (`{analysis}_{trajectory}` by default, so `rdf_nvt`), made safe with the
+Matrix's `safeFileName` and free for all of a job's files with its `uniqueName`: if `rdf_nvt.xvg` (or any of its files)
+exists, the job is `rdf_nvt (2)`. gmx runs with `GMX_MAXBACKUP=99`, so a file that appears under one of its names during
+the job is backed up by GROMACS and named in the record.
 
-## The run record
+## The vault space
 
-`<stem>.run.json`, written when the run ends, is everything needed to know and repeat the run
-(`format: "gmx-cypher run"`, `version: 3`; versions 1 and 2, written before, are read as RDF):
+`<vault>/gmx-cypher/` is gmx-cypher's own folder in your vault, at its top, outside every project folder: the Matrix
+reads only project folders and `.matrix/`, so it never sees it (proved with the Matrix's own code in the tests). It
+holds `space.json` (what wrote it), a `README.md`, a **record copy** for each result sent (named by the sent file's
+SHA-256, its paths relative to their allowed folder and its environment's names only, since a vault may be shared or
+put in Git), and the **saved compare views** of each project. Every file there is created once and never changed or
+deleted; a folder of that name that isn't gmx-cypher's (no `space.json`) is refused, in words.
 
-- `analysis`: the command (`rdf`, `hbond-legacy`, …); `command.args` names the gmx tool it ran as;
+With a project's `_inbox/`, that is all gmx-cypher ever writes in a vault. It never writes in `.matrix/` or anywhere
+else in a project folder.
 
-- `runner`, `gmx` (path and version), `env` (the `GMX…` environment variables gmx ran with);
-- `command`: working directory, program and arguments, exactly as run (no shell);
-- `started`, `ended`, `status`, `exit`, `frames` (analysed, last time), `log` (stdout and stderr);
-- `inputs`: each file's path, size and modification time, and SHA-256 (trajectories only when
-  `"hashTrajectories": true` is set in `config.json`, because hashing many GB is slow);
-- `groups`: name, role, hue, the steps that built it, its atoms as ranges (`43-3239:4`), the count, and
-  `gmx select`'s count;
+After a send, the dialog says what to do in the Matrix (open the project, *Vault → Check folder now*, then *Untracked
+files → attach*) and links to the project.
+
+## The record
+
+`<stem>.run.json` is written when the job starts (`status: "running"`) and completed when it ends, by writing a new file
+and renaming it over the first, so a reader never sees half a record. It holds everything needed to know and repeat the
+job (`format: "gmx-cypher run"`, `version: 3`; versions 1 and 2 are read as RDF):
+
+- `analysis`: the command; `runner`, `gmx` (path and version), `env` (the `GMX…` variables gmx ran with);
+- `command`: working directory, program and arguments, exactly as run (no shell); `stdin`: the answers gmx read;
+- `started`, `ended`, `status`, `exit`, `frames`, `log`;
+- `inputs`: each file's path, size, modification time, and SHA-256 (trajectories only with `"hashTrajectories": true`
+  in `config.json`, because hashing many GB is slow);
+- `groups`: name, role, hue, the steps that built it, its atoms as ranges (`43-3239:4`), its count and `gmx select`'s;
 - `options`: every option of the form with its value, its default, and whether it is the default;
-- `outputs`: each file with its size and SHA-256; `problems`: anything that went against the rules (a
-  GROMACS backup of one of its names);
-- `stdin`: the answers gmx read (energy terms; the groups of the tools that ask for them);
-- what gmx printed that the result shows: `statistics` (energy), `distances` (distance), `summary`
-  (H-bonds' donors and acceptors), `windows` (wham, each file hashed), `frames` (awh: the frames written);
-- `recipe`: the options, groups, template and folder, for *run again* (jobs → *run again* opens it in its
-  command; the new run gets new names).
+- `outputs`: each file with its size and SHA-256; `problems`: anything that went against the rules;
+- what gmx printed that the result shows (energy statistics, distances, H-bond donors and acceptors, wham windows, AWH
+  frames and its axis unit);
+- `recipe`: what *open in set-up* fills the steps with (a new job gets new names).
 
-Recipes are version 3 too, and name their command; an atom-name list is a rule of its own (`names`), and
-a version 1 recipe selects exactly the atoms it did.
-
-## Templates and tokens
-
-- **Output names** (analysis → *file name*): `{analysis}` (the command, `rdf`) and `{trajectory}` (its
-  name without the extension; for energy and awh, the energy file's). In a batch, also the Matrix's fields as its path template reads them: `{method}`
-  `{column}` `{name}` `{seq}` `{time}` `{run}` `{temp}` (the preview names a token the path doesn't give).
-- **Sending** fills the *project's own* file pattern with the fields (`{*}` becomes `rdf`), so PMF
-  Sequences reads the name back. RDF files are kept apart from PMF files by folder, not by name.
-- **Batch path templates** use the Matrix's folder-pattern rules, by its own `parsePath`: tokens never
-  cross `/`, `**` is any number of folders, `{*}` is one folder that is ignored, and the template matches
-  the end of the path below the root.
+A job whose record says `running` when gmx-cypher starts again is marked *interrupted*; its record is not shown as
+a result elsewhere.
 
 ## Safety
 
 gmx-cypher can:
-- read files inside the allowed folders, and read your Matrix vault; (de)Cypher gets only the vault's RDF files
-  and its rows' structures, and run records found in the allowed folders;
+- read files inside the allowed folders, and read your Matrix vault through a reader whose every write throws;
 - start `gmx` and the GROMACS tools it knows (never through a shell), in a trajectory's folder;
-- in the cluster view: start `qq jobs` (`qq jobs -a` with *show finished*) and `gmx-eta -a`, on this machine. The
-  programs are `qq` and `gmx-eta` from your `PATH`, or the absolute paths set in *settings*; their arguments are
-  fixed in the code, one runs at a time, and nothing typed in the page reaches them;
-- write new files: a run's outputs, under names that are free; files in its own state folder; and a result you
-  send, into the project's `_inbox` folder.
-
-(de)Cypher writes nothing: an export is a download from your browser.
+- in the cluster view: start `qq jobs -e`, `qq jobs -a` and `gmx-eta -a` on this machine, with fixed arguments, one
+  at a time;
+- write new files: a job's outputs, under names that are free; files in its own state folder; a result you send, into
+  the project's `_inbox`; and its own vault space.
 
 It cannot, by design:
-- overwrite or delete any of your files (new names are created exclusively; the vault reader's every write throws);
-- be reached from another computer, or used by another page in your browser (it listens on 127.0.0.1 only; every
-  request needs the token and a local Host; a request from a page must come from this very address, so not from
-  another port of 127.0.0.1 either; and every POST must be JSON);
+- overwrite or delete any of your files (new names are created exclusively; archive moves a job's file without copying
+  or replacing anything);
+- be reached from another computer, or used by another page in your browser (127.0.0.1 only; every request needs the
+  token and a local Host; a request from a page must come from this very address; every POST must be JSON);
 - run anything but the commands above, kill or submit a cluster job, or send free text from the page to a shell;
-- reach the network beyond serving its own page (`qq` and `gmx-eta` reach the cluster themselves, as they do from
-  your shell).
+- reach the network beyond serving its own page.
 
-*cancel* stops the whole process group of a run (SIGTERM, then SIGKILL after 5 s); stopping gmx-cypher
-cancels its running jobs first.
+*cancel* stops the whole process group of a job (SIGTERM, then SIGKILL after 5 s); stopping gmx-cypher cancels its
+running jobs first.
 
 ## Development
 
 ```sh
 npm run dev        # server and page with hot reload
-npm test           # checks that matrix/ is the pinned Matrix, unchanged (T144), then the tests (fake gmx)
+npm test           # checks that matrix/ is the pinned Matrix, unchanged, then the tests (fake gmx)
 npm run lint
 npm run build
-npm run e2e        # the browser tests: the smoke test and (de)Cypher's (Playwright, Chromium)
+npm run e2e        # the browser tests (Playwright, Chromium): smoke, compare, the cluster tab
 GMX=/path/to/gmx npx vitest run   # also the tests that need a real gmx
 ```
 
-`test/fake-gmx.mjs` answers like GROMACS 2025.4, with its real text. The design decisions are in
-[`docs/decisions.md`](docs/decisions.md), the plan in [`docs/phase0.md`](docs/phase0.md), and the
-report in [`docs/report.md`](docs/report.md).
+`test/fake-gmx.mjs` answers like GROMACS 2025.4, with its real text and outputs (`test/fixtures/README.md` says where
+each came from). The decisions are in [`docs/decisions.md`](docs/decisions.md), the roadmap in
+[`docs/roadmap.md`](docs/roadmap.md), and each batch's plan and report in `docs/` (batch 3:
+[`docs/batch-3.md`](docs/batch-3.md), [`docs/batch-3-phase0.md`](docs/batch-3-phase0.md),
+[`docs/batch-3-report.md`](docs/batch-3-report.md)).
 
 ## The Matrix (`matrix/`)
 
 `matrix/` is a git submodule: the Matrix, [github.com/Kikoun18/the-matrix](https://github.com/Kikoun18/the-matrix), at the
-commit this repository pins. gmx-cypher takes the vault format, the file parsers and the batch planner from its code
-(`src/lib/seq`, `src/lib/storage/…`, `src/lib/structFile`, `scripts/node-backend`) and some of its test fixtures, and
-never changes it. `npm test` fails when `matrix/` is not at the pinned commit or has changes (`scripts/matrix-pinned.mjs`).
-`matrix/` needs no `npm install` of its own.
+commit this repository pins. gmx-cypher takes the vault format, the file parsers, the batch planner, the figure exports
+and the export preferences from its code, and never changes it. `npm test` fails when `matrix/` is not at the pinned
+commit or has changes (`scripts/matrix-pinned.mjs`). `matrix/` needs no `npm install` of its own.
 
 To use a newer Matrix, on purpose:
 
@@ -386,5 +338,5 @@ git add matrix && git commit    # the commit is the decision
 ```
 
 The Matrix was called PMF Sequences, and lived in this repository's `app/` folder, until October 2026. The documents in
-`docs/` are the record of the work done then: they keep the old name, the `app/` paths and the numbers (T…, R…) of their time.
-What the Matrix *stores* keeps its old name too (a vault's manifest says `"app": "pmf-sequences"`); the Matrix's README says why.
+`docs/` are the record of the work done then: they keep the old name, the `app/` paths and the numbers (T…, R…) of their
+time. What the Matrix *stores* keeps its old name too (a vault's manifest says `"app": "pmf-sequences"`).
