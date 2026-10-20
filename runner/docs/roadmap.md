@@ -208,7 +208,7 @@ From [`batch-3.md`](batch-3.md) §5: one coherent app, (de)Cypher for every anal
 
 ### Phase 7: The runner at scale (R12, R13)
 - [x] R12a Logs on demand; startup without logs in memory (T190)
-- [ ] R12b Search, filters, multi-select
+- [x] R12b Search, filters, multi-select (T191)
 - [ ] R12c Archive
 - [ ] R13 Run diff
 
