@@ -138,6 +138,11 @@ export function AnalysisCard({ members, on, tone, mol, pal, view, selected, tone
   const curvesIn = (p: Palette) => kit.buildCurves({ focus: a, plotted: members, selected, colorBy: 'group', pal: p, tones }).filter(c => on.includes(c.analysis)).map(c => { const m = members.find(x => x.id === c.analysis)!; return { ...c, source: many ? (m.ref ? 'ref ' + names[m.id] : names[m.id]) : '' } })
   // A result of a command without atom groups (energy, AWH, WHAM) is its chart alone; an RDF keeps its structure, atoms known or not.
   const rdf = !a.plot, chartOnly = !rdf && !a.ref && a.sels.every(g => !g.atoms.length)
+  // Values painted on the structure (R10b, RMSF): a point of the chart rings its atom (or its residue's atoms), an atom moves the chart's readout to its x.
+  const paint = React.useMemo(() => kit.paintOf(a, mol), [a, mol])
+  const keyOf = (nr: number) => (a.paint?.by === 'residue' && mol ? mol.resnr[mol.g2l[nr]] : nr)
+  const [atomX, setAtomX] = React.useState<number | null>(null), [chartX, setChartX] = React.useState<number | null>(null)
+  const ring = React.useMemo(() => (paint && chartX != null ? [...paint.values.keys()].filter(nr => keyOf(nr) === chartX) : undefined), [paint, chartX]) // eslint-disable-line react-hooks/exhaustive-deps -- keyOf reads a and mol, as paint does
   const exp: ChartExport = { file: a.label, fields: { command: a.command ?? 'rdf' }, title, csv: () => curvesCsv(curvesIn(pal).map(c => ({ ...c, name: c.source ? c.name + ' · ' + c.source : c.name })), a.xlabel, a.ylabel) }
   // One result page's order (R9b): its actions, its structure beside its chart, its settings and groups, where it came from.
   return (
@@ -170,12 +175,13 @@ export function AnalysisCard({ members, on, tone, mol, pal, view, selected, tone
               {mol && <><Button variant="outline" size="sm" onClick={() => ref.current?.fit()}>fit selection</Button><Button variant="ghost" size="sm" onClick={() => ref.current?.reset()}>reset view</Button><Button variant="ghost" size="sm" onClick={() => void savePng(ref.current, a.label)} title="the structure as drawn now, as a PNG">png</Button></>}
             </div>
             <StructurePanel ref={h => { ref.current = h; handle(h) }} className="min-h-[420px]" mol={mol} pal={pal} view={view} sels={a.sels} selected={idx} refs={refs} hoverSel={hoverSel}
+              paint={paint} ring={ring} onAtom={paint ? nr => setAtomX(nr != null && paint.values.has(nr) ? keyOf(nr) : null) : undefined}
               onPick={(is, add) => onSelect(pickGroups(selected, is.map(i => a.sels[i].name), add))} onPickRef={pickRef} onActive={onActive}
               empty={<><span className="text-heading font-bold">No structure</span><span className="max-w-[40ch] text-caption text-muted-foreground">{a.structNote}</span></>} />
           </div>}
           <div className="flex min-w-0 flex-col gap-2">
             <div className="flex items-center justify-end gap-1">{rdf && marks}{curves.length > 0 && <ExportMenu exp={exp} curves={curvesIn} xlabel={a.xlabel} ylabel={a.ylabel} {...chartOf(a, view.marks)} />}</div>
-            <ChartPanel className="h-[300px] flex-none" curves={curves} grid={a.x} xlabel={a.xlabel} ylabel={a.ylabel} pal={pal} {...chartOf(a, view.marks)}
+            <ChartPanel className="h-[300px] flex-none" curves={curves} grid={a.x} xlabel={a.xlabel} ylabel={a.ylabel} pal={pal} {...chartOf(a, view.marks)} at={atomX} onAt={paint ? setChartX : undefined}
               empty={curves.length ? null : rdf ? { title: 'Pick an atom group', hint: 'Click atoms in the structure or a chip below. ' + modName() + '-click adds more groups to the plot.' } : { title: 'Pick a curve', hint: 'Click a chip below. ' + modName() + '-click adds more.' }} />
             <CurveTable curves={curves} source={many} stats={rdf ? 'peaks' : 'series'} onRemove={n => onSelect(selected.filter(x => x !== n))} onHover={c => { setHot(c?.key ?? null); setHover(c?.name ?? null) }} />
           </div>

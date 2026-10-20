@@ -101,14 +101,18 @@ export function fromRecord(o: RecordSource): Analysis {
  * Any other command's result (R10a): a curve per column of its main file, each with the group it measures, drawn from
  * the data with no rule and no peaks; a reference that no curve measures is the reference.
  */
+const QUANTITY: Record<string, string> = { rmsf: 'RMSF', energy: 'energy', distance: 'distance', mindist: 'minimum distance' }
 function fromResult(o: RecordSource, x: Xvg, command: string): Analysis {
   const groups = o.record.groups.map((g, i) => ({ role: g.role, name: g.name, atoms: fromRanges(g.atoms), tone: toneOf(g.tone, i) }))
   const of = x.ys.map((_, i) => curveGroup(command, groups, i))
   const sels: Sel[] = x.ys.map((y, i) => ({ name: of[i]?.name ?? (command.startsWith('gyrate') && i ? 'about ' + 'xyz'[i - 1] : x.legends[i] || 'series ' + (i + 1)), atoms: of[i]?.atoms ?? [], tone: of[i]?.tone ?? TONES[i % TONES.length], y, peak: null, shell: null }))
   const r = groups.find(g => g.role === 'reference' && !of.includes(g)), ref = r ? { name: r.name, atoms: r.atoms, tone: r.tone } : null
   return {
-    id: o.id, kind: o.kind, command, title: o.title, label: o.label, x: x.x, xlabel: x.xlabel || 'x', ylabel: x.ylabel || 'y', ref, sels, struct: o.struct, structNote: o.structNote,
+    // gmx writes some y labels as a unit alone, "(nm)": the quantity is named in front of it.
+    id: o.id, kind: o.kind, command, title: o.title, label: o.label, x: x.x, xlabel: x.xlabel || 'x', ylabel: /^\(/.test(x.ylabel) ? (QUANTITY[command] ?? 'value') + ' ' + x.ylabel : x.ylabel || 'y', ref, sels, struct: o.struct, structNote: o.structNote,
     plot: { y: command.startsWith('hbond') ? 'zero' : 'data', rule: null },
+    // RMSF is painted on the structure (R10b): per atom, or per residue with -res.
+    ...(command === 'rmsf' && sels[0] ? { paint: { by: o.record.options?.some(f => f.flag === 'res' && f.value === true) ? 'residue' as const : 'atom' as const, values: x.x.map((v, i): [number, number] => [v, sels[0].y[i]]), label: 'RMSF', unit: 'nm' } } : {}),
     sub: facts([o.source, 'gmx ' + command, o.record.frames ? o.record.frames.analysed + ' frames' : null, ref ? 'ref ' + ref.name + ' · ' + ref.atoms.length + ' atoms' : null]),
   }
 }

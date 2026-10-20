@@ -54,13 +54,18 @@ export function exportFocused(): boolean {
  * line, with Shift a horizontal one; focused, ← → step along a curve (Shift: ten), ↑ ↓ change curve, Enter marks,
  * Esc hides the cursor.
  */
-export function ChartPanel({ curves, grid, xlabel, ylabel, pal, marks, y, rule, xDigits, height, className, empty }: ChartOptions & {
+export function ChartPanel({ curves, grid, xlabel, ylabel, pal, marks, y, rule, xDigits, height, className, empty, at = null, onAt }: ChartOptions & {
   curves: Curve[]; grid: number[]; xlabel: string; ylabel: string; pal: Palette; marks: Marks; height?: number; className?: string; empty?: { title: string; hint: string } | null
+  /** An x pointed at elsewhere (a structure's atom, R10b), read out while the pointer is not on the chart; and the x under the pointer, told back. */
+  at?: number | null; onAt?: (x: number | null) => void
 }) {
   const box = React.useRef<HTMLDivElement>(null)
   const id = 'plot-' + React.useId().replace(/[^\w-]/g, '')
   const [size, setSize] = React.useState({ w: 0, h: 0 })
-  const [hover, setHover] = React.useState<number | null>(null), [near, setNear] = React.useState<string | null>(null)
+  const [over, setHover] = React.useState<number | null>(null), [near, setNear] = React.useState<string | null>(null), hover = over ?? at
+  const told = React.useRef(onAt)
+  React.useLayoutEffect(() => { told.current = onAt })
+  React.useEffect(() => { told.current?.(over) }, [over])
   const [pins, setPins] = React.useState<{ key: string; i: number }[]>([]), [lines, setLines] = React.useState<{ axis: 'x' | 'y'; v: number }[]>([]), [said, setSaid] = React.useState('')
   React.useLayoutEffect(() => {
     const el = box.current

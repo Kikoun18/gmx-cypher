@@ -54,7 +54,11 @@ export interface Analysis {
   plot?: Plot
   /** The gmx command it is a result of, when not an RDF (R10a). */
   command?: string
+  /** Values to paint on its structure (R10b: RMSF), by atom or residue number, the group's atoms only. */
+  paint?: { by: 'atom' | 'residue'; values: [number, number][]; label: string; unit: string }
 }
+/** A structure's painted atoms (R10b): each atom's value by its GROMACS number, the range, and what the values are. */
+export interface Paint { values: Map<number, number>; min: number; max: number; label: string; unit: string }
 /** A chart's y range (from 0, or the data's own), its dashed rule (g = 1, 0, none) and its x digits. */
 export interface Plot { y: 'zero' | 'data'; rule: number | null; xDigits?: number }
 
@@ -62,6 +66,8 @@ export interface Hue { base: string; fg: string; soft: string; strong: string }
 export interface Palette {
   dark: boolean; bg: string; fg: string; card: string; secondary: string; muted: string; border: string; input: string; ring: string
   bond: string; edge: string; hl: number; neutral: Record<string, string>; hues: Record<Tone, Hue>
+  /** The sequential ramp's stops, lowest first (R7a), for values painted on a structure (R10b). */
+  ramp: string[]
 }
 
 export interface Mol {
@@ -86,10 +92,13 @@ export interface SceneState {
   /** A group or reference hovered elsewhere (a chip, a curve), ringed here. */
   hoverSel: number
   hoverRef: number
+  /** Atoms painted by a value (R10b), and atoms ringed from elsewhere (a chart's point), by GROMACS number. */
+  paint?: Paint | null
+  ring?: number[]
 }
 
 /** The atom under the pointer: its line, its group or reference (−1: none), and where its card goes. */
-export interface AtomHover { atom: string; sel: number; ref: number; left: number; top: number }
+export interface AtomHover { atom: string; sel: number; ref: number; left: number; top: number; nr: number; value?: number }
 
 export interface Curve {
   key: string; name: string; source: string; analysis: string
@@ -107,7 +116,7 @@ export type VNode = [string, Record<string, unknown>, ...(VNode | string)[]]
 export interface ChartGeom { m: { l: number; r: number; t: number; b: number }; iw: number; ih: number; x0: number; x1: number; y0: number; y1: number; grid: number[]; xDigits: number; yDigits: number }
 
 /** One job as an export carries it: atoms as ranges, y values rounded, its selection when exported. */
-export interface ExportAnalysis { id: string; title: string; label: string; sub: string; x: number[]; xlabel: string; ylabel: string; ref: { name: string; atoms: string; tone: Tone } | null; sels: { name: string; atoms: string; tone: Tone; y: number[]; peak: Peak | null; shell?: Peak | null; colors?: Colors }[]; struct: string | null; structNote: string; selected: string[]; tone: Tone; plot?: Plot }
+export interface ExportAnalysis { id: string; title: string; label: string; sub: string; x: number[]; xlabel: string; ylabel: string; ref: { name: string; atoms: string; tone: Tone } | null; sels: { name: string; atoms: string; tone: Tone; y: number[]; peak: Peak | null; shell?: Peak | null; colors?: Colors }[]; struct: string | null; structNote: string; selected: string[]; tone: Tone; plot?: Plot; paint?: Analysis['paint'] }
 /** Everything an exported page needs: its tokens, structures without solvent, the analyses, the comparison and the style. */
 export interface ExportData {
   /** The page's heading, as chosen ('(de)Cypher' unless changed). */
@@ -145,7 +154,23 @@ export function decypherKit(data: KitData) {
     const hues = {} as Record<Tone, Hue>
     for (const k of TONES) hues[k] = { base: t[k], fg: t[k + '-foreground'], soft: t[k + '-soft'], strong: t[k + '-strong'] }
     const neutral = { C: t['atom-c'], H: t['atom-h'], O: t['atom-o'], N: t['atom-n'], S: t['atom-s'], P: t['atom-p'], X: t['atom-x'] }
-    return { dark, bg: t.background, fg: t.foreground, card: t.card, secondary: t.secondary, muted: t['muted-foreground'], border: t.border, input: t.input, ring: t.ring, bond: t.bond, edge: t.edge, hl: dark ? HL.dark : HL.light, neutral, hues }
+    return { dark, bg: t.background, fg: t.foreground, card: t.card, secondary: t.secondary, muted: t['muted-foreground'], border: t.border, input: t.input, ring: t.ring, bond: t.bond, edge: t.edge, hl: dark ? HL.dark : HL.light, neutral, hues, ramp: [0, 1, 2, 3].map(i => t['ramp-' + i]) }
+  }
+  /** The ramp's colour at t from 0 (the lowest value) to 1 (the highest), between its stops. */
+  function rampAt(pal: Palette, t: number): string {
+    const r = pal.ramp, x = Math.min(1, Math.max(0, Number.isFinite(t) ? t : 0)) * (r.length - 1), i = Math.min(r.length - 2, Math.floor(x))
+    return mix(r[i], r[i + 1], x - i)
+  }
+  /** An analysis's values on a structure (R10b): each atom of its first group gets its own value, or its residue's. */
+  function paintOf(a: Pick<Analysis, 'paint' | 'sels'>, mol: Mol | null): Paint | null {
+    if (!a.paint || !mol) return null
+    const by = new Map(a.paint.values), within = new Set(a.sels[0]?.atoms ?? []), values = new Map<number, number>()
+    for (let k = 0; k < mol.n; k++) {
+      const nr = mol.gnr[k], v = by.get(a.paint.by === 'atom' ? nr : mol.resnr[k])
+      if (within.has(nr) && v != null && Number.isFinite(v)) values.set(nr, v)
+    }
+    const vs = [...values.values()]
+    return vs.length ? { values, min: Math.min(...vs), max: Math.max(...vs), label: a.paint.label, unit: a.paint.unit } : null
   }
 
   /** Sorted atom numbers as `43-3239:4, 5`: runs of three or more with one step, else single numbers. */
@@ -452,7 +477,7 @@ export function decypherKit(data: KitData) {
       const rest = selIdx.size ? st.rest : 'tinted', restB = rest === 'tinted' ? 0 : 0.5
       const hovSi = st.hoverSel, hovRef = st.hoverRef
       const R = RADS[rep] || RADS['ball & stick'], BW = BONDW[rep] ?? 0.016
-      const kind = new Uint8Array(n), fill: string[] = new Array(n), rim: string[] = new Array(n), lw = new Float32Array(n), bcol: string[] = new Array(n)
+      const kind = new Uint8Array(n), fill: string[] = new Array(n), rim: string[] = new Array(n), lw = new Float32Array(n), bcol: string[] = new Array(n), ringed = new Set(st.ring ?? [])
       for (let k = 0; k < n; k++) {
         const e = mol.el[k], si = mb.groupOf[k], rk = mb.ref[k], isRef = rk > 0
         const sel = si >= 0 && selIdx.has(si), prev = si >= 0 && si === hovSi && !sel
@@ -463,6 +488,10 @@ export function decypherKit(data: KitData) {
         else if (prev) { const t = T[sels[si].tone]; kind[k] = 4; fill[k] = t.soft; rim[k] = t.strong; lw[k] = 1.6; rs = 1.12; bcol[k] = t.strong }
         else if (si >= 0 && rest === 'tinted') { const t = T[sels[si].tone]; kind[k] = 1; fill[k] = t.soft; rim[k] = t.strong; lw[k] = 1.1; bcol[k] = th.bond }
         else { kind[k] = 0; fill[k] = th.neutral[e]; rim[k] = mix(fill[k], th.edge, 0.45); lw[k] = 1; bcol[k] = th.bond; if (rest === 'ghost') rs = 0.7 }
+        // A painted atom (R10b) takes the ramp's colour at its value; one ringed from a chart stands out in ink.
+        const pv = !isRef && st.paint ? st.paint.values.get(mol.gnr[k]) : undefined
+        if (pv != null) { kind[k] = 2; fill[k] = rampAt(th, (pv - st.paint!.min) / (st.paint!.max - st.paint!.min || 1)); rim[k] = mix(fill[k], th.fg, 0.4); lw[k] = 1.4; bcol[k] = th.bond; rs = Math.max(rs, 1.1) }
+        if (ringed.has(mol.gnr[k])) { rim[k] = th.fg; lw[k] = 2.6; rs *= 1.35 }
         hitR[k] = Math.max(1.5, R[e] * s * P[4 * k + 3] * rs)
       }
       const ghost = (k: number) => rest === 'ghost' && kind[k] === 0
@@ -613,7 +642,7 @@ export function decypherKit(data: KitData) {
       const mol = st.mol, mb = membership()!, x = P[4 * k], y = P[4 * k + 1], r = hitR[k]
       let left = x + r + 12
       if (left + 240 > cw - 8) left = x - r - 12 - 240
-      cb.hover({ atom: '#' + mol.gnr[k] + ' ' + mol.name[k] + ' · ' + mol.resn[k] + ' ' + mol.resnr[k], sel: si, ref: mb.ref[k] ? mb.refOwner[k] : -1, left: Math.max(8, left), top: Math.max(8, Math.min(ch - 100, y - 30)) })
+      cb.hover({ atom: '#' + mol.gnr[k] + ' ' + mol.name[k] + ' · ' + mol.resn[k] + ' ' + mol.resnr[k], sel: si, ref: mb.ref[k] ? mb.refOwner[k] : -1, left: Math.max(8, left), top: Math.max(8, Math.min(ch - 100, y - 30)), nr: mol.gnr[k], value: st.paint?.values.get(mol.gnr[k]) })
     }
     const onDown = (e: PointerEvent) => {
       drag = { sx: e.clientX, sy: e.clientY, x: e.clientX, y: e.clientY, moved: false, pan: pans(e.button, held.pan) }
@@ -962,7 +991,7 @@ export function decypherKit(data: KitData) {
     const analyses: Analysis[] = data.analyses.map(a => ({
       id: a.id, kind: 'job', title: a.title, label: a.label, sub: a.sub, x: a.x, xlabel: a.xlabel, ylabel: a.ylabel,
       ref: a.ref ? { name: a.ref.name, atoms: fromRanges(a.ref.atoms), tone: a.ref.tone } : null,
-      sels: a.sels.map(s => ({ name: s.name, atoms: fromRanges(s.atoms), tone: s.tone, y: s.y, peak: s.peak, shell: s.shell ?? null, ...(s.colors ? { colors: s.colors } : {}) })), struct: a.struct, structNote: a.structNote, ...(a.plot ? { plot: a.plot } : {}),
+      sels: a.sels.map(s => ({ name: s.name, atoms: fromRanges(s.atoms), tone: s.tone, y: s.y, peak: s.peak, shell: s.shell ?? null, ...(s.colors ? { colors: s.colors } : {}) })), struct: a.struct, structNote: a.structNote, ...(a.plot ? { plot: a.plot } : {}), ...(a.paint ? { paint: a.paint } : {}),
     }))
     const tones: Record<string, Tone> = {}
     data.analyses.forEach(a => { tones[a.id] = a.tone })
@@ -1074,9 +1103,12 @@ export function decypherKit(data: KitData) {
     function structureBox(a: Analysis, sel: () => string[], set: (s: string[]) => void, refs: () => { label: string; atoms: number[]; on?: boolean }[], pickRef?: (i: number, add: boolean) => void) {
       const mol = molOf(a.struct)
       if (!mol) return { el: h('div', { class: 'dc-nostruct' }, h('b', null, 'No structure'), h('span', { class: 'dc-cap' }, a.structNote || 'this job came without a structure')), set: () => {} }
-      const canvas = h('canvas', { class: 'dc-canvas' }) as HTMLCanvasElement, tip = h('div', { class: 'dc-tip', hidden: true })
+      const canvas = h('canvas', { class: 'dc-canvas' }) as HTMLCanvasElement, tip = h('div', { class: 'dc-tip', hidden: true }), paint = paintOf(a, mol)
+      // Painted values (R10b): the ramp's scale in place of the plotted / not plotted key, drawn again with the theme.
+      const scale = h('span', null), drawScale = () => paint && scale.replaceChildren(paint.label + ' (' + paint.unit + ') ' + +paint.min.toPrecision(4), h('i', { class: 'dc-ramp', style: { background: 'linear-gradient(to right, ' + pal().ramp.join(', ') + ')' } }), +paint.max.toPrecision(4) + ' · the rest neutral')
+      if (paint) { redraws.push(drawScale); drawScale() }
       const wrap = h('div', { class: 'dc-struct' }, canvas, tip,
-        h('div', { class: 'dc-legend' }, h('span', null, h('i', { class: 'dc-k dc-k-sel' }), 'plotted'), h('span', null, h('i', { class: 'dc-k dc-k-rest' }), 'not plotted'), h('span', null, h('i', { class: 'dc-k dc-k-ref' }), 'reference'),
+        h('div', { class: 'dc-legend' }, ...(paint ? [scale] : [h('span', null, h('i', { class: 'dc-k dc-k-sel' }), 'plotted'), h('span', null, h('i', { class: 'dc-k dc-k-rest' }), 'not plotted')]), h('span', null, h('i', { class: 'dc-k dc-k-ref' }), 'reference'),
           h('span', { class: 'dc-grow' }), h('span', null, 'drag rotate · right- or Space-drag pan · scroll zoom · double-click fit · Shift-click residue · C + click centre')))
       let hoverSel = -1
       const view = structureView(canvas, wrap, {
@@ -1084,7 +1116,7 @@ export function decypherKit(data: KitData) {
           if (!hv) { tip.hidden = true; return }
           const g = hv.sel >= 0 ? a.sels[hv.sel] : null, r = hv.ref >= 0 ? refs()[hv.ref] : null
           tip.hidden = false; tip.style.left = hv.left + 'px'; tip.style.top = hv.top + 'px'
-          tip.replaceChildren(h('div', { class: 'dc-cap' }, hv.atom),
+          tip.replaceChildren(h('div', { class: 'dc-cap' }, hv.atom), ...(hv.value != null && paint ? [h('b', null, paint.label + ' ' + +hv.value.toPrecision(4) + ' ' + paint.unit)] : []),
             h('b', { style: { color: g ? pal().hues[g.tone].strong : 'var(--foreground)' } }, g ? g.name + ' · ' + g.atoms.length + ' atoms' : r ? 'reference · ' + r.label : 'not in any group'),
             h('div', { class: 'dc-cap' }, g ? 'click: plot only this · ' + modName() + '-click: add or remove · Shift: its residue' : r ? (pickRef ? 'click: plot only this one · ' + modName() + '-click: add or remove' : 'g(r) is measured from these atoms') : ''))
         },
@@ -1093,7 +1125,7 @@ export function decypherKit(data: KitData) {
       })
       const update = () => {
         const s = sel()
-        view.set({ mol, pal: pal(), rep: data.view.rep, rest: data.view.rest, labels: data.view.labels, hydrogens: data.view.hydrogens, sels: a.sels, selected: a.sels.flatMap((g, i) => (s.includes(g.name) ? [i] : [])), refs: refs(), hoverSel, hoverRef: -1 })
+        view.set({ mol, pal: pal(), rep: data.view.rep, rest: data.view.rest, labels: data.view.labels, hydrogens: data.view.hydrogens, sels: a.sels, selected: a.sels.flatMap((g, i) => (s.includes(g.name) ? [i] : [])), refs: refs(), hoverSel, hoverRef: -1, paint })
       }
       redraws.push(update)
       update()
@@ -1183,7 +1215,7 @@ export function decypherKit(data: KitData) {
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => redraws.forEach(f => f()))
   }
 
-  return { legendPick, pickGroups, clickScope, pans, scopeAtoms, TONES, DASH, DASH_NAMES, REPS, RESTS, SOLV, palette, toRanges, fromRanges, parseStructure, mix, buildMol, structureView, matchGroup, rdfLooks, buildCurves, looseName, sameButReference, morphWhy, pickRefs, refLabels, niceTicks, xDigitsOf, valAt, hoverRows, hoverX, readoutTitle, chart, mount }
+  return { rampAt, paintOf, legendPick, pickGroups, clickScope, pans, scopeAtoms, TONES, DASH, DASH_NAMES, REPS, RESTS, SOLV, palette, toRanges, fromRanges, parseStructure, mix, buildMol, structureView, matchGroup, rdfLooks, buildCurves, looseName, sameButReference, morphWhy, pickRefs, refLabels, niceTicks, xDigitsOf, valAt, hoverRows, hoverX, readoutTitle, chart, mount }
 }
 
 export type Kit = ReturnType<typeof decypherKit>

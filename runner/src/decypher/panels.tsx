@@ -5,7 +5,7 @@ import * as React from 'react'
 import { cn } from '../lib/utils'
 import { Swatch } from '../core/Chart'
 import { Legend } from '../ui/legend'
-import type { AtomHover, Curve, Group, HeldKeys, Mol, Palette, SceneState } from '../core/kit'
+import type { AtomHover, Curve, Group, HeldKeys, Mol, Paint, Palette, SceneState } from '../core/kit'
 import { useBindings } from '../lib/shortcuts'
 import { modName } from '../lib/platform'
 import type { View } from './state'
@@ -17,10 +17,15 @@ export interface StructureHandle { fit: () => void; reset: () => void; where: (n
 export const StructurePanel = React.forwardRef<StructureHandle, {
   mol: Mol | null; pal: Palette; view: View; sels: Group[]; selected: number[]; refs: { label: string; atoms: number[]; on?: boolean }[]
   hoverSel: number; hoverRef?: number; onPick: (sels: number[], add: boolean) => void; onPickRef?: (ref: number, add: boolean) => void; onActive?: () => void; className?: string; empty: React.ReactNode
-}>(function StructurePanel({ mol, pal, view, sels, selected, refs, hoverSel, hoverRef = -1, onPick, onPickRef, onActive, className, empty }, ref) {
+  /** Values painted on the atoms (R10b), atoms ringed from the chart, and the atom under the pointer for the chart. */
+  paint?: Paint | null; ring?: number[]; onAtom?: (nr: number | null) => void
+}>(function StructurePanel({ mol, pal, view, sels, selected, refs, hoverSel, hoverRef = -1, onPick, onPickRef, onActive, className, empty, paint = null, ring, onAtom }, ref) {
   const wrap = React.useRef<HTMLDivElement>(null), canvas = React.useRef<HTMLCanvasElement>(null)
   const ctl = React.useRef<ReturnType<typeof kit.structureView> | null>(null)
   const [tip, setTip] = React.useState<AtomHover | null>(null)
+  const atom = React.useRef(onAtom)
+  React.useLayoutEffect(() => { atom.current = onAtom })
+  React.useEffect(() => { atom.current?.(tip?.nr ?? null) }, [tip?.nr])
   const pick = React.useRef(onPick), pickRef = React.useRef(onPickRef)
   // The held keys, from the registry: read by the view at each press, so a key rebound in settings applies at once.
   const [bindings] = useBindings(), held = React.useRef<HeldKeys>({ centre: 'c', pan: ' ' })
@@ -35,25 +40,28 @@ export const StructurePanel = React.forwardRef<StructureHandle, {
     return () => { c.destroy(); ctl.current = null }
   }, [!!mol]) // eslint-disable-line react-hooks/exhaustive-deps -- made once while there is a structure; set() brings each change
   React.useEffect(() => {
-    const st: SceneState = { mol, pal, rep: view.rep, rest: view.rest, labels: view.labels, hydrogens: view.hydrogens, sels, selected, refs, hoverSel, hoverRef }
+    const st: SceneState = { mol, pal, rep: view.rep, rest: view.rest, labels: view.labels, hydrogens: view.hydrogens, sels, selected, refs, hoverSel, hoverRef, paint, ring }
     ctl.current?.set(st)
-  }, [mol, pal, view.rep, view.rest, view.labels, view.hydrogens, sels, selected, refs, hoverSel, hoverRef])
+  }, [mol, pal, view.rep, view.rest, view.labels, view.hydrogens, sels, selected, refs, hoverSel, hoverRef, paint, ring])
   if (!mol) return <div className={cn('flex flex-col items-center justify-center gap-1.5 p-6 text-center', className)}>{empty}</div>
   const mod = modName(), g = tip && tip.sel >= 0 ? sels[tip.sel] : null, r = tip && tip.ref >= 0 ? refs[tip.ref] : null, on = g ? selected.includes(sels.indexOf(g)) : false
   return (
     <div ref={wrap} className={cn('relative min-h-[340px]', className)} onPointerDown={onActive} onMouseEnter={onActive}>
       <canvas ref={canvas} className="absolute inset-0 block size-full cursor-grab touch-none" aria-label="structure: drag to rotate, right- or Space-drag to pan, scroll to zoom, double-click to fit the plotted groups; Shift-click takes a residue, Alt-click an atom name, C + click centres" />
       <div className="pointer-events-none absolute inset-x-3.5 bottom-2.5 flex flex-wrap items-end justify-between gap-x-3.5 gap-y-1.5 text-caption text-muted-foreground">
-        <div className="flex flex-wrap gap-3.5">
+        {/* Painted values (R10b): the ramp's scale, lowest to highest, in place of the plotted / not plotted key. */}
+        {paint ? <span className="inline-flex items-center gap-2">{paint.label} ({paint.unit}) {fmtStat(paint.min)}
+          <span aria-hidden className="h-1.5 w-28 rounded-full" style={{ background: 'linear-gradient(to right, ' + pal.ramp.join(', ') + ')' }} />{fmtStat(paint.max)} · the rest neutral</span> : <div className="flex flex-wrap gap-3.5">
           <span className="inline-flex items-center gap-[7px]"><span className="size-2.5 rounded-full bg-coral shadow-[0_0_0_1.5px_var(--coral-strong),0_0_9px_var(--coral-strong)]" />plotted</span>
           <span className="inline-flex items-center gap-[7px]"><span className="size-2.5 rounded-full" style={{ background: pal.neutral.O }} />not plotted</span>
           <span className="inline-flex items-center gap-[7px]"><span className="size-2 rounded-full bg-foreground shadow-[0_0_0_1.5px_var(--card),0_0_0_2.7px_var(--foreground)]" />reference</span>
-        </div>
+        </div>}
         <span>{mol.n} atoms · solvent hidden{mol.truncated ? ' · first 4000' : ''} · drag rotate · right- or Space-drag pan · scroll zoom · F fit</span>
       </div>
       {tip && (
         <div className="pointer-events-none absolute z-[2] flex w-60 flex-col gap-0.5 rounded-lg border border-border bg-popover px-2.5 py-2 shadow-menu" style={{ left: tip.left, top: tip.top }}>
           <span className="text-caption text-muted-foreground">{tip.atom}</span>
+          {tip.value != null && paint && <span className="text-control font-bold">{paint.label} {fmtStat(tip.value)} {paint.unit}</span>}
           <span className="text-control font-bold" style={{ color: g ? pal.hues[g.tone].strong : r ? 'var(--foreground)' : 'var(--muted-foreground)' }}>
             {g ? g.name + ' · ' + g.atoms.length + ' atoms' : r ? 'reference · ' + r.label : 'not in any group'}
           </span>
@@ -64,10 +72,10 @@ export const StructurePanel = React.forwardRef<StructureHandle, {
   )
 })
 
-/** The curves under a chart: series, source, atoms, then an RDF's both peak rules (R3d), or any other result's mean and range (R10a); × takes one off the plot. */
 const mean = (y: number[]) => { const v = y.filter(Number.isFinite); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : NaN }
 const fmtStat = (v: number) => (Number.isFinite(v) ? Number(v.toPrecision(4)).toString() : '—')
 
+/** The curves under a chart: series, source, atoms, then an RDF's both peak rules (R3d), or any other result's mean and range (R10a); × takes one off the plot. */
 export function CurveTable({ curves, onRemove, onHover, source = true, stats = 'peaks' }: { curves: Curve[]; onRemove: (name: string) => void; onHover: (c: Curve | null) => void; source?: boolean; stats?: 'peaks' | 'series' }) {
   if (!curves.length) return null
   const cols = source ? 'grid-cols-[26px_minmax(0,1fr)_minmax(0,1.1fr)_44px_96px_96px_26px]' : 'grid-cols-[26px_minmax(0,1fr)_44px_96px_96px_26px]'

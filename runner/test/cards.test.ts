@@ -4,6 +4,8 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { curveGroup, mainXvg, quantityOf, unlike } from '../src/core/cards';
 import { fromRecord, type RecordLike } from '../src/decypher/parse';
+import { kit, parseStructure } from '../src/core/index';
+import { themeTokens } from '../src/core/tokens';
 
 const F = (p: string) => readFileSync(new URL('./fixtures/' + p, import.meta.url), 'utf8');
 const out = (...names: string[]) => names.map(n => ({ kind: n.endsWith('.ndx') ? 'ndx' : 'xvg', path: '/sim/out/' + n }));
@@ -63,7 +65,8 @@ describe('a record and its main file as an analysis', () => {
   });
   it('gmx rmsf: one curve along the atoms of its group', () => {
     const a = make(rec('rmsf', [g('selection', 'sulfate', '1-30', 'coral')]), F('r9/rmsf/rmsf_nvt.xvg'));
-    expect([a.xlabel, a.ylabel, a.sels.length, a.sels[0].name, a.sels[0].atoms.length, a.x.slice(0, 3)]).toEqual(['Atom', '(nm)', 1, 'sulfate', 30, [1, 2, 3]]);
+    // gmx labels its y "(nm)": the quantity is named in front.
+    expect([a.xlabel, a.ylabel, a.sels.length, a.sels[0].name, a.sels[0].atoms.length, a.x.slice(0, 3)]).toEqual(['Atom', 'RMSF (nm)', 1, 'sulfate', 30, [1, 2, 3]]);
   });
   it('gmx mindist: a curve per selection, the reference in ink', () => {
     const a = make(rec('mindist', [g('reference', 'sulfate', '1-30', 'coral'), g('selection', 'sodium', '31-42', 'sky'), g('selection', 'water', '43-3242', 'mint')]), F('r9/mindist/mindist_nvt.xvg'));
@@ -71,7 +74,7 @@ describe('a record and its main file as an analysis', () => {
   });
   it('gmx energy: its terms, no atoms, so no structure', () => {
     const a = make(rec('energy', []), F('gmx-2025.4/energy-potential.xvg'));
-    expect([a.sels.map(s => [s.name, s.atoms.length]), a.ref, a.ylabel]).toEqual([[['Bond', 0], ['Potential', 0]], null, '(kJ/mol)']);
+    expect([a.sels.map(s => [s.name, s.atoms.length]), a.ref, a.ylabel]).toEqual([[['Bond', 0], ['Potential', 0]], null, 'energy (kJ/mol)']);
   });
   it('gmx gyrate: Rg is its group\'s; the parts about x, y and z are named so', () => {
     const a = make(rec('gyrate', [g('selection', 'sulfate', '1-30', 'coral')]), F('r9/gyrate/gyrate_nvt.xvg'));
@@ -80,5 +83,32 @@ describe('a record and its main file as an analysis', () => {
   it('an RDF stays as it was: g(r) from zero, with both peak rules', () => {
     const a = make(rec('rdf', [g('reference', 'sulfur', '5-30:5', 'coral'), g('selection', 'water_O', '43-3239:4', 'sky')]), F('gmx-2025.4/rdf_nvt.xvg'));
     expect([a.command, a.plot, a.sels[0].name, !!a.sels[0].peak]).toEqual([undefined, undefined, 'water_O', true]);
+  });
+});
+
+describe('RMSF on the structure (R10b)', () => {
+  const struct = parseStructure(F('nvt/nvt.gro'), 'gro');
+  const rmsf = (file: string, res: boolean) => fromRecord({ id: 'job:r', kind: 'job', title: 't', label: 'l', source: 'job', xvg: F(file), struct: null, structNote: '',
+    record: { analysis: 'rmsf', groups: [{ role: 'selection', name: 'sulfate', atoms: '1-30', tone: 'coral' }], options: [{ flag: 'res', value: res }] } });
+  const molOf = (atoms: number[]) => kit.buildMol(struct, new Set(atoms), new Set(), 'frame positions');
+
+  it('per atom: each atom of the group its own value, in nm; every other atom none', () => {
+    const a = rmsf('r9/rmsf/rmsf_nvt.xvg', false), p = kit.paintOf(a, molOf(a.sels[0].atoms))!;
+    expect(a.paint).toMatchObject({ by: 'atom', label: 'RMSF', unit: 'nm' });
+    expect([p.values.size, p.values.get(1), p.values.get(31)]).toEqual([30, 0.6309, undefined]);
+    expect([p.min, p.max]).toEqual([Math.min(...a.sels[0].y), Math.max(...a.sels[0].y)]);
+  });
+  it('per residue: every atom of a residue its residue\'s value', () => {
+    const a = rmsf('r9/rmsf-res/rmsf_nvt.xvg', true), p = kit.paintOf(a, molOf(a.sels[0].atoms))!;
+    expect(a.paint?.by).toBe('residue');
+    expect([1, 2, 3, 4, 5, 6, 10, 11].map(n => p.values.get(n))).toEqual([0.6251, 0.6251, 0.6251, 0.6251, 0.6251, 0.3175, 0.3175, 0.6191]);
+  });
+  it('the colour is the sequential ramp: its first stop at the lowest value, its last at the highest', () => {
+    const pal = kit.palette(false, themeTokens(F('../../src/tokens.json'), F('../../src/roles.json')).light);
+    expect([kit.rampAt(pal, 0), kit.rampAt(pal, 1)]).toEqual([pal.ramp[0], pal.ramp[pal.ramp.length - 1]]);
+    expect(pal.ramp.length).toBe(4);
+  });
+  it('no other command paints its structure', () => {
+    expect(fromRecord({ id: 'x', kind: 'job', title: 't', label: 'l', source: 'job', xvg: F('r9/rms/rmsd_nvt.xvg'), struct: null, structNote: '', record: { analysis: 'rms', groups: [] } }).paint).toBeUndefined();
   });
 });
