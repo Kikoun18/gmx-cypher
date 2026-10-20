@@ -505,7 +505,7 @@ export function ResultView({ job, record: rec, recordError, log, allow, vault, o
       <ResultPage open={live || job.status === 'failed'}
         actions={<>
           {actions}
-          {job.kind === 'rdf' && job.status === 'done' && <Button onClick={onCompare}>compare</Button>}
+          {job.status === 'done' && <Button onClick={onCompare}>compare</Button>}
           {done && vault && <Button ref={sendButton} variant="outline" onClick={() => setSending(true)}>send to vault…</Button>}
           {rec && <Button variant="outline" onClick={() => onRunAgain(rec)}>open in set-up</Button>}
           {done && <ExportAll figures={figures} file={stem} fields={{ ...job.fields, command: job.kind }} />}

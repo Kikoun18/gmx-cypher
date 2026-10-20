@@ -33,7 +33,7 @@ export interface Sel extends Group { y: number[]; peak: Peak | null; shell?: Pea
 /** Which peak marks a chart draws (R3d): the maximum filled, the first shell hollow. */
 export type Marks = 'both' | 'maximum' | 'first shell' | 'none'
 
-/** One RDF: a gmx-cypher job, a run record found on disk, an RDF of the Matrix vault, or files from disk. */
+/** One result (an RDF, or any command's since R10a): a gmx-cypher job, a record found on disk, an RDF of the Matrix vault, or files from disk. */
 export interface Analysis {
   id: string
   kind: 'job' | 'record' | 'vault' | 'file'
@@ -52,6 +52,8 @@ export interface Analysis {
   structNote: string
   /** How its chart is drawn when it is not an RDF (R6a: any result as HTML): its y range, its rule, its x digits. */
   plot?: Plot
+  /** The gmx command it is a result of, when not an RDF (R10a). */
+  command?: string
 }
 /** A chart's y range (from 0, or the data's own), its dashed rule (g = 1, 0, none) and its x digits. */
 export interface Plot { y: 'zero' | 'data'; rule: number | null; xDigits?: number }

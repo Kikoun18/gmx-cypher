@@ -1,4 +1,4 @@
-// (de)Cypher: RDFs of several jobs at once, each with the structure its groups are atoms of, side by side or on
+// (de)Cypher: results of several jobs at once (RDFs first, any command's since R10a), each with the structure its groups are atoms of, side by side or on
 // one graph, from gmx-cypher's own jobs, from the Matrix's vault (with the row's structure), or from files.
 // The RDF Explorer design (v3) in Morpheus, as gmx-cypher's own view: compare, in the results' detail pane at
 // #compare?jobs=… (R9a), opened from the jobs list, a result, or with a key.
@@ -26,6 +26,7 @@ import { DisplayMenu, DisplayRow, StyleRow } from '../ui/display-menu'
 import { ResultPage } from '../ui/result-page'
 import { ChartPanel, ExportMenu, Swatch, type ChartExport } from '../core/Chart'
 import { curvesCsv } from '../lib/csv'
+import { unlike } from '../core/cards'
 import { download as downloadBlob, renderBatch } from '../../../matrix/src/lib/export'
 import { graphData } from '../core/export'
 import { fileName, useExportPrefs } from '../core/exportPrefs'
@@ -46,6 +47,9 @@ const NO_MORPHS: ActiveMorph[] = []
 /** What compare's renderer can't draw of the one set of styles, and why (question 17). */
 export const CANNOT: Partial<Record<Style, string>> = { lines: 'compare draws every atom, so no bonds alone', cartoon: 'compare reads no secondary structure, so no ribbon' }
 const MARKS: readonly Marks[] = ['both', 'maximum', 'first shell', 'none']
+
+/** How an analysis's chart is drawn: an RDF from zero with g = 1 and its peak marks; any other result as its plot says (R10a). */
+const chartOf = (a: Analysis, marks: Marks) => (a.plot ? { y: a.plot.y, rule: a.plot.rule, xDigits: a.plot.xDigits, marks: 'none' as Marks } : { marks, xDigits: 3 })
 
 /** The peak marks a chart draws (R3d), in the chart's header (R9b): the maximum filled, the first shell hollow. */
 function MarksSelect({ value, onChange }: { value: Marks; onChange: (m: Marks) => void }) {
@@ -132,7 +136,9 @@ export function AnalysisCard({ members, on, tone, mol, pal, view, selected, tone
   const title = cardTitle(members)
   // The chart's export (R6a): the curves in the export theme's palette; its CSV, each curve named with its source.
   const curvesIn = (p: Palette) => kit.buildCurves({ focus: a, plotted: members, selected, colorBy: 'group', pal: p, tones }).filter(c => on.includes(c.analysis)).map(c => { const m = members.find(x => x.id === c.analysis)!; return { ...c, source: many ? (m.ref ? 'ref ' + names[m.id] : names[m.id]) : '' } })
-  const exp: ChartExport = { file: a.label, fields: { command: 'rdf' }, title, csv: () => curvesCsv(curvesIn(pal).map(c => ({ ...c, name: c.source ? c.name + ' · ' + c.source : c.name })), a.xlabel, a.ylabel) }
+  // A result of a command without atom groups (energy, AWH, WHAM) is its chart alone; an RDF keeps its structure, atoms known or not.
+  const rdf = !a.plot, chartOnly = !rdf && !a.ref && a.sels.every(g => !g.atoms.length)
+  const exp: ChartExport = { file: a.label, fields: { command: a.command ?? 'rdf' }, title, csv: () => curvesCsv(curvesIn(pal).map(c => ({ ...c, name: c.source ? c.name + ' · ' + c.source : c.name })), a.xlabel, a.ylabel) }
   // One result page's order (R9b): its actions, its structure beside its chart, its settings and groups, where it came from.
   return (
     <section aria-label={title} className="flex flex-col rounded-xl border border-border bg-card" onMouseEnter={onActive}>
@@ -158,7 +164,7 @@ export function AnalysisCard({ members, on, tone, mol, pal, view, selected, tone
           {many && <Button variant="outline" size="sm" onClick={onSplit} title="show each RDF as its own card again">split</Button>}
         </>}
         charts={<div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,380px),1fr))] gap-4">
-          <div className="flex min-w-0 flex-col rounded-lg border border-border">
+          {!chartOnly && <div className="flex min-w-0 flex-col rounded-lg border border-border">
             <div className="flex flex-wrap items-center gap-2 border-b border-border px-3 py-2">
               {display}<span className="flex-1" />
               {mol && <><Button variant="outline" size="sm" onClick={() => ref.current?.fit()}>fit selection</Button><Button variant="ghost" size="sm" onClick={() => ref.current?.reset()}>reset view</Button><Button variant="ghost" size="sm" onClick={() => void savePng(ref.current, a.label)} title="the structure as drawn now, as a PNG">png</Button></>}
@@ -166,17 +172,17 @@ export function AnalysisCard({ members, on, tone, mol, pal, view, selected, tone
             <StructurePanel ref={h => { ref.current = h; handle(h) }} className="min-h-[420px]" mol={mol} pal={pal} view={view} sels={a.sels} selected={idx} refs={refs} hoverSel={hoverSel}
               onPick={(is, add) => onSelect(pickGroups(selected, is.map(i => a.sels[i].name), add))} onPickRef={pickRef} onActive={onActive}
               empty={<><span className="text-heading font-bold">No structure</span><span className="max-w-[40ch] text-caption text-muted-foreground">{a.structNote}</span></>} />
-          </div>
+          </div>}
           <div className="flex min-w-0 flex-col gap-2">
-            <div className="flex items-center justify-end gap-1">{marks}{curves.length > 0 && <ExportMenu exp={exp} curves={curvesIn} xlabel={a.xlabel} ylabel={a.ylabel} marks={view.marks} xDigits={3} />}</div>
-            <ChartPanel className="h-[300px] flex-none" curves={curves} grid={a.x} xlabel={a.xlabel} ylabel={a.ylabel} pal={pal} marks={view.marks} xDigits={3}
-              empty={curves.length ? null : { title: 'Pick an atom group', hint: 'Click atoms in the structure or a chip below. ' + modName() + '-click adds more groups to the plot.' }} />
-            <CurveTable curves={curves} source={many} onRemove={n => onSelect(selected.filter(x => x !== n))} onHover={c => { setHot(c?.key ?? null); setHover(c?.name ?? null) }} />
+            <div className="flex items-center justify-end gap-1">{rdf && marks}{curves.length > 0 && <ExportMenu exp={exp} curves={curvesIn} xlabel={a.xlabel} ylabel={a.ylabel} {...chartOf(a, view.marks)} />}</div>
+            <ChartPanel className="h-[300px] flex-none" curves={curves} grid={a.x} xlabel={a.xlabel} ylabel={a.ylabel} pal={pal} {...chartOf(a, view.marks)}
+              empty={curves.length ? null : rdf ? { title: 'Pick an atom group', hint: 'Click atoms in the structure or a chip below. ' + modName() + '-click adds more groups to the plot.' } : { title: 'Pick a curve', hint: 'Click a chip below. ' + modName() + '-click adds more.' }} />
+            <CurveTable curves={curves} source={many} stats={rdf ? 'peaks' : 'series'} onRemove={n => onSelect(selected.filter(x => x !== n))} onHover={c => { setHot(c?.key ?? null); setHover(c?.name ?? null) }} />
           </div>
         </div>}
         settings={<>
           {!many && <p className="m-0 text-caption text-muted-foreground">{a.sub}</p>}
-          <Section label={'Groups ' + pad(a.sels.length) + ' · plotted ' + pad(idx.length)}>
+          <Section label={(chartOnly ? 'Curves ' : 'Groups ') + pad(a.sels.length) + ' · plotted ' + pad(idx.length)}>
             <Button variant="ghost" size="sm" onClick={() => onSelect(a.sels.map(g => g.name))}>all</Button>
             <Button variant="ghost" size="sm" onClick={() => onSelect([])}>none</Button>
           </Section>
@@ -196,7 +202,9 @@ function CompareView({ shown, focus, setFocus, mols, pal, view, patch, selected,
 }) {
   const [hover, setHover] = React.useState<string | null>(null), [hot, setHot] = React.useState<string | null>(null)
   const ref = React.useRef<StructureHandle | null>(null), [bindings] = useBindings()
-  const plotted = React.useMemo(() => [focus, ...shown.filter(a => a !== focus)], [focus, shown])
+  // Only like quantities share the graph (R10a): the others are named, with the reason.
+  const refused = React.useMemo(() => shown.flatMap(a => { const why = a === focus ? null : unlike(focus, a); return why ? [{ a, why }] : [] }), [shown, focus])
+  const plotted = React.useMemo(() => [focus, ...shown.filter(a => a !== focus && !refused.some(r => r.a === a))], [focus, shown, refused])
   const curves: Curve[] = React.useMemo(() => kit.buildCurves({ focus, plotted, selected, colorBy: view.colorBy, pal, tones })
     .map(c => ({ ...c, hot: c.key === hot, dim: hot ? c.key !== hot : !!hover && c.name !== hover && selected.includes(hover) })), [focus, plotted, selected, view.colorBy, pal, tones, hover, hot])
   const idx = React.useMemo(() => focus.sels.flatMap((g, i) => (selected.includes(g.name) ? [i] : [])), [focus, selected])
@@ -208,7 +216,7 @@ function CompareView({ shown, focus, setFocus, mols, pal, view, patch, selected,
   const i = shown.indexOf(focus), step = (d: number) => setFocus(shown[(i + d + shown.length) % shown.length].id)
   // One graph's export (R6a): every curve, named with its RDF, in the export theme's palette.
   const curvesIn = (p: Palette) => kit.buildCurves({ focus, plotted, selected, colorBy: view.colorBy, pal: p, tones })
-  const exp: ChartExport = { file: 'one-graph_' + plotted.length + '-RDFs', fields: { command: 'rdf' }, title: 'One graph · ' + plural(plotted.length, 'RDF'), csv: () => curvesCsv(curvesIn(pal).map(c => ({ ...c, name: c.name + ' · ' + c.source })), focus.xlabel, focus.ylabel) }
+  const exp: ChartExport = { file: 'one-graph_' + plotted.length + '-results', fields: { command: focus.command ?? 'rdf' }, title: 'One graph · ' + plural(plotted.length, 'result'), csv: () => curvesCsv(curvesIn(pal).map(c => ({ ...c, name: c.name + ' · ' + c.source })), focus.xlabel, focus.ylabel) }
   return (
     <div className="grid min-h-[660px] grid-cols-[repeat(auto-fit,minmax(min(100%,460px),1fr))] gap-4">
       <section aria-label="structure" className="flex min-w-0 flex-col rounded-xl border border-border bg-card" onMouseEnter={onActive}>
@@ -239,7 +247,7 @@ function CompareView({ shown, focus, setFocus, mols, pal, view, patch, selected,
       </section>
       <section aria-label="one graph" className="flex min-w-0 flex-col rounded-xl border border-border bg-card">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-border px-4 py-2">
-          <span className="text-label uppercase text-muted-foreground">One graph · {plural(plotted.length, 'RDF')}</span>
+          <span className="text-label uppercase text-muted-foreground">One graph · {plural(plotted.length, 'result')}</span>
           {kit.rdfLooks(plotted, tones, idx.length).map((look, k) => { const a = plotted[k]; return (
             <span key={a.id} className="inline-flex items-center gap-1.5 text-caption" title={a.title}>
               <Swatch color={view.colorBy === 'job' ? pal.hues[look.tone].strong : look.round ? pal.muted : pal.fg} dash={kit.DASH[(view.colorBy === 'job' ? look.jobDash : look.groupDash) % kit.DASH.length]} />
@@ -248,13 +256,14 @@ function CompareView({ shown, focus, setFocus, mols, pal, view, patch, selected,
           ) })}
           <span className="flex-1" />
           <Seg label="color by" value={view.colorBy} options={['group', 'job'] as const} labels={{ job: 'result' }} onChange={v => patch({ colorBy: v })} />
-          {marks}
-          {curves.length > 0 && <ExportMenu exp={exp} curves={curvesIn} xlabel={focus.xlabel} ylabel={focus.ylabel} marks={view.marks} xDigits={3} />}
+          {!focus.plot && marks}
+          {curves.length > 0 && <ExportMenu exp={exp} curves={curvesIn} xlabel={focus.xlabel} ylabel={focus.ylabel} {...chartOf(focus, view.marks)} />}
         </div>
-        <ChartPanel className="mx-4 mb-1.5 mt-3.5 flex-1" curves={curves} grid={focus.x} xlabel={focus.xlabel} ylabel={focus.ylabel} pal={pal} marks={view.marks} xDigits={3}
+        <ChartPanel className="mx-4 mb-1.5 mt-3.5 flex-1" curves={curves} grid={focus.x} xlabel={focus.xlabel} ylabel={focus.ylabel} pal={pal} {...chartOf(focus, view.marks)}
           empty={curves.length ? null : { title: 'Pick an atom group', hint: 'Each group you pick is drawn for every result that has it: the same atoms of the same structure, else the same name.' }} />
         <div className="border-t border-border px-4 pb-3.5 pt-2.5">
-          <CurveTable curves={curves} onRemove={n => onSelect(selected.filter(x => x !== n))} onHover={c => { setHot(c?.key ?? null); setHover(c?.name ?? null) }} />
+          <CurveTable curves={curves} stats={focus.plot ? 'series' : 'peaks'} onRemove={n => onSelect(selected.filter(x => x !== n))} onHover={c => { setHot(c?.key ?? null); setHover(c?.name ?? null) }} />
+          {refused.map(r => <Status key={r.a.id} level="info">{r.why}</Status>)}
           {unmatched.map(u => <Status key={u.an.id} level="warning" why={'Groups are matched by their atoms, then their name (case, punctuation and a trailing "…x" ignored), then their place in a list as long.'}>{u.an.label}: no group to match {u.names.join(', ')}</Status>)}
           {!curves.length && <p className="m-0 text-caption text-muted-foreground">{view.colorBy === 'group' ? 'by group: each group its hue, each result its dash' : 'by result: each result its hue, each group its dash'}</p>}
         </div>
@@ -263,7 +272,7 @@ function CompareView({ shown, focus, setFocus, mols, pal, view, patch, selected,
   )
 }
 
-interface FoundRun { path: string; stem: string; frames: number | null; groups: number; reference: string | null; structure: string | null; ended: string | null }
+interface FoundRun { path: string; stem: string; analysis: string; frames: number | null; groups: number; reference: string | null; structure: string | null; ended: string | null }
 
 /** RDF runs gmx-cypher wrote before, found by their records under a folder: another home's, another machine's. */
 function RunsTab({ allow, row }: { allow: string[]; row: (ref: SourceRef, title: string, sub: React.ReactNode) => React.ReactNode }) {
@@ -281,18 +290,18 @@ function RunsTab({ allow, row }: { allow: string[]; row: (ref: SourceRef, title:
         <Input size="sm" aria-label="folder to look in" value={root} onChange={e => setRoot(e.target.value)} onKeyDown={e => pressed(e, 'enter') && root.trim() && find()} />
         <Button variant="outline" size="sm" className="h-8" onClick={find} disabled={!root.trim() || busy}>{busy ? 'looking…' : 'find'}</Button>
       </div>
-      <p className="m-0 text-caption text-muted-foreground">every RDF record (.run.json) under this folder, newest first, with the structure each ran on</p>
+      <p className="m-0 text-caption text-muted-foreground">every record (.run.json) under this folder, of any command, newest first, with the structure each ran on</p>
       {found && 'error' in found && <Status level="error">{found.error}</Status>}
       {found && 'runs' in found && (found.runs.length
-        ? <div className="flex flex-col">{found.runs.map(r => row({ kind: 'record', path: r.path }, r.stem, [r.frames != null ? r.frames + ' frames' : null, r.reference ? 'ref ' + r.reference : null, plural(Math.max(0, r.groups - 1), 'group'), rel(r.path, found.root).split('/').slice(0, -1).join('/') || null].filter(Boolean).join(' · ')))}</div>
-        : <p className="m-0 text-caption text-muted-foreground">no RDF records under {found.root}</p>)}
+        ? <div className="flex flex-col">{found.runs.map(r => row({ kind: 'record', path: r.path }, r.stem, ['gmx ' + r.analysis, r.frames != null ? r.frames + ' frames' : null, r.reference ? 'ref ' + r.reference : null, plural(Math.max(0, r.groups - 1), 'group'), rel(r.path, found.root).split('/').slice(0, -1).join('/') || null].filter(Boolean).join(' · ')))}</div>
+        : <p className="m-0 text-caption text-muted-foreground">no records under {found.root}</p>)}
       {found && 'runs' in found && found.more && <Status level="info">the first {found.runs.length} only · look in a folder further down</Status>}
       {found && 'runs' in found && found.unread.length > 0 && <p className="m-0 text-caption text-muted-foreground">couldn't look into {found.unread.length === 1 ? found.unread[0] : plural(found.unread.length, 'folder')}</p>}
     </div>
   )
 }
 
-/** Where the picked sources come from: this gmx-cypher's RDF jobs, runs on disk, the Matrix's vault, or files. */
+/** Where the picked sources come from: this gmx-cypher's jobs, records on disk, the Matrix's vault (its RDFs), or files. */
 function AddPanel({ sources, allow, vaultPath, vault, loadVault, fileRows, onFiles, onClearFiles }: {
   sources: DecypherSources; allow: string[]; vaultPath: string | null; vault: { list?: VaultRdfs; error?: string } | null; loadVault: () => void
   fileRows: { path: string; kind: string; status: string; error: boolean }[]; onFiles: (f: LoadedFile[]) => void; onClearFiles: () => void
@@ -498,7 +507,7 @@ export function Decypher({ sources, files, onFiles, onClearFiles, jobs, jobsLoad
     const byId = new Map(shown.map(a => [a.id, a])), joined = new Set(morphs.flatMap(m => m.ids.slice(1)))
     return shown.filter(a => !joined.has(a.id)).map(lead => {
       const m = morphs.find(x => x.ids[0] === lead.id), members = m ? m.ids.map(id => byId.get(id)!) : [lead]
-      return { lead, members, on: m ? m.on : [lead.id], candidates: shown.filter(b => !members.includes(b)).map(b => ({ a: b, why: kit.morphWhy(lead, b) })) }
+      return { lead, members, on: m ? m.on : [lead.id], candidates: lead.plot ? [] : shown.filter(b => !members.includes(b) && !b.plot).map(b => ({ a: b, why: kit.morphWhy(lead, b) })) }
     })
   }, [shown, morphs])
 
@@ -563,7 +572,7 @@ export function Decypher({ sources, files, onFiles, onClearFiles, jobs, jobsLoad
   )
   const marks = <MarksSelect value={view.marks} onChange={m => patch({ marks: m })} />
   const loading = items.filter(i => i.status === 'loading').length
-  const subtitle = !items.length ? 'RDFs of several jobs at once, with their structures' : [plural(ready.length, 'RDF'), plural(new Set(ready.map(a => a.struct).filter(Boolean)).size, 'structure'), loading ? 'reading ' + loading + '…' : null, shown.length < ready.length ? (ready.length - shown.length) + ' hidden' : null].filter(Boolean).join(' · ')
+  const subtitle = !items.length ? 'results of several jobs at once, with their structures' : [plural(ready.length, 'result'), plural(new Set(ready.map(a => a.struct).filter(Boolean)).size, 'structure'), loading ? 'reading ' + loading + '…' : null, shown.length < ready.length ? (ready.length - shown.length) + ' hidden' : null].filter(Boolean).join(' · ')
 
   return (
     <section data-decypher="" onKeyDown={onKey} aria-labelledby="decypher-title" aria-describedby="decypher-sub" className="flex min-w-0 flex-col rounded-lg border border-border">
@@ -583,7 +592,7 @@ export function Decypher({ sources, files, onFiles, onClearFiles, jobs, jobsLoad
               <Section label={'Sources ' + pad(items.length)}>
                 {items.length > 0 && <Button variant="ghost" size="sm" onClick={() => patch({ hidden: [] })} disabled={!view.hidden.length}>show all</Button>}
               </Section>
-              {!items.length && <p className="m-0 text-caption text-muted-foreground">nothing picked yet · tick RDF jobs in the jobs list, or add below</p>}
+              {!items.length && <p className="m-0 text-caption text-muted-foreground">nothing picked yet · tick jobs in the jobs list, or add below</p>}
               {items.map(it => <SourceRow key={it.key} it={it} tone={tones[it.analysis?.id ?? it.key]} pal={pal} hidden={!!it.analysis && view.hidden.includes(it.analysis.id)}
                 onShow={on => it.analysis && patch(v => ({ hidden: on ? v.hidden.filter(x => x !== it.analysis!.id) : [...v.hidden, it.analysis!.id] }))}
                 onRemove={it.kind === 'file' ? undefined : () => sources.remove(it.key)}
@@ -595,7 +604,7 @@ export function Decypher({ sources, files, onFiles, onClearFiles, jobs, jobsLoad
             {!items.length ? (
               <div className="mx-auto mt-10 flex max-w-[620px] flex-col gap-4 rounded-2xl border-2 border-dashed border-input bg-card p-10">
                 <span className="text-display font-bold">Nothing to decipher yet</span>
-                <span className="max-w-[62ch] text-prose text-muted-foreground">Tick RDF jobs in the jobs list, or add the RDFs of the Matrix vault (each with its row's structure), records on disk, or files dropped anywhere on the page. Several at once are shown side by side, or compared on one graph.</span>
+                <span className="max-w-[62ch] text-prose text-muted-foreground">Tick jobs in the jobs list, of any command, or add the RDFs of the Matrix vault (each with its row's structure), records on disk, or files dropped anywhere on the page. Several at once are shown side by side, or compared on one graph.</span>
                 <span className="text-caption text-muted-foreground">{keyName ? keyName + ' opens compare and goes back · ' : ''}{keyLabel(bindings.fit)} fits the plotted groups · {keyLabel(bindings.reset)} resets the view · {keyLabel(bindings.sheet)} lists every key</span>
               </div>
             ) : !shown.length ? (

@@ -7,6 +7,7 @@ import { parseNdx } from '../lib/ndx'
 import { peaks } from '../lib/rdf'
 import { fromRanges, readStructure, TONES } from '../core/index'
 import type { Analysis, Group, Peak, Sel, Struct, Tone } from '../core/kit'
+import { curveGroup } from '../core/cards'
 
 const toneOf = (t: unknown, i: number): Tone => (TONES.includes(t as Tone) ? (t as Tone) : TONES[i % TONES.length])
 export const basename = (s: string) => String(s || '').replace(/['"]/g, '').split(/[\\/]/).pop() || ''
@@ -65,6 +66,7 @@ export interface RecordLike {
   inputs?: Record<string, { path: string } | undefined>
   groups: RecordGroup[]
   options?: { flag: string; value: unknown }[]
+  outputs?: { kind: string; path: string }[]
 }
 
 /** A record's reference and selections, atoms from its ranges. */
@@ -82,12 +84,32 @@ export const binOf = (r: RecordLike | null, x: number[]) => {
 /** Its facts in one line: what it is, the frames, the bin, the reference. */
 export function facts(parts: (string | null | false | undefined)[]) { return parts.filter(Boolean).join(' · ') }
 
-export function fromRecord(o: { id: string; kind: Analysis['kind']; title: string; label: string; source: string; record: RecordLike; xvg: string; struct: string | null; structNote: string }): Analysis {
-  const x = parseXvg(o.xvg), { ref, sels } = recordGroups(o.record), bin = binOf(o.record, x.x)
+type RecordSource = { id: string; kind: Analysis['kind']; title: string; label: string; source: string; record: RecordLike; xvg: string; struct: string | null; structNote: string }
+
+export function fromRecord(o: RecordSource): Analysis {
+  const x = parseXvg(o.xvg), command = o.record.analysis ?? 'rdf'
+  if (command !== 'rdf') return fromResult(o, x, command)
+  const { ref, sels } = recordGroups(o.record), bin = binOf(o.record, x.x)
   return {
     id: o.id, kind: o.kind, title: o.title, label: o.label, x: x.x, xlabel: x.xlabel || 'r (nm)', ylabel: x.ylabel || 'g(r)', ref, sels: withCurves(x, sels),
     struct: o.struct, structNote: o.structNote,
     sub: facts([o.source, o.record.frames ? o.record.frames.analysed + ' frames' : null, bin ? 'bin ' + bin + ' nm' : null, ref ? 'ref ' + ref.name + ' · ' + ref.atoms.length + ' atoms' : null]),
+  }
+}
+
+/**
+ * Any other command's result (R10a): a curve per column of its main file, each with the group it measures, drawn from
+ * the data with no rule and no peaks; a reference that no curve measures is the reference.
+ */
+function fromResult(o: RecordSource, x: Xvg, command: string): Analysis {
+  const groups = o.record.groups.map((g, i) => ({ role: g.role, name: g.name, atoms: fromRanges(g.atoms), tone: toneOf(g.tone, i) }))
+  const of = x.ys.map((_, i) => curveGroup(command, groups, i))
+  const sels: Sel[] = x.ys.map((y, i) => ({ name: of[i]?.name ?? (command.startsWith('gyrate') && i ? 'about ' + 'xyz'[i - 1] : x.legends[i] || 'series ' + (i + 1)), atoms: of[i]?.atoms ?? [], tone: of[i]?.tone ?? TONES[i % TONES.length], y, peak: null, shell: null }))
+  const r = groups.find(g => g.role === 'reference' && !of.includes(g)), ref = r ? { name: r.name, atoms: r.atoms, tone: r.tone } : null
+  return {
+    id: o.id, kind: o.kind, command, title: o.title, label: o.label, x: x.x, xlabel: x.xlabel || 'x', ylabel: x.ylabel || 'y', ref, sels, struct: o.struct, structNote: o.structNote,
+    plot: { y: command.startsWith('hbond') ? 'zero' : 'data', rule: null },
+    sub: facts([o.source, 'gmx ' + command, o.record.frames ? o.record.frames.analysed + ' frames' : null, ref ? 'ref ' + ref.name + ' · ' + ref.atoms.length + ' atoms' : null]),
   }
 }
 

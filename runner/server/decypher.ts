@@ -6,6 +6,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import type { RowRecord } from '../../matrix/src/lib/storage/records';
 import { recordComplete, type RunRecord } from '../src/lib/record';
+import { mainXvg } from '../src/core/cards';
 import type { VaultRdfs, VaultRow, VaultRun } from '../src/decypher/vaultTypes';
 import { inside, real, within } from './files';
 import { HttpError } from './http';
@@ -89,12 +90,13 @@ export async function vaultFile(v: VaultView, jobs: Jobs, path: string): Promise
 // RDF runs gmx-cypher wrote before, wherever they are in the allowed folders: each has its record beside its
 // outputs, so a run this runner's job list doesn't know (another home, another machine) still opens with its groups.
 
-export interface FoundRun { path: string; stem: string; frames: number | null; groups: number; reference: string | null; structure: string | null; ended: string | null }
+export interface FoundRun { path: string; stem: string; analysis: string; frames: number | null; groups: number; reference: string | null; structure: string | null; ended: string | null }
 
-const isRdfRecord = (r: Partial<RunRecord> | null): r is RunRecord => !!r && r.format === 'gmx-cypher run' && (r.analysis ?? 'rdf') === 'rdf' && Array.isArray(r.groups) && Array.isArray(r.outputs);
+const isRecord = (r: Partial<RunRecord> | null): r is RunRecord => !!r && r.format === 'gmx-cypher run' && Array.isArray(r.groups) && Array.isArray(r.outputs);
+const stemOf = (p: string) => (p.split('/').pop() ?? '').replace(/\.run\.json$/, '');
 
 /**
- * Every RDF run record under `root` (in the allowed folders, links not followed out of them), newest first; at most
+ * Every record of a finished job under `root` (any command since R10a; in the allowed folders, links not followed out of them), newest first; at most
  * `limit` records, and the walk stops after `budget` entries: `more` says a folder further down would find the rest.
  */
 export function findRuns(root: string, roots: string[], limit = 400, budget = 50_000): { runs: FoundRun[]; more: boolean; unread: string[] } {
@@ -113,10 +115,10 @@ export function findRuns(root: string, roots: string[], limit = 400, budget = 50
       if (st?.isDirectory()) { walk(p, depth + 1); continue; }
       if (!st?.isFile() || !name.endsWith('.run.json') || st.size > 4 << 20) continue;
       const rec = recordAt(r, false);
-      if (!isRdfRecord(rec) || !recordComplete(rec) || !rec.outputs.some(o => o.kind === 'xvg')) continue;
+      if (!isRecord(rec) || !recordComplete(rec) || !mainXvg(rec.outputs, stemOf(r))) continue;
       if (runs.length >= limit) { more = true; return; }
       const ref = rec.groups.find(g => g.role === 'reference');
-      runs.push({ path: r, stem: name.slice(0, -'.run.json'.length), frames: rec.frames?.analysed ?? null, groups: rec.groups.length, reference: ref?.name ?? null, structure: rec.inputs?.structure?.path ?? null, ended: rec.ended ?? null });
+      runs.push({ path: r, stem: name.slice(0, -'.run.json'.length), analysis: rec.analysis ?? 'rdf', frames: rec.frames?.analysed ?? null, groups: rec.groups.length, reference: ref?.name ?? null, structure: rec.inputs?.structure?.path ?? null, ended: rec.ended ?? null });
     }
   };
   walk(start, 0);
@@ -124,13 +126,14 @@ export function findRuns(root: string, roots: string[], limit = 400, budget = 50
   return { runs, more, unread };
 }
 
-/** A found run's record and its g(r): the record in the allowed folders, its .xvg too. */
+/** A found record and its main file (R10a): the record in the allowed folders, its main .xvg too. */
 export function readRun(path: string, roots: string[]): { record: RunRecord; xvg: string } {
   const p = inside(path, roots);
   if (!p.endsWith('.run.json')) throw new HttpError(400, path + ' is not a gmx-cypher run record (.run.json)');
   const rec = recordAt(p, false);
-  if (!isRdfRecord(rec)) throw new HttpError(400, path + ' is not the record of an RDF run');
+  if (!isRecord(rec)) throw new HttpError(400, path + ' is not a gmx-cypher run record');
   if (!recordComplete(rec)) throw new HttpError(409, path + " is incomplete: its job didn't finish (the record was written when it started)");
-  const out = rec.outputs.find(o => o.kind === 'xvg')!;
-  return { record: rec, xvg: readFileSync(inside(out.path, roots), 'utf8') };
+  const main = mainXvg(rec.outputs, stemOf(p));
+  if (!main) throw new HttpError(404, path + ' names no .xvg of its own');
+  return { record: rec, xvg: readFileSync(inside(main, roots), 'utf8') };
 }

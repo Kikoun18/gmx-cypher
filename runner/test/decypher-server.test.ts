@@ -108,7 +108,7 @@ function runsOnDisk() {
   return { root, sim, out }
 }
 
-describe('(de)Cypher finds RDF runs gmx-cypher wrote before, by their records', () => {
+describe('(de)Cypher finds the jobs gmx-cypher ran before, by their records', () => {
   it('lists the RDF records under a folder, newest first, and reads one with its g(r)', () => {
     const { root, out } = runsOnDisk()
     const found = findRuns(root, [root])
@@ -120,7 +120,8 @@ describe('(de)Cypher finds RDF runs gmx-cypher wrote before, by their records', 
     const run = readRun(join(out, 'rdf_o111_Methionine_H.run.json'), [root])
     expect(run.record.groups[0].name).toBe('H_Met')
     expect(run.xvg).toBe(readFileSync(F + 'rdf_o111_Methionine_H.xvg', 'utf8'))
-    expect(() => readRun(join(out, 'energy_nvt.run.json'), [root])).toThrow('is not the record of an RDF run')
+    // Any command's record is read since R10a; one that names no .xvg of its own has nothing to show, and is not listed.
+    expect(() => readRun(join(out, 'energy_nvt.run.json'), [root])).toThrow('names no .xvg of its own')
     expect(() => readRun(join(out, 'rdf_o111_Methionine_H.xvg'), [root])).toThrow('is not a gmx-cypher run record')
   })
 

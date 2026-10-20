@@ -64,14 +64,17 @@ export const StructurePanel = React.forwardRef<StructureHandle, {
   )
 })
 
-/** The curves under a chart: series, source, atoms, both peak rules (R3d); × takes a group off the plot. */
-export function CurveTable({ curves, onRemove, onHover, source = true }: { curves: Curve[]; onRemove: (name: string) => void; onHover: (c: Curve | null) => void; source?: boolean }) {
+/** The curves under a chart: series, source, atoms, then an RDF's both peak rules (R3d), or any other result's mean and range (R10a); × takes one off the plot. */
+const mean = (y: number[]) => { const v = y.filter(Number.isFinite); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : NaN }
+const fmtStat = (v: number) => (Number.isFinite(v) ? Number(v.toPrecision(4)).toString() : '—')
+
+export function CurveTable({ curves, onRemove, onHover, source = true, stats = 'peaks' }: { curves: Curve[]; onRemove: (name: string) => void; onHover: (c: Curve | null) => void; source?: boolean; stats?: 'peaks' | 'series' }) {
   if (!curves.length) return null
   const cols = source ? 'grid-cols-[26px_minmax(0,1fr)_minmax(0,1.1fr)_44px_96px_96px_26px]' : 'grid-cols-[26px_minmax(0,1fr)_44px_96px_96px_26px]'
   return (
     <div className="flex max-h-64 flex-col gap-0.5 overflow-auto">
       <div className={cn('grid items-center gap-2 pb-1 text-label uppercase text-muted-foreground', cols)}>
-        <span /><span className="truncate">series</span>{source && <span className="truncate">source</span>}<span className="text-right">atoms</span><span className="text-right">maximum r · g</span><span className="text-right">first shell r · g</span><span />
+        <span /><span className="truncate">series</span>{source && <span className="truncate">source</span>}<span className="text-right">atoms</span>{stats === 'peaks' ? <><span className="text-right">maximum r · g</span><span className="text-right">first shell r · g</span></> : <><span className="text-right">mean</span><span className="text-right">min – max</span></>}<span />
       </div>
       {curves.map(c => (
         <div key={c.key} className={cn('grid min-h-[26px] items-center gap-2 text-control', cols)} onMouseEnter={() => onHover(c)} onMouseLeave={() => onHover(null)}>
@@ -79,8 +82,13 @@ export function CurveTable({ curves, onRemove, onHover, source = true }: { curve
           <span className="truncate font-bold" style={{ color: c.color }}>{c.name}</span>
           {source && <span className="truncate text-muted-foreground">{c.source}</span>}
           <span className="text-right">{c.atoms || '—'}</span>
-          <span className="text-right">{c.peak ? c.peak.r.toFixed(3) + ' · ' + c.peak.g.toFixed(2) : '—'}</span>
-          <span className="text-right">{c.shell ? c.shell.r.toFixed(3) + ' · ' + c.shell.g.toFixed(2) : '—'}</span>
+          {stats === 'peaks' ? <>
+            <span className="text-right">{c.peak ? c.peak.r.toFixed(3) + ' · ' + c.peak.g.toFixed(2) : '—'}</span>
+            <span className="text-right">{c.shell ? c.shell.r.toFixed(3) + ' · ' + c.shell.g.toFixed(2) : '—'}</span>
+          </> : <>
+            <span className="text-right">{fmtStat(mean(c.y))}</span>
+            <span className="text-right">{fmtStat(Math.min(...c.y.filter(Number.isFinite))) + ' – ' + fmtStat(Math.max(...c.y.filter(Number.isFinite)))}</span>
+          </>}
           <button type="button" aria-label={'take ' + c.name + ' off the plot'} onClick={() => onRemove(c.name)} className="grid size-[22px] place-items-center justify-self-end rounded-full text-muted-foreground hover:bg-accent hover:text-foreground">×</button>
         </div>
       ))}
@@ -96,6 +104,8 @@ export function GroupChips({ refs, sels, selected, pal, dim, hover, onShown, onP
   /** Given where RDFs are morphed: the references are buttons, one, the other or both plotted. */
   onPickRef?: (ref: number, add: boolean) => void
 }) {
+  // Curves of a result without atom groups (energy terms) have no atoms to count.
+  const counts = refs.length > 0 || sels.some(g => g.atoms.length)
   return (
     <div className="flex flex-wrap gap-1.5">
       {refs.map((r, i) => {
@@ -108,7 +118,7 @@ export function GroupChips({ refs, sels, selected, pal, dim, hover, onShown, onP
       <Legend label="groups" className="contents" items={sels.map(g => ({ key: g.name, label: g.name, g }))} shown={selected} onShown={onShown} onHover={onHover}
         itemClass={(_, on) => cn('inline-flex h-[26px] items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 text-caption transition-[background-color,box-shadow] duration-[120ms]', on && 'font-bold')}
         itemStyle={({ g }, on) => { const t = pal.hues[g.tone]; return { background: on ? t.base : dim ? pal.secondary : t.soft, color: on ? t.fg : dim ? pal.muted : t.strong, boxShadow: hover === g.name ? '0 0 0 2px ' + pal.fg : 'none' } }}
-        item={({ g }, on) => <><span className="size-[7px] shrink-0 rounded-full" style={{ background: on ? pal.hues[g.tone].fg : pal.hues[g.tone].strong }} />{g.name}<span className="opacity-70">{g.atoms.length || '—'}</span></>} />
+        item={({ g }, on) => <><span className="size-[7px] shrink-0 rounded-full" style={{ background: on ? pal.hues[g.tone].fg : pal.hues[g.tone].strong }} />{g.name}{counts && <span className="opacity-70">{g.atoms.length || '—'}</span>}</>} />
     </div>
   )
 }

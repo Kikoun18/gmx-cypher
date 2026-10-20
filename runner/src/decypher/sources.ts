@@ -1,4 +1,4 @@
-// Loading what (de)Cypher shows. A job through the runner's own routes: its record, its g(r), and the structure
+// Loading what (de)Cypher shows. A job through the runner's own routes: its record, its main file, and the structure
 // it ran with. A vault RDF through the read-only vault routes, with its row's structure when that has the atoms
 // the groups reach, else the structure of the run that wrote it. Files from disk through fromFiles.
 
@@ -7,6 +7,7 @@ import { getJson } from '../api'
 import type { Job } from '../jobs'
 import type { Analysis, Struct } from '../core/kit'
 import { readStructure } from '../core/index'
+import { mainXvg } from '../core/cards'
 import { basename, fromFiles, fromRecord, fromVault, maxAtom, recordGroups, shortLabels, type FileRow, type LoadedFile, type RecordLike } from './parse'
 import { refKey, type SourceRef } from './state'
 import type { VaultRdfs } from './vaultTypes'
@@ -50,8 +51,10 @@ async function runStructure(rec: RecordLike): Promise<{ key: string | null; note
 }
 
 async function loadJob(job: Job): Promise<Result> {
-  const rec = await getJson<RecordLike>('/api/jobs/' + job.id + '/record'), xvg = await text('/api/jobs/' + job.id + '/output?kind=xvg')
-  const s = await runStructure(rec), stem = String(job.meta?.stem ?? job.title)
+  // Any command's result (R10a): its main file by the record's outputs; a command without atom groups has no structure.
+  const rec = await getJson<RecordLike>('/api/jobs/' + job.id + '/record'), main = mainXvg(rec.outputs ?? [], basename(String(job.meta?.record ?? '')).replace(/\.run\.json$/, ''))
+  const xvg = await text('/api/jobs/' + job.id + '/output?' + (main ? 'name=' + enc(basename(main)) : 'kind=xvg'))
+  const s = rec.groups.length ? await runStructure(rec) : { key: null, note: 'gmx ' + rec.analysis + ' has no atom groups, so no structure', structs: {} }, stem = String(job.meta?.stem ?? job.title)
   return { analysis: fromRecord({ id: 'job:' + job.id, kind: 'job', title: job.name ?? job.title, label: stem, source: 'job', record: rec, xvg, struct: s.key, structNote: s.note }), structs: s.structs }
 }
 
@@ -112,7 +115,7 @@ export function useAnalyses(refs: SourceRef[], allJobs: Job[], jobsLoaded: boole
       const key = refKey(r)
       if (started.current.has(key)) continue
       let p: Promise<Result> | null = null
-      if (r.kind === 'job') { const j = jobs.find(x => x.id === r.id); if (j && j.kind === 'rdf' && j.status === 'done') p = loadJob(j) }
+      if (r.kind === 'job') { const j = jobs.find(x => x.id === r.id); if (j && j.status === 'done') p = loadJob(j) }
       else if (r.kind === 'record') p = loadRecord(r.path)
       else if (vault) p = loadVault(r, vault)
       if (!p) continue
@@ -129,9 +132,8 @@ export function useAnalyses(refs: SourceRef[], allJobs: Job[], jobsLoaded: boole
         const j = jobs.find(x => x.id === r.id), name = j?.name ?? j?.title ?? r.id
         if (d) return 'error' in d ? { key, kind: 'job', name, status: 'error', error: d.error } : { key, kind: 'job', name, status: 'ready', analysis: d.analysis }
         if (!j) return { key, kind: 'job', name, status: jobsLoaded ? 'error' : 'loading', error: jobsLoaded ? 'not among this gmx-cypher\'s jobs' : undefined }
-        if (j.kind !== 'rdf') return { key, kind: 'job', name, status: 'error', error: 'not an RDF run' }
         if (j.status === 'running') return { key, kind: 'job', name, status: 'waiting', error: 'running · it opens here when it ends' }
-        if (j.status !== 'done') return { key, kind: 'job', name, status: 'error', error: j.status + ': no g(r) to show' }
+        if (j.status !== 'done') return { key, kind: 'job', name, status: 'error', error: j.status + ': no result to show' }
         return { key, kind: 'job', name, status: 'loading' }
       }
       if (r.kind === 'record') {
