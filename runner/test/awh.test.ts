@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { parseHelp } from '../src/lib/gmxText';
-import { awhArgv, awhFrames, awhNames, awhOptionProblems, awhTargetError, framesWritten, frameOptions, type AwhFrame } from '../src/lib/awh';
+import { awhArgv, awhConvergence, awhFrames, awhNames, awhOptionProblems, awhTargetError, framesWritten, frameOptions, type AwhFrame } from '../src/lib/awh';
 import { DEFAULT_PATTERN, detectAna, getAnalyses, parseName, parseTable } from '../../matrix/src/lib/seq';
 import { parseGmxHeader } from '../../matrix/src/lib/gmxHeader';
 
@@ -114,5 +114,49 @@ describe('the awh argument list and refusals (R5)', () => {
   it('2023.3 has the same options', () => {
     const old = parseHelp(readFileSync(new URL('gmx-2023.3/awh-h.txt', FIX), 'utf8')).map(o => o.flag);
     expect(old).toEqual(help.map(o => o.flag));
+  });
+});
+
+describe('AWH convergence (R7b): every frame against the one before and the final one, after aligning', () => {
+  const frame = (time: number, y: number[], x = y.map((_, i) => 0.3 + 0.1 * i)) => ({ time, x, y });
+
+  it('two frames, by hand: aligned by their mean, the largest |ΔPMF| and the RMS over the shared grid', () => {
+    // Means 1 and 1: aligned [-1, 0, 1] and [0, 0, 0]; differences 1, 0, 1 → largest 1, RMS √(2/3).
+    const c = awhConvergence([frame(0, [0, 1, 2]), frame(2, [1, 1, 1])]);
+    if ('error' in c) throw new Error(c.error);
+    expect(c.align).toBe('aligned by their mean over the shared grid');
+    expect(c.unit).toBe('kJ/mol');
+    expect(c.steps.map(s => s.time)).toEqual([0, 2]);
+    expect(c.steps[0].prev).toBeNull();
+    expect(c.steps[0].final!.max).toBe(1);
+    expect(c.steps[0].final!.rms).toBeCloseTo(Math.sqrt(2 / 3), 12);
+    expect(c.steps[1].prev).toEqual(c.steps[0].final);
+    // The final frame against itself says nothing: none.
+    expect(c.steps[1].final).toBeNull();
+  });
+
+  it('frames that differ only by a constant have not changed', () => {
+    const c = awhConvergence([frame(0, [5, 6.5, 9]), frame(2, [0, 1.5, 4]), frame(4, [-3, -1.5, 1])]);
+    if ('error' in c) throw new Error(c.error);
+    for (const s of c.steps) for (const d of [s.prev, s.final]) if (d) { expect(d.max).toBeCloseTo(0, 12); expect(d.rms).toBeCloseTo(0, 12); }
+  });
+
+  it('frames on another grid are refused, in words', () => {
+    expect(awhConvergence([frame(0, [0, 1, 2]), frame(2, [0, 1])])).toEqual({ error: 'the frame at t = 2 ps has 2 points from 0.3 to 0.4, the one at t = 0 ps 3 points from 0.3 to 0.5: frames on different grids can\'t be compared point by point' });
+    expect(awhConvergence([frame(0, [0, 1]), frame(2, [0, 1], [0.3, 0.45])])).toMatchObject({ error: expect.stringContaining('different grids') });
+    expect(awhConvergence([frame(0, [0, 1])])).toEqual({ error: 'one frame: nothing to compare it with' });
+  });
+
+  it('in time order, whatever order they come in; the real run: 11 frames, the changes shrink toward the end', () => {
+    const real = frames.map(f => { const t = parseTable(readFileSync(new URL('awh/out/awh' + f.suffix, FIX), 'utf8')); return { time: f.time, x: t.cols[0], y: t.cols[1] } });
+    const c = awhConvergence([...real].reverse());
+    if ('error' in c) throw new Error(c.error);
+    expect(c.steps.map(s => s.time)).toEqual([0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20]);
+    // Each against the one before, by hand for the last step.
+    const al = (y: number[]) => { const m = y.reduce((a, v) => a + v, 0) / y.length; return y.map(v => v - m) };
+    const a = al(real[10].y), b = al(real[9].y), d = a.map((v, i) => v - b[i]);
+    expect(c.steps[10].prev!.max).toBeCloseTo(Math.max(...d.map(Math.abs)), 12);
+    expect(c.steps[10].prev!.rms).toBeCloseTo(Math.sqrt(d.reduce((s, v) => s + v * v, 0) / d.length), 12);
+    expect(c.steps[0].final!.rms).toBeGreaterThan(c.steps[9].final!.rms);
   });
 });

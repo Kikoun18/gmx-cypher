@@ -4,7 +4,7 @@
 import type { RunRecord } from './record';
 
 /** Where a result came from: its command, gmx, record, source file and groups (label → gmx name and atoms). */
-export interface CsvMeta { command?: string; directory?: string; gmx?: string; record?: string; source?: { name: string; sha256: string }; groups?: { label: string; name: string; atoms: string }[] }
+export interface CsvMeta { command?: string; directory?: string; gmx?: string; record?: string; source?: { name: string; sha256: string }; groups?: { label: string; name: string; atoms: string }[]; notes?: string[] }
 
 /** A command-line word as a shell reads it back: quoted when it holds anything but plain characters. */
 const word = (a: string) => (/^[\w./:=+@%-]+$/.test(a) ? a : "'" + a.replace(/'/g, "'\\''") + "'");
@@ -56,7 +56,7 @@ function tableCsv(cols: { x: string[]; y: string[]; name: string }[], xlabel: st
   const notes = [
     ...(meta.command ? ['command: ' + meta.command] : []), ...(meta.directory ? ['directory: ' + meta.directory] : []), ...(meta.gmx ? ['gmx: ' + meta.gmx] : []),
     ...(meta.record ? ['record: ' + meta.record] : []), ...(meta.source ? ['source: ' + meta.source.name + ' sha256 ' + meta.source.sha256] : []),
-    ...(meta.groups ?? []).map(g => 'group ' + g.label + ': gmx name ' + g.name + ', atoms ' + g.atoms),
+    ...(meta.groups ?? []).map(g => 'group ' + g.label + ': gmx name ' + g.name + ', atoms ' + g.atoms), ...(meta.notes ?? []),
   ];
   return [...notes.map(l => '# ' + l.replace(/[\r\n]+/g, ' ')), head.map(field).join(','), ...body.map(r => r.map(field).join(','))].join('\n') + '\n';
 }

@@ -79,6 +79,19 @@ describe('a run of gmx awh (R5)', () => {
     await s.close();
   });
 
+  it('its convergence (R7b): every frame it wrote, each against the one before and the final one, in kJ/mol', async () => {
+    const { s, req, roots } = await setup({ options: { skip: '1' } });
+    const { job, record } = await startRun(s.ctx, req, roots);
+    await record;
+    const c = await (await fetch(s.base + '/api/jobs/' + job.id + '/awh-convergence', { headers: s.headers })).json();
+    expect(c).toMatchObject({ align: 'aligned by their mean over the shared grid', unit: 'kJ/mol', frames: 11, bias: null, biases: 1 });
+    expect(c.steps.map((x: { time: number }) => x.time)).toEqual([0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20]);
+    expect(c.steps[10]).toMatchObject({ prev: { max: expect.any(Number), rms: expect.any(Number) }, final: null });
+    const other = (await (await fetch(s.base + '/api/jobs/nope/awh-convergence', { headers: s.headers })).json());
+    expect(other.error).toBeTruthy();
+    await s.close();
+  });
+
   it('the scan the page shows: 11 frames, 0–20 ps, and the target error', async () => {
     const { s, req } = await setup();
     await s.call('/api/config', { allow: [req.inputs.edr!.replace(/\/awh\.edr$/, '')] });

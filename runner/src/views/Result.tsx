@@ -10,14 +10,14 @@ import { TOKENS_BY_THEME } from '../core/theme'
 import { Section } from '../ui/separator'
 import { getJson } from '../api'
 import { estimateOf, type Job } from '../jobs'
-import { awhTargetError } from '../lib/awh'
+import { awhTargetError, type AwhConvergence } from '../lib/awh'
 import { neighbourOverlaps, overlapNotes, parseBootstrap, parseHistograms, windowsInOrder } from '../lib/wham'
 import { COMMANDS } from '../lib/commands'
 import { driftLarger, type EnergyRow } from '../lib/energy'
 import { curveStats } from '../lib/curves'
 import { peaks, resultSeries } from '../lib/rdf'
 import { parseTable } from '../../../matrix/src/lib/seq'
-import { csvMeta, xvgCsv } from '../lib/csv'
+import { csvMeta, curvesCsv, xvgCsv } from '../lib/csv'
 import type { RunRecord } from '../lib/record'
 import { groupText, toneText, toneVar, type Tone } from '../lib/tones'
 import { cn } from '../lib/utils'
@@ -222,7 +222,45 @@ function AwhChart({ job, record }: { job: Job; record: RunRecord }) {
         <Stat label="frames written" value={String(names.length)} hint={'t = ' + time(names[0]) + (names.length > 1 ? ' … ' + time(names[names.length - 1]) : '') + ' ps · one PMF file each'} />
         {target && <Stat label="target error · last frame" value={target.kJ + ' kJ/mol'} hint={target.kT + ' kT · from the AWH metadata of ' + names[names.length - 1]} />}
       </div>
+      <AwhConvergenceChart job={job} record={record} />
     </div>
+  )
+}
+
+/**
+ * AWH convergence (R7b): how far each frame's PMF moved from the frame before and from the final one, against time,
+ * from every frame the run wrote; each frame aligned by its mean first. No threshold (question 21).
+ */
+function AwhConvergenceChart({ job, record }: { job: Job; record: RunRecord }) {
+  const [c, setC] = React.useState<{ id: string; c: (AwhConvergence & { bias: number | null; biases: number }) | { error: string } } | null>(null)
+  React.useEffect(() => {
+    let alive = true
+    getJson<(AwhConvergence & { bias: number | null; biases: number }) | { error: string }>('/api/jobs/' + job.id + '/awh-convergence').then(x => alive && setC({ id: job.id, c: x }), e => alive && setC({ id: job.id, c: { error: (e as Error).message } }))
+    return () => { alive = false }
+  }, [job.id])
+  if (!c || c.id !== job.id) return <p className="m-0 text-caption text-muted-foreground" aria-live="polite">reading every frame for the convergence…</p>
+  if ('error' in c.c) return <><Section label="Convergence" /><Status level="info" className="text-control">{c.c.error}</Status></>
+  const v = c.c, at = (k: 'prev' | 'final', m: 'max' | 'rms') => v.steps.flatMap(s => (s[k] ? [[s.time, s[k]![m]] as [number, number]] : []))
+  const series: Series[] = [
+    { label: 'largest |ΔPMF|, from the frame before', points: at('prev', 'max'), tone: 'coral' },
+    { label: 'RMS ΔPMF, from the frame before', points: at('prev', 'rms'), tone: 'coral', dash: 1 },
+    { label: 'largest |ΔPMF|, from the final frame', points: at('final', 'max'), tone: 'sky' },
+    { label: 'RMS ΔPMF, from the final frame', points: at('final', 'rms'), tone: 'sky', dash: 1 },
+  ]
+  const last = v.steps[v.steps.length - 1], before = v.steps[v.steps.length - 2]
+  const note = v.align + ' · every frame the job wrote (' + v.frames + ') · ΔPMF in kJ/mol · no threshold' + (v.biases > 1 ? ' · bias ' + v.bias + ' of ' + v.biases : '')
+  const exp: ChartExport = { file: String(job.meta?.stem ?? 'awh') + '_convergence', fields: { ...job.fields, command: job.kind }, title: (job.name ?? job.title) + ' · convergence',
+    csv: () => curvesCsv(series.map(s => ({ name: s.label, x: s.points.map(p => p[0]), y: s.points.map(p => p[1]) })), 'time (ps)', 'ΔPMF (kJ/mol)', { ...csvMeta(record, String(job.meta?.record ?? ''), '', g => g.name), notes: ['frames ' + v.align, 'every frame the job wrote: ' + v.frames] }) }
+  return (
+    <>
+      <Section label="Convergence" />
+      <SeriesChart series={series} xlabel="time (ps)" ylabel="ΔPMF (kJ/mol)" height={220} legend y="zero" rule={null} exp={exp} />
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3">
+        <Stat label={'last step · t = ' + before.time + ' → ' + last.time + ' ps'} value={last.prev!.max.toPrecision(3) + ' kJ/mol'} hint={'largest |ΔPMF| · RMS ' + last.prev!.rms.toPrecision(3) + ' kJ/mol'} />
+        <Stat label={'first frame · from the final one'} value={v.steps[0].final!.max.toPrecision(3) + ' kJ/mol'} hint={'largest |ΔPMF| · RMS ' + v.steps[0].final!.rms.toPrecision(3) + ' kJ/mol'} />
+      </div>
+      <p className="m-0 text-caption text-muted-foreground">{note}</p>
+    </>
   )
 }
 

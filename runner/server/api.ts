@@ -9,7 +9,7 @@ import { inputRole, suggestInputs } from '../src/lib/inputs';
 import { fromRanges } from '../src/core/index';
 import { nameProblem } from '../src/lib/groups';
 import { checkInputs, checkSizes } from './check';
-import { awhScan } from './awh';
+import { awhScan, runConvergence } from './awh';
 import { energyMenu } from './energy';
 import { findWindows } from './wham';
 import { inside, listFolder, namesIn, saveUpload } from './files';
@@ -247,7 +247,7 @@ export function makeApi(ctx: Ctx): Api {
       if (!role || role === 'output') throw new HttpError(400, name + ' is not a GROMACS input (.xtc .trr .tng .tpr .gro .pdb .ndx .edr); not uploaded');
       return { body: await saveUpload(req, ctx.home, name) };
     }
-    const job = /^\/api\/jobs\/([\w-]+)(\/cancel|\/record|\/output)?$/.exec(url.pathname);
+    const job = /^\/api\/jobs\/([\w-]+)(\/cancel|\/record|\/output|\/awh-convergence)?$/.exec(url.pathname);
     if (job) {
       const j = ctx.jobs.get(job[1]);
       if (!j) throw new HttpError(404, 'no job ' + job[1]);
@@ -263,6 +263,12 @@ export function makeApi(ctx: Ctx): Api {
         const text = readFileSync(path, 'utf8');
         if (!text.trim()) throw new HttpError(404, 'this job has no record: it stopped before gmx-cypher wrote it');
         return { body: JSON.parse(text) };
+      }
+      // AWH convergence (R7b): every frame the run wrote, each against the one before and the final one.
+      if (req.method === 'GET' && job[2] === '/awh-convergence') {
+        const names = j.meta?.names as OutputNames | undefined, stem = j.meta?.stem as string | undefined;
+        if (j.kind !== 'awh' || !names || !stem) throw new HttpError(404, 'not a gmx awh run');
+        return { body: runConvergence(String(j.meta!.outDir), stem, names) };
       }
       if (req.method === 'GET' && job[2] === '/output') {
         // A run's own .xvg files only, by kind, or one of gmx awh's frames by its name (R5): the chart reads them.
