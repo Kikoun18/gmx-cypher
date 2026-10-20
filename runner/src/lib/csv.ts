@@ -60,3 +60,14 @@ function tableCsv(cols: { x: string[]; y: string[]; name: string }[], xlabel: st
   ];
   return [...notes.map(l => '# ' + l.replace(/[\r\n]+/g, ' ')), head.map(field).join(','), ...body.map(r => r.map(field).join(','))].join('\n') + '\n';
 }
+
+/** A chart's marks and lines (R11c) as the CSV's comment lines: each point on its curve, each line, at full precision. */
+export function pinNotes(pins: { points: { key: string; i: number; label?: string }[]; lines: { axis: 'x' | 'y'; v: number; label?: string }[] }, curves: { key: string; name: string; source?: string; x: number[]; y: number[] }[]): string[] {
+  const named = (l?: string) => (l ? ' ' + l : '');
+  return [
+    ...pins.points.flatMap(p => { const c = curves.find(x => x.key === p.key); return c && p.i < c.x.length ? ['mark' + named(p.label) + ': ' + c.name + (c.source ? ' · ' + c.source : '') + ' at x = ' + c.x[p.i] + ', y = ' + c.y[p.i]] : []; }),
+    ...pins.lines.map(l => 'line' + named(l.label) + ': ' + l.axis + ' = ' + l.v),
+  ];
+}
+/** A CSV with comment lines above its own. */
+export const withNotes = (csv: string, notes: string[]) => notes.map(l => '# ' + l.replace(/[\r\n]+/g, ' ') + '\n').join('') + csv;

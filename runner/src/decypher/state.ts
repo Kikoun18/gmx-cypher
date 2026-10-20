@@ -2,7 +2,7 @@
 // picked, and how you last looked at them. Jobs are in the address; files from disk are read in the page, not kept.
 
 import * as React from 'react'
-import type { ColorBy, Arrange, LineStyle, Marks, Rep, Rest, Scale } from '../core/kit'
+import type { ColorBy, Arrange, LineStyle, Marks, Pins, Rep, Rest, Scale } from '../core/kit'
 import { kit } from '../core/index'
 
 export type SourceRef =
@@ -74,9 +74,11 @@ export interface View {
   ownScale: string[]
   /** Curves' styles of their own (R11b), by curve key. */
   styles: Record<string, LineStyle>
+  /** Each chart's marks and lines (R11c): by its card's lead id, `one` for the one graph. */
+  pins: Record<string, Pins>
 }
 
-export const DEFAULT_VIEW: View = { mode: 'each', colorBy: 'group', rep: 'ball & stick', rest: 'grey', arrange: 'side by side', labels: true, hydrogens: true, marks: 'both', link: false, hidden: [], selected: {}, focus: null, morphed: [], scale: 'own', ownScale: [], styles: {} }
+export const DEFAULT_VIEW: View = { mode: 'each', colorBy: 'group', rep: 'ball & stick', rest: 'grey', arrange: 'side by side', labels: true, hydrogens: true, marks: 'both', link: false, hidden: [], selected: {}, focus: null, morphed: [], scale: 'own', ownScale: [], styles: {}, pins: {} }
 
 function checkView(v: unknown): View | null {
   if (!v || typeof v !== 'object') return null
@@ -94,6 +96,7 @@ function checkView(v: unknown): View | null {
     labels: bool(o.labels, d.labels), hydrogens: bool(o.hydrogens, d.hydrogens), marks: one(o.marks, ['both', 'maximum', 'first shell', 'none'] as const, (o as { peaks?: boolean }).peaks === false ? 'none' : d.marks), link: bool(o.link, d.link),
     hidden: Array.isArray(o.hidden) ? o.hidden.filter(x => typeof x === 'string') : [], selected, focus: typeof o.focus === 'string' ? o.focus : null, morphed,
     scale: one(o.scale, ['own', 'x', 'y', 'both'] as const, d.scale), ownScale: strs(o.ownScale), styles: kit.cleanStyles(o.styles),
+    pins: Object.fromEntries(Object.entries(o.pins && typeof o.pins === 'object' ? o.pins : {}).map(([k, p]) => [k, kit.cleanPins(p)])),
   }
 }
 

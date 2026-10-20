@@ -6,6 +6,7 @@ import { graphData } from '../src/core/export'
 import { themeTokens } from '../src/core/tokens'
 import { exportData } from '../src/decypher/export'
 import { fromFiles } from '../src/decypher/parse'
+import { pinNotes, withNotes } from '../src/lib/csv'
 import { RUNNER } from './helpers'
 
 const TOKENS = themeTokens(readFileSync(RUNNER + 'src/tokens.json', 'utf8'), readFileSync(RUNNER + 'src/roles.json', 'utf8'))
@@ -92,5 +93,35 @@ describe('line styles (R11b)', () => {
     expect(JSON.stringify(path)).toContain('"strokeWidth":1.5')
     const fig = (theme: 'light' | 'print') => graphData({ title: 't', file: 'f', xlabel: 'x', ylabel: 'y', curves: [sa, b] }, theme).series.map(s => s.width)
     expect([fig('light'), fig('print')]).toEqual([[1.5, 2], [2, 2.5]])
+  })
+})
+
+describe('marks and lines (R11c)', () => {
+  const curve = { key: 'job:a|sodium|sodium', name: 'sodium', source: 'rdf_a', analysis: 'job:a', x: [0, 0.5, 1], y: [0, 2.25, 1], color: '#2471a3', dash: 'none', peak: null, atoms: 6 }
+  const pins = { points: [{ key: curve.key, i: 1, label: 'first shell' }, { key: curve.key, i: 2 }, { key: 'gone', i: 0 }], lines: [{ axis: 'x' as const, v: 0.35 }, { axis: 'y' as const, v: 1, label: 'bulk' }] }
+  it('keeps what a saved view may hold: points by curve key and index, lines on x or y, labels as text', () => {
+    expect(kit.cleanPins({ points: [{ key: 'k', i: 2, label: 'a' }, { key: 'k', i: -1 }, { i: 1 }, { key: 'k', i: 1, label: 3 }], lines: [{ axis: 'z', v: 1 }, { axis: 'y', v: NaN }, { axis: 'x', v: 0.4, label: '' }] }))
+      .toEqual({ points: [{ key: 'k', i: 2, label: 'a' }, { key: 'k', i: 1 }], lines: [{ axis: 'x', v: 0.4 }] })
+    expect(kit.cleanPins('x')).toEqual({ points: [], lines: [] })
+  })
+  it('draws each on the chart with its label, or its value when it has none; a point of a curve not drawn is left out', () => {
+    const tree = JSON.stringify(kit.chart({ W: 400, H: 300, curves: [curve], grid: curve.x, xlabel: 'r (nm)', ylabel: 'g(r)', hover: null, marks: 'none', pal, pins, xDigits: 3 }).tree)
+    expect(['first shell', '1.000, 1.00', 'x = 0.35', 'bulk'].map(t => tree.includes(t))).toEqual([true, true, true, true])
+  })
+  it('go into figures as the Matrix\'s pins: on their curve, in the legend by the curve\'s name; lines with their labels', () => {
+    const d = graphData({ title: 't', file: 'f', xlabel: 'r (nm)', ylabel: 'g(r)', curves: [curve], marks: 'none', pins }, 'light')
+    expect(d.pins!.marks).toEqual([{ x: 0.5, y: 2.25, color: '#2471a3', label: 'first shell', curve: 'sodium · rdf_a' }, { x: 1, y: 1, color: '#2471a3', label: '1.00', curve: 'sodium · rdf_a' }])
+    expect(d.pins!.lines).toEqual([{ axis: 'y', v: 1, label: 'g = 1' }, { axis: 'x', v: 0.35, label: 'x = 0.35' }, { axis: 'y', v: 1, label: 'bulk' }])
+  })
+  it('and into the CSV, as comment lines above the header, at full precision', () => {
+    expect(pinNotes(pins, [curve])).toEqual(['mark first shell: sodium · rdf_a at x = 0.5, y = 2.25', 'mark: sodium · rdf_a at x = 1, y = 1', 'line: x = 0.35', 'line bulk: y = 1'])
+    expect(withNotes('# command: gmx rdf\nr,g\n0,0\n', ['line: x = 0.35'])).toBe('# line: x = 0.35\n# command: gmx rdf\nr,g\n0,0\n')
+  })
+  it('and into the HTML export, keyed as the export keys its curves', () => {
+    const NAMES = ['9.multiwalker.gro', 'rdf_o111_Methionine_H.ndx', 'rdf_o111_Methionine_H.run.json', 'rdf_o111_Methionine_H.xvg']
+    const { analyses, structs } = fromFiles(NAMES.map(n => ({ path: '/sims/' + n, text: readFileSync(RUNNER + 'test/fixtures/decypher/' + n, 'utf8') })))
+    const id = analyses[0].id, view = { rep: 'ball & stick' as const, rest: 'grey' as const, labels: true, hydrogens: true, arrange: 'side by side' as const, pins: { [id]: { points: [{ key: id + '|O5...S|O5...S', i: 3, label: 'here' }], lines: [{ axis: 'x' as const, v: 0.3 }] }, gone: { points: [], lines: [] } } }
+    const d = exportData({ analyses, structs, selected: () => [], tones: {}, compare: null, view, theme: 'light', tokens: TOKENS, structures: false, by: 'x' })
+    expect(d.view.pins).toEqual({ a1: { points: [{ key: 'a1|O5...S|O5...S', i: 3, label: 'here' }], lines: [{ axis: 'x', v: 0.3 }] } })
   })
 })

@@ -4,7 +4,7 @@
 // machine stay out: structures and jobs are named s1, a1….
 
 import { KIT_DATA, kit, toRanges } from '../core/index'
-import { decypherKit, type Analysis, type ColorBy, type ExportAnalysis, type ExportData, type Struct, type Tone } from '../core/kit'
+import { decypherKit, type Analysis, type ColorBy, type ExportAnalysis, type ExportData, type Pins, type Struct, type Tone } from '../core/kit'
 import type { ThemeTokens } from '../core/tokens'
 
 
@@ -84,6 +84,16 @@ function renameKeys<T>(styles: Record<string, T>, id: Map<string, string>): Reco
   return out
 }
 
+/** Marks and lines (R11c) by the export's ids: each chart's (a card's lead, or `one`), its points by their curves' keys. */
+function renamePins(pins: Record<string, Pins>, id: Map<string, string>): Record<string, Pins> {
+  const out: Record<string, Pins> = {}, key = (k: string) => Object.keys(renameKeys({ [k]: 0 }, id))[0]
+  for (const [chart, p] of Object.entries(pins)) {
+    const to = chart === 'one' ? 'one' : id.get(chart)
+    if (to) out[to] = { points: p.points.flatMap(x => { const k = key(x.key); return k ? [{ ...x, key: k }] : [] }), lines: p.lines }
+  }
+  return out
+}
+
 export function exportData(o: ExportInput): ExportData {
   const id = new Map(o.analyses.map((a, i) => [a.id, 'a' + (i + 1)])), sid = new Map<string, string>(), structs: Record<string, Struct> = {}
   if (o.structures) for (const a of o.analyses) {
@@ -109,7 +119,7 @@ export function exportData(o: ExportInput): ExportData {
   // A morph keeps the RDFs that are in the export, the first of them leading; fewer than two is no morph.
   const morphs = cardsOf(o.analyses, o.morphs ?? []).filter(c => c.members.length > 1)
     .map(c => ({ ids: c.members.map(a => id.get(a.id)!), on: c.on.map(x => id.get(x)!), title: chosen(c.lead) || cardTitle(c.members) }))
-  return { header: (o.header ?? '').trim() || DEFAULT_HEADER, made: o.made ?? new Date().toISOString(), by: o.by, theme: o.theme, tokens: o.tokens, structs, analyses, compare, ...(morphs.length ? { morphs } : {}), view: { ...o.view, ...(o.view.ownScale ? { ownScale: o.view.ownScale.filter(x => id.has(x)).map(x => id.get(x)!) } : {}), ...(o.view.styles ? { styles: renameKeys(o.view.styles, id) } : {}) } }
+  return { header: (o.header ?? '').trim() || DEFAULT_HEADER, made: o.made ?? new Date().toISOString(), by: o.by, theme: o.theme, tokens: o.tokens, structs, analyses, compare, ...(morphs.length ? { morphs } : {}), view: { ...o.view, ...(o.view.ownScale ? { ownScale: o.view.ownScale.filter(x => id.has(x)).map(x => id.get(x)!) } : {}), ...(o.view.styles ? { styles: renameKeys(o.view.styles, id) } : {}), ...(o.view.pins ? { pins: renamePins(o.view.pins, id) } : {}) } }
 }
 
 const CSS = `*{box-sizing:border-box}

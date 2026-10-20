@@ -9,6 +9,8 @@ export type Tone = 'coral' | 'sky' | 'mint' | 'butter' | 'lilac' | 'aqua' | 'ros
 export type Rep = 'ball & stick' | 'sticks' | 'spheres'
 export type Rest = 'tinted' | 'grey' | 'ghost'
 export type Arrange = 'side by side' | 'frame positions'
+/** Marks and lines put on a chart (R8a, R11c): a point by its curve's key and index, a line on x or y; each may have a label of its own. */
+export interface Pins { points: { key: string; i: number; label?: string }[]; lines: { axis: 'x' | 'y'; v: number; label?: string }[] }
 /** A curve's style of its own (R11b): a dash by the Matrix's name, a width within Morpheus's 1.5–2 px, a shade in steps (−3…3). */
 export interface LineStyle { dash?: string; width?: number; shade?: number }
 /** Same scale (R11a): the axes compare's charts share, among charts of like quantities. */
@@ -151,7 +153,9 @@ export interface ExportData {
   compare: { ids: string[]; focus: string; selected: string[]; colorBy: ColorBy } | null
   /** RDFs shown as one card (they differ only in their reference): the first leads; `on` are those whose reference is plotted. */
   morphs?: { ids: string[]; on: string[]; title: string }[]
-  view: { rep: Rep; rest: Rest; labels: boolean; hydrogens: boolean; arrange: Arrange; scale?: Scale; ownScale?: string[]; styles?: Record<string, LineStyle> }
+  view: { rep: Rep; rest: Rest; labels: boolean; hydrogens: boolean; arrange: Arrange; scale?: Scale; ownScale?: string[]; styles?: Record<string, LineStyle>
+    /** Each chart's marks and lines (R11c), by its card's lead id, or `one` for the one graph. */
+    pins?: Record<string, Pins> }
 }
 
 /** What the kit is made from (src/core/index.ts): the tones in palette order, and the Matrix's dashes with their names. */
@@ -1040,6 +1044,15 @@ export function decypherKit(data: KitData) {
    * hollow, and at `hover` a rule with a dot on each curve. The y range starts at 0 (`zero`: g(r), counts) or is the
    * data's own (`data`). Axis labels keep their case: data names and units are not shouted.
    */
+  /** Marks and lines kept as they may be (R11c): a point needs its curve's key and a whole index, a line its axis and a value; a label is text. */
+  function cleanPins(v: unknown): Pins {
+    const o = (v && typeof v === 'object' ? v : {}) as Record<string, unknown>, list = (x: unknown) => (Array.isArray(x) ? x.filter(e => e && typeof e === 'object') as Record<string, unknown>[] : [])
+    const label = (e: Record<string, unknown>) => (typeof e.label === 'string' && e.label.trim() ? { label: e.label } : {})
+    return {
+      points: list(o.points).flatMap(e => { const { key: k, i } = e; return typeof k === 'string' && Number.isInteger(i) && (i as number) >= 0 ? [{ key: k, i: i as number, ...label(e) }] : [] }),
+      lines: list(o.lines).filter(e => (e.axis === 'x' || e.axis === 'y') && typeof e.v === 'number' && Number.isFinite(e.v)).map(e => ({ axis: e.axis as 'x' | 'y', v: e.v as number, ...label(e) })),
+    }
+  }
   /** Line styles kept as they may be (R11b): a known dash name, a width clamped to 1.5–2 px, a shade to three steps either way. */
   function cleanStyles(v: unknown): Record<string, LineStyle> {
     const out: Record<string, LineStyle> = {}
@@ -1107,6 +1120,8 @@ export function decypherKit(data: KitData) {
   }
 
   function chart(o: { W: number; H: number; curves: Curve[]; grid: number[]; xlabel: string; ylabel: string; hover: number | null; marks: Marks; pal: Palette; animate?: boolean; y?: 'zero' | 'data'; rule?: number | null; id?: string; xDigits?: number
+    /** Marks and lines put on it (R8a, R11c): a point of a curve not drawn is left out, a line off the axes too. */
+    pins?: Pins
     /** Ranges shared with other charts (R11a), in place of this chart's own data's. */
     share?: { x?: [number, number]; y?: [number, number] } }): { tree: VNode; geom: ChartGeom } {
     const th = o.pal, W = o.W, H = o.H, m = { l: 48, r: 20, t: 24, b: 40 }, rule = o.rule === undefined ? 1 : o.rule, clip = o.id || 'dc-plot'
@@ -1174,6 +1189,21 @@ export function decypherKit(data: KitData) {
       }
       k.push(['g', { key: 'c' + c.key, opacity: c.dim ? 0.4 : 1, style: { transition: 'opacity 140ms ease' } }, ...g])
     })
+    // Marks and lines (R11c): a line dashed in the muted ink with its label, a point a dot in its curve's colour with its label, or its value.
+    const pinText = { fontFamily: F, fontSize: '10px', fill: th.muted }
+    for (const l of o.pins?.lines ?? []) {
+      const v = l.axis === 'x' ? sx(l.v) : sy(l.v), text = l.label ?? (l.axis === 'x' ? 'x = ' : 'y = ') + l.v
+      if (l.axis === 'x' ? v < m.l || v > m.l + iw : v < m.t || v > m.t + ih) continue
+      k.push(['g', { key: 'pl' + l.axis + l.v }, l.axis === 'x' ? ['line', { x1: v, x2: v, y1: m.t, y2: m.t + ih, stroke: th.muted, strokeDasharray: '2 3' }] : ['line', { x1: m.l, x2: m.l + iw, y1: v, y2: v, stroke: th.muted, strokeDasharray: '2 3' }],
+        ['text', { x: l.axis === 'x' ? v + 5 : m.l + iw - 4, y: l.axis === 'x' ? m.t + ih - 6 : v - 4, textAnchor: l.axis === 'x' ? 'start' : 'end', style: pinText }, text]])
+    }
+    for (const p of o.pins?.points ?? []) {
+      const c = o.curves.find(x => x.key === p.key)
+      if (!c || p.i >= c.x.length) continue
+      const px = sx(c.x[p.i]), py = sy(c.y[p.i])
+      k.push(['g', { key: 'pp' + p.key + p.i }, ['circle', { cx: px, cy: py, r: 6, fill: BG }], ['circle', { cx: px, cy: py, r: 4, fill: c.color }],
+        ['text', { x: px + 8, y: py - 8, style: { ...pinText, fontSize: '11px', fill: th.fg, stroke: BG, strokeWidth: '3px', paintOrder: 'stroke', strokeLinejoin: 'round' } }, p.label ?? c.x[p.i].toFixed(xDigits) + ', ' + c.y[p.i].toFixed(yDigits)]])
+    }
     if (o.hover != null && o.curves.length) {
       const xv = sx(o.hover)
       k.push(['line', { key: 'hl', x1: xv, x2: xv, y1: m.t, y2: m.t + ih, stroke: th.input, strokeWidth: 1 }])
@@ -1239,14 +1269,14 @@ export function decypherKit(data: KitData) {
 
     /** A chart that fills its box, redrawn on resize, with a rule and a card of values under the pointer. */
     let charts = 0
-    function chartBox(get: () => { curves: Curve[]; grid: number[]; xlabel: string; ylabel: string; plot?: Plot; share?: { x?: [number, number]; y?: [number, number] } }) {
+    function chartBox(get: () => { curves: Curve[]; grid: number[]; xlabel: string; ylabel: string; plot?: Plot; share?: { x?: [number, number]; y?: [number, number] }; pins?: Pins }) {
       const box = h('div', { class: 'dc-chart' }), card = h('div', { class: 'dc-hover', hidden: true }), id = 'dc-plot-' + ++charts
       const wrap = h('div', { class: 'dc-chart-wrap' }, box, card)
       let hover: number | null = null, geom: ChartGeom | null = null
       const render = () => {
         const W = box.clientWidth, H = box.clientHeight
         if (!W || !H) return
-        const g = get(), out = chart({ W, H, curves: g.curves, grid: g.grid, xlabel: g.xlabel, ylabel: g.ylabel, hover, marks: 'both', pal: pal(), id, share: g.share, ...(g.plot ? { y: g.plot.y, rule: g.plot.rule, xDigits: g.plot.xDigits } : { xDigits: 3 }) })
+        const g = get(), out = chart({ W, H, curves: g.curves, grid: g.grid, xlabel: g.xlabel, ylabel: g.ylabel, hover, marks: 'both', pal: pal(), id, share: g.share, pins: g.pins, ...(g.plot ? { y: g.plot.y, rule: g.plot.rule, xDigits: g.plot.xDigits } : { xDigits: 3 }) })
         geom = out.geom
         box.replaceChildren(svg(out.tree))
         if (hover == null || !g.curves.length) { card.hidden = true; return }
@@ -1356,7 +1386,7 @@ export function decypherKit(data: KitData) {
       const shown: Record<string, 'on' | 'dim' | 'off'> = {}
       const curves = () => styleCurves(buildCurves({ focus, plotted, selected, colorBy, pal: pal(), tones }), styles, pal())
       const drawn = () => curves().filter(x => shown[x.key] !== 'off').map(x => ({ ...x, dim: shown[x.key] === 'dim' }))
-      const ch = chartBox(() => ({ curves: drawn(), grid: focus.x, xlabel: focus.xlabel, ylabel: focus.ylabel, plot: focus.plot }))
+      const ch = chartBox(() => ({ curves: drawn(), grid: focus.x, xlabel: focus.xlabel, ylabel: focus.ylabel, plot: focus.plot, pins: pinsOf('one') }))
       const legend = h('div', { class: 'dc-chips' })
       const seg = h('div', { class: 'dc-seg', role: 'group', 'aria-label': 'colour by' })
       const NEXT = { on: 'dim', dim: 'off', off: 'on' } as const, WORD = { on: '', dim: ' · dimmed', off: ' · hidden' }
@@ -1379,6 +1409,7 @@ export function decypherKit(data: KitData) {
 
     // The same scale (R11a), as exported: the cards' charts, each drawn on the ranges it shares; all drawn again when one changes.
     const scaled: { id: string; xlabel: string; ylabel: string; curves: () => Curve[]; render: () => void }[] = []
+    const pinsOf = (id: string) => (data.view.pins?.[id] ? cleanPins(data.view.pins[id]) : undefined)
     const styles = cleanStyles(data.view.styles), scale = data.view.scale ?? 'own', shareOf = (id: string) => (scale === 'own' ? undefined : sharedScales(scaled.map(c => ({ ...c, curves: c.curves() })), scale, data.view.ownScale ?? [])[id])
 
     /** One RDF's card; or, for RDFs that differ only in their reference, one card for them all (`morph`), led by the first. */
@@ -1392,7 +1423,7 @@ export function decypherKit(data: KitData) {
         const m = members.find(x => x.id === c.analysis)!
         return { ...c, source: m.ref ? 'ref ' + names[m.id] : names[m.id], dim: hoverSel >= 0 && c.name !== a.sels[hoverSel]?.name }
       }), styles, pal())
-      const ch = chartBox(() => ({ curves: curves(), grid: a.x, xlabel: a.xlabel, ylabel: a.ylabel, plot: a.plot, share: shareOf(a.id) }))
+      const ch = chartBox(() => ({ curves: curves(), grid: a.x, xlabel: a.xlabel, ylabel: a.ylabel, plot: a.plot, share: shareOf(a.id), pins: pinsOf(a.id) }))
       scaled.push({ id: a.id, xlabel: a.xlabel, ylabel: a.ylabel, curves, render: ch.render })
       const tb = table(curves, !!a.plot)
       // Only references on this card's structure can be drawn on it; every RDF of a morph has its chip.
@@ -1427,7 +1458,7 @@ export function decypherKit(data: KitData) {
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => redraws.forEach(f => f()))
   }
 
-  return { contrast, cleanStyles, styleCurves, sameLooks, sharedDomain, sharedScales, rampAt, paintOf, structureNote, legendPick, pickGroups, clickScope, pans, scopeAtoms, TONES, DASH, DASH_NAMES, REPS, RESTS, SOLV, palette, toRanges, fromRanges, parseStructure, mix, buildMol, structureView, matchGroup, rdfLooks, buildCurves, looseName, sameButReference, morphWhy, pickRefs, refLabels, niceTicks, xDigitsOf, valAt, hoverRows, hoverX, readoutTitle, chart, mount }
+  return { cleanPins, contrast, cleanStyles, styleCurves, sameLooks, sharedDomain, sharedScales, rampAt, paintOf, structureNote, legendPick, pickGroups, clickScope, pans, scopeAtoms, TONES, DASH, DASH_NAMES, REPS, RESTS, SOLV, palette, toRanges, fromRanges, parseStructure, mix, buildMol, structureView, matchGroup, rdfLooks, buildCurves, looseName, sameButReference, morphWhy, pickRefs, refLabels, niceTicks, xDigitsOf, valAt, hoverRows, hoverX, readoutTitle, chart, mount }
 }
 
 export type Kit = ReturnType<typeof decypherKit>

@@ -5,12 +5,14 @@ import { grey, renderExport, type GraphData } from '../../../matrix/src/lib/expo
 import type { ExportPrefs } from '../../../matrix/src/lib/exportPrefs'
 import { fmtValue } from '../../../matrix/src/lib/seq'
 import { kit, type Series } from './index'
-import type { Analysis, Curve, Marks, Plot } from './kit'
+import type { Analysis, Curve, Marks, Pins, Plot } from './kit'
 
 /** A chart as a figure: its title and file name, axes, curves (in the export theme's palette) and how it is drawn. */
 export interface Figure { title: string; sub?: string; file: string; xlabel: string; ylabel: string; curves: Curve[]; y?: 'zero' | 'data'; rule?: number | null; marks?: Marks; xDigits?: number
   /** The y range shared with other charts (R11a); the Matrix's figures take no x range, so a shared x stays on the page. */
-  share?: { x?: [number, number]; y?: [number, number] } }
+  share?: { x?: [number, number]; y?: [number, number] }
+  /** Marks and lines put on the chart (R11c), as the Matrix's pins: on their curve, named in the legend. */
+  pins?: Pins }
 
 /**
  * A figure as the Matrix's graph: each curve a series in its colour (grey for print) and dash, an error band as
@@ -42,7 +44,10 @@ export function graphData(f: Figure, theme: ExportPrefs['theme']): GraphData {
   return {
     file: f.file, title: f.title, ...(f.sub ? { sub: f.sub } : {}), xLabel: f.xlabel, yLabel: f.ylabel, series,
     ...(zero ? { domain: { lo: 0, hi: Math.max(Number.isFinite(hi) ? hi : 0, rule != null && rule > 0 ? rule : 0) * 1.12 || 1 } } : sy ? { domain: { lo: sy[0] - pad, hi: sy[1] + pad } } : {}),
-    pins: { marks: pins, lines: rule != null && rule !== 0 ? [{ axis: 'y' as const, v: rule, label: rule === 1 ? 'g = 1' : 'y = ' + rule }] : [] },
+    pins: {
+      marks: [...pins, ...(f.pins?.points ?? []).flatMap(p => { const c = f.curves.find(x => x.key === p.key); return c && p.i < c.x.length ? [{ x: c.x[p.i], y: c.y[p.i], color: ink(c), label: p.label ?? fmtValue(c.y[p.i]), curve: name(c) }] : [] })],
+      lines: [...(rule != null && rule !== 0 ? [{ axis: 'y' as const, v: rule, label: rule === 1 ? 'g = 1' : 'y = ' + rule }] : []), ...(f.pins?.lines ?? []).map(l => ({ axis: l.axis, v: l.v, label: l.label ?? (l.axis === 'x' ? 'x = ' : 'y = ') + l.v }))],
+    },
   }
 }
 

@@ -14,7 +14,9 @@ import { cn } from '../lib/utils'
 import { figureFile, graphData, resultAnalysis, type Figure } from './export'
 import { fileName, useExportPrefs, type NameFields } from './exportPrefs'
 import { curvesOf, kit, type Series } from './index'
-import type { ChartGeom, Curve, Marks, Palette, VNode } from './kit'
+import type { ChartGeom, Curve, Marks, Palette, Pins, VNode } from './kit'
+import { pinNotes, withNotes } from '../lib/csv'
+import { Input } from '../ui/input'
 import { PALETTES, TOKENS_BY_THEME, usePageTheme } from './theme'
 
 /** A line of a curve in its colour and dash, for legends, tables and readouts. */
@@ -38,6 +40,41 @@ export interface ChartOptions {
   xDigits?: number
   /** Ranges shared with other charts (R11a), in place of this chart's own. */
   share?: { x?: [number, number]; y?: [number, number] }
+  /** Marks and lines put on the chart (R11c), drawn, listed under it, and carried into its exports. */
+  pins?: Pins
+}
+export const NO_PINS: Pins = { points: [], lines: [] }
+
+/**
+ * A chart's marks and lines under it (R11c): each with what it marks, a label of its own (empty: its value), and ×;
+ * all cleared at once.
+ */
+function PinList({ pins, curves, geom, onPins }: { pins: Pins; curves: Curve[]; geom: ChartGeom; onPins: (p: Pins) => void }) {
+  const points = pins.points.flatMap((p, n) => { const c = curves.find(x => x.key === p.key); return c && p.i < c.x.length ? [{ p, n, c }] : [] })
+  if (!points.length && !pins.lines.length) return null
+  const relabel = <T extends { label?: string }>(list: T[], n: number, label: string) => list.map((e, j) => (j === n ? { ...e, label: label || undefined } : e))
+  const row = 'grid grid-cols-[14px_minmax(0,1fr)_minmax(0,160px)_22px] items-center gap-2 text-caption'
+  return (
+    <div className="flex flex-col gap-1" aria-label="marks and lines">
+      {points.map(({ p, n, c }) => (
+        <div key={'p' + n} className={row}>
+          <span className="size-2.5 justify-self-center rounded-full" style={{ background: c.color }} aria-hidden />
+          <span className="truncate" title={c.name + (c.source ? ' · ' + c.source : '')}>{c.x[p.i].toFixed(geom.xDigits)}, {c.y[p.i].toFixed(geom.yDigits)} · {c.name + (c.source ? ' · ' + c.source : '')}</span>
+          <Input className="h-6 text-caption" value={p.label ?? ''} placeholder="label" aria-label={'label of the mark on ' + c.name} onChange={e => onPins({ ...pins, points: relabel(pins.points, n, e.target.value) })} />
+          <button type="button" aria-label={'remove the mark on ' + c.name} className="grid size-[22px] place-items-center rounded-full text-muted-foreground hover:bg-accent hover:text-foreground" onClick={() => onPins({ ...pins, points: pins.points.filter((_, j) => j !== n) })}>×</button>
+        </div>
+      ))}
+      {pins.lines.map((l, n) => (
+        <div key={'l' + n} className={row}>
+          <svg width={14} height={10} aria-hidden className="justify-self-center">{l.axis === 'x' ? <line x1={7} x2={7} y1={0} y2={10} stroke="currentColor" strokeDasharray="2 2" /> : <line x1={0} x2={14} y1={5} y2={5} stroke="currentColor" strokeDasharray="2 2" />}</svg>
+          <span className="truncate">{(l.axis === 'x' ? 'vertical line at x = ' : 'horizontal line at y = ') + l.v}</span>
+          <Input className="h-6 text-caption" value={l.label ?? ''} placeholder="label" aria-label={'label of the line at ' + l.axis + ' = ' + l.v} onChange={e => onPins({ ...pins, lines: relabel(pins.lines, n, e.target.value) })} />
+          <button type="button" aria-label={'remove the line at ' + l.axis + ' = ' + l.v} className="grid size-[22px] place-items-center rounded-full text-muted-foreground hover:bg-accent hover:text-foreground" onClick={() => onPins({ ...pins, lines: pins.lines.filter((_, j) => j !== n) })}>×</button>
+        </div>
+      ))}
+      <button type="button" className="self-start text-caption text-muted-foreground underline underline-offset-2 hover:text-foreground" onClick={() => onPins(NO_PINS)}>clear all</button>
+    </div>
+  )
 }
 
 /** The export key's charts (R8b): each export menu by its trigger, and the chart under the pointer. */
@@ -56,10 +93,12 @@ export function exportFocused(): boolean {
  * line, with Shift a horizontal one; focused, ← → step along a curve (Shift: ten), ↑ ↓ change curve, Enter marks,
  * Esc hides the cursor.
  */
-export function ChartPanel({ curves, grid, xlabel, ylabel, pal, marks, y, rule, xDigits, share, height, className, empty, at = null, onAt }: ChartOptions & {
+export function ChartPanel({ curves, grid, xlabel, ylabel, pal, marks, y, rule, xDigits, share, pins: held, onPins, height, className, empty, at = null, onAt }: ChartOptions & {
   curves: Curve[]; grid: number[]; xlabel: string; ylabel: string; pal: Palette; marks: Marks; height?: number; className?: string; empty?: { title: string; hint: string } | null
   /** An x pointed at elsewhere (a structure's atom, R10b), read out while the pointer is not on the chart; and the x under the pointer, told back. */
   at?: number | null; onAt?: (x: number | null) => void
+  /** Keeping the marks and lines (R11c) where the chart's exports read them; without it the chart keeps its own. */
+  onPins?: (p: Pins) => void
 }) {
   const box = React.useRef<HTMLDivElement>(null)
   const id = 'plot-' + React.useId().replace(/[^\w-]/g, '')
@@ -68,7 +107,8 @@ export function ChartPanel({ curves, grid, xlabel, ylabel, pal, marks, y, rule, 
   const told = React.useRef(onAt)
   React.useLayoutEffect(() => { told.current = onAt })
   React.useEffect(() => { told.current?.(over) }, [over])
-  const [pins, setPins] = React.useState<{ key: string; i: number }[]>([]), [lines, setLines] = React.useState<{ axis: 'x' | 'y'; v: number }[]>([]), [said, setSaid] = React.useState('')
+  const [own, setOwn] = React.useState<Pins>(NO_PINS), [said, setSaid] = React.useState('')
+  const pins = held ?? own, setPins = onPins ?? setOwn
   React.useLayoutEffect(() => {
     const el = box.current
     if (!el) return
@@ -78,20 +118,20 @@ export function ChartPanel({ curves, grid, xlabel, ylabel, pal, marks, y, rule, 
   }, [])
   // The curve nearest the pointer is drawn over the others, which dim (Morpheus's 40 %, R7a).
   const drawn = React.useMemo(() => (near && curves.length > 1 ? curves.map(c => (c.key === near ? { ...c, hot: true, dim: false } : { ...c, dim: true })) : curves), [curves, near])
-  const out = React.useMemo(() => (size.w && size.h ? kit.chart({ W: size.w, H: size.h, curves: drawn, grid, xlabel, ylabel, hover, marks, pal, animate: true, y, rule, id, xDigits, share }) : null), [size, drawn, grid, xlabel, ylabel, hover, marks, pal, y, rule, id, xDigits, share])
+  const out = React.useMemo(() => (size.w && size.h ? kit.chart({ W: size.w, H: size.h, curves: drawn, grid, xlabel, ylabel, hover, marks, pal, animate: true, y, rule, id, xDigits, share, pins }) : null), [size, drawn, grid, xlabel, ylabel, hover, marks, pal, y, rule, id, xDigits, share, pins])
   const geom: ChartGeom | null = out?.geom ?? null
   const xv = geom && hover != null ? geom.m.l + ((hover - geom.x0) / (geom.x1 - geom.x0 || 1)) * geom.iw : 0
   // Data ↔ pixels on this chart's axes.
   const px = (x: number) => geom!.m.l + ((x - geom!.x0) / (geom!.x1 - geom!.x0 || 1)) * geom!.iw, py = (y: number) => geom!.m.t + geom!.ih - ((y - geom!.y0) / (geom!.y1 - geom!.y0 || 1)) * geom!.ih
   const fmt = (v: number, d: number) => v.toFixed(d)
   const pin = (c: Curve, i: number) => {
-    const had = pins.some(p => p.key === c.key && p.i === i)
-    setPins(had ? pins.filter(p => !(p.key === c.key && p.i === i)) : [...pins, { key: c.key, i }])
+    const had = pins.points.some(p => p.key === c.key && p.i === i)
+    setPins({ ...pins, points: had ? pins.points.filter(p => !(p.key === c.key && p.i === i)) : [...pins.points, { key: c.key, i }] })
     setSaid((had ? 'unmarked ' : 'marked ') + c.name + ' at ' + fmt(c.x[i], geom!.xDigits) + ', ' + fmt(c.y[i], geom!.yDigits))
   }
   const line = (axis: 'x' | 'y', v: number) => {
-    const had = lines.some(l => l.axis === axis && l.v === v)
-    setLines(had ? lines.filter(l => !(l.axis === axis && l.v === v)) : [...lines, { axis, v }])
+    const had = pins.lines.some(l => l.axis === axis && l.v === v)
+    setPins({ ...pins, lines: had ? pins.lines.filter(l => !(l.axis === axis && l.v === v)) : [...pins.lines, { axis, v }] })
     setSaid((had ? 'removed the ' : '') + (axis === 'x' ? 'vertical line at ' : 'horizontal line at ') + v)
   }
   const onClick = (e: React.MouseEvent) => {
@@ -120,8 +160,7 @@ export function ChartPanel({ curves, grid, xlabel, ylabel, pal, marks, y, rule, 
     else if (hover != null) line(a.line, a.line === 'x' ? c.x[i] : c.y[i])
     e.preventDefault(); e.stopPropagation()
   }
-  const shownPins = pins.flatMap(p => { const c = curves.find(x => x.key === p.key); return c && p.i < c.x.length ? [{ c, i: p.i }] : [] })
-  return (
+  return (<>
     <div ref={box} data-slot="chart" className={cn('relative outline-offset-2', height ? null : 'min-h-[260px]', className)} style={height ? { height } : undefined}
       tabIndex={curves.length ? 0 : undefined} role={curves.length ? 'group' : undefined} aria-label={curves.length ? ylabel + ' against ' + xlabel + ': hover or use the arrow keys to read values; click marks a point' : undefined}
       onClick={onClick} onKeyDown={onKey} onBlur={() => { setHover(null); setNear(null) }} onMouseEnter={e => { pointed = e.currentTarget }}
@@ -136,26 +175,6 @@ export function ChartPanel({ curves, grid, xlabel, ylabel, pal, marks, y, rule, 
       }}
       onMouseLeave={e => { setHover(null); setNear(null); if (pointed === e.currentTarget) pointed = null }}>
       <div className="absolute inset-0">{out && toReact(out.tree, 0)}</div>
-      {geom && (shownPins.length > 0 || lines.length > 0) && (
-        <svg className="pointer-events-none absolute inset-0 size-full overflow-visible" aria-hidden>
-          {lines.map(l => { const v = l.axis === 'x' ? px(l.v) : py(l.v); if (l.axis === 'x' ? v < geom.m.l || v > geom.m.l + geom.iw : v < geom.m.t || v > geom.m.t + geom.ih) return null; return (
-            <g key={l.axis + l.v} className="fill-muted-foreground stroke-muted-foreground text-[10px]">
-              {l.axis === 'x' ? <line x1={v} x2={v} y1={geom.m.t} y2={geom.m.t + geom.ih} strokeDasharray="2 3" /> : <line x1={geom.m.l} x2={geom.m.l + geom.iw} y1={v} y2={v} strokeDasharray="2 3" />}
-              <text x={l.axis === 'x' ? v + 5 : geom.m.l + geom.iw - 4} y={l.axis === 'x' ? geom.m.t + geom.ih - 6 : v - 4} textAnchor={l.axis === 'x' ? 'start' : 'end'} stroke="none">{(l.axis === 'x' ? 'x = ' : 'y = ') + l.v}</text>
-            </g>
-          ) })}
-          {shownPins.map(({ c, i }) => (
-            <g key={c.key + ':' + i}>
-              <circle cx={px(c.x[i])} cy={py(c.y[i])} r={6} fill="var(--card)" /><circle cx={px(c.x[i])} cy={py(c.y[i])} r={4} fill={c.color} />
-              <text x={px(c.x[i]) + 8} y={py(c.y[i]) - 8} className="fill-foreground text-[11px]">{fmt(c.x[i], geom.xDigits) + ', ' + fmt(c.y[i], geom.yDigits)}</text>
-            </g>
-          ))}
-        </svg>
-      )}
-      {geom && (shownPins.length > 0 || lines.length > 0) && (
-        <button type="button" className="absolute text-caption text-muted-foreground underline underline-offset-2 hover:text-foreground" style={{ left: 0, top: geom.m.t + geom.ih + 22 }}
-          onClick={e => { e.stopPropagation(); setPins([]); setLines([]); setSaid('marks cleared') }}>clear marks</button>
-      )}
       <span className="sr-only" aria-live="polite">{said}</span>
       {empty && (
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-1.5 px-6 text-center">
@@ -178,7 +197,8 @@ export function ChartPanel({ curves, grid, xlabel, ylabel, pal, marks, y, rule, 
         </div>
       )}
     </div>
-  )
+    {geom && <PinList pins={pins} curves={curves} geom={geom} onPins={p => { setPins(p); setSaid(p === NO_PINS ? 'marks cleared' : '') }} />}
+  </>)
 }
 
 /** What a chart exports under (R6a): its file's own name and the fields of the name template (R6b), its title, its data as CSV, and (when it can be one) an HTML page. */
@@ -199,7 +219,8 @@ export function ExportMenu({ exp, curves, xlabel, ylabel, marks, className, ...o
     setBusy(true)
     try {
       const name = (ext: string) => fileName(prefs.name, { ...exp.fields, file: exp.file }, ext)
-      if (f === 'csv') download(new Blob([exp.csv()], { type: 'text/csv;charset=utf-8' }), name('csv'))
+      // The marks and lines (R11c) as comment lines above the CSV's own.
+      if (f === 'csv') download(new Blob([withNotes(exp.csv(), o.pins ? pinNotes(o.pins, curves(PALETTES.light)) : [])], { type: 'text/csv;charset=utf-8' }), name('csv'))
       else if (f === 'html') { if (exp.html) download(new Blob([await exp.html()], { type: 'text/html;charset=utf-8' }), name('html')) }
       else if (f === 'svg' || f === 'pdf' || f === 'png') {
         const pal = PALETTES[prefs.theme === 'dark' ? 'dark' : 'light']
@@ -237,7 +258,7 @@ export function ExportAll({ figures, file, fields }: { figures: Map<string, Page
     setBusy(true)
     try {
       const taken = new Set<string>(), name = (f: PageFigure, ext: string) => fileName(prefs.name, { ...f.exp.fields, file: f.exp.file }, ext, taken)
-      if (what === 'csv') { list.forEach(f => download(new Blob([f.exp.csv()], { type: 'text/csv;charset=utf-8' }), name(f, 'csv'))); return }
+      if (what === 'csv') { list.forEach(f => { const g = f.figure(PALETTES.light); download(new Blob([withNotes(f.exp.csv(), g.pins ? pinNotes(g.pins, g.curves) : [])], { type: 'text/csv;charset=utf-8' }), name(f, 'csv')) }); return }
       const pal = PALETTES[prefs.theme === 'dark' ? 'dark' : 'light'], ext = prefs.layout === 'pdf' ? 'pdf' : prefs.format
       const out = await renderBatch(list.map(f => ({ data: graphData(f.figure(pal), prefs.theme), name: name(f, ext) })), prefs, fileName(prefs.name, { ...fields, file }, 'x').replace(/\.x$/, ''))
       out.forEach(f => download(f.blob, f.name))
@@ -276,21 +297,21 @@ export function SeriesChart({ series, xlabel, ylabel, marks = 'none', height = 2
 }) {
   const pal = PALETTES[usePageTheme()]
   const all = React.useMemo(() => curvesOf(series, pal), [series, pal])
-  const [hidden, setHidden] = React.useState<string[]>([]), [dimmed, setDimmed] = React.useState<string[]>([]), [lit, setLit] = React.useState<string | null>(null)
+  const [hidden, setHidden] = React.useState<string[]>([]), [dimmed, setDimmed] = React.useState<string[]>([]), [lit, setLit] = React.useState<string | null>(null), [pins, setPins] = React.useState<Pins>(NO_PINS)
   const curves = React.useMemo(() => all.filter(c => !hidden.includes(c.key)).map(c => (lit ? { ...c, dim: c.key !== lit } : dimmed.includes(c.key) ? { ...c, dim: true } : c)), [all, hidden, dimmed, lit])
   // On a result page, the chart is one of its figures (R9b) while it is drawn.
   const figures = React.useContext(FiguresContext), fid = React.useId()
   React.useEffect(() => {
     if (!figures || !exp) return
-    figures.set(fid, { exp, figure: p => ({ title: exp.title, sub: exp.sub, file: exp.file, xlabel, ylabel, curves: curvesOf(series, p), marks, ...o }) })
+    figures.set(fid, { exp, figure: p => ({ title: exp.title, sub: exp.sub, file: exp.file, xlabel, ylabel, curves: curvesOf(series, p), marks, ...o, pins }) })
     return () => { figures.delete(fid) }
   })
   const full = React.useMemo(() => exp && { ...exp, ...(resultAnalysis({ id: 'r', title: '', sub: '', xlabel, ylabel, series }) ? { html: () => resultHtml(exp, series, xlabel, ylabel, o) } : { html: null, why: 'its curves are on different x grids' }) },
     [exp, series, xlabel, ylabel, o.y, o.rule, o.xDigits])
   return (
     <figure className="relative m-0 flex flex-col gap-2">
-      {full && <ExportMenu className="absolute right-0 top-0 z-[1]" exp={full} curves={p => curvesOf(series, p)} xlabel={xlabel} ylabel={ylabel} marks={marks} {...o} />}
-      <ChartPanel curves={curves} grid={curves[0]?.x ?? []} xlabel={xlabel} ylabel={ylabel} pal={pal} marks={marks} height={height} {...o} />
+      {full && <ExportMenu className="absolute right-0 top-0 z-[1]" exp={full} curves={p => curvesOf(series, p)} xlabel={xlabel} ylabel={ylabel} marks={marks} {...o} pins={pins} />}
+      <ChartPanel curves={curves} grid={curves[0]?.x ?? []} xlabel={xlabel} ylabel={ylabel} pal={pal} marks={marks} height={height} {...o} pins={pins} onPins={setPins} />
       {ramp && curves.length > 1 && (
         <figcaption className="flex flex-wrap items-center gap-x-3 text-caption text-muted-foreground">
           <span>{ramp.first}</span>
