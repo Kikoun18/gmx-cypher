@@ -93,6 +93,8 @@ export function exportData(o: ExportInput): ExportData {
     sels: a.sels.map(g => ({ name: g.name, atoms: toRanges(g.atoms), tone: g.tone, y: g.y.map(v => round(v, 4)), peak: g.peak && { r: round(g.peak.r, 5), g: round(g.peak.g, 4) }, shell: g.shell ? { r: round(g.shell.r, 5), g: round(g.shell.g, 4) } : null, ...(g.colors ? { colors: g.colors } : {}) })),
     struct: a.struct ? sid.get(a.struct) ?? null : null, structNote: scrub(a.structNote), selected: o.selected(a), tone: o.tones[a.id] ?? 'coral', ...(a.plot ? { plot: a.plot } : {}), ...(a.paint ? { paint: a.paint } : {}),
     ...(a.pairs ? { pairs: a.pairs } : {}), ...(a.command ? { command: a.command } : {}),
+    ...(a.lines ? { lines: a.lines.map(l => ({ ...l, segs: l.segs.map(g => ({ at: toRanges(g.at), v: g.v.map(v => round(v, 4)) as [number, number, number] })) })) } : {}),
+    ...(a.fit ? { fit: { name: a.fit.name, atoms: toRanges(a.fit.atoms) } } : {}),
   }))
   const compare = o.compare && o.compare.ids.filter(x => id.has(x)).length > 1
     ? { ids: o.compare.ids.filter(x => id.has(x)).map(x => id.get(x)!), focus: id.get(o.compare.focus) ?? id.get(o.compare.ids[0])!, selected: o.compare.selected, colorBy: o.compare.colorBy }
@@ -134,6 +136,7 @@ button:focus-visible{outline:2px solid var(--ring);outline-offset:2px}
 .dc-k-sel{background:var(--coral);box-shadow:0 0 0 1.5px var(--coral-strong),0 0 9px var(--coral-strong)}
 .dc-k-rest{background:var(--stone)}
 .dc-k-ref{width:8px;height:8px;background:var(--foreground);box-shadow:0 0 0 1.5px var(--card),0 0 0 2.7px var(--foreground)}
+.dc-k-fit{width:8px;height:8px;border:1.5px dashed var(--foreground)}
 .dc-tip,.dc-hover{position:absolute;z-index:2;pointer-events:none;background:var(--popover);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow-menu);padding:8px 10px;display:flex;flex-direction:column;gap:2px}
 .dc-tip{width:240px}
 .dc-tip b{font-size:12px}

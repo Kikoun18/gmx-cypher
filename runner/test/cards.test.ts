@@ -147,11 +147,11 @@ describe('H-bond pairs on the structure (R10c)', () => {
   });
   it('says how many were found and drawn, or why none is', () => {
     const p = nearestPairs(hbondTriplets(ndx), struct), mol = (arrange: 'frame positions' | 'side by side') => kit.buildMol(struct, new Set([1]), new Set(), arrange, p.drawn);
-    expect(kit.pairsNote({ command: 'hbond', pairs: p }, mol('frame positions'))).toBe("569 pairs found over the trajectory, drawn dashed at the structure's positions: the 200 nearest · 369 not drawn");
-    expect(kit.pairsNote({ command: 'hbond', pairs: p }, mol('side by side'))).toBe('569 pairs found over the trajectory: arrange the molecules in frame positions to draw them');
-    expect(kit.pairsNote({ command: 'hbond' }, null)).toBe('no pairs drawn: this result came without its _hbonds.ndx');
-    expect(kit.pairsNote({ command: 'hbond-legacy' }, null)).toMatch(/^gmx hbond-legacy writes no pairs/);
-    expect(kit.pairsNote({ command: 'rmsf' }, null)).toBeNull();
+    expect(kit.structureNote({ command: 'hbond', pairs: p }, mol('frame positions'))).toBe("569 pairs found over the trajectory, drawn dashed at the structure's positions: the 200 nearest · 369 not drawn");
+    expect(kit.structureNote({ command: 'hbond', pairs: p }, mol('side by side'))).toBe('569 pairs found over the trajectory: arrange the molecules in frame positions to draw them');
+    expect(kit.structureNote({ command: 'hbond' }, null)).toBe('no pairs drawn: this result came without its _hbonds.ndx');
+    expect(kit.structureNote({ command: 'hbond-legacy' }, null)).toMatch(/^gmx hbond-legacy writes no pairs/);
+    expect(kit.structureNote({ command: 'rmsf' }, null)).toBeNull();
   });
   it('keeps the paired molecules in an export, solvent being left out', () => {
     const kept = compactStruct(struct, new Set([1]), 4000, new Set([67, 68, 11]));

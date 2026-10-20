@@ -67,6 +67,8 @@ export interface RecordLike {
   groups: RecordGroup[]
   options?: { flag: string; value: unknown }[]
   outputs?: { kind: string; path: string }[]
+  /** gmx distance's averages, as it printed them (R7). */
+  distances?: { average: number }[]
 }
 
 /** A record's reference and selections, atoms from its ranges. */
@@ -107,13 +109,16 @@ function fromResult(o: RecordSource, x: Xvg, command: string): Analysis {
   const of = x.ys.map((_, i) => curveGroup(command, groups, i))
   const sels: Sel[] = x.ys.map((y, i) => ({ name: of[i]?.name ?? (command.startsWith('gyrate') && i ? 'about ' + 'xyz'[i - 1] : x.legends[i] || 'series ' + (i + 1)), atoms: of[i]?.atoms ?? [], tone: of[i]?.tone ?? TONES[i % TONES.length], y, peak: null, shell: null }))
   const r = groups.find(g => g.role === 'reference' && !of.includes(g)), ref = r ? { name: r.name, atoms: r.atoms, tone: r.tone } : null
+  // gmx rms fits on its first group (R10d), unless -fit none.
+  const fit = command === 'rms' && groups[0] && o.record.options?.find(f => f.flag === 'fit')?.value !== 'none' ? { name: groups[0].name, atoms: groups[0].atoms } : undefined
   return {
     // gmx writes some y labels as a unit alone, "(nm)": the quantity is named in front of it.
     id: o.id, kind: o.kind, command, title: o.title, label: o.label, x: x.x, xlabel: x.xlabel || 'x', ylabel: /^\(/.test(x.ylabel) ? (QUANTITY[command] ?? 'value') + ' ' + x.ylabel : x.ylabel || 'y', ref, sels, struct: o.struct, structNote: o.structNote,
     plot: { y: command.startsWith('hbond') ? 'zero' : 'data', rule: null },
     // RMSF is painted on the structure (R10b): per atom, or per residue with -res.
     ...(command === 'rmsf' && sels[0] ? { paint: { by: o.record.options?.some(f => f.flag === 'res' && f.value === true) ? 'residue' as const : 'atom' as const, values: x.x.map((v, i): [number, number] => [v, sels[0].y[i]]), label: 'RMSF', unit: 'nm' } } : {}),
-    sub: facts([o.source, 'gmx ' + command, o.record.frames ? o.record.frames.analysed + ' frames' : null, ref ? 'ref ' + ref.name + ' · ' + ref.atoms.length + ' atoms' : null]),
+    ...(fit ? { fit } : {}),
+    sub: facts([o.source, 'gmx ' + command, o.record.frames ? o.record.frames.analysed + ' frames' : null, ref ? 'ref ' + ref.name + ' · ' + ref.atoms.length + ' atoms' : null, command === 'rms' ? (fit ? 'fit on ' + fit.name : 'no fit') : null]),
   }
 }
 

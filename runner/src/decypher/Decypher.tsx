@@ -143,7 +143,10 @@ export function AnalysisCard({ members, on, tone, mol, pal, view, selected, tone
   const keyOf = (nr: number) => (a.paint?.by === 'residue' && mol ? mol.resnr[mol.g2l[nr]] : nr)
   const [atomX, setAtomX] = React.useState<number | null>(null), [chartX, setChartX] = React.useState<number | null>(null)
   const ring = React.useMemo(() => (paint && chartX != null ? [...paint.values.keys()].filter(nr => keyOf(nr) === chartX) : undefined), [paint, chartX]) // eslint-disable-line react-hooks/exhaustive-deps -- keyOf reads a and mol, as paint does
-  const pairsNote = kit.pairsNote(a, mol)
+  // What else the structure shows (R10c, R10d): H-bond pairs, the lines of the plotted groups, the fit group.
+  const note = kit.structureNote(a, mol)
+  const lines = React.useMemo(() => a.lines?.filter(l => selected.includes(l.group)).map(l => ({ line: l, tone: a.sels.find(g => g.name === l.group)?.tone ?? tone })), [a, selected, tone])
+  const fit = React.useMemo(() => (a.fit ? { label: a.fit.name, atoms: a.fit.atoms } : undefined), [a])
   const exp: ChartExport = { file: a.label, fields: { command: a.command ?? 'rdf' }, title, csv: () => curvesCsv(curvesIn(pal).map(c => ({ ...c, name: c.source ? c.name + ' · ' + c.source : c.name })), a.xlabel, a.ylabel) }
   // One result page's order (R9b): its actions, its structure beside its chart, its settings and groups, where it came from.
   return (
@@ -176,10 +179,10 @@ export function AnalysisCard({ members, on, tone, mol, pal, view, selected, tone
               {mol && <><Button variant="outline" size="sm" onClick={() => ref.current?.fit()}>fit selection</Button><Button variant="ghost" size="sm" onClick={() => ref.current?.reset()}>reset view</Button><Button variant="ghost" size="sm" onClick={() => void savePng(ref.current, a.label)} title="the structure as drawn now, as a PNG">png</Button></>}
             </div>
             <StructurePanel ref={h => { ref.current = h; handle(h) }} className="min-h-[420px]" mol={mol} pal={pal} view={view} sels={a.sels} selected={idx} refs={refs} hoverSel={hoverSel}
-              paint={paint} ring={ring} onAtom={paint ? nr => setAtomX(nr != null && paint.values.has(nr) ? keyOf(nr) : null) : undefined} pairs={a.pairs?.drawn}
+              paint={paint} ring={ring} onAtom={paint ? nr => setAtomX(nr != null && paint.values.has(nr) ? keyOf(nr) : null) : undefined} pairs={a.pairs?.drawn} lines={lines} fit={fit}
               onPick={(is, add) => onSelect(pickGroups(selected, is.map(i => a.sels[i].name), add))} onPickRef={pickRef} onActive={onActive}
               empty={<><span className="text-heading font-bold">No structure</span><span className="max-w-[40ch] text-caption text-muted-foreground">{a.structNote}</span></>} />
-            {pairsNote && <p className="m-0 border-t border-border px-3 py-2 text-caption text-muted-foreground">{pairsNote}</p>}
+            {note && <p className="m-0 border-t border-border px-3 py-2 text-caption text-muted-foreground">{note}</p>}
           </div>}
           <div className="flex min-w-0 flex-col gap-2">
             <div className="flex items-center justify-end gap-1">{rdf && marks}{curves.length > 0 && <ExportMenu exp={exp} curves={curvesIn} xlabel={a.xlabel} ylabel={a.ylabel} {...chartOf(a, view.marks)} />}</div>

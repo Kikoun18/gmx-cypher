@@ -58,7 +58,16 @@ export interface Analysis {
   paint?: { by: 'atom' | 'residue'; values: [number, number][]; label: string; unit: string }
   /** H-bond pairs to draw (R10c): donor, hydrogen, acceptor, the nearest at the structure's positions, of `total` found. */
   pairs?: { drawn: [number, number, number][]; total: number }
+  /** Lines measured on its structure (R10d): gmx distance's and gmx mindist's, one per group. */
+  lines?: Line[]
+  /** gmx rms's fit group (R10d), shown on its structure. */
+  fit?: { name: string; atoms: number[] }
 }
+/**
+ * A line on a structure (R10d), for one group: from the centre of `at` (the end drawn), along `v` (nm, across the box
+ * edges) to the other end; its length here and gmx's average. com: gmx measured centres of mass, drawn of geometry.
+ */
+export interface Line { group: string; kind: 'com' | 'cog' | 'pairs' | 'closest'; segs: { at: number[]; v: [number, number, number] }[]; here: number; gmx: number | null; total?: number }
 /** A structure's painted atoms (R10b): each atom's value by its GROMACS number, the range, and what the values are. */
 export interface Paint { values: Map<number, number>; min: number; max: number; label: string; unit: string }
 /** A chart's y range (from 0, or the data's own), its dashed rule (g = 1, 0, none) and its x digits. */
@@ -74,7 +83,7 @@ export interface Palette {
 
 export interface Mol {
   n: number; gnr: number[]; el: string[]; name: string[]; resn: string[]; resnr: number[]
-  local: Float64Array; comp: Int32Array; comps: { minx: number; maxx: number; miny: number; maxy: number; D: number; ox: number; oy: number }[]
+  local: Float64Array; comp: Int32Array; comps: { minx: number; maxx: number; miny: number; maxy: number; D: number; ox: number; oy: number; R: number[] }[]
   bonds: Int32Array; g2l: Int32Array; ext: { w: number; h: number }; nmol: number; molOf: Int32Array; molLabels: string[]; truncated: boolean; hidden: number
   /** The H-bond pairs it can draw (R10c), as "donor-hydrogen-acceptor" numbers: in frame positions, each atom drawn, the two not apart across the box. */
   links: string[]; arrange: Arrange
@@ -101,6 +110,9 @@ export interface SceneState {
   ring?: number[]
   /** H-bond pairs drawn dashed (R10c), those of them the Mol can draw. */
   pairs?: [number, number, number][]
+  /** Lines drawn dashed in their group's hue (R10d), in frame positions; the fit group ringed (R10d). */
+  lines?: { line: Line; tone: Tone }[]
+  fit?: { label: string; atoms: number[] }
 }
 
 /** The atom under the pointer: its line, its group or reference (−1: none), and where its card goes. */
@@ -122,7 +134,8 @@ export type VNode = [string, Record<string, unknown>, ...(VNode | string)[]]
 export interface ChartGeom { m: { l: number; r: number; t: number; b: number }; iw: number; ih: number; x0: number; x1: number; y0: number; y1: number; grid: number[]; xDigits: number; yDigits: number }
 
 /** One job as an export carries it: atoms as ranges, y values rounded, its selection when exported. */
-export interface ExportAnalysis { id: string; title: string; label: string; sub: string; x: number[]; xlabel: string; ylabel: string; ref: { name: string; atoms: string; tone: Tone } | null; sels: { name: string; atoms: string; tone: Tone; y: number[]; peak: Peak | null; shell?: Peak | null; colors?: Colors }[]; struct: string | null; structNote: string; selected: string[]; tone: Tone; plot?: Plot; paint?: Analysis['paint']; pairs?: Analysis['pairs']; command?: string }
+export interface ExportAnalysis { id: string; title: string; label: string; sub: string; x: number[]; xlabel: string; ylabel: string; ref: { name: string; atoms: string; tone: Tone } | null; sels: { name: string; atoms: string; tone: Tone; y: number[]; peak: Peak | null; shell?: Peak | null; colors?: Colors }[]; struct: string | null; structNote: string; selected: string[]; tone: Tone; plot?: Plot; paint?: Analysis['paint']; pairs?: Analysis['pairs']; command?: string
+  lines?: (Omit<Line, 'segs'> & { segs: { at: string; v: [number, number, number] }[] })[]; fit?: { name: string; atoms: string } }
 /** Everything an exported page needs: its tokens, structures without solvent (but for H-bond pairs' molecules), the analyses, the comparison and the style. */
 export interface ExportData {
   /** The page's heading, as chosen ('(de)Cypher' unless changed). */
@@ -167,15 +180,30 @@ export function decypherKit(data: KitData) {
     const r = pal.ramp, x = Math.min(1, Math.max(0, Number.isFinite(t) ? t : 0)) * (r.length - 1), i = Math.min(r.length - 2, Math.floor(x))
     return mix(r[i], r[i + 1], x - i)
   }
-  /** What a result's H-bond pairs come to on its structure (R10c), in words: how many were found and drawn, or why none is. */
-  function pairsNote(a: Pick<Analysis, 'pairs' | 'command'>, mol: Mol | null): string | null {
+  /**
+   * What a result's structure shows besides its groups, in words (R10c, R10d): its H-bond pairs, found and drawn, or why
+   * none is; its lines and what they measure; gmx rms's fit group. Null for nothing more.
+   */
+  function structureNote(a: Pick<Analysis, 'pairs' | 'command' | 'lines' | 'fit'> & { ref?: Analysis['ref'] }, mol: Mol | null): string | null {
+    const framed = !mol || mol.arrange === 'frame positions', place = (what: string) => what + ': arrange the molecules in frame positions to draw them'
     if (a.command === 'hbond-legacy') return 'gmx hbond-legacy writes no pairs to draw: the selection tool, gmx hbond, does'
-    if (!a.pairs) return a.command === 'hbond' ? 'no pairs drawn: this result came without its _hbonds.ndx' : null
-    const { drawn, total } = a.pairs, found = total + (total === 1 ? ' pair' : ' pairs') + ' found over the trajectory'
-    if (!mol) return found
-    if (mol.arrange !== 'frame positions') return found + ': arrange the molecules in frame positions to draw them'
-    const can = new Set(mol.links), k = drawn.filter(p => can.has(p.join('-'))).length
-    return found + ', drawn dashed at the structure\'s positions: ' + (k < drawn.length ? k + ' of the ' + drawn.length + ' nearest (the rest across the box edge)' : 'the ' + k + ' nearest') + (total > k ? ' · ' + (total - k) + ' not drawn' : '')
+    if (a.command === 'hbond') {
+      if (!a.pairs) return 'no pairs drawn: this result came without its _hbonds.ndx'
+      const { drawn, total } = a.pairs, found = total + (total === 1 ? ' pair' : ' pairs') + ' found over the trajectory'
+      if (!mol) return found
+      if (!framed) return place(found)
+      const can = new Set(mol.links), k = drawn.filter(p => can.has(p.join('-'))).length
+      return found + ', drawn dashed at the structure\'s positions: ' + (k < drawn.length ? k + ' of the ' + drawn.length + ' nearest (the rest across the box edge)' : 'the ' + k + ' nearest') + (total > k ? ' · ' + (total - k) + ' not drawn' : '')
+    }
+    if (a.command === 'rms') return a.fit ? 'fitted on ' + a.fit.name + ', which is measured first; each further group is measured after the same fit' : 'no fit: each group is measured where it is'
+    const kind = a.lines?.[0]?.kind, r = a.ref?.name ?? 'the reference'
+    if (!kind) return null
+    if (!framed) return place('lines between ' + (kind === 'closest' ? 'the closest atoms' : kind === 'pairs' ? 'the pairs' : 'the centres'))
+    if (kind === 'closest') return 'dashed: the closest atoms of ' + r + ' and each plotted group, at the structure\'s positions, their distance here beside gmx\'s mean over the frames'
+    const most = a.lines!.find(l => l.total)?.total
+    if (kind === 'pairs') return 'dashed: from atom k of ' + r + ' to atom k of each plotted group, at the structure\'s positions, their mean length here beside gmx\'s average' + (most ? ' · the first 200 of ' + most + ' pairs drawn' : '')
+    return 'dashed: from ' + r + '\'s centre to each plotted group\'s, at the structure\'s positions, its length here beside gmx\'s average · '
+      + (kind === 'com' ? 'centres of geometry: gmx measured centres of mass, which a structure file can\'t give' : 'centres of geometry, as gmx measured')
   }
 
   /** An analysis's values on a structure (R10b): each atom of its first group gets its own value, or its residue's. */
@@ -417,7 +445,7 @@ export function decypherKit(data: KitData) {
         rmax = Math.max(rmax, Math.hypot(lx, ly, lz))
       })
       const pad = 0.1
-      return { minx: minx - pad, maxx: maxx + pad, miny: miny - pad, maxy: maxy + pad, D: rmax * 4 + 0.6, ox: 0, oy: 0 }
+      return { minx: minx - pad, maxx: maxx + pad, miny: miny - pad, maxy: maxy + pad, D: rmax * 4 + 0.6, ox: 0, oy: 0, R }
     })
     // Shelf-pack the molecules into rows.
     const gap = 0.45
@@ -527,7 +555,7 @@ export function decypherKit(data: KitData) {
       const rest = selIdx.size ? st.rest : 'tinted', restB = rest === 'tinted' ? 0 : 0.5
       const hovSi = st.hoverSel, hovRef = st.hoverRef
       const R = RADS[rep] || RADS['ball & stick'], BW = BONDW[rep] ?? 0.016
-      const kind = new Uint8Array(n), fill: string[] = new Array(n), rim: string[] = new Array(n), lw = new Float32Array(n), bcol: string[] = new Array(n), ringed = new Set(st.ring ?? [])
+      const kind = new Uint8Array(n), fill: string[] = new Array(n), rim: string[] = new Array(n), lw = new Float32Array(n), bcol: string[] = new Array(n), ringed = new Set(st.ring ?? []), fitted = new Set(st.fit?.atoms ?? [])
       for (let k = 0; k < n; k++) {
         const e = mol.el[k], si = mb.groupOf[k], rk = mb.ref[k], isRef = rk > 0
         const sel = si >= 0 && selIdx.has(si), prev = si >= 0 && si === hovSi && !sel
@@ -595,6 +623,8 @@ export function decypherKit(data: KitData) {
         if (rep !== 'sticks' || kd >= 2) { ctx.lineWidth = lw[k]; ctx.strokeStyle = mix(rim[k], BG, bl); ctx.stroke() }
         if (r > 3 && !ghost(k)) { ctx.beginPath(); ctx.arc(x - r * 0.32, y - r * 0.34, r * 0.3, 0, TAU); ctx.fillStyle = 'rgba(255,255,255,' + th.hl * (1 - bl) + ')'; ctx.fill() }
         if (kd === 3) { const off = refOff(mb.refOwner[k]); if (mb.ref[k] === 2 || off) ctx.setLineDash([3, 2]); ctx.beginPath(); ctx.arc(x, y, r + 2.4, 0, TAU); ctx.lineWidth = 1.2; ctx.strokeStyle = mix(th.fg, BG, off ? 0.55 : fog * 0.5); ctx.stroke(); ctx.setLineDash([]) }
+        // gmx rms's fit group (R10d): a dashed ink ring, over whatever colour the atom has.
+        if (fitted.has(mol.gnr[k])) { ctx.setLineDash([2, 2]); ctx.beginPath(); ctx.arc(x, y, r + 2.6, 0, TAU); ctx.lineWidth = 1.2; ctx.strokeStyle = mix(th.fg, BG, fog * 0.5); ctx.stroke(); ctx.setLineDash([]) }
         const ringed = k === hoverAtom || (kd === 3 && hovRef >= 0 && mb.refOwner[k] === hovRef) || (kd === 2 && mb.groupOf[k] === hovSi)
         if (ringed) { ctx.beginPath(); ctx.arc(x, y, r + 3.5, 0, TAU); ctx.lineWidth = 1.5; ctx.strokeStyle = th.fg; ctx.stroke() }
         ctx.globalAlpha = 1
@@ -602,6 +632,36 @@ export function decypherKit(data: KitData) {
       ctx.globalAlpha = 0.24
       for (let k = 0; k < n; k++) if (vis[k] && kind[k] === 2) { ctx.beginPath(); ctx.arc(P[4 * k], P[4 * k + 1], hitR[k] * 0.8, 0, TAU); ctx.fillStyle = fill[k]; ctx.fill() }
       ctx.globalAlpha = 1
+      // Labels placed so far, line lengths and callouts alike, so none covers another.
+      const placed: { x: number; y: number; w: number; h: number }[] = []
+      const clash = (px: number, py: number, pw: number, ph: number) => placed.some(q => px < q.x + q.w + 4 && px + pw + 4 > q.x && py < q.y + q.h + 3 && py + ph + 3 > q.y)
+      // Lines (R10d), over the atoms, in frame positions: from the centre of the end drawn, along the vector to the other
+      // end, each end a small ring; the length here and gmx's average above the first of a group's lines.
+      if (st.lines?.length && mol.arrange === 'frame positions') {
+        const c0 = mol.comps[0], R0 = c0.R
+        const proj = (l: number[]) => { const px = M[0] * l[0] + M[1] * l[1] + M[2] * l[2], py = M[3] * l[0] + M[4] * l[1] + M[5] * l[2], pz = M[6] * l[0] + M[7] * l[1] + M[8] * l[2], f = c0.D / (c0.D - pz); return [cx + (c0.ox + px * f) * s, cy - (c0.oy + py * f) * s] }
+        ctx.font = '700 11px mononoki, ui-monospace, monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+        for (const { line, tone } of st.lines) {
+          const t = T[tone]
+          line.segs.forEach((g, gi) => {
+            const ks = g.at.map(nr => (nr < mol.g2l.length ? mol.g2l[nr] : -1)).filter(k => k >= 0)
+            if (!ks.length) return
+            const a = [0, 1, 2].map(c => ks.reduce((u, k) => u + mol.local[3 * k + c], 0) / ks.length), v = g.v
+            const b = [0, 1, 2].map(c => a[c] + R0[3 * c] * v[0] + R0[3 * c + 1] * v[1] + R0[3 * c + 2] * v[2])
+            const [x1, y1] = proj(a), [x2, y2] = proj(b)
+            ctx.setLineDash([5, 4]); ctx.lineWidth = 1.75; ctx.strokeStyle = t.strong
+            ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke(); ctx.setLineDash([])
+            for (const [ex, ey] of [[x1, y1], [x2, y2]]) { ctx.beginPath(); ctx.arc(ex, ey, 3.5, 0, TAU); ctx.fillStyle = BG; ctx.fill(); ctx.lineWidth = 1.5; ctx.stroke() }
+            if (gi) return
+            const text = +line.here.toPrecision(3) + ' nm here' + (line.gmx != null ? ' · gmx ' + +line.gmx.toPrecision(3) : ''), pw = ctx.measureText(text).width + 14, ph = 18
+            const px = Math.min(Math.max(4, (x1 + x2) / 2 - pw / 2), w - 4 - pw)
+            let py = Math.min(y1, y2) - ph - 8, guard = 0
+            while (guard++ < 30 && clash(px, py, pw, ph)) py -= ph + 4
+            py = Math.max(4, py); placed.push({ x: px, y: py, w: pw, h: ph })
+            rr(ctx, px, py, pw, ph, 9); ctx.fillStyle = t.base; ctx.fill(); ctx.lineWidth = 1; ctx.strokeStyle = t.strong; ctx.stroke(); ctx.fillStyle = t.fg; ctx.fillText(text, px + pw / 2, py + ph / 2 + 0.5)
+          })
+        }
+      }
       if (!st.labels) return
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
       ctx.font = '400 11px mononoki, ui-monospace, monospace'; ctx.fillStyle = th.muted
@@ -614,7 +674,6 @@ export function decypherKit(data: KitData) {
       }
       Object.keys(bb).forEach(key => { const m = +key, lab = mol.molLabels[m]; if (lab) ctx.fillText(lab, (bb[m].x0 + bb[m].x1) / 2, Math.min(h - 44, bb[m].y1 + 16)) })
       ctx.font = '700 11px mononoki, ui-monospace, monospace'
-      const placed: { x: number; y: number; w: number; h: number }[] = []
       /** A label over the topmost atom: a group's in its hue; the reference's an ink outline (T159), dashed for a second one or one not plotted. */
       const callout = (atoms: number[], text: string, bg: string, fgc: string, line: string, border: 'none' | 'solid' | 'dashed') => {
         const dashed = border === 'dashed'
@@ -623,8 +682,7 @@ export function decypherKit(data: KitData) {
         if (top < 0) return
         const ax = P![4 * top], pw = ctx.measureText(text).width + 16, ph = 20
         let px = Math.min(Math.max(4, ax - pw / 2), w - 4 - pw), py = ty - 16 - ph, guard = 0
-        const clash = () => placed.some(q => px < q.x + q.w + 4 && px + pw + 4 > q.x && py < q.y + q.h + 3 && py + ph + 3 > q.y)
-        while (guard++ < 30 && clash()) py -= ph + 4
+        while (guard++ < 30 && clash(px, py, pw, ph)) py -= ph + 4
         py = Math.max(4, py)
         placed.push({ x: px, y: py, w: pw, h: ph })
         ctx.strokeStyle = line; ctx.lineWidth = 1
@@ -636,6 +694,7 @@ export function decypherKit(data: KitData) {
       }
       st.refs.forEach((r, ri) => { if (mb.refAtoms[ri].length) callout(mb.refAtoms[ri], 'ref ' + r.label, th.card, r.on === false ? th.muted : th.fg, r.on === false ? th.border : th.fg, ri > 0 || r.on === false ? 'dashed' : 'solid') })
       st.selected.forEach(i => { const g = sels[i]; if (!g) return; const t = T[g.tone]; callout(mb.groupAtoms[i], g.name, t.base, t.fg, t.strong, 'none') })
+      if (st.fit) { const ks = st.fit.atoms.map(nr => (nr < mol.g2l.length ? mol.g2l[nr] : -1)).filter(k => k >= 0); callout(ks, 'fit ' + st.fit.label, th.card, th.fg, th.fg, 'dashed') }
       if (hovSi >= 0 && sels[hovSi] && !selIdx.has(hovSi)) { const t = T[sels[hovSi].tone]; callout(mb.groupAtoms[hovSi], sels[hovSi].name, t.soft, t.strong, t.strong, 'none') }
     }
 
@@ -1055,6 +1114,7 @@ export function decypherKit(data: KitData) {
       id: a.id, kind: 'job', title: a.title, label: a.label, sub: a.sub, x: a.x, xlabel: a.xlabel, ylabel: a.ylabel,
       ref: a.ref ? { name: a.ref.name, atoms: fromRanges(a.ref.atoms), tone: a.ref.tone } : null,
       sels: a.sels.map(s => ({ name: s.name, atoms: fromRanges(s.atoms), tone: s.tone, y: s.y, peak: s.peak, shell: s.shell ?? null, ...(s.colors ? { colors: s.colors } : {}) })), struct: a.struct, structNote: a.structNote, ...(a.plot ? { plot: a.plot } : {}), ...(a.paint ? { paint: a.paint } : {}), ...(a.pairs ? { pairs: a.pairs } : {}), ...(a.command ? { command: a.command } : {}),
+      ...(a.lines ? { lines: a.lines.map(l => ({ ...l, segs: l.segs.map(g => ({ at: fromRanges(g.at), v: g.v })) })) } : {}), ...(a.fit ? { fit: { name: a.fit.name, atoms: fromRanges(a.fit.atoms) } } : {}),
     }))
     const tones: Record<string, Tone> = {}
     data.analyses.forEach(a => { tones[a.id] = a.tone })
@@ -1172,7 +1232,7 @@ export function decypherKit(data: KitData) {
       if (paint) { redraws.push(drawScale); drawScale() }
       const wrap = h('div', { class: 'dc-struct' }, canvas, tip,
         h('div', { class: 'dc-legend' }, ...(paint ? [scale] : [h('span', null, h('i', { class: 'dc-k dc-k-sel' }), 'plotted'), h('span', null, h('i', { class: 'dc-k dc-k-rest' }), 'not plotted')]), h('span', null, h('i', { class: 'dc-k dc-k-ref' }), 'reference'),
-          h('span', { class: 'dc-grow' }), h('span', null, 'drag rotate · right- or Space-drag pan · scroll zoom · double-click fit · Shift-click residue · C + click centre')))
+          ...(a.fit ? [h('span', null, h('i', { class: 'dc-k dc-k-fit' }), 'fit group')] : []), h('span', { class: 'dc-grow' }), h('span', null, 'drag rotate · right- or Space-drag pan · scroll zoom · double-click fit · Shift-click residue · C + click centre')))
       let hoverSel = -1
       const view = structureView(canvas, wrap, {
         hover: hv => {
@@ -1188,11 +1248,12 @@ export function decypherKit(data: KitData) {
       })
       const update = () => {
         const s = sel()
-        view.set({ mol, pal: pal(), rep: data.view.rep, rest: data.view.rest, labels: data.view.labels, hydrogens: data.view.hydrogens, sels: a.sels, selected: a.sels.flatMap((g, i) => (s.includes(g.name) ? [i] : [])), refs: refs(), hoverSel, hoverRef: -1, paint, pairs: a.pairs?.drawn })
+        const lines = (a.lines ?? []).filter(l => s.includes(l.group)).map(l => ({ line: l, tone: a.sels.find(g => g.name === l.group)?.tone ?? a.sels[0].tone }))
+        view.set({ mol, pal: pal(), rep: data.view.rep, rest: data.view.rest, labels: data.view.labels, hydrogens: data.view.hydrogens, sels: a.sels, selected: a.sels.flatMap((g, i) => (s.includes(g.name) ? [i] : [])), refs: refs(), hoverSel, hoverRef: -1, paint, pairs: a.pairs?.drawn, lines, ...(a.fit ? { fit: { label: a.fit.name, atoms: a.fit.atoms } } : {}) })
       }
       redraws.push(update)
       update()
-      const note = pairsNote(a, mol)
+      const note = structureNote(a, mol)
       return { el: note ? h('div', null, wrap, h('p', { class: 'dc-cap dc-note' }, note)) : wrap, set: (i: number) => { hoverSel = i; update() } }
     }
 
@@ -1279,7 +1340,7 @@ export function decypherKit(data: KitData) {
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => redraws.forEach(f => f()))
   }
 
-  return { rampAt, paintOf, pairsNote, legendPick, pickGroups, clickScope, pans, scopeAtoms, TONES, DASH, DASH_NAMES, REPS, RESTS, SOLV, palette, toRanges, fromRanges, parseStructure, mix, buildMol, structureView, matchGroup, rdfLooks, buildCurves, looseName, sameButReference, morphWhy, pickRefs, refLabels, niceTicks, xDigitsOf, valAt, hoverRows, hoverX, readoutTitle, chart, mount }
+  return { rampAt, paintOf, structureNote, legendPick, pickGroups, clickScope, pans, scopeAtoms, TONES, DASH, DASH_NAMES, REPS, RESTS, SOLV, palette, toRanges, fromRanges, parseStructure, mix, buildMol, structureView, matchGroup, rdfLooks, buildCurves, looseName, sameButReference, morphWhy, pickRefs, refLabels, niceTicks, xDigitsOf, valAt, hoverRows, hoverX, readoutTitle, chart, mount }
 }
 
 export type Kit = ReturnType<typeof decypherKit>
