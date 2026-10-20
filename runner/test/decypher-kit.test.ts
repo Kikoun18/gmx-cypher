@@ -1,16 +1,16 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { decypherKit, type Analysis, type VNode } from '../src/decypher/kit'
-import { fromFiles, fromRecord, fromVault, parseGro, parsePdb, parseXvg, peakOf, shortLabels, type RecordLike } from '../src/decypher/parse'
-import { themeTokens } from '../src/decypher/tokens'
+import { KIT_DATA, kit, parseStructure } from '../src/core/index'
+import { decypherKit, type Analysis, type VNode } from '../src/core/kit'
+import { fromFiles, fromRecord, fromVault, parseXvg, peakOf, shortLabels, type RecordLike } from '../src/decypher/parse'
+import { themeTokens } from '../src/core/tokens'
 import { RUNNER } from './helpers'
 
-const kit = decypherKit()
 const F = RUNNER + 'test/fixtures/decypher/'
 const read = (n: string) => readFileSync(F + n, 'utf8')
 const NAMES = ['9.multiwalker.gro', 'mmmmmmmm.gro', 'rdf_o111_Methionine_H.ndx', 'rdf_o111_Methionine_H.run.json', 'rdf_o111_Methionine_H.xvg', 'rdf_o111_Methionine_S.ndx', 'rdf_o111_Methionine_S.run.json', 'rdf_o111_Methionine_S.xvg']
 const files = () => fromFiles(NAMES.map(n => ({ path: 'o111/' + n, text: read(n) })))
-const TOKENS = themeTokens(read('../../../src/tokens.json'))
+const TOKENS = themeTokens(read('../../../src/tokens.json'), read('../../../src/roles.json'))
 const tokens = (dark: boolean) => TOKENS[dark ? 'dark' : 'light']
 const pal = kit.palette(true, tokens(true))
 /** Every node of a chart tree with its tag. */
@@ -32,9 +32,15 @@ describe('(de)Cypher reads your runs as the RDF Explorer design does', () => {
     // The peptide alone has 139 atoms; the groups reach atom 246: only the system's structure fits.
     expect(h.struct).toBe('file:o111/9.multiwalker.gro')
     expect(h.sub).toBe('files · 51 frames · bin 0.03 nm · ref H_Met')
-    expect(rows.find(r => r.path.endsWith('mmmmmmmm.gro'))!.status).toBe('✓ 139 atoms · not linked')
-    expect(rows.find(r => r.path.endsWith('Methionine_H.xvg'))!.status).toBe('✓ 13 curves · 115 points → rdf_o111_Methionine_H.run.json, rdf_o111_Methionine_H.ndx, 9.multiwalker.gro')
+    expect(rows.find(r => r.path.endsWith('mmmmmmmm.gro'))!.status).toBe('139 atoms · not linked')
+    expect(rows.find(r => r.path.endsWith('Methionine_H.xvg'))!.status).toBe('13 curves · 115 points → rdf_o111_Methionine_H.run.json, rdf_o111_Methionine_H.ndx, 9.multiwalker.gro')
     expect(shortLabels(analyses.map(a => a.label))).toEqual(['Methionine_H', 'Methionine_S'])
+  })
+
+  it("a dropped record whose job didn't finish is not used: its row says so (R2b)", () => {
+    const rec = JSON.parse(read('rdf_o111_Methionine_H.run.json'))
+    const { files } = fromFiles([{ path: 'cut.run.json', text: JSON.stringify({ ...rec, status: 'running', complete: false }) }])
+    expect(files[0].status).toBe("an incomplete record: its job didn't finish")
   })
 
   it('a peak is the highest point of the curve, not the first shell\'s; an index without a record names the groups by the legends', () => {
@@ -93,10 +99,10 @@ describe('(de)Cypher reads your runs as the RDF Explorer design does', () => {
   })
 
   it('structures: a .gro in nm, a .pdb from Å, and the drawable molecule without solvent', () => {
-    const g = parseGro(read('9.multiwalker.gro'))
+    const g = parseStructure(read('9.multiwalker.gro'), 'gro')
     expect(g).toMatchObject({ n: 279, box: [6.95022, 6.95022, 6.95022] })
     expect(g.nr[278]).toBe(279)
-    const p = parsePdb('CRYST1   30.000   30.000   30.000  90.00  90.00  90.00 P 1\nATOM      1  N   MET A   1      -4.700  -2.470   5.000  1.00  0.00           N\nATOM      2  CA  MET A   1      -3.700  -2.470   5.000  1.00  0.00           C\nEND\n')
+    const p = parseStructure('CRYST1   30.000   30.000   30.000  90.00  90.00  90.00 P 1\nATOM      1  N   MET A   1      -4.700  -2.470   5.000  1.00  0.00           N\nATOM      2  CA  MET A   1      -3.700  -2.470   5.000  1.00  0.00           C\nEND\n', 'pdb')
     expect(p).toMatchObject({ n: 2, box: [3, 3, 3], name: ['N', 'CA'], resn: ['MET', 'MET'] })
     expect(p.xyz[0]).toBeCloseTo(-0.47)
     const mol = kit.buildMol(g, new Set([10]), new Set([125]), 'side by side')!
@@ -127,11 +133,11 @@ describe('(de)Cypher reads your runs as the RDF Explorer design does', () => {
   it('the chart: axes, a path and a peak per curve, a rule where the pointer is', () => {
     const [h] = files().analyses
     const curves = kit.buildCurves({ focus: h, plotted: [h], selected: ['O5...S'], colorBy: 'group', pal, tones: {} })
-    const { tree, geom } = kit.chart({ W: 600, H: 360, curves, grid: h.x, xlabel: h.xlabel, ylabel: h.ylabel, hover: 0.6, peaks: true, pal })
+    const { tree, geom } = kit.chart({ W: 600, H: 360, curves, grid: h.x, xlabel: h.xlabel, ylabel: h.ylabel, hover: 0.6, marks: 'maximum', pal })
     expect(tree[0]).toBe('svg')
     expect(nodes(tree, 'path')).toHaveLength(2)
     expect(nodes(tree, 'circle')).toHaveLength(2)
-    expect(nodes(tree, 'text').map(t => t[2])).toContain('R (NM)')
+    expect(nodes(tree, 'text').map(t => t[2])).toContain('r (nm)')
     expect(kit.hoverX(geom, geom.m.l)).toBe(h.x[0])
     expect(kit.hoverX(geom, geom.m.l + geom.iw + 5)).toBeNull()
     expect(kit.valAt(h.x, h.sels[2].y, h.x[10])).toBe(h.sels[2].y[10])
@@ -141,7 +147,7 @@ describe('(de)Cypher reads your runs as the RDF Explorer design does', () => {
     const [h] = files().analyses
     const one = kit.buildCurves({ focus: h, plotted: [h], selected: ['O5...S'], colorBy: 'group', pal, tones: {} })[0]
     const curves = [0, 1, 2, 3].map(i => ({ ...one, key: 'k' + i }))
-    const { tree } = kit.chart({ W: 600, H: 360, curves, grid: h.x, xlabel: '', ylabel: '', hover: null, peaks: true, pal })
+    const { tree } = kit.chart({ W: 600, H: 360, curves, grid: h.x, xlabel: '', ylabel: '', hover: null, marks: 'maximum', pal, xDigits: 3 })
     const labels = nodes(tree, 'text').filter(t => t[2] === one.peak!.r.toFixed(3))
     expect(labels.map(t => t[1].y)).toEqual([-8, -21, -34])
     expect(nodes(tree, 'circle')).toHaveLength(4)
@@ -150,13 +156,39 @@ describe('(de)Cypher reads your runs as the RDF Explorer design does', () => {
   it('is self-contained: its source text alone makes the same kit (the HTML export carries it)', () => {
     const src = decypherKit.toString()
     expect(src).not.toMatch(/<\/script/i)
-    const again = new Function('return (' + src + ')()')() as typeof kit
-    const g = parseGro(read('9.multiwalker.gro'))
-    expect(again.ranges('43-49:3, 5')).toEqual([43, 46, 49, 5])
+    const again = new Function('return (' + src + ')(' + JSON.stringify(KIT_DATA) + ')')() as typeof kit
+    const g = parseStructure(read('9.multiwalker.gro'), 'gro')
+    expect(again.fromRanges('43-49:3, 5')).toEqual([5, 43, 46, 49])
+    expect(again.DASH).toEqual(kit.DASH)
     const a = again.buildMol(g, new Set([10]), new Set(), 'side by side')!, b = kit.buildMol(g, new Set([10]), new Set(), 'side by side')!
     expect(Array.from(a.local)).toEqual(Array.from(b.local))
     const [h] = files().analyses as Analysis[]
     const c = again.buildCurves({ focus: h, plotted: [h], selected: ['CH...S'], colorBy: 'group', pal: again.palette(false, tokens(false)), tones: {} })
-    expect(again.chart({ W: 400, H: 300, curves: c, grid: h.x, xlabel: '', ylabel: '', hover: null, peaks: true, pal: again.palette(false, tokens(false)) }).tree[0]).toBe('svg')
+    expect(again.chart({ W: 400, H: 300, curves: c, grid: h.x, xlabel: '', ylabel: '', hover: null, marks: 'maximum', pal: again.palette(false, tokens(false)) }).tree[0]).toBe('svg')
   })
 })
+
+describe('the neutrals moved into the role layer unchanged (R4b)', () => {
+  it('the palette draws atoms outside every group, bonds and rims in the same colours as before', () => {
+    const t = themeTokens(readFileSync(new URL('../src/tokens.json', import.meta.url), 'utf8'), readFileSync(new URL('../src/roles.json', import.meta.url), 'utf8'))
+    const light = kit.palette(false, t.light), dark = kit.palette(true, t.dark)
+    expect([light.bond, light.edge, light.hl, light.neutral]).toEqual(['#a8a29e', '#201e1d', 0.45, { C: '#7d7773', H: '#f7f6f5', O: '#b3aaa4', N: '#9b948f', S: '#cfc5bd', P: '#b8b0aa', X: '#a39d99' }])
+    expect([dark.bond, dark.edge, dark.hl, dark.neutral]).toEqual(['#5a5450', '#0e0d0c', 0.26, { C: '#8a8480', H: '#aaa49f', O: '#6f6965', N: '#7a7470', S: '#a0978f', P: '#8a8480', X: '#7a7470' }])
+  })
+})
+
+describe('both peak rules in compare (R3d)', () => {
+  it('each group has its maximum and its first shell; the chart marks the maximum filled and the first shell hollow', () => {
+    const a = files().analyses.find(x => x.label.endsWith('_H'))!, g = a.sels.find(s => s.name === 'NH_N...S')!
+    expect([g.peak!.r, g.shell!.r]).toEqual([0.6, 0.45])
+    const pal = kit.palette(false, TOKENS.light)
+    const curves = kit.buildCurves({ focus: a, plotted: [a], selected: ['NH_N...S'], colorBy: 'group', pal, tones: {} })
+    const svg = (marks: 'both' | 'maximum' | 'first shell' | 'none') => JSON.stringify(kit.chart({ W: 600, H: 300, curves, grid: a.x, xlabel: 'r (nm)', ylabel: 'g(r)', hover: null, marks, pal }).tree)
+    expect(svg('both')).toContain('"key":"pk"')
+    expect(svg('both')).toContain('"key":"sh"')
+    expect(svg('maximum')).not.toContain('"key":"sh"')
+    expect(svg('first shell')).not.toContain('"key":"pk"')
+    expect(svg('none')).not.toMatch(/"key":"(pk|sh)"/)
+  })
+})
+

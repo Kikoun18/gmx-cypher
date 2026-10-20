@@ -6,8 +6,8 @@ import { parseHelp } from '../src/lib/gmxText';
 import { energyOptionProblems } from '../src/lib/energy';
 import { recordProblems } from '../src/lib/record';
 import { planRun, startRun, type RunRequest } from '../server/runs';
-import { detectAna, getAnalyses, parseTable } from '../../app/src/lib/seq';
-import { parseGmxHeader } from '../../app/src/lib/gmxHeader';
+import { detectAna, getAnalyses, parseTable } from '../../matrix/src/lib/seq';
+import { parseGmxHeader } from '../../matrix/src/lib/gmxHeader';
 import { apiServer, FAKE_GMX, RUNNER, tmp } from './helpers';
 
 // gmx energy (R4) on the test trajectory's energy file: the argv, the refusals, and a run through the fake gmx
@@ -64,9 +64,9 @@ describe('the energy command (R4): its argument list and its refusals', () => {
   });
 });
 
-describe('the energy output in PMF Sequences (R4): typed Energy, every column a curve', () => {
+describe('the energy output in the Matrix (R4): typed Energy, every column a curve', () => {
   // Real 2025.4 output of gmx energy (terms 1 and 6 of rerun.edr). Its title "GROMACS Energies" does not contain
-  // PMF Sequences' keyword "energy", so only the file name types it (Phase 0 §4): Cypher's default name does.
+  // the Matrix's keyword "energy", so only the file name types it (Phase 0 §4): Cypher's default name does.
   const text = readFileSync(new URL('./fixtures/gmx-2025.4/energy-potential.xvg', import.meta.url), 'utf8');
   const h = parseGmxHeader(text)!, t = parseTable(text);
 
@@ -75,13 +75,13 @@ describe('the energy output in PMF Sequences (R4): typed Energy, every column a 
     ['energy_rerun (2).xvg', 'energy'],
   ])('%s → %s, with both terms as curves', (name, k) => {
     const a = detectAna(getAnalyses(null), name, t.head, h.tool);
-    // PMF Sequences batch 3 reads the file's own header ("GROMACS Energies", from gmx energy): the name no longer matters.
+    // The Matrix batch 3 reads the file's own header ("GROMACS Energies", from gmx energy): the name no longer matters.
     expect(a).toEqual({ k, from: 'header' });
     expect(getAnalyses(null).find(x => x.k === a.k)?.yCols).toBe('all');
     expect(t.head.legends).toEqual(['Bond', 'Potential']);
   });
 
-  it('a name without "energy" is typed Energy too, from the header (PMF Sequences before batch 3 needed "energy" in the name)', () => {
+  it('a name without "energy" is typed Energy too, from the header (the Matrix before batch 3 needed "energy" in the name)', () => {
     expect(detectAna(getAnalyses(null), 'pot.xvg', t.head, h.tool)).toEqual({ k: 'energy', from: 'header' });
   });
 });
@@ -128,7 +128,7 @@ describe('a run of gmx energy (R4): planned, checked against the file, and recor
     const { job, record } = await startRun(s.ctx, req, roots);
     await record;
     writeFileSync(join(dir, 'energy/energy_rerun.run.json'), '');
-    expect(await s.call('/api/jobs/' + job.id + '/record')).toEqual({ status: 404, json: { error: 'this run has no record: it stopped before gmx-cypher wrote it' } });
+    expect(await s.call('/api/jobs/' + job.id + '/record')).toEqual({ status: 404, json: { error: 'this job has no record: it stopped before gmx-cypher wrote it' } });
     await s.close();
   });
 

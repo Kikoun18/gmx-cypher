@@ -14,7 +14,9 @@ import { COMMANDS, commandOf } from '../lib/commands'
 import { inputRole, type Role, type Slot } from '../lib/inputs'
 import { useAwhScan, useTerms } from '../terms'
 import { cn } from '../lib/utils'
-import { fmtBytes } from '../../../app/src/lib/structFile'
+import { shortPath } from '../lib/paths'
+import { fmtBytes } from '../../../matrix/src/lib/structFile'
+import { Status } from '../ui/status'
 
 interface Entry { name: string; kind: 'dir' | 'file'; size: number; mtime: number; role: Role | 'output' | null }
 interface Listing { path: string; parent: string | null; entries: Entry[]; hidden: number }
@@ -28,8 +30,6 @@ const SLOTS: { slot: Slot; label: string; accepts: Role[]; optional?: boolean }[
 ]
 const SLOT_OF: Partial<Record<Role, Slot>> = { trajectory: 'trajectory', 'run input': 'runInput', structure: 'structure', index: 'index', 'energy file': 'edr' }
 
-/** A folder as `root-name/rest`, relative to the allowed folder it is in. */
-const short = (dir: string, roots: string[]) => { const r = roots.find(x => dir === x || dir.startsWith(x + '/')); return r ? r.split('/').pop() + dir.slice(r.length) : dir }
 const join = (dir: string, name: string) => (dir.endsWith('/') ? dir : dir + '/') + name
 const when = (ms: number) => { const d = new Date(ms), p = (n: number) => String(n).padStart(2, '0'); return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes()) }
 
@@ -49,12 +49,12 @@ function Browser({ roots, path, onPath, used, onFile }: { roots: string[]; path:
         {crumbs.map((c, i) => {
           const to = i === 0 ? c : root + '/' + crumbs.slice(1, i + 1).join('/')
           const label = i === 0 ? c.split('/').pop() : c
-          return <React.Fragment key={to}>{i > 0 && <span className="text-muted-foreground">/</span>}{i < crumbs.length - 1 ? <button className="text-coral-strong hover:underline" title={to} onClick={() => onPath(to)}>{label}</button> : <span className="font-bold" title={to}>{label}</span>}</React.Fragment>
+          return <React.Fragment key={to}>{i > 0 && <span className="text-muted-foreground">/</span>}{i < crumbs.length - 1 ? <button className="text-foreground underline underline-offset-[3px] hover:decoration-2" title={to} onClick={() => onPath(to)}>{label}</button> : <span className="font-bold" title={to}>{label}</span>}</React.Fragment>
         })}
         <span className="flex-1" />
         {listing && <span className="text-caption text-muted-foreground">{listing.entries.filter(e => e.kind === 'file').length} files{listing.hidden ? ' · ' + listing.hidden + ' other files not shown' : ''}</span>}
       </div>
-      {error && <p className="m-0 px-4 py-3 text-control text-destructive">✗ {error}</p>}
+      {error && <Status level="error" className="px-4 py-3 text-control">{error}</Status>}
       {listing && (
         <table className="w-full text-control">
           <thead><tr className="text-left text-label uppercase text-muted-foreground"><th className="px-4 py-2 font-normal">name</th><th className="font-normal">kind</th><th className="font-normal">size</th><th className="pr-4 font-normal">modified</th></tr></thead>
@@ -119,7 +119,7 @@ function Checks({ check, busy }: ReturnType<typeof useInputCheck>) {
         {check.index && <tr><td className="py-1 text-muted-foreground">index</td><td className="text-caption text-muted-foreground">{check.index.groups} groups</td><td className="text-right font-bold">atoms ≤ {check.index.maxAtom}</td></tr>}
       </tbody></table>
       {check.ok ? (
-        <p className="m-0 text-control text-mint-strong">✓ the inputs agree{check.estimate ? ' · ≈' + check.estimate.frames + ' frames, ' + check.estimate.start + '–' + check.estimate.end + ' ps (from the run input)' : ''}</p>
+        <Status level="ok" className="text-control">the inputs agree{check.estimate ? ' · ≈' + check.estimate.frames + ' frames, ' + check.estimate.start + '–' + check.estimate.end + ' ps (from the run input)' : ''}</Status>
       ) : (
         <Alert variant="destructive"><X /><AlertTitle>these inputs can't run together</AlertTitle><AlertDescription>{check.problems.map(p => <p key={p}>{p}</p>)}</AlertDescription></Alert>
       )}
@@ -127,17 +127,29 @@ function Checks({ check, busy }: ReturnType<typeof useInputCheck>) {
   )
 }
 
-export function Inputs({ state, draft, setDraft, onSettings, onNext }: { state: AppState; draft: Draft; setDraft: React.Dispatch<React.SetStateAction<Draft>>; onSettings: () => void; onNext?: () => void }) {
-  // The slots the analysis asks for: an energy file alone for gmx energy; the four for the rest (section 7).
+/** Whether the inputs the command takes are ready, as gmx reads them: the set-up's first step and its state (R9a). */
+export function useInputsCheck(draft: Draft) {
   const command = commandOf(draft.analysis ?? 'rdf') ?? COMMANDS[0]
-  const slots = command.inputs.map(slot => SLOTS.find(s => s.slot === slot)!)
   // Only the slots shown are checked: a file another command uses can't hold this one up (review finding 7).
   const checked = useInputCheck(command.groups ? Object.fromEntries(Object.entries(draft.inputs).filter(([k]) => command.inputs.includes(k as Slot))) : {})
   const energy = useTerms(command.tool === 'energy' ? draft.inputs.edr?.path : undefined)
   const awh = useAwhScan(command.tool === 'awh' ? draft.inputs.edr?.path : undefined, command.tool === 'awh' ? draft.inputs.runInput?.path : undefined)
   const frames = awh?.scan?.frames
-  // gmx wham takes no input slots: its windows are found in the analysis tab (R6).
+  // gmx wham takes no input slots: its windows are found in the command step (R6).
   const ready = command.tool === 'energy' ? !!energy?.terms : command.tool === 'awh' ? !!frames?.length : command.tool === 'wham' ? true : !!checked.check?.ok
+  const failed = command.tool === 'energy' ? !!energy?.error : command.tool === 'awh' ? !!awh?.error || frames?.length === 0 : !!checked.check && !checked.check.ok
+  const busy = command.tool === 'energy' ? !!draft.inputs.edr && !energy : command.tool === 'awh' ? !!draft.inputs.edr && !!draft.inputs.runInput && !awh : checked.busy
+  return { command, checked, energy, awh, frames, ready, failed, busy }
+}
+
+export function Inputs({ state, draft, setDraft, check, uploads, onUploaded, onSettings, onNext }: {
+  state: AppState; draft: Draft; setDraft: React.Dispatch<React.SetStateAction<Draft>>; check: ReturnType<typeof useInputsCheck>
+  /** Files dropped elsewhere on the page that belong here (R9a): uploaded as if dropped here. */
+  uploads: File[]; onUploaded: () => void; onSettings: () => void; onNext?: () => void
+}) {
+  // The slots the analysis asks for: an energy file alone for gmx energy; the four for the rest (section 7).
+  const { command, checked, energy, awh, frames, ready } = check
+  const slots = command.inputs.map(slot => SLOTS.find(s => s.slot === slot)!)
   const roots = state.config.allow
   const [path, setPath] = React.useState<string | null>(() => { const t = draft.inputs.trajectory?.path; return t ? t.slice(0, t.lastIndexOf('/')) : roots[0] || null })
   const [picking, setPicking] = React.useState<Slot | null>(null)
@@ -151,26 +163,27 @@ export function Inputs({ state, draft, setDraft, onSettings, onNext }: { state: 
   const assign = async (p: string, role: Role | 'output' | null) => {
     const slot = picking || (role && role !== 'output' ? SLOT_OF[role] : undefined)
     const ok = slot && SLOTS.find(s => s.slot === slot)!.accepts.includes(role as Role)
-    if (!slot || !ok) { toast.error('✗ ' + p.split('/').pop() + ' is not a ' + (picking ? SLOTS.find(s => s.slot === picking)!.label : 'GROMACS input')); return }
-    if (!command.inputs.includes(slot)) { toast.error('✗ ' + p.split('/').pop() + ' is a ' + role + ': gmx ' + command.tool + ' takes ' + slots.map(s => s.label).join(' and ')); return }
+    if (!slot || !ok) { toast.error(p.split('/').pop() + ' is not a ' + (picking ? SLOTS.find(s => s.slot === picking)!.label : 'GROMACS input')); return }
+    if (!command.inputs.includes(slot)) { toast.error(p.split('/').pop() + ' is a ' + role + ': gmx ' + command.tool + ' takes ' + slots.map(s => s.label).join(' and ')); return }
     setPicking(null)
     if (slot !== 'trajectory') { set(slot, { path: p, why: 'picked' }); return }
     try { setDraft(d => ({ ...d, inputs: others(d.inputs) })); const s = await getJson<Draft['inputs']>('/api/suggest?trajectory=' + encodeURIComponent(p)); setDraft(d => ({ ...d, inputs: { ...others(d.inputs), ...s } })) }
-    catch (e) { toast.error('✗ ' + (e as Error).message) }
+    catch (e) { toast.error((e as Error).message) }
   }
   const upload = async (files: File[]) => {
     for (const f of files) {
       const role = inputRole(f.name)
-      if (!role || role === 'output') { toast.error('✗ ' + f.name + ' is not a GROMACS input (.xtc .trr .tng .tpr .gro .pdb .ndx .edr); not uploaded'); continue }
+      if (!role || role === 'output') { toast.error(f.name + ' is not a GROMACS input (.xtc .trr .tng .tpr .gro .pdb .ndx .edr); not uploaded'); continue }
       try {
         const r = await fetch('/api/upload?name=' + encodeURIComponent(f.name), { method: 'POST', body: f })
         const body = await r.json()
         if (!r.ok) throw new Error(body.error)
-        toast('✓ ' + f.name + ' uploaded · ' + fmtBytes(body.size))
+        toast(f.name + ' uploaded · ' + fmtBytes(body.size))
         await assign(body.path, role)
-      } catch (e) { toast.error('✗ ' + f.name + ': ' + (e as Error).message) }
+      } catch (e) { toast.error(f.name + ': ' + (e as Error).message) }
     }
   }
+  React.useEffect(() => { if (!uploads.length) return; onUploaded(); upload(uploads) }, [uploads]) // eslint-disable-line react-hooks/exhaustive-deps -- once per drop
 
   return (
     <div className="grid grid-cols-[minmax(0,1fr)_360px] gap-5">
@@ -181,14 +194,15 @@ export function Inputs({ state, draft, setDraft, onSettings, onNext }: { state: 
             {roots.map(r => <button key={r} onClick={() => setPath(r)}><Badge tone={path?.startsWith(r) ? 'stone' : undefined} appearance="solid" variant="outline">{r}</Badge></button>)}
           </div>
         ) : <p className="m-0 text-control text-muted-foreground">no folder is allowed yet · add one in settings, or start with --allow &lt;folder&gt;</p>}
-        {picking && <p className="m-0 text-control" aria-live="polite">pick the {SLOTS.find(s => s.slot === picking)!.label} · <button className="text-coral-strong hover:underline" onClick={() => setPicking(null)}>stop picking</button></p>}
+        {picking && <p className="m-0 text-control" aria-live="polite">pick the {SLOTS.find(s => s.slot === picking)!.label} · <button className="text-foreground underline underline-offset-[3px] hover:decoration-2" onClick={() => setPicking(null)}>stop picking</button></p>}
         {path && <Browser roots={[...roots, ...Object.values(draft.inputs).map(p => p!.path.slice(0, p!.path.lastIndexOf('/')))]} path={path} onPath={setPath} used={used} onFile={(p, e) => assign(p, e.role)} />}
         <input ref={fileRef} type="file" multiple hidden onChange={e => { upload(Array.from(e.target.files || [])); e.target.value = '' }} />
+        {/* A drop anywhere on the page lands here when it holds inputs (R9a); this zone says so, and offers the picker. */}
         <Dropzone className="max-w-none py-6" title="Drop files here" description="any GROMACS input, by upload into gmx-cypher's own folder · large trajectories are better picked by path, where they are"
-          onFiles={upload} action={<Button variant="outline" onClick={() => fileRef.current?.click()}><Upload /> choose files</Button>} />
+          action={<Button variant="outline" onClick={() => fileRef.current?.click()}><Upload /> choose files</Button>} />
       </div>
       <div className="flex flex-col gap-4">
-        <Section label="This run" />
+        <Section label="This job" />
         {slots.map(({ slot, label, optional: always }) => {
           // Optional: the index for RDF; for a command without groups, any input it can run without (energy's run input).
           const optional = always || (!command.groups && !command.required.includes(slot))
@@ -198,7 +212,7 @@ export function Inputs({ state, draft, setDraft, onSettings, onNext }: { state: 
               <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                 <span className="text-label uppercase text-muted-foreground">{label}{optional && ' · optional'}</span>
                 <span className="truncate text-body font-bold">{p ? p.path.split('/').pop() : '—'}</span>
-                {p && <span className="truncate text-caption text-muted-foreground" title={p.path}>{short(p.path.slice(0, p.path.lastIndexOf('/')), roots)}</span>}
+                {p && <span className="truncate text-caption text-muted-foreground" title={p.path}>{shortPath(p.path.slice(0, p.path.lastIndexOf('/')), roots)}</span>}
                 {p && <span className="text-caption text-muted-foreground">{p.why}</span>}
               </div>
               {p && optional && <Button variant="ghost" size="sm" onClick={() => setDraft(d => { const { [slot]: _gone, ...rest } = d.inputs; return { ...d, inputs: rest } })}>clear</Button>}
@@ -208,13 +222,17 @@ export function Inputs({ state, draft, setDraft, onSettings, onNext }: { state: 
         })}
         <Section label="Checks" />
         {command.tool === 'energy'
-          ? <p className="m-0 text-control" aria-live="polite">{draft.inputs.edr ? energy?.terms ? '✓ ' + energy.terms.length + ' terms · read by gmx energy' : energy?.error ? '✗ ' + energy.error : 'reading the terms…' : 'pick an energy file'}</p>
+          ? !draft.inputs.edr ? <p className="m-0 text-control">pick an energy file</p>
+            : energy?.terms ? <Status level="ok" className="text-control">{energy.terms.length + ' terms · read by gmx energy'}</Status>
+            : energy?.error ? <Status level="error" className="text-control">{energy.error}</Status> : <p className="m-0 text-control" aria-live="polite">reading the terms…</p>
           : command.tool === 'wham'
-          ? <p className="m-0 text-control text-muted-foreground">gmx wham reads umbrella windows, not these inputs: find them in the analysis tab</p>
+          ? <p className="m-0 text-control text-muted-foreground">gmx wham reads umbrella windows, not these inputs: find them in the command tab</p>
           : command.tool === 'awh'
-          ? <p className="m-0 text-control" aria-live="polite">{!draft.inputs.edr || !draft.inputs.runInput ? 'pick the energy file and its run input'
-            : awh?.error ? '✗ ' + awh.error : !frames ? 'reading the AWH frames…' : !frames.length ? '✗ no AWH data in this energy file'
-            : '✓ ' + frames.length + ' AWH frames, ' + frames[0].time + '–' + frames[frames.length - 1].time + ' ps · read by gmx awh'}</p>
+          ? !draft.inputs.edr || !draft.inputs.runInput ? <p className="m-0 text-control">pick the energy file and its run input</p>
+            : awh?.error ? <Status level="error" className="text-control">{awh.error}</Status>
+            : !frames ? <p className="m-0 text-control" aria-live="polite">reading the AWH frames…</p>
+            : !frames.length ? <Status level="error" className="text-control">no AWH data in this energy file</Status>
+            : <Status level="ok" className="text-control">{frames.length + ' AWH frames, ' + frames[0].time + '–' + frames[frames.length - 1].time + ' ps · read by gmx awh'}</Status>
           : <Checks {...checked} />}
         {onNext && <Button size="lg" className="self-start" disabled={!ready || !state.gmx.ok} onClick={onNext}>use these inputs</Button>}
       </div>

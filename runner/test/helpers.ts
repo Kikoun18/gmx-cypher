@@ -1,11 +1,16 @@
 import { spawn, type ChildProcess } from 'node:child_process';
-import { copyFileSync, cpSync, mkdirSync, mkdtempSync } from 'node:fs';
+import { copyFileSync, cpSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 export const RUNNER = new URL('..', import.meta.url).pathname;
-export const APP = new URL('../../app/', import.meta.url).pathname;
-export const tmp = (prefix: string) => mkdtempSync(join(tmpdir(), 'gmxc-' + prefix + '-'));
+export const APP = new URL('../../matrix/', import.meta.url).pathname;
+// A run leaves nothing in the system's temp folder (a session of runs had filled the disk with them, 65 MB a runner
+// home): Vitest removes each test file's folders after it (test/setup.ts), Playwright when its worker ends.
+const made: string[] = [];
+export const cleanTmp = () => { for (const d of made.splice(0)) try { rmSync(d, { recursive: true, force: true }); } catch { /* already gone */ } };
+process.on('exit', cleanTmp);
+export const tmp = (prefix: string) => { const d = mkdtempSync(join(tmpdir(), 'gmxc-' + prefix + '-')); made.push(d); return d; };
 
 export interface Started { url: string; cookie: string; out: () => string; home: string; proc: ChildProcess }
 

@@ -7,6 +7,8 @@
 @custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
 
 @theme {
+  /* Titles (T160): Archivo 800, as the Matrix; everything else is mononoki. */
+  --font-title: Archivo, ui-sans-serif, system-ui, sans-serif;
   --color-*: initial;
   --shadow-*: initial;
   --text-label: 10px;
@@ -53,6 +55,13 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  /* The role layer (src/roles.json, T159): UI state in ink, the ordered-series ramp. */
+  --color-state: var(--state);
+  --color-state-foreground: var(--state-foreground);
+  --color-ramp-0: var(--ramp-0);
+  --color-ramp-1: var(--ramp-1);
+  --color-ramp-2: var(--ramp-2);
+  --color-ramp-3: var(--ramp-3);
   --color-field: var(--field);
   --color-scrim: var(--scrim);
   --color-coral: var(--coral);
@@ -121,3 +130,11 @@
   ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 9999px; }
   ::-webkit-scrollbar-track { background: transparent; }
 }
+
+/* Archivo 800 for titles, as the Matrix (T160), self-hosted so it works offline and on a cluster: SIL OFL 1.1,
+   from @fontsource/archivo 5.2.5 (public/fonts/Archivo-LICENSE.txt). The title sizes are used only for titles:
+   the app's name, page, dialog and card titles. */
+@font-face { font-family: "Archivo"; src: url("/fonts/archivo-latin-800-normal.woff2") format("woff2"); font-weight: 800; font-style: normal; font-display: swap; unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD; }
+@font-face { font-family: "Archivo"; src: url("/fonts/archivo-latin-ext-800-normal.woff2") format("woff2"); font-weight: 800; font-style: normal; font-display: swap; unicode-range: U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF; }
+.text-title, .text-heading, .text-display { font-family: var(--font-title); font-weight: 800; }
+

@@ -2,6 +2,7 @@ import * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
 
 import { cn } from "../lib/utils"
+import { levelText } from "./status"
 
 const alertVariants = cva(
   "relative grid w-full grid-cols-[0_1fr] content-start items-start gap-y-0.5 rounded-lg border px-4 py-3 text-control has-[>svg]:grid-cols-[16px_1fr] has-[>svg]:gap-x-3 [&>svg]:size-4 [&>svg]:translate-y-px [&>svg]:text-current",
@@ -9,10 +10,11 @@ const alertVariants = cva(
     variants: {
       variant: {
         default: "border-border bg-card text-card-foreground",
-        info: "border-sky-strong/30 bg-sky-soft text-sky-strong",
-        success: "border-mint-strong/30 bg-mint-soft text-mint-strong",
-        warning: "border-butter-strong/30 bg-butter-soft text-butter-strong",
-        destructive: "border-destructive/40 bg-coral-soft text-destructive",
+        // Status levels (R9c, T159): ink on the card, the icon and the title saying which; an error in `destructive`, as the status component draws it.
+        info: "border-border bg-card text-foreground",
+        success: "border-border bg-card text-foreground",
+        warning: "border-foreground/40 bg-card text-foreground",
+        destructive: cn("border-destructive/50 bg-card", levelText.error),
       },
     },
     defaultVariants: { variant: "default" },

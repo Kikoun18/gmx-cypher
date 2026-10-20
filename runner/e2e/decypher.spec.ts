@@ -1,17 +1,18 @@
-// (de)Cypher in a browser: two finished RDF jobs (your Methionine runs) ticked in the jobs tab, side by side with
-// their structure, on one graph, exported as one HTML file that works on its own; its key rebound in settings.
+// (de)Cypher in a browser: two finished RDF jobs (your Methionine runs) selected in the results' jobs list open
+// compare (R9a), side by side with their structure, on one graph, exported as one HTML file that works on its own;
+// its key rebound in settings.
 import { execFileSync, spawn, type ChildProcess } from 'node:child_process'
-import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { expect, test, type Page } from '@playwright/test'
+import { tmp } from '../test/helpers'
 
 const RUNNER = new URL('..', import.meta.url).pathname, F = RUNNER + 'test/fixtures/decypher/'
 let runner: ChildProcess, url: string, sim: string
 
 test.beforeAll(async () => {
-  const home = mkdtempSync(join(tmpdir(), 'gmxc-e2e-home-'))
-  sim = mkdtempSync(join(tmpdir(), 'gmxc-e2e-sim-'))
+  const home = tmp('e2e-home')
+  sim = tmp('e2e-sim')
   const out = join(sim, 'rdf')
   mkdirSync(out)
   mkdirSync(join(home, 'jobs'))
@@ -27,8 +28,8 @@ test.beforeAll(async () => {
     const spec = { kind: 'rdf', title: stem + ' · ' + rec.groups[0].name + ' → 13 groups', file: 'gmx', args: [], cwd: sim, meta: { stem, outDir: out, record: join(out, stem + '.run.json'), names: { xvg: stem + '.xvg', ndx: stem + '.ndx' } } }
     writeFileSync(join(home, 'jobs', id + '.ndjson'), [{ t: 'created', at, spec }, { t: 'started', at, pid: 1 }, { t: 'ended', at, status: 'done', code: 0, signal: null }].map(e => JSON.stringify(e)).join('\n') + '\n')
   }
-  // PMF Sequences' vault with two RDFs of one cell, whose runs this runner doesn't know (as for a vault from another machine).
-  const vault = mkdtempSync(join(tmpdir(), 'gmxc-e2e-vault-'))
+  // The Matrix's vault with two RDFs of one cell, whose runs this runner doesn't know (as for a vault from another machine).
+  const vault = tmp('e2e-vault')
   execFileSync(process.execPath, ['--import', './server/register.mjs', 'e2e/make-vault.ts', vault], { cwd: RUNNER })
   writeFileSync(join(home, 'config.json'), JSON.stringify({ vault }))
   runner = spawn(process.execPath, ['--import', './server/register.mjs', 'server/main.ts', '--port', '0', '--gmx', join(RUNNER, 'test/fake-gmx.mjs'), '--allow', sim],
@@ -53,18 +54,32 @@ function watch(page: Page) {
 test('tick two jobs, see them side by side and on one graph, export them as one HTML file', async ({ page, context }) => {
   const errors = watch(page)
   await page.goto(url)
-  await page.getByRole('tab', { name: /jobs/ }).click()
-  for (const k of ['H', 'S']) await page.getByRole('checkbox', { name: new RegExp('show rdf_o111_Methionine_' + k + '.* in \\(de\\)Cypher') }).click()
-  await page.getByRole('button', { name: /^\(de\)Cypher · 02/ }).click()
+  await page.getByRole('tab', { name: /results/ }).click()
+  // A click shows one job's result; ticking another selects two, and two open compare in the detail pane.
+  await page.getByRole('navigation', { name: 'jobs' }).getByRole('button', { name: /^rdf_o111_Methionine_H/ }).click()
+  await expect(page).toHaveURL(/#results\/jaaaaaaaaaaa1$/)
+  await expect(page.getByRole('checkbox', { name: 'select rdf_o111_Methionine_H' })).toBeChecked()
+  await page.getByRole('checkbox', { name: 'select rdf_o111_Methionine_S' }).click()
+  await expect(page.getByRole('button', { name: /^compare · 02/ })).toBeVisible()
+  await expect(page).toHaveURL(/#compare\?jobs=jaaaaaaaaaaa1,jaaaaaaaaaaa2$/)
 
   // Each job: its structure (solvent hidden) beside its g(r), the first group plotted.
-  const dialog = page.getByRole('dialog', { name: '(de)Cypher' })
+  const dialog = page.getByRole('region', { name: 'compare', exact: true })
   const h = dialog.getByRole('region', { name: /rdf_o111_Methionine_H/ }), s = dialog.getByRole('region', { name: /rdf_o111_Methionine_S/ })
   await expect(h).toBeVisible()
   await expect(s).toBeVisible()
+  // A reload keeps the view; back returns to the one result, forward to compare.
+  await page.reload()
+  await expect(h).toBeVisible()
+  await expect(s).toBeVisible()
+  await page.goBack()
+  await expect(page.getByRole('heading', { name: /^rdf_o111_Methionine_H/ })).toBeVisible()
+  await expect(dialog).toBeHidden()
+  await page.goForward()
+  await expect(h).toBeVisible()
   await expect(h.getByText('249 atoms · solvent hidden', { exact: false })).toBeVisible()
   await expect(h.getByText('Groups 13 · plotted 01')).toBeVisible()
-  await h.getByRole('button', { name: /^O5\.\.\.S/ }).click({ modifiers: ['Shift'] })
+  await h.getByRole('button', { name: /^O5\.\.\.S/ }).click({ modifiers: ['ControlOrMeta'] })
   await expect(h.getByText('Groups 13 · plotted 02')).toBeVisible()
   await expect(h.getByRole('button', { name: 'take O5...S off the plot' })).toBeVisible()
 
@@ -77,9 +92,15 @@ test('tick two jobs, see them side by side and on one graph, export them as one 
   // Export: one file that draws on its own, from file://, with nothing fetched.
   await dialog.getByRole('button', { name: 'export' }).click()
   const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: '+ Export html' }).click()])
-  await expect(page.getByText(/✓ exported decypher_2-RDFs_/)).toBeVisible()
-  const file = join(mkdtempSync(join(tmpdir(), 'gmxc-e2e-export-')), download.suggestedFilename())
+  await expect(page.getByText(/^decypher_2-RDFs_/)).toBeVisible()
+  const file = join(tmp('e2e-export'), download.suggestedFilename())
   await download.saveAs(file)
+  // The same RDFs as figures (R6b): by default one PDF, a page for each card and one for the one graph.
+  const [figures] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: '+ Export figures' }).click()])
+  const pdfFile = join(tmp('e2e-export'), figures.suggestedFilename())
+  await figures.saveAs(pdfFile)
+  const pdf = readFileSync(pdfFile, 'latin1')
+  expect([pdf.slice(0, 8), /\/Type \/Pages [^>]*\/Count (\d+)/.exec(pdf)?.[1], pdfFile.endsWith('.pdf')]).toEqual(['%PDF-1.4', '3', true])
   const html = readFileSync(file, 'utf8')
   expect(html).not.toContain(sim)
   const exported = await context.newPage(), exportErrors = watch(exported), requests: string[] = []
@@ -89,7 +110,7 @@ test('tick two jobs, see them side by side and on one graph, export them as one 
   await expect(exported.locator('canvas')).toHaveCount(2)
   await expect(exported.getByText('ONE GRAPH')).toBeVisible()
   const card = exported.locator('section').filter({ has: exported.getByRole('heading', { name: /rdf_o111_Methionine_S/ }) })
-  await card.getByRole('button', { name: /^CH\.\.\.S/ }).click({ modifiers: ['Shift'] })
+  await card.getByRole('button', { name: /^CH\.\.\.S/ }).click({ modifiers: ['ControlOrMeta'] })
   await expect(card.locator('.dc-trow b', { hasText: 'CH...S' })).toBeVisible()
   await exported.getByRole('button', { name: 'dark' }).click()
   await expect(exported.locator('html')).toHaveAttribute('data-theme', 'dark')
@@ -98,27 +119,39 @@ test('tick two jobs, see them side by side and on one graph, export them as one 
   expect(errors).toEqual([])
 })
 
-test('the key opens and closes (de)Cypher; settings rebind it; runs on disk are found by their records', async ({ page }) => {
+test('the key opens compare and goes back; settings rebind it; records on disk are found', async ({ page }) => {
   const errors = watch(page)
   await page.goto(url)
+  // The key works once the page has drawn (its handler is attached then); a press before that is lost under load.
+  await expect(page.getByRole('button', { name: 'settings' })).toBeVisible()
   await page.keyboard.press('d')
-  const dialog = page.getByRole('dialog', { name: '(de)Cypher' })
+  const dialog = page.getByRole('region', { name: 'compare', exact: true })
   await expect(dialog).toBeVisible()
+  await expect(page).toHaveURL(/#compare$/)
   await page.keyboard.press('d')
   await expect(dialog).toBeHidden()
+  await expect(page).toHaveURL(/#results$/)
 
   await page.getByRole('button', { name: 'settings' }).click()
-  await page.getByRole('button', { name: 'open and close (de)Cypher change' }).click()
+  await page.getByRole('button', { name: 'opens compare with the jobs selected, and goes back change' }).click()
   await page.keyboard.press('k')
   await expect(page.getByRole('dialog', { name: 'Settings' }).getByText('K', { exact: true })).toBeVisible()
   await page.keyboard.press('Escape')
   await expect(page.getByRole('dialog', { name: 'Settings' })).toBeHidden()
+  // ? lists every key (R8b), as bound now.
+  await page.keyboard.press('?')
+  const sheet = page.getByRole('dialog', { name: 'Keys' })
+  await expect(sheet.getByText('opens compare with the jobs selected, and goes back')).toBeVisible()
+  await expect(sheet.getByText('K', { exact: true })).toBeVisible()
+  await expect(sheet.getByText('fits the plotted groups')).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(sheet).toBeHidden()
   await page.keyboard.press('d')
   await expect(dialog).toBeHidden()
   await page.keyboard.press('k')
   await expect(dialog).toBeVisible()
 
-  await dialog.getByRole('radio', { name: 'runs' }).click()
+  await dialog.getByRole('radio', { name: 'on disk' }).click()
   await dialog.getByRole('button', { name: 'find' }).click()
   await dialog.getByText('rdf_o111_Methionine_H', { exact: true }).click()
   await expect(dialog.getByRole('region', { name: /rdf_o111_Methionine_H · H_Met → 13 groups/ })).toBeVisible()
@@ -129,10 +162,10 @@ test('the key opens and closes (de)Cypher; settings rebind it; runs on disk are 
 test('morph the two runs into one card, pick their references, sorted values, headings of my own in the export', async ({ page, context }) => {
   const errors = watch(page)
   await page.goto(url)
-  await page.getByRole('tab', { name: /jobs/ }).click()
-  for (const k of ['H', 'S']) await page.getByRole('checkbox', { name: new RegExp('show rdf_o111_Methionine_' + k + '.* in \\(de\\)Cypher') }).click()
-  await page.getByRole('button', { name: /^\(de\)Cypher · 02/ }).click()
-  const dialog = page.getByRole('dialog', { name: '(de)Cypher' })
+  await page.getByRole('tab', { name: /results/ }).click()
+  await page.getByRole('navigation', { name: 'jobs' }).getByRole('button', { name: /^rdf_o111_Methionine_H/ }).click()
+  await page.getByRole('checkbox', { name: 'select rdf_o111_Methionine_S' }).click()
+  const dialog = page.getByRole('region', { name: 'compare', exact: true })
   await expect(dialog.getByRole('region', { name: /rdf_o111_Methionine_S/ })).toBeVisible()
 
   // The two runs share their structure and groups and differ in their reference: they can be morphed.
@@ -156,13 +189,13 @@ test('morph the two runs into one card, pick their references, sorted values, he
   await expect(card.getByRole('button', { name: 'take NH_N...S off the plot' })).toHaveCount(1)
   await refs.nth(1).click()
   await expect(refs.nth(0)).toHaveAttribute('aria-pressed', 'true')
-  await refs.nth(0).click({ modifiers: ['Shift'] })
+  await refs.nth(0).click({ modifiers: ['ControlOrMeta'] })
   await expect(refs.nth(0)).toHaveAttribute('aria-pressed', 'false')
-  await refs.nth(0).click({ modifiers: ['Shift'] })
+  await refs.nth(0).click({ modifiers: ['ControlOrMeta'] })
   await expect(card.getByRole('button', { name: 'take NH_N...S off the plot' })).toHaveCount(2)
 
   // A group plotted too, then the values under the pointer come highest first.
-  await card.getByRole('button', { name: /^CH\.\.\.S/ }).click({ modifiers: ['Shift'] })
+  await card.getByRole('button', { name: /^CH\.\.\.S/ }).click({ modifiers: ['ControlOrMeta'] })
   const chart = card.locator('svg[role=img]').first()
   const box = (await chart.boundingBox())!
   await page.mouse.move(box.x + box.width * 0.35, box.y + box.height * 0.5)
@@ -177,7 +210,7 @@ test('morph the two runs into one card, pick their references, sorted values, he
   await page.getByLabel('page heading').fill('Methionine, two references')
   await page.getByLabel('heading of 2 morphed RDFs').fill('Hydrogens against sulfurs')
   const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: '+ Export html' }).click()])
-  const file = join(mkdtempSync(join(tmpdir(), 'gmxc-e2e-export-')), download.suggestedFilename())
+  const file = join(tmp('e2e-export'), download.suggestedFilename())
   await download.saveAs(file)
   const html = readFileSync(file, 'utf8')
   const exported = await context.newPage(), exportErrors = watch(exported)
@@ -195,13 +228,13 @@ test('morph the two runs into one card, pick their references, sorted values, he
   await expect(chips.nth(0)).toHaveAttribute('aria-pressed', 'true')
   await expect(chips.nth(1)).toHaveAttribute('aria-pressed', 'false')
   await expect(one.locator('.dc-trow b')).toHaveCount(2)
-  await chips.nth(1).click({ modifiers: ['Shift'] })
+  await chips.nth(1).click({ modifiers: ['ControlOrMeta'] })
   await expect(one.locator('.dc-trow b')).toHaveCount(4)
 
-  // The peak is the highest point of the curve, and the exported values come highest first as well.
+  // The maximum is the highest point of the curve (the table gives it as "r · g", beside the first shell), and the exported values come highest first as well.
   const data = JSON.parse(/<script type="application\/json" id="dc-data">(.*?)<\/script>/s.exec(html)![1])
   const top = (a: number, name: string) => Math.max(...data.analyses[a].sels.find((g: { name: string }) => g.name === name).y)
-  const peakG = (await one.locator('.dc-trow').filter({ hasText: 'NH_N...S' }).first().locator('span.dc-r').last().innerText()).trim()
+  const peakG = (await one.locator('.dc-trow').filter({ hasText: 'NH_N...S' }).first().locator('span.dc-r').nth(1).innerText()).split(' · ')[1].trim()
   expect([top(0, 'NH_N...S').toFixed(2), top(1, 'NH_N...S').toFixed(2)]).toContain(peakG)
   const ebox = (await one.locator('.dc-chart svg').first().boundingBox())!
   await exported.mouse.move(ebox.x + ebox.width * 0.35, ebox.y + ebox.height * 0.5)
@@ -216,8 +249,9 @@ test('morph the two runs into one card, pick their references, sorted values, he
 test('two RDFs of the vault, whose runs are unknown: the morph menu is there, and they morph by their group names', async ({ page }) => {
   const errors = watch(page)
   await page.goto(url)
+  await expect(page.getByRole('button', { name: 'settings' })).toBeVisible()
   await page.keyboard.press('d')
-  const dialog = page.getByRole('dialog', { name: '(de)Cypher' })
+  const dialog = page.getByRole('region', { name: 'compare', exact: true })
   await dialog.getByRole('radio', { name: 'vault' }).click()
   await dialog.getByText('Methionine × PG · run a', { exact: true }).click()
   await dialog.getByText('Methionine × PG · run b', { exact: true }).click()
@@ -246,5 +280,58 @@ test('two RDFs of the vault, whose runs are unknown: the morph menu is there, an
   await expect(card.getByRole('button', { name: 'take NH_N...S off the plot' })).toHaveCount(2)
   await card.getByRole('button', { name: 'split' }).click()
   await expect(cards).toHaveCount(2)
+  expect(errors).toEqual([])
+})
+
+test('one gesture scheme (R8a): a legend acts alike on a result chart and in compare; Shift-click on a structure takes the residue', async ({ page }) => {
+  const errors = watch(page)
+  const legendCase = async (items: (name: RegExp) => ReturnType<Page['getByRole']>, count: () => Promise<number>) => {
+    await items(/^O5\.\.\.S/).click()
+    await expect(items(/^O5\.\.\.S/)).toHaveAttribute('aria-pressed', 'true')
+    expect(await count()).toBe(1)
+    await items(/^O5\.\.\.S/).click()
+    await expect.poll(count).toBe(13)
+    await items(/^O5\.\.\.S/).click({ modifiers: ['ControlOrMeta'] })
+    await expect(items(/^O5\.\.\.S/)).toHaveAttribute('aria-pressed', 'false')
+    expect(await count()).toBe(12)
+  }
+  // A result chart's legend.
+  await page.goto(url + '#results/jaaaaaaaaaaa1')
+  const legend = page.getByRole('group', { name: 'curves of g(r)' })
+  await expect(legend).toBeVisible()
+  await legendCase(n => legend.getByRole('button', { name: n }), () => legend.locator('button[aria-pressed=true]').count())
+  // Compare's chips: the same rules.
+  await page.goto(url + '#compare?jobs=jaaaaaaaaaaa1')
+  const card = page.getByRole('region', { name: /rdf_o111_Methionine_H/ }), chips = card.getByRole('group', { name: 'groups' })
+  await expect(card.getByText(/Groups 13 · plotted/)).toBeVisible()
+  await legendCase(n => chips.getByRole('button', { name: n }), () => chips.locator('button[aria-pressed=true]').count())
+
+  // Shift-click on an atom of a group: every group with an atom in its residue. A plotted group's atom is found by its
+  // hue in a picture of the view (the rest is grey, the reference ink), then confirmed by its hover card.
+  // Labels off (from the display menu), so the hues left are atoms, not the groups' name tags.
+  await card.getByRole('button', { name: /^display/ }).click()
+  await card.getByRole('checkbox', { name: 'labels' }).click()
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(300)
+  const canvas = card.locator('canvas'), box = (await canvas.boundingBox())!
+  const spots = await page.evaluate(async b64 => {
+    const img = new Image(); img.src = 'data:image/png;base64,' + b64; await img.decode()
+    const c = document.createElement('canvas'); c.width = img.width; c.height = img.height
+    const x = c.getContext('2d')!; x.drawImage(img, 0, 0)
+    const d = x.getImageData(0, 0, c.width, c.height).data, out: { x: number; y: number }[] = []
+    for (let i = 0; i < d.length && out.length < 40; i += 4 * 7) if (Math.max(d[i], d[i + 1], d[i + 2]) - Math.min(d[i], d[i + 1], d[i + 2]) > 90 && Math.floor(i / 4 / c.width) < c.height * 0.85) out.push({ x: ((i / 4) % c.width) / c.width, y: Math.floor(i / 4 / c.width) / c.height })
+    return out
+  }, (await canvas.screenshot()).toString('base64'))
+  let at: { x: number; y: number } | null = null
+  for (const sp of spots) {
+    const p = { x: box.x + box.width * sp.x, y: box.y + box.height * sp.y + 2 }
+    await page.mouse.move(p.x, p.y)
+    if (await card.getByText(/Shift: its residue/).count()) { at = p; break }
+  }
+  expect(at).not.toBeNull()
+  await page.mouse.click(at!.x, at!.y)
+  await expect(card.getByText('Groups 13 · plotted 01')).toBeVisible()
+  await page.keyboard.down('Shift'); await page.mouse.click(at!.x, at!.y); await page.keyboard.up('Shift')
+  await expect(card.getByText(/Groups 13 · plotted (0[2-9]|1[0-3])/)).toBeVisible()
   expect(errors).toEqual([])
 })

@@ -148,3 +148,8 @@ export function whamArgv(r: { options: Options; pull: 'pullx' | 'pullf' }, io: W
   }
   return args;
 }
+
+/** The windows in their order along ξ (R7a): sorted by where each histogram peaks, as the overlap table sorts them. */
+export function windowsInOrder(h: Histograms): { window: number; x: number[]; y: number[] }[] {
+  return neighbourOverlaps(h).order.map(w => ({ window: w, x: h.x, y: h.windows[w - 1] }));
+}

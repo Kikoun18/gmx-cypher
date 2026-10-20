@@ -31,7 +31,7 @@ export function Analysis({ gmx, draft, setDraft, onStarted }: { gmx: AppState['g
   return (
     <div className="flex flex-col gap-5">
       <Field>
-        <Label htmlFor="analysis-command">analysis</Label>
+        <Label htmlFor="analysis-command">command</Label>
         <Select value={command.tool} onValueChange={tool => setDraft(d => withCommand(d, tool))}>
           <SelectTrigger id="analysis-command" size="sm" className="w-[38rem] max-w-full"><SelectValue /></SelectTrigger>
           <SelectContent>

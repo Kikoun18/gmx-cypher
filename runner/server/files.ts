@@ -1,11 +1,11 @@
 // Files by path, only inside the allowed folders (T10), and uploads written once (T11).
 
 import { createHash, randomBytes } from 'node:crypto';
-import { createReadStream, createWriteStream, mkdirSync, readdirSync, realpathSync, statSync } from 'node:fs';
+import { createReadStream, createWriteStream, mkdirSync, readdirSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, sep } from 'node:path';
 import type { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
-import { safeFileName } from '../../app/src/lib/storage/path';
+import { safeFileName } from '../../matrix/src/lib/storage/path';
 import { inputRole } from '../src/lib/inputs';
 import { HttpError } from './http';
 
@@ -69,4 +69,14 @@ export async function sha256File(path: string): Promise<string> {
   const hash = createHash('sha256');
   for await (const chunk of createReadStream(path)) hash.update(chunk as Buffer);
   return hash.digest('hex');
+}
+
+/**
+ * Replaces a file this job made with new text, whole or not at all (R2b): written to `<path>.tmp-<tag>`, created
+ * exclusively, then renamed into place. A reader sees the old file or the new one, never half of one.
+ */
+export function replaceOwn(path: string, text: string, tag: string) {
+  const tmp = path + '.tmp-' + tag;
+  writeFileSync(tmp, text, { flag: 'wx' });
+  try { renameSync(tmp, path); } catch (e) { rmSync(tmp, { force: true }); throw e; }
 }

@@ -72,7 +72,7 @@ describe('a run of gmx hbond, the selection tool (R8)', () => {
 
   it('the legacy command is refused where the selection tool is', async () => {
     const { s, req, roots } = await setup('hbond-legacy');
-    await expect(planRun(s.ctx, req, roots)).rejects.toMatchObject({ status: 409, message: expect.stringContaining('question 33') });
+    await expect(planRun(s.ctx, req, roots)).rejects.toMatchObject({ status: 409, message: expect.stringContaining("so the two tools' criteria never mix") });
     await s.close();
   });
 });

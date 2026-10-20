@@ -2,8 +2,8 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { detectAna, getAnalyses, parseTable } from '../../app/src/lib/seq';
-import { parseGmxHeader } from '../../app/src/lib/gmxHeader';
+import { detectAna, getAnalyses, parseTable } from '../../matrix/src/lib/seq';
+import { parseGmxHeader } from '../../matrix/src/lib/gmxHeader';
 import { FAKE_GMX, tmp } from './helpers';
 
 function system() {
@@ -18,7 +18,7 @@ describe('the fake gmx', () => {
     expect(out).toBe(readFileSync(new URL('./fixtures/gmx-2025.4/rdf-h.txt', import.meta.url), 'utf8'));
   });
 
-  it('writes an RDF that PMF Sequences reads as an RDF, with its own command, working directory and group names', () => {
+  it('writes an RDF that the Matrix reads as an RDF, with its own command, working directory and group names', () => {
     const dir = system();
     const r = spawnSync(FAKE_GMX, ['rdf', '-f', 'nvt.xtc', '-s', 'nvt.tpr', '-n', 'g.ndx', '-ref', 'group 0', '-sel', 'group 1', 'group 2', '-o', 'rdf.xvg', '-cn', 'cn.xvg'], { cwd: dir, encoding: 'utf8' });
     expect(r.status).toBe(0);

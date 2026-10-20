@@ -8,7 +8,7 @@ import type { Options } from './rdf';
 
 /** The options offered; `contacts` switches -on on and gmx-cypher names its file. -pi, -max, -or and -ox are not offered. */
 export const MINDIST_FORM: CommandOption[] = [
-  { flag: 'contacts', group: 'contacts', label: 'contacts too', what: 'the number of atom pairs within the contact distance, over time: a second file, not sent to the vault (PMF Sequences gives it no type)', switch: 'on' },
+  { flag: 'contacts', group: 'contacts', label: 'contacts too', what: 'the number of atom pairs within the contact distance, over time: a second file, not sent to the vault (the Matrix gives it no type)', switch: 'on' },
   { flag: 'd', group: 'contacts', label: 'contact distance', unit: 'nm', what: 'pairs closer than this count as contacts' },
   { flag: 'group', group: 'contacts', label: 'one per atom of the other group', what: 'an atom of the other group near several atoms of the reference counts once' },
   { flag: 'b', group: 'frames', label: 'first', unit: 'ps', what: 'frames before this time are skipped' },

@@ -1,58 +1,17 @@
-// (de)Cypher's sources as analyses: a gmx-cypher run (its record and its g(r)), an RDF of the PMF Sequences
+// (de)Cypher's sources as analyses: a gmx-cypher run (its record and its g(r)), an RDF of the Matrix
 // vault, or files from disk (gro, pdb, ndx, xvg, run.json) linked as the RDF Explorer design links them. The
-// x and y come from PMF Sequences' own parseTable; a curve's peak is its highest point (T152), not the first shell's (T27).
+// x and y come from the Matrix's own parseTable; a curve's peak is its highest point (T152), not the first shell's (T27).
 
-import { parseTable } from '../../../app/src/lib/seq'
-import { structFormat } from '../../../app/src/lib/structFile'
+import { parseTable } from '../../../matrix/src/lib/seq'
 import { parseNdx } from '../lib/ndx'
-import { decypherKit, type Analysis, type Group, type Peak, type Sel, type Struct, type Tone } from './kit'
+import { peaks } from '../lib/rdf'
+import { fromRanges, readStructure, TONES } from '../core/index'
+import type { Analysis, Group, Peak, Sel, Struct, Tone } from '../core/kit'
+import { curveGroup } from '../core/cards'
 
-const kit = decypherKit()
-export const TONES = kit.TONES
 const toneOf = (t: unknown, i: number): Tone => (TONES.includes(t as Tone) ? (t as Tone) : TONES[i % TONES.length])
 export const basename = (s: string) => String(s || '').replace(/['"]/g, '').split(/[\\/]/).pop() || ''
 export const stemOf = (n: string) => n.replace(/\.run\.json$/i, '').replace(/\.(xvg|ndx|gro|pdb|json)$/i, '')
-
-// ---------- structures ----------
-export function parseGro(text: string): Struct {
-  const lines = text.split(/\r?\n/), n = parseInt(lines[1], 10)
-  if (!(n > 0)) throw new Error('no atom count on line 2')
-  if (lines.length < n + 2) throw new Error('it ends before its ' + n + ' atoms')
-  const nr: number[] = new Array(n), resnr: number[] = new Array(n), resn: string[] = new Array(n), name: string[] = new Array(n), xyz: number[] = new Array(3 * n)
-  // Coordinates are fixed-width; a .gro written with more decimals widens them, read from the first atom.
-  let w = 8
-  const s0 = lines[2].slice(20), d1 = s0.indexOf('.'), d2 = s0.indexOf('.', d1 + 1)
-  if (d1 >= 0 && d2 > d1) w = d2 - d1
-  for (let i = 0; i < n; i++) {
-    const L = lines[i + 2]
-    nr[i] = i + 1; resnr[i] = parseInt(L.slice(0, 5), 10); resn[i] = L.slice(5, 10).trim(); name[i] = L.slice(10, 15).trim()
-    for (let k = 0; k < 3; k++) xyz[3 * i + k] = parseFloat(L.slice(20 + k * w, 20 + (k + 1) * w))
-  }
-  const box = (lines[n + 2] || '').trim().split(/\s+/).map(Number)
-  return { title: lines[0].trim(), n, nr, resnr, resn, name, xyz, box: [box[0] || 0, box[1] || 0, box[2] || 0] }
-}
-
-/** A .pdb's first model, in nm like a .gro; its box from CRYST1. */
-export function parsePdb(text: string): Struct {
-  const s: Struct = { title: '', n: 0, nr: [], resnr: [], resn: [], name: [], xyz: [], box: [0, 0, 0] }
-  for (const l of text.split(/\r?\n/)) {
-    if (l.startsWith('ENDMDL')) break
-    if (l.startsWith('TITLE') && !s.title) s.title = l.slice(10).trim()
-    if (l.startsWith('CRYST1')) s.box = [parseFloat(l.slice(6, 15)) / 10 || 0, parseFloat(l.slice(15, 24)) / 10 || 0, parseFloat(l.slice(24, 33)) / 10 || 0]
-    if (!/^(ATOM  |HETATM)/.test(l)) continue
-    const p = l.padEnd(80)
-    s.n++; s.nr.push(s.n); s.name.push(p.slice(12, 16).trim()); s.resn.push(p.slice(17, 21).trim()); s.resnr.push(parseInt(p.slice(22, 26), 10))
-    s.xyz.push(parseFloat(p.slice(30, 38)) / 10, parseFloat(p.slice(38, 46)) / 10, parseFloat(p.slice(46, 54)) / 10)
-  }
-  if (!s.n) throw new Error('no ATOM or HETATM lines')
-  return s
-}
-
-export function parseStruct(name: string, text: string): Struct {
-  const f = structFormat(name, text)
-  if (!f) throw new Error(basename(name) + ' is not a .gro or .pdb')
-  return f === 'gro' ? parseGro(text) : parsePdb(text)
-}
 
 // ---------- g(r) ----------
 export interface Xvg { x: number[]; ys: number[][]; legends: string[]; xlabel: string; ylabel: string; ndxName: string | null; refIdx: number | null; selIdx: number[] | null }
@@ -75,6 +34,12 @@ export function parseXvg(text: string): Xvg {
   return { x, ys, legends: ys.map((_, i) => t.head.legends[i] || ''), xlabel: t.head.xLabel, ylabel: t.head.yLabel, ndxName, refIdx, selIdx }
 }
 
+/** The curve's first shell (T27's rule, R3d): none when g(r) never rises above 1. */
+export function shellOf(x: number[], y: number[]): Peak | null {
+  const s = peaks(x.flatMap((v, i) => (Number.isFinite(v) && Number.isFinite(y[i]) ? [[v, y[i]] as [number, number]] : []))).firstShell
+  return s && { r: s.r, g: s.g }
+}
+
 /** The curve's highest point (the first of equal ones), wherever it is; null for a curve with no value above zero. */
 export function peakOf(x: number[], y: number[]): Peak | null {
   let best = -1
@@ -88,24 +53,27 @@ function withCurves(x: Xvg, groups: Group[]): Sel[] {
     let col = x.legends.indexOf(g.name)
     if (col < 0) col = i
     const y = x.ys[col] || []
-    return { ...g, y, peak: y.length ? peakOf(x.x, y) : null }
+    return { ...g, y, peak: y.length ? peakOf(x.x, y) : null, shell: y.length ? shellOf(x.x, y) : null }
   }).filter(g => g.y.length)
 }
 
 // ---------- a run record ----------
 export interface RecordGroup { index?: number; role: string; name: string; tone?: string; atoms: string }
 export interface RecordLike {
-  analysis?: string; job?: string; record?: string
+  analysis?: string; job?: string; record?: string; status?: string; complete?: boolean
   command?: { args?: string[] }
   frames?: { analysed: number; lastTime: number } | null
   inputs?: Record<string, { path: string } | undefined>
   groups: RecordGroup[]
   options?: { flag: string; value: unknown }[]
+  outputs?: { kind: string; path: string }[]
+  /** gmx distance's averages, as it printed them (R7). */
+  distances?: { average: number }[]
 }
 
 /** A record's reference and selections, atoms from its ranges. */
 export function recordGroups(r: RecordLike): { ref: Group | null; sels: Group[] } {
-  const conv = (g: RecordGroup, i: number): Group => ({ name: g.name, atoms: kit.ranges(g.atoms), tone: toneOf(g.tone, i) })
+  const conv = (g: RecordGroup, i: number): Group => ({ name: g.name, atoms: fromRanges(g.atoms), tone: toneOf(g.tone, i) })
   const r0 = r.groups.find(g => g.role === 'reference')
   return { ref: r0 ? conv(r0, 0) : null, sels: r.groups.filter(g => g.role === 'selection').map(conv) }
 }
@@ -118,12 +86,39 @@ export const binOf = (r: RecordLike | null, x: number[]) => {
 /** Its facts in one line: what it is, the frames, the bin, the reference. */
 export function facts(parts: (string | null | false | undefined)[]) { return parts.filter(Boolean).join(' · ') }
 
-export function fromRecord(o: { id: string; kind: Analysis['kind']; title: string; label: string; source: string; record: RecordLike; xvg: string; struct: string | null; structNote: string }): Analysis {
-  const x = parseXvg(o.xvg), { ref, sels } = recordGroups(o.record), bin = binOf(o.record, x.x)
+type RecordSource = { id: string; kind: Analysis['kind']; title: string; label: string; source: string; record: RecordLike; xvg: string; struct: string | null; structNote: string }
+
+export function fromRecord(o: RecordSource): Analysis {
+  const x = parseXvg(o.xvg), command = o.record.analysis ?? 'rdf'
+  if (command !== 'rdf') return fromResult(o, x, command)
+  const { ref, sels } = recordGroups(o.record), bin = binOf(o.record, x.x)
   return {
     id: o.id, kind: o.kind, title: o.title, label: o.label, x: x.x, xlabel: x.xlabel || 'r (nm)', ylabel: x.ylabel || 'g(r)', ref, sels: withCurves(x, sels),
     struct: o.struct, structNote: o.structNote,
     sub: facts([o.source, o.record.frames ? o.record.frames.analysed + ' frames' : null, bin ? 'bin ' + bin + ' nm' : null, ref ? 'ref ' + ref.name + ' · ' + ref.atoms.length + ' atoms' : null]),
+  }
+}
+
+/**
+ * Any other command's result (R10a): a curve per column of its main file, each with the group it measures, drawn from
+ * the data with no rule and no peaks; a reference that no curve measures is the reference.
+ */
+const QUANTITY: Record<string, string> = { rmsf: 'RMSF', energy: 'energy', distance: 'distance', mindist: 'minimum distance' }
+function fromResult(o: RecordSource, x: Xvg, command: string): Analysis {
+  const groups = o.record.groups.map((g, i) => ({ role: g.role, name: g.name, atoms: fromRanges(g.atoms), tone: toneOf(g.tone, i) }))
+  const of = x.ys.map((_, i) => curveGroup(command, groups, i))
+  const sels: Sel[] = x.ys.map((y, i) => ({ name: of[i]?.name ?? (command.startsWith('gyrate') && i ? 'about ' + 'xyz'[i - 1] : x.legends[i] || 'series ' + (i + 1)), atoms: of[i]?.atoms ?? [], tone: of[i]?.tone ?? TONES[i % TONES.length], y, peak: null, shell: null }))
+  const r = groups.find(g => g.role === 'reference' && !of.includes(g)), ref = r ? { name: r.name, atoms: r.atoms, tone: r.tone } : null
+  // gmx rms fits on its first group (R10d), unless -fit none.
+  const fit = command === 'rms' && groups[0] && o.record.options?.find(f => f.flag === 'fit')?.value !== 'none' ? { name: groups[0].name, atoms: groups[0].atoms } : undefined
+  return {
+    // gmx writes some y labels as a unit alone, "(nm)": the quantity is named in front of it.
+    id: o.id, kind: o.kind, command, title: o.title, label: o.label, x: x.x, xlabel: x.xlabel || 'x', ylabel: /^\(/.test(x.ylabel) ? (QUANTITY[command] ?? 'value') + ' ' + x.ylabel : x.ylabel || 'y', ref, sels, struct: o.struct, structNote: o.structNote,
+    plot: { y: command.startsWith('hbond') ? 'zero' : 'data', rule: null },
+    // RMSF is painted on the structure (R10b): per atom, or per residue with -res.
+    ...(command === 'rmsf' && sels[0] ? { paint: { by: o.record.options?.some(f => f.flag === 'res' && f.value === true) ? 'residue' as const : 'atom' as const, values: x.x.map((v, i): [number, number] => [v, sels[0].y[i]]), label: 'RMSF', unit: 'nm' } } : {}),
+    ...(fit ? { fit } : {}),
+    sub: facts([o.source, 'gmx ' + command, o.record.frames ? o.record.frames.analysed + ' frames' : null, ref ? 'ref ' + ref.name + ' · ' + ref.atoms.length + ' atoms' : null, command === 'rms' ? (fit ? 'fit on ' + fit.name : 'no fit') : null]),
   }
 }
 
@@ -145,7 +140,7 @@ function interp(xs: number[], ys: number[], x: number) {
 }
 
 /**
- * An RDF analysis of PMF Sequences: each curve from its file's columns as the vault records them. With the
+ * An RDF analysis of the Matrix: each curve from its file's columns as the vault records them. With the
  * gmx-cypher run that wrote the file (found by its SHA-256), column k is that run's selection k: its atoms and hue.
  */
 export function fromVault(o: { id: string; title: string; label: string; source: string; curves: VaultCurve[]; record: RecordLike | null; struct: string | null; structNote: string }): Analysis {
@@ -162,7 +157,7 @@ export function fromVault(o: { id: string; title: string; label: string; source:
     if (!cy) return []
     const y = c.text === first.text && c.xCol === first.xCol ? cy.filter((_, j) => keep[j]).map(v => (Number.isFinite(v) ? v : 0)) : x.map(v => interp(cx, cy, v))
     const g = c.xCol === 1 ? groups.sels[c.yCol - 2] : undefined
-    return [{ name: c.label, atoms: g ? g.atoms : [], tone: g ? g.tone : TONES[i % TONES.length], y, peak: peakOf(x, y) }]
+    return [{ name: c.label, atoms: g ? g.atoms : [], tone: g ? g.tone : TONES[i % TONES.length], y, peak: peakOf(x, y), shell: shellOf(x, y) }]
   })
   const head = t0.head
   return {
@@ -188,13 +183,14 @@ export function fromFiles(files: LoadedFile[]): { analyses: Analysis[]; structs:
     const kind: FileRow['kind'] = /\.json$/i.test(name) ? 'run' : /\.(gro|pdb)$/i.test(name) ? 'gro' : /\.ndx$/i.test(name) ? 'ndx' : /\.xvg$/i.test(name) ? 'xvg' : 'file'
     const p: P = { path: f.path, name, dir, kind, data: null, error: null, status: '' }
     try {
-      if (kind === 'gro') { const s = parseStruct(name, f.text); p.data = s; p.status = '✓ ' + s.n + ' atoms' }
-      else if (kind === 'ndx') { const g = parseNdx(f.text); if (!g.length) throw new Error('no [ groups ]'); p.data = g; p.status = '✓ ' + g.length + ' groups' }
-      else if (kind === 'xvg') { const x = parseXvg(f.text); p.data = x; p.status = '✓ ' + x.ys.length + ' curves · ' + x.x.length + ' points' }
+      if (kind === 'gro') { const s = readStructure(name, f.text); p.data = s; p.status = s.n + ' atoms' }
+      else if (kind === 'ndx') { const g = parseNdx(f.text); if (!g.length) throw new Error('no [ groups ]'); p.data = g; p.status = g.length + ' groups' }
+      else if (kind === 'xvg') { const x = parseXvg(f.text); p.data = x; p.status = x.ys.length + ' curves · ' + x.x.length + ' points' }
       else if (kind === 'run') {
         const r = JSON.parse(f.text) as RecordLike
         if (!r || !Array.isArray(r.groups)) throw new Error('no groups')
-        p.data = r; p.status = '✓ ' + (r.analysis || 'rdf') + (r.frames ? ' · ' + r.frames.analysed + ' frames' : '')
+        if (r.complete === false || r.status === 'running') { p.error = "an incomplete record: its job didn't finish"; return p }
+        p.data = r; p.status = (r.analysis || 'rdf') + (r.frames ? ' · ' + r.frames.analysed + ' frames' : '')
       } else p.error = 'not a gro, pdb, ndx, xvg or run.json'
     } catch (e) { p.error = 'not a valid ' + kind + ' (' + (e as Error).message + ')' }
     return p
@@ -216,7 +212,7 @@ export function fromFiles(files: LoadedFile[]): { analyses: Analysis[]; structs:
       // The record's groups, atoms from the index when it holds the same group at the same place.
       const conv = (g: RecordGroup, i: number): Group => {
         const hit = g.index != null && ng[g.index]?.name === g.name ? ng[g.index] : byName(g.name)
-        return { name: g.name, tone: toneOf(g.tone, i), atoms: hit ? hit.atoms : kit.ranges(g.atoms) }
+        return { name: g.name, tone: toneOf(g.tone, i), atoms: hit ? hit.atoms : fromRanges(g.atoms) }
       }
       const r0 = rec.groups.find(g => g.role === 'reference')
       ref = r0 ? conv(r0, 0) : null
@@ -253,7 +249,7 @@ export function fromFiles(files: LoadedFile[]): { analyses: Analysis[]; structs:
   const order = { gro: 0, ndx: 1, xvg: 2, run: 3, file: 4 }
   const rows: FileRow[] = parsed.slice().sort((p, q) => order[p.kind] - order[q.kind] || p.path.localeCompare(q.path)).map(p => ({
     path: p.path, kind: p.kind, error: !!p.error,
-    status: p.error ? '✗ ' + p.error : p.status + (linked[p.path] ?? (xvgs.length && !used.has(p.path) ? ' · not linked' : '')),
+    status: p.error ? p.error : p.status + (linked[p.path] ?? (xvgs.length && !used.has(p.path) ? ' · not linked' : '')),
   }))
   return { analyses, structs, files: rows }
 }

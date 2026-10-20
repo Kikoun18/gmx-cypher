@@ -1,9 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { structFormat, toPdb } from '../../app/src/lib/structFile';
-import { atomTable, drawnNumbers, fromRanges, toRanges } from '../src/lib/atoms';
+import { structFormat, toPdb } from '../../matrix/src/lib/structFile';
+import { fromRanges, toRanges } from '../src/core/index';
+import { atomTable, drawnNumbers } from '../src/lib/atoms';
 
-const APP = new URL('../../app/test/fixtures/', import.meta.url), NVT = new URL('./fixtures/nvt/', import.meta.url);
+const APP = new URL('../../matrix/test/fixtures/', import.meta.url), NVT = new URL('./fixtures/nvt/', import.meta.url);
 const read = (base: URL, f: string) => readFileSync(new URL(f, base), 'utf8');
 const pdbLines = (pdb: string) => pdb.split('\n').filter(l => /^(ATOM  |HETATM)/.test(l));
 

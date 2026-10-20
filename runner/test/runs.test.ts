@@ -1,7 +1,8 @@
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { recordProblems } from '../src/lib/record';
+import { recordComplete, recordProblems } from '../src/lib/record';
+import { replaceOwn } from '../server/files';
 import type { Group } from '../src/lib/groups';
 import { startRun, type RunRequest } from '../server/runs';
 import { apiServer, RUNNER, tmp } from './helpers';
@@ -21,7 +22,7 @@ async function setup() {
   return { dir, s, req, roots: [dir] };
 }
 
-afterEach(() => { delete process.env.FAKE_GMX_TOUCH; });
+afterEach(() => { delete process.env.FAKE_GMX_TOUCH; delete process.env.FAKE_GMX_SLOW; });
 
 describe('a run writes four new files under one stem' + (REAL ? ' (a real gmx)' : ' (the fake gmx)'), () => {
   it('rdf/rdf_nvt.xvg, _cn.xvg, .ndx and .run.json; the record is complete', async () => {
@@ -66,11 +67,11 @@ describe('a run writes four new files under one stem' + (REAL ? ' (a real gmx)' 
     await s.close();
   });
 
-  it('refuses an output folder inside the PMF Sequences vault: results go there only by sending (review finding 11)', async () => {
+  it('refuses an output folder inside the Matrix vault: results go there only by sending (review finding 11)', async () => {
     const { dir, s, req, roots } = await setup();
     mkdirSync(join(dir, 'vault/ions'), { recursive: true });
     s.ctx.config.vault = join(dir, 'vault');
-    await expect(startRun(s.ctx, { ...req, outDir: join(dir, 'vault/ions') }, roots)).rejects.toThrow(join(dir, 'vault/ions') + ' is inside the PMF Sequences vault; results go there only by send to vault');
+    await expect(startRun(s.ctx, { ...req, outDir: join(dir, 'vault/ions') }, roots)).rejects.toThrow(join(dir, 'vault/ions') + ' is inside the Matrix vault; results go there only by send to vault');
     expect(readdirSync(join(dir, 'vault/ions'))).toEqual([]);
     await s.close();
   });
@@ -100,7 +101,7 @@ describe.skipIf(REAL)('nothing is overwritten, even when files appear meanwhile 
     const { dir, s, req, roots } = await setup();
     process.env.FAKE_GMX_TOUCH = 'rdf=' + join(dir, 'rdf/rdf_nvt.xvg');
     const r = await (await startRun(s.ctx, req, roots)).record;
-    expect(r.problems).toEqual(['gmx backed up a file that appeared during the run: #rdf_nvt.xvg.1#']);
+    expect(r.problems).toEqual(['gmx backed up a file that appeared during the job: #rdf_nvt.xvg.1#']);
     expect(readFileSync(join(dir, 'rdf/#rdf_nvt.xvg.1#'), 'utf8')).toContain('appeared while gmx rdf ran');
     await s.close();
   });
@@ -111,7 +112,7 @@ describe.skipIf(REAL)('nothing is overwritten, even when files appear meanwhile 
     try {
       process.env.FAKE_GMX_TOUCH = 'rdf=' + join(dir, 'rdf/rdf_nvt.xvg');
       const r = await (await startRun(s.ctx, req, roots)).record;
-      expect(r.problems).toEqual(['gmx backed up a file that appeared during the run: #rdf_nvt.xvg.1#']);
+      expect(r.problems).toEqual(['gmx backed up a file that appeared during the job: #rdf_nvt.xvg.1#']);
       expect(r.env.GMX_MAXBACKUP).toBe('99');
     } finally { delete process.env.GMX_MAXBACKUP; }
     await s.close();
@@ -156,3 +157,45 @@ describe('runs over HTTP', () => {
     await s.close();
   });
 });
+
+describe('the record exists from the start (R2b, T157)', () => {
+  // The keys of a record written by batch 2's code from your real run: a completed record now has these and `complete`.
+  const golden = Object.keys(JSON.parse(readFileSync(RUNNER + 'test/fixtures/decypher/rdf_o111_Methionine_H.run.json', 'utf8')));
+
+  it('is written when the job starts, says it is running, and is completed by a rename when it ends', async () => {
+    const { dir, s, req, roots } = await setup();
+    process.env.FAKE_GMX_SLOW = '40';
+    const { job, record } = await startRun(s.ctx, req, roots);
+    const path = join(dir, 'rdf/rdf_nvt.run.json'), first = JSON.parse(readFileSync(path, 'utf8'));
+    expect(first).toMatchObject({ format: 'gmx-cypher run', version: 3, job: job.id, status: 'running', complete: false, ended: null, outputs: [] });
+    expect(first.groups.map((g: { name: string; atoms: string }) => [g.name, g.atoms])).toEqual([['sulfur', '5-30:5'], ['water_O', '43-3239:4'], ['sodium', '31-42']]);
+    expect(recordComplete(first)).toBe(false);
+    expect(recordProblems(first)).toEqual([]);
+    const r = await record, last = JSON.parse(readFileSync(path, 'utf8'));
+    expect(last).toEqual(JSON.parse(JSON.stringify(r)));
+    expect(last).toMatchObject({ status: 'done', complete: true });
+    expect(recordComplete(last)).toBe(true);
+    expect(Object.keys(last).sort()).toEqual([...golden, 'complete'].sort());
+    expect(readdirSync(join(dir, 'rdf')).filter(n => n.includes('.tmp-'))).toEqual([]);
+    await s.close();
+  });
+
+  it('a record from before, without the field, is complete when it has ended', () => {
+    expect(recordComplete(JSON.parse(readFileSync(RUNNER + 'test/fixtures/formats/run-v1.run.json', 'utf8')))).toBe(true);
+    expect(recordComplete({ status: 'running' })).toBe(false);
+  });
+
+  it('replaceOwn writes a whole new file or nothing: a temporary name, then a rename', () => {
+    const d = tmp('own'), p = join(d, 'a.run.json');
+    writeFileSync(p, 'first\n');
+    replaceOwn(p, 'second\n', 'j1');
+    expect(readFileSync(p, 'utf8')).toBe('second\n');
+    expect(readdirSync(d)).toEqual(['a.run.json']);
+    // The temporary name taken: refused, and the record is left as it was.
+    writeFileSync(p + '.tmp-j2', 'someone else\n');
+    expect(() => replaceOwn(p, 'third\n', 'j2')).toThrow(/EEXIST/);
+    expect(readFileSync(p, 'utf8')).toBe('second\n');
+    expect(readFileSync(p + '.tmp-j2', 'utf8')).toBe('someone else\n');
+  });
+});
+

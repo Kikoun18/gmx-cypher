@@ -1,13 +1,14 @@
 // Runs (R5, T21, T29–T31; R4 for the commands without groups): free names chosen for all of a run's files and
 // checked again just before the spawn, each group's size confirmed by gmx select, the index written next to the
-// outputs with O_EXCL, gmx started without a shell, and the run record written when it ends. Nothing existing is
-// ever replaced. A command with groups claims its stem with its index; one without claims it with its record.
+// outputs with O_EXCL, gmx started without a shell, and the run record written when the job starts and completed,
+// by a rename, when it ends (R2b). Nothing existing is ever replaced but the record the job itself wrote. A command
+// with groups claims its stem with its index; one without claims it with its record.
 
 import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, statSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import { atomTable, type Atom } from '../src/lib/atoms';
 import { allNames, COMMANDS, commandOf, roleProblems, type CommandDef, type InputSlot, type OutputNames, type RunIo } from '../src/lib/commands';
-import { awhFrames, awhNames, framesWritten, type AwhFrame } from '../src/lib/awh';
+import { awhFrames, awhNames, awhUnits, framesWritten, type AwhFrame } from '../src/lib/awh';
 import { commonFolder, listFile, whamOutputNames } from '../src/lib/wham';
 import { parseDistanceStats } from '../src/lib/distance';
 import { summaryLines } from '../src/lib/hbond';
@@ -20,12 +21,12 @@ import { structureMismatch } from '../src/lib/checks';
 import { frameEstimate } from '../src/lib/gmxText';
 import { runEstimate, type Options } from '../src/lib/rdf';
 import { buildRecord, type FileInfo, type Output, type RunRecord } from '../src/lib/record';
-import { structFormat } from '../../app/src/lib/structFile';
+import { structFormat } from '../../matrix/src/lib/structFile';
 import type { Ctx } from './api';
 import { awhScan } from './awh';
-import { checkSizes, dumpRunInput } from './check';
+import { checkSizes, dumpRunInput, dumpText } from './check';
 import { energyMenu } from './energy';
-import { inside, sha256File, within } from './files';
+import { inside, replaceOwn, sha256File, within } from './files';
 import { findTool, toolHelp } from './gmx';
 import { HttpError } from './http';
 import type { Job } from './jobs';
@@ -36,7 +37,7 @@ export interface RunRequest {
   inputs: Partial<Record<Slot, string>>; groups: Group[]; options: Options; template?: string; outDir?: string | null;
   /** The energy terms picked, by number from the file's menu (R4); sent on stdin. */
   terms?: number[];
-  /** Values for the name template's PMF Sequences tokens: a batch's path fields (review finding 4). */
+  /** Values for the name template's Matrix tokens: a batch's path fields (review finding 4). */
   names?: Record<string, string>;
   /** A batch run whose names were taken meanwhile takes the next free stem instead of stopping (review finding 5). */
   retryNames?: boolean;
@@ -104,7 +105,7 @@ export async function planRun(ctx: Ctx, req: RunRequest, roots: string[]): Promi
     throw new HttpError(400, folder + ', the folder that holds all the inputs, is outside the allowed folders: choose an output folder inside them');
   // The vault is written only by sending, into a project's _inbox (review finding 11).
   const vault = ctx.config.vault && existsSync(ctx.config.vault) ? realpathSync(ctx.config.vault) : null;
-  if (vault && within(outDir, vault)) throw new HttpError(400, outDir + ' is inside the PMF Sequences vault; results go there only by send to vault');
+  if (vault && within(outDir, vault)) throw new HttpError(400, outDir + ' is inside the Matrix vault; results go there only by send to vault');
   let stem: string;
   try { stem = renderStem(req.template || DEFAULT_TEMPLATE, { ...req.names, analysis: cmd.tool, trajectory: named }); }
   catch (e) {
@@ -142,7 +143,7 @@ export async function planRun(ctx: Ctx, req: RunRequest, roots: string[]): Promi
     if (!frames.length) problems.push('this energy file has no AWH data');
     // gmx awh writes nothing and still exits 0 when -b is past the last frame (2025.4, checked).
     else if (!written.length) problems.push('no AWH frame in this range: the file has frames from ' + frames[0].time + ' to ' + frames[frames.length - 1].time + ' ps');
-    // The last frame is the run's file for the vault (the usual choice for PMF Sequences); the earlier ones come with it.
+    // The last frame is the run's file for the vault (the usual choice for the Matrix); the earlier ones come with it.
     if (files.length) names = { xvg: files[files.length - 1], record: names.record, more: files.slice(0, -1) };
   }
   // gmx wham reads its windows from two lists, written beside the outputs, with the windows' real paths.
@@ -166,7 +167,9 @@ function groupsAtoms(cmd: CommandDef, req: RunRequest, roots: string[]): { atoms
   if (!format) throw new HttpError(400, path + ' is not a .gro or .pdb');
   const count = roleProblems(cmd, Array.isArray(req.groups) ? req.groups.length : 0);
   if (count.length) throw new HttpError(400, count.join('\n'));
-  const names = req.groups.map(g => g.name), atoms = atomTable(text, format);
+  let atoms: Atom[];
+  try { atoms = atomTable(text, format); } catch (e) { throw new HttpError(400, path + ': ' + (e as Error).message); }
+  const names = req.groups.map(g => g.name);
   const sets = req.groups.map((g, i) => {
     const bad = nameProblem(g.name, names.filter((_, j) => j !== i));
     if (bad) throw new HttpError(400, g.name + ': ' + bad);
@@ -193,8 +196,8 @@ const writing = new Map<string, Promise<RunRecord>>();
 export async function recordWritten(jobId: string) { await writing.get(jobId)?.catch(() => {}); }
 
 /**
- * Starts a run, or refuses with the reason. `record` settles once the record is written (tests wait on it);
- * a job interrupted by a restart of gmx-cypher gets no record.
+ * Starts a run, or refuses with the reason. The record is written as the job starts, and `record` settles once it is
+ * completed at the end (tests wait on it); a job interrupted by a restart keeps the first one, which says so (R2b).
  */
 export async function startRun(ctx: Ctx, req: RunRequest, roots: string[]): Promise<{ job: Job; record: Promise<RunRecord> }> {
   let plan = await planRun(ctx, req, roots);
@@ -243,11 +246,38 @@ export async function startRun(ctx: Ctx, req: RunRequest, roots: string[]): Prom
   // The frames it will read (≈), for its progress: the run input's schedule narrowed by -b, -e and -dt.
   const estimate = d && cmd.groups ? runEstimate(frameEstimate(d, inputs.trajectory!.path), req.options || {}) : null;
   const env = { ...Object.fromEntries(Object.entries(process.env).filter(([k]) => k.startsWith('GMX'))) as Record<string, string>, ...plan.env };
+  const help = await toolHelp(ctx.gmx, plan.gmxTool);
+  const windows = plan.windows ? await Promise.all(plan.windows.map(async w => ({ tpr: await fileInfo(w.tpr, true), pull: await fileInfo(w.pull, true) }))) : null;
+  // What gmx awh's ξ is (R7c): read once from the run input, kept in the record so it never needs the run input again.
+  const awhUnitsRead = plan.tool === 'awh' ? awhUnits(await dumpText(ctx.gmx, inside(req.inputs.runInput!, roots), plan.cwd)) : null;
+  const recordOf = (j: Job, outputs: Output[], problems: string[]): RunRecord => buildRecord({
+    analysis: plan.tool, record: plan.names.record, runner: ctx.version, gmx: { path: ctx.gmx.path!, version: ctx.gmx.version! }, env, command: { cwd: plan.cwd, file: plan.file, args: plan.argv },
+    inputs, groups: req.groups ?? [], atoms, sizes, options: plan.options, help, form: cmd.options, template: req.template || DEFAULT_TEMPLATE,
+    outDir: req.outDir ?? null, job: j, outputs, problems, stdin: plan.stdin, terms: req.terms, complete: !!j.ended,
+    ...(windows ? { windows, pull: req.pull ?? 'pullx' } : {}),
+    ...(plan.tool === 'energy' ? { statistics: parseEnergyStats(j.log) } : {}),
+    ...(plan.tool === 'distance' ? { distances: parseDistanceStats(j.log) } : {}),
+    // What gmx hbond found (R8): the donors and acceptors of each group, and the legacy tool's average.
+    ...(cmd.summary ? { summary: summaryLines(j.log, cmd.summary) } : {}),
+    ...(awhUnitsRead ? { awhUnits: awhUnitsRead } : {}),
+    // gmx awh's frames are its files: how many it wrote, and the time of the last (the one for the vault).
+    ...(plan.tool === 'awh' ? { frames: j.ended ? awhRecordFrames(plan.stem, outputs.map(o => o.path.split('/').pop()!)) : null } : {}),
+  });
+  const json = (r: RunRecord) => JSON.stringify(r, null, 2) + '\n';
   const job = ctx.jobs.start({
     kind: plan.tool, title: !cmd.groups ? plan.stem + ' · gmx ' + plan.tool : plan.stem + ' · ' + req.groups[0].name + (req.groups.length > 1 ? ' → ' + req.groups.slice(1).map(g => g.name).join(', ') : ''),
     file: plan.file, args: plan.argv, cwd: plan.cwd, env: plan.env, meta: { stem: plan.stem, outDir: plan.outDir, record: recordPath, names: plan.names, estimate },
     ...(plan.stdin != null ? { stdin: plan.stdin } : {}),
   });
+  // The record from the start (R2b): what is known now, the job running. A command with groups writes it new under its
+  // claimed stem; one without replaces the empty file that claimed it.
+  try {
+    if (cmd.groups) writeFileSync(recordPath, json(recordOf(job, [], [])), { flag: 'wx' });
+    else replaceOwn(recordPath, json(recordOf(job, [], [])), job.id);
+  } catch (e) {
+    ctx.jobs.cancel(job.id);
+    throw new HttpError(409, 'gmx-cypher could not write the record ' + recordPath + ' (' + (e as Error).message + '); the job was cancelled');
+  }
 
   const record = new Promise<RunRecord>((done, fail) => {
     const finish = async (j: Job) => {
@@ -261,21 +291,9 @@ export async function startRun(ctx: Ctx, req: RunRequest, roots: string[]): Prom
       }
       // A GROMACS backup (#name.1#) of one of our names means something wrote it during the run.
       const problems = readdirSync(plan.outDir).filter(n => { const m = /^#(.+)\.\d+#$/.exec(n); return m && ours.has(nameKey(m[1])); })
-        .map(n => 'gmx backed up a file that appeared during the run: ' + n);
-      const r = buildRecord({
-        analysis: plan.tool, record: plan.names.record, runner: ctx.version, gmx: { path: ctx.gmx.path!, version: ctx.gmx.version! }, env, command: { cwd: plan.cwd, file: plan.file, args: plan.argv },
-        inputs, groups: req.groups ?? [], atoms, sizes, options: plan.options, help: await toolHelp(ctx.gmx, plan.gmxTool), form: cmd.options, template: req.template || DEFAULT_TEMPLATE,
-        outDir: req.outDir ?? null, job: j, outputs, problems, stdin: plan.stdin, terms: req.terms,
-        ...(plan.windows ? { windows: await Promise.all(plan.windows.map(async w => ({ tpr: await fileInfo(w.tpr, true), pull: await fileInfo(w.pull, true) }))), pull: req.pull ?? 'pullx' } : {}),
-        ...(plan.tool === 'energy' ? { statistics: parseEnergyStats(j.log) } : {}),
-        ...(plan.tool === 'distance' ? { distances: parseDistanceStats(j.log) } : {}),
-        // What gmx hbond found (R8): the donors and acceptors of each group, and the legacy tool's average.
-        ...(cmd.summary ? { summary: summaryLines(j.log, cmd.summary) } : {}),
-        // gmx awh's frames are its files: how many it wrote, and the time of the last (the one for the vault).
-        ...(plan.tool === 'awh' ? { frames: awhRecordFrames(plan.stem, outputs.map(o => o.path.split('/').pop()!)) } : {}),
-      });
-      // The record of a command with groups is new under its stem; one without was claimed as an empty file above.
-      writeFileSync(recordPath, JSON.stringify(r, null, 2) + '\n', { flag: cmd.groups ? 'wx' : 'w' });
+        .map(n => 'gmx backed up a file that appeared during the job: ' + n);
+      const r = recordOf(j, outputs, problems);
+      replaceOwn(recordPath, json(r), j.id);
       return r;
     };
     const onJob = (j: Job) => { if (j.id === job.id && j.ended) { ctx.jobs.off('job', onJob); finish(j).then(done, fail); } };

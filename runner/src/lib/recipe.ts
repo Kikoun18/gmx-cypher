@@ -3,10 +3,11 @@ import { commandOf, rdfCommand, roleProblems, withCommand } from './commands';
 // possible, hand-picked atoms as ranges), the name template and output folder. One recipe serves other
 // trajectories of the same system, and is checked against each system before it runs there.
 
-import { toRanges, type Atom } from './atoms';
+import { toRanges } from '../core/index';
+import type { Atom } from './atoms';
 import { groupAtoms, type Group } from './groups';
 import type { Options } from './rdf';
-import { safeFileName } from '../../../app/src/lib/storage/path';
+import { safeFileName } from '../../../matrix/src/lib/storage/path';
 
 export interface Recipe {
   format: 'gmx-cypher recipe';
@@ -70,5 +71,5 @@ export function applyRecipe(r: Recipe, atoms: Atom[]): { counts: number[]; probl
   return { counts, problems };
 }
 
-/** The file a recipe is saved in, `<id>.json`: its name made safe as PMF Sequences makes file names. Two names can share one. */
+/** The file a recipe is saved in, `<id>.json`: its name made safe as the Matrix makes file names. Two names can share one. */
 export const recipeId = (name: string) => safeFileName(name + '.json').slice(0, -'.json'.length);

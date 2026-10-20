@@ -1,19 +1,20 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { compactStruct, exportData, exportHtml, exportName } from '../src/decypher/export'
-import { fromFiles, parseGro } from '../src/decypher/parse'
-import { themeTokens } from '../src/decypher/tokens'
+import { parseStructure } from '../src/core/index'
+import { fromFiles } from '../src/decypher/parse'
+import { themeTokens } from '../src/core/tokens'
 import { RUNNER } from './helpers'
 
 const F = RUNNER + 'test/fixtures/decypher/'
 const NAMES = ['9.multiwalker.gro', 'rdf_o111_Methionine_H.ndx', 'rdf_o111_Methionine_H.run.json', 'rdf_o111_Methionine_H.xvg', 'rdf_o111_Methionine_S.ndx', 'rdf_o111_Methionine_S.run.json', 'rdf_o111_Methionine_S.xvg']
 const loaded = () => fromFiles(NAMES.map(n => ({ path: '/home/me/sims/o111/' + n, text: readFileSync(F + n, 'utf8') })))
-const tokens = themeTokens(readFileSync(RUNNER + 'src/tokens.json', 'utf8'))
+const tokens = themeTokens(readFileSync(RUNNER + 'src/tokens.json', 'utf8'), readFileSync(RUNNER + 'src/roles.json', 'utf8'))
 const view = { rep: 'ball & stick' as const, rest: 'grey' as const, labels: true, hydrogens: true, arrange: 'side by side' as const }
 
 describe('the HTML export: one file, nothing fetched, each job still interactive', () => {
   it('structures go without water and ions, at a .gro\'s precision, keeping the atom numbers', () => {
-    const g = parseGro(readFileSync(F + '9.multiwalker.gro', 'utf8')), c = compactStruct(g, new Set())
+    const g = parseStructure(readFileSync(F + '9.multiwalker.gro', 'utf8'), 'gro'), c = compactStruct(g, new Set())
     expect(c.n).toBe(249)
     expect(c.nr[248]).toBe(249)
     expect(c.resn).not.toContain('SOL')
@@ -50,11 +51,24 @@ describe('the HTML export: one file, nothing fetched, each job still interactive
     expect(html).toContain('[data-theme="dark"]{--background:#141312')
     expect(html).toContain('src:url(data:font/woff2;base64,AAAA)')
     expect(html).toContain('kit.mount(document.getElementById("app")')
+    // The kit's data, which it can't import, is written beside its source (R5a): the Matrix's ten dashes.
+    expect(html).toContain('"dashNames":["solid","dashed","dotted"')
     expect(html.match(/<\/script>/g)).toHaveLength(2)
     const json = /<script type="application\/json" id="dc-data">(.*?)<\/script>/s.exec(html)![1]
     expect(JSON.parse(json).analyses[0].title).toBe(a.title)
     expect(html).toContain('<title>(de)Cypher · evil &lt;/script&gt;')
     expect(exportName(analyses, new Date('2026-10-13T10:00:00Z'))).toBe('decypher_2-RDFs_2026-10-13.html')
     expect(exportName([analyses[0]], new Date('2026-10-13T10:00:00Z'))).toBe('decypher_rdf_o111_Methionine_H_2026-10-13.html')
+  })
+
+  it('titles in Archivo 800, as data, as on the page (T160)', () => {
+    const { analyses, structs } = loaded()
+    const d = exportData({ analyses, structs, selected: () => [], tones: {}, compare: null, view, theme: 'light', tokens, structures: false, by: 'gmx-cypher 0.1.0' })
+    const html = exportHtml(d, { regular: 'AAAA', bold: 'BBBB', title: 'CCCC', titleExt: 'DDDD' })
+    expect(html).toContain('@font-face{font-family:Archivo;src:url(data:font/woff2;base64,CCCC) format("woff2");font-weight:800')
+    expect(html).toContain('@font-face{font-family:Archivo;src:url(data:font/woff2;base64,DDDD) format("woff2");font-weight:800')
+    expect(html).toMatch(/\.dc-header h1\{[^}]*font-family:Archivo,/)
+    expect(html).toMatch(/\.dc-bar h2\{[^}]*font-family:Archivo,/)
+    expect(html).not.toMatch(/https?:\/\/fonts/)
   })
 })

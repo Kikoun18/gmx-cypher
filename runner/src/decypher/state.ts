@@ -1,8 +1,9 @@
-// What (de)Cypher shows, kept in this browser (a convenience, never data): the jobs and vault RDFs you picked,
-// and how you last looked at them. Files from disk are read in the page and not kept.
+// What (de)Cypher shows, kept in this browser (a convenience, never data): the vault RDFs and records on disk you
+// picked, and how you last looked at them. Jobs are in the address; files from disk are read in the page, not kept.
 
 import * as React from 'react'
-import type { ColorBy, Arrange, Rep, Rest } from './kit'
+import type { ColorBy, Arrange, LineStyle, Marks, Pins, Rep, Rest, Scale } from '../core/kit'
+import { kit } from '../core/index'
 
 export type SourceRef =
   | { kind: 'job'; id: string }
@@ -23,17 +24,22 @@ const isRef = (r: unknown): r is SourceRef => {
   return !!x && ((x.kind === 'job' && typeof x.id === 'string') || (x.kind === 'record' && typeof x.path === 'string') || (x.kind === 'vault' && ['project', 'row', 'rdf'].every(k => typeof x[k] === 'string')))
 }
 
-/** The picked jobs and vault RDFs, in the order they were picked; the jobs tab's checkboxes and (de)Cypher share them. */
-export function useDecypherSources() {
-  const [refs, setRefs] = React.useState<SourceRef[]>(() => load(REFS, v => (Array.isArray(v) ? v.filter(isRef) : null)) ?? [])
-  React.useEffect(() => save(REFS, refs), [refs])
-  const keys = React.useMemo(() => new Set(refs.map(refKey)), [refs])
+/**
+ * What compare shows: the jobs the address names (the jobs list's selection, R9a), then the vault RDFs and runs on
+ * disk picked, kept in this browser in the order they were picked. A job is never kept here: the address holds it.
+ */
+export function useDecypherSources(jobs: string[], setJobs: (ids: string[]) => void) {
+  const [stored, setStored] = React.useState<SourceRef[]>(() => load(REFS, v => (Array.isArray(v) ? v.filter(isRef).filter(r => r.kind !== 'job') : null)) ?? [])
+  React.useEffect(() => save(REFS, stored), [stored])
+  const refs = React.useMemo(() => [...jobs.map((id): SourceRef => ({ kind: 'job', id })), ...stored], [jobs, stored])
+  const keys = new Set(refs.map(refKey))
+  const set = (next: SourceRef[]) => { setJobs(next.flatMap(r => (r.kind === 'job' ? [r.id] : []))); setStored(next.filter(r => r.kind !== 'job')) }
   return {
     refs,
     has: (r: SourceRef) => keys.has(refKey(r)),
-    toggle: (r: SourceRef) => setRefs(l => (l.some(x => refKey(x) === refKey(r)) ? l.filter(x => refKey(x) !== refKey(r)) : [...l, r])),
-    add: (rs: SourceRef[]) => setRefs(l => [...l, ...rs.filter(r => !l.some(x => refKey(x) === refKey(r)))]),
-    remove: (key: string) => setRefs(l => l.filter(x => refKey(x) !== key)),
+    toggle: (r: SourceRef) => set(keys.has(refKey(r)) ? refs.filter(x => refKey(x) !== refKey(r)) : [...refs, r]),
+    add: (rs: SourceRef[]) => set([...refs, ...rs.filter(r => !keys.has(refKey(r)))]),
+    remove: (key: string) => set(refs.filter(x => refKey(x) !== key)),
   }
 }
 export type DecypherSources = ReturnType<typeof useDecypherSources>
@@ -51,7 +57,8 @@ export interface View {
   arrange: Arrange
   labels: boolean
   hydrogens: boolean
-  peaks: boolean
+  /** The peak marks the charts draw (R3d): the maximum filled, the first shell hollow. A view saved before kept a `peaks` switch. */
+  marks: Marks
   /** Picking a group in one job picks the same group in the others. */
   link: boolean
   /** Analyses left out of the view, by id. */
@@ -62,9 +69,16 @@ export interface View {
   focus: string | null
   /** RDFs morphed into one card each (while each job is shown). */
   morphed: Morph[]
+  /** The axes the cards' charts share (R11a), among like quantities; the cards reset to their own scale, by lead id. */
+  scale: Scale
+  ownScale: string[]
+  /** Curves' styles of their own (R11b), by curve key. */
+  styles: Record<string, LineStyle>
+  /** Each chart's marks and lines (R11c): by its card's lead id, `one` for the one graph. */
+  pins: Record<string, Pins>
 }
 
-export const DEFAULT_VIEW: View = { mode: 'each', colorBy: 'group', rep: 'ball & stick', rest: 'grey', arrange: 'side by side', labels: true, hydrogens: true, peaks: true, link: false, hidden: [], selected: {}, focus: null, morphed: [] }
+export const DEFAULT_VIEW: View = { mode: 'each', colorBy: 'group', rep: 'ball & stick', rest: 'grey', arrange: 'side by side', labels: true, hydrogens: true, marks: 'both', link: false, hidden: [], selected: {}, focus: null, morphed: [], scale: 'own', ownScale: [], styles: {}, pins: {} }
 
 function checkView(v: unknown): View | null {
   if (!v || typeof v !== 'object') return null
@@ -76,10 +90,13 @@ function checkView(v: unknown): View | null {
   const morphed = (Array.isArray(o.morphed) ? o.morphed : []).map(m => ({ ids: strs((m as Morph)?.ids), off: strs((m as Morph)?.off) })).filter(m => m.ids.length > 1)
   return {
     mode: one(o.mode, ['each', 'one'] as const, d.mode), colorBy: one(o.colorBy, ['group', 'job'] as const, d.colorBy),
-    rep: one(o.rep, ['ball & stick', 'licorice', 'spacefill'] as const, d.rep), rest: one(o.rest, ['tinted', 'grey', 'ghost'] as const, d.rest),
+    // A view saved before the one set of style names (R9b) said licorice and spacefill.
+    rep: one(({ licorice: 'sticks', spacefill: 'spheres' } as Record<string, string>)[o.rep as string] ?? o.rep, ['ball & stick', 'sticks', 'spheres'] as const, d.rep), rest: one(o.rest, ['tinted', 'grey', 'ghost'] as const, d.rest),
     arrange: one(o.arrange, ['side by side', 'frame positions'] as const, d.arrange),
-    labels: bool(o.labels, d.labels), hydrogens: bool(o.hydrogens, d.hydrogens), peaks: bool(o.peaks, d.peaks), link: bool(o.link, d.link),
+    labels: bool(o.labels, d.labels), hydrogens: bool(o.hydrogens, d.hydrogens), marks: one(o.marks, ['both', 'maximum', 'first shell', 'none'] as const, (o as { peaks?: boolean }).peaks === false ? 'none' : d.marks), link: bool(o.link, d.link),
     hidden: Array.isArray(o.hidden) ? o.hidden.filter(x => typeof x === 'string') : [], selected, focus: typeof o.focus === 'string' ? o.focus : null, morphed,
+    scale: one(o.scale, ['own', 'x', 'y', 'both'] as const, d.scale), ownScale: strs(o.ownScale), styles: kit.cleanStyles(o.styles),
+    pins: Object.fromEntries(Object.entries(o.pins && typeof o.pins === 'object' ? o.pins : {}).map(([k, p]) => [k, kit.cleanPins(p)])),
   }
 }
 
@@ -88,12 +105,6 @@ export function useView() {
   React.useEffect(() => save(VIEW, view), [view])
   const patch = React.useCallback((p: Partial<View> | ((v: View) => Partial<View>)) => setView(v => ({ ...v, ...(typeof p === 'function' ? p(v) : p) })), [])
   return [view, patch] as const
-}
-
-/** Picking a group: alone (a second click clears it), or added to / taken from the others. */
-export function pickGroup(list: string[], name: string, add: boolean): string[] {
-  if (add) return list.includes(name) ? list.filter(x => x !== name) : [...list, name]
-  return list.length === 1 && list[0] === name ? [] : [name]
 }
 
 /** `other` joins `lead`'s card (making one if it has none), its reference plotted; any card it was in loses it. */

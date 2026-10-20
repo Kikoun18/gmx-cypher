@@ -1,9 +1,9 @@
 import { createHash } from 'node:crypto'
-import { copyFileSync, mkdirSync, readdirSync, readFileSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
+import { copyFileSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { NodeBackend } from '../../app/scripts/node-backend'
-import { newVault, withAnalysis, withPmf, withStructure, fixture } from '../../app/test/helpers'
+import { NodeBackend } from '../../matrix/scripts/node-backend'
+import { newVault, withAnalysis, withPmf, withStructure, fixture } from '../../matrix/test/helpers'
 import { findRuns, readRun, runsBySha, vaultFile, vaultRdfs } from '../server/decypher'
 import { Jobs } from '../server/jobs'
 import { openVault } from '../server/vault'
@@ -20,7 +20,7 @@ function listing(root: string): string[] {
   return out
 }
 
-/** PMF Sequences' own vault: WRWYCR with a PMF run, your H run's g(r) as its RDF on HA, and the peptide's structure. */
+/** The Matrix's own vault: WRWYCR with a PMF run, your H run's g(r) as its RDF on HA, and the peptide's structure. */
 async function madeVault() {
   const dir = tmp('vault')
   const { svc, vault } = await newVault(new NodeBackend(dir))
@@ -30,6 +30,12 @@ async function madeVault() {
   svc.commit(s.store, new Map([...a.uploads, ...r.uploads, ...s.uploads]))
   await svc.flush()
   await vault.close()
+  // The Matrix may still be writing its PMF cache (a .tmp- file, then renamed): the vault is made once it holds still.
+  for (let i = 0, last = ''; i < 40; i++) {
+    const now = listing(dir).join('\n')
+    if (now === last && !now.includes('.tmp-')) break
+    last = now; await new Promise(ok => setTimeout(ok, 50))
+  }
   return dir
 }
 
@@ -44,7 +50,7 @@ function jobsWithRun(home: string) {
   return new Jobs(join(home, 'jobs'))
 }
 
-describe('(de)Cypher reads the RDFs of PMF Sequences, with their structures (read only)', () => {
+describe('(de)Cypher reads the RDFs of the Matrix, with their structures (read only)', () => {
   it('lists each RDF with its curves, its row\'s structures and the run that wrote it; nothing written', async () => {
     const dir = await madeVault(), before = listing(dir), jobs = jobsWithRun(tmp('home'))
     expect([...runsBySha(jobs).values()].map(r => r.job)).toEqual(['jmv5ik7gl0l8e'])
@@ -75,7 +81,7 @@ describe('(de)Cypher reads the RDFs of PMF Sequences, with their structures (rea
   it('the routes: no vault is said in words; with one, the list and its files', async () => {
     const s = await apiServer()
     try {
-      expect(await s.call('/api/decypher/vault')).toEqual({ status: 409, json: { error: 'no vault set: choose the PMF Sequences vault in settings' } })
+      expect(await s.call('/api/decypher/vault')).toEqual({ status: 409, json: { error: 'no vault set: choose the Matrix vault in settings' } })
       s.ctx.config.vault = await madeVault()
       const r = await s.call<{ projects: { rows: { rdfs: { curves: { file: string }[] }[] }[] }[] }>('/api/decypher/vault')
       expect(r.status).toBe(200)
@@ -108,7 +114,7 @@ function runsOnDisk() {
   return { root, sim, out }
 }
 
-describe('(de)Cypher finds RDF runs gmx-cypher wrote before, by their records', () => {
+describe('(de)Cypher finds the jobs gmx-cypher ran before, by their records', () => {
   it('lists the RDF records under a folder, newest first, and reads one with its g(r)', () => {
     const { root, out } = runsOnDisk()
     const found = findRuns(root, [root])
@@ -120,8 +126,24 @@ describe('(de)Cypher finds RDF runs gmx-cypher wrote before, by their records', 
     const run = readRun(join(out, 'rdf_o111_Methionine_H.run.json'), [root])
     expect(run.record.groups[0].name).toBe('H_Met')
     expect(run.xvg).toBe(readFileSync(F + 'rdf_o111_Methionine_H.xvg', 'utf8'))
-    expect(() => readRun(join(out, 'energy_nvt.run.json'), [root])).toThrow('is not the record of an RDF run')
+    // Any command's record is read since R10a; one that names no .xvg of its own has nothing to show, and is not listed.
+    expect(() => readRun(join(out, 'energy_nvt.run.json'), [root])).toThrow('names no .xvg of its own')
     expect(() => readRun(join(out, 'rdf_o111_Methionine_H.xvg'), [root])).toThrow('is not a gmx-cypher run record')
+    // gmx hbond's record brings its pairs file (R10c), while it is there.
+    const H = new URL('./fixtures/hbond/new/', import.meta.url).pathname
+    for (const f of ['hbond_nvt.xvg', 'hbond_nvt_hbonds.ndx']) copyFileSync(H + f, join(out, f))
+    writeFileSync(join(out, 'hbond_nvt.run.json'), JSON.stringify({ format: 'gmx-cypher run', version: 3, analysis: 'hbond', groups: [], outputs: [{ kind: 'xvg', path: join(out, 'hbond_nvt.xvg') }, { kind: 'ndx', path: join(out, 'hbond_nvt_hbonds.ndx') }] }))
+    expect(readRun(join(out, 'hbond_nvt.run.json'), [root]).pairs).toBe(readFileSync(H + 'hbond_nvt_hbonds.ndx', 'utf8'))
+    rmSync(join(out, 'hbond_nvt_hbonds.ndx'))
+    expect(readRun(join(out, 'hbond_nvt.run.json'), [root]).pairs).toBeUndefined()
+  })
+
+  it('skips and refuses a record whose job did not finish: the one written at its start (R2b)', () => {
+    const { root, out } = runsOnDisk()
+    const rec = JSON.parse(readFileSync(join(out, 'rdf_o111_Methionine_H.run.json'), 'utf8'))
+    writeFileSync(join(out, 'rdf_cut.run.json'), JSON.stringify({ ...rec, status: 'running', complete: false, ended: null }))
+    expect(findRuns(root, [root]).runs.map(r => r.stem)).not.toContain('rdf_cut')
+    expect(() => readRun(join(out, 'rdf_cut.run.json'), [root])).toThrow("is incomplete: its job didn't finish")
   })
 
   it('stays inside the allowed folders: a folder outside is refused, a link out is not followed', () => {

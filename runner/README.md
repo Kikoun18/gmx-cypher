@@ -3,9 +3,9 @@
 A local tool that runs GROMACS analyses on your trajectories and energy files: `gmx rdf`, `distance`,
 `hbond`, `rms`, `rmsf`, `gyrate`, `mindist`, `energy`, `awh` and `wham`. You pick atom groups in 3D or by
 rule, see the exact command before it runs, get every output with a run record, and hand results to
-**PMF Sequences** through its vault, where they land in the right row, column and run. A *cluster* tab
+**the Matrix** through its vault, where they land in the right row, column and run. A *cluster* tab
 shows your cluster jobs (`qq jobs` with `gmx-eta -a`). **(de)Cypher** shows the RDFs of several jobs at once, each with the
-structure its groups are atoms of, side by side or on one graph, also RDFs from the PMF Sequences vault with their rows'
+structure its groups are atoms of, side by side or on one graph, also RDFs from the Matrix vault with their rows'
 structures, and exports them as one interactive HTML file.
 
 It runs on your machine (or the machine that has the trajectories), serves its page on 127.0.0.1 only,
@@ -16,10 +16,14 @@ and never deletes or overwrites a file.
 You need Node.js 22.18 or newer, and GROMACS (`gmx_mpi` or `gmx`).
 
 ```sh
-cd runner
+git clone --recurse-submodules https://github.com/Kikoun18/gmx-cypher
+cd gmx-cypher/runner
 npm install
 npm start                       # builds the page, then starts the server
 ```
+
+In a clone you already have, `git submodule update --init` fetches `matrix/` (do it once, and again after a pull that
+moves it). `matrix/` is the Matrix, whose own code gmx-cypher reads vaults with; see *The Matrix* under Development.
 
 It prints an address with a one-time token. Open it in Chrome:
 
@@ -56,8 +60,8 @@ ssh -L 8765:127.0.0.1:8765 workstation      # then open the same address here
 ## A first RDF, step by step
 
 1. **Settings.** Check that `gmx` reads *✓ ready*. Add the folders with your simulations under *allowed
-   folders*; the file browser shows only those. To send results to PMF Sequences, set your *vault folder*
-   (and, optionally, the address where you open PMF Sequences).
+   folders*; the file browser shows only those. To send results to the Matrix, set your *vault folder*
+   (and, optionally, the address where you open the Matrix).
 2. **inputs.** Browse to a run and click its trajectory (`.xtc`, `.trr`, `.tng`). The run input (`.tpr`),
    structure (`.gro` or `.pdb`) and an index (`.ndx`), if any, are suggested from the same folder, each
    with its reason; change any with *pick*. Small GROMACS inputs can also be uploaded. gmx-cypher then checks that
@@ -86,10 +90,10 @@ ssh -L 8765:127.0.0.1:8765 workstation      # then open the same address here
    peak and frames, the options that change g(r), and the cumulative number if you asked for it.
 7. **send to vault…** (needs a vault in settings). Choose the project; the dialog fills sequence, column,
    group and run as the project's folder pattern reads them from the run's folder, names the file by the
-   project's file pattern, and shows where PMF Sequences itself will put it (its own `planBatch` on this
+   project's file pattern, and shows where the Matrix itself will put it (its own `planBatch` on this
    file), including which curves it will import. *send to vault* copies the g(r) file into
    `<project folder>/_inbox/`.
-8. **In PMF Sequences:** open the project, *Vault → Check folder now* (or reload the page), then
+8. **In the Matrix:** open the project, *Vault → Check folder now* (or reload the page), then
    *Vault → Untracked files → attach*. Its upload dialog shows the same landing.
 
 **Recipes** (in the analysis tab, for commands with groups): save the options, groups, file name and folder under a name, load them again for
@@ -109,19 +113,19 @@ vault* sends each by the same rule as a single send.
 
 Each command runs from one definition: the inputs it needs, the options it offers (each with its default
 from your `gmx <tool> -h` and a note on what it changes), its file names, what gmx would refuse (said
-before anything runs), and which file goes to the vault, typed as PMF Sequences types it (checked with
-PMF Sequences' own `detectAna` on real GROMACS output). Where GROMACS 2024 replaced a tool (`hbond`,
+before anything runs), and which file goes to the vault, typed as the Matrix types it (checked with
+the Matrix's own `detectAna` on real GROMACS output). Where GROMACS 2024 replaced a tool (`hbond`,
 `gyrate`), the picker greys out the one your gmx doesn't have, with the reason. Times are in ps and files
-keep xmgrace's `@` lines (gmx's defaults; no form offers others): PMF Sequences reads both.
+keep xmgrace's `@` lines (gmx's defaults; no form offers others): the Matrix reads both.
 
 **Trajectory and groups** (a trajectory, a run input, a structure for the groups):
 
 - **`gmx rdf`**: g(r) of each selection around the reference. Options that change the numbers: `-bin`,
   `-rmax`, `-norm`, `-selrpos`/`-seltype`, `-excl`, `-cut`, `-xy`, `-surf`, `-b`/`-e`/`-dt`. Vault: g(r),
-  typed RDF; the cumulative number (`-cn`) stays here (PMF Sequences would read its title as another RDF).
+  typed RDF; the cumulative number (`-cn`) stays here (the Matrix would read its title as another RDF).
 - **`gmx distance`**: from the reference to each selection over time, between centres of mass or of
   geometry, or atom by atom (*pairs*: as many atoms in each; unequal sizes are refused, gmx would pair
-  them silently). Vault: the averages (`-oav`), typed Distance (PMF Sequences reads the first curve).
+  them silently). Vault: the averages (`-oav`), typed Distance (the Matrix reads the first curve).
   Every distance, x/y/z and the histogram when asked; the histogram stays here.
 - **`gmx hbond`** (GROMACS 2024 and later): H-bonds between the reference and one target, by its own
   criteria (`-hbr`, `-hba`, `-cutoff` ≥ 0.35 nm and ≥ `-hbr`, donor and acceptor elements). Reference and
@@ -135,12 +139,12 @@ keep xmgrace's `@` lines (gmx's defaults; no form offers others): PMF Sequences 
   further groups after the same fit (`-fit`, `-mw`, `-prev`). Vault: typed RMSD (the first curve, the fit
   group's).
 - **`gmx rmsf`**: one group's fluctuation per atom, or per residue (`-res`), fitted unless `-nofit`. Vault:
-  typed RMSF; its x is the atom's number in the system, which PMF Sequences labels "Residue".
+  typed RMSF; its x is the atom's number in the system, which the Matrix labels "Residue".
 - **`gmx gyrate`** (2024 and later; `gyrate-legacy` where it is missing): one group's radius of gyration
   over time, total and about x, y and z, weighted by mass (or charge, or geometry). The two tools agree on
   one molecule and not on a group of several, so they are never mixed. Vault: typed Rg (the total).
 - **`gmx mindist`**: the minimum distance from the reference to each group over time; the contacts within
-  `-d` when asked (a second file, which PMF Sequences gives no type: it stays here). Vault: typed Distance.
+  `-d` when asked (a second file, which the Matrix gives no type: it stays here). Vault: typed Distance.
 
 **An energy file:**
 
@@ -151,7 +155,7 @@ keep xmgrace's `@` lines (gmx's defaults; no form offers others): PMF Sequences 
   energy file.
 - **`gmx awh`**: the PMF of each stored frame, from the energy file and its run input. Choose the last
   frame (the default), every N-th, or all; the page says how many files each choice writes. Files are
-  `<stem>_t<time>.xvg` (PMF Sequences' own name pattern); the last frame goes to the vault, typed PMF, in
+  `<stem>_t<time>.xvg` (the Matrix's own name pattern); the last frame goes to the vault, typed PMF, in
   kJ/mol.
 
 **Window lists:**
@@ -161,7 +165,7 @@ keep xmgrace's `@` lines (gmx's defaults; no form offers others): PMF Sequences 
   temperature from the run inputs (gmx wham would assume 298 K), and shows `-b` as each window's
   equilibration. The result shows the profile with its bootstrap band, the histograms, and the overlap of
   each pair of neighbouring windows, gaps named. Vault: the histograms, typed Histogram; the profile stays
-  here (PMF Sequences would type it Histogram too, or as a PMF give it the AWH correction).
+  here (the Matrix would type it Histogram too, or as a PMF give it the AWH correction).
 
 ## Atom picking
 
@@ -204,11 +208,11 @@ RDF job also has *open in (de)Cypher*. Or press **D** anywhere but in a field: *
 - *jobs*: this gmx-cypher's RDF runs. A running one waits and opens when it ends.
 - *runs*: RDF runs gmx-cypher wrote before, found by their records (`*.run.json`) under a folder of the allowed ones:
   another home's, another machine's. Each opens with its groups and the structure it ran on.
-- *vault*: the RDF analyses of your PMF Sequences vault (*settings → vault*), by project and row. Each comes with its
-  **row's structure** (the `.gro` or `.pdb` PMF Sequences keeps with the sequence) when that has the atoms the groups
+- *vault*: the RDF analyses of your Matrix vault (*settings → vault*), by project and row. Each comes with its
+  **row's structure** (the `.gro` or `.pdb` the Matrix keeps with the sequence) when that has the atoms the groups
   reach; else with the structure the run used, and the note says why (`mmmmmmmm.gro has 139 atoms; the groups reach
   atom 246`). The groups' atoms come from the gmx-cypher run that wrote the file, found by its SHA-256 among this
-  runner's jobs (PMF Sequences keeps files byte for byte); an RDF no run of this gmx-cypher wrote still shows its curves,
+  runner's jobs (the Matrix keeps files byte for byte); an RDF no run of this gmx-cypher wrote still shows its curves,
   without atoms.
 - *files*: gro, pdb, ndx, xvg and run.json files, or a folder of them, dropped anywhere on (de)Cypher or picked. Each
   .xvg finds its record (by the record's `-o`, else by its name), its index (the record's `-n`, the .xvg's command line,
@@ -280,7 +284,7 @@ no ETA.
 | A sent result | `<vault>/<project folder>/_inbox/<name>` |
 
 The stem comes from the file-name template (`{analysis}_{trajectory}` by default, so `rdf_nvt`). It is
-made safe with PMF Sequences' `safeFileName` and free for all of a run's files with its `uniqueName`: if
+made safe with the Matrix's `safeFileName` and free for all of a run's files with its `uniqueName`: if
 `rdf_nvt.xvg` (or any of its files, in any case) exists, the run is `rdf_nvt (2)`. The names are checked
 again just before gmx starts, and the stem is claimed by creating its `.ndx` (or, for a command without
 groups, its record). gmx runs with
@@ -316,18 +320,18 @@ a version 1 recipe selects exactly the atoms it did.
 ## Templates and tokens
 
 - **Output names** (analysis → *file name*): `{analysis}` (the command, `rdf`) and `{trajectory}` (its
-  name without the extension; for energy and awh, the energy file's). In a batch, also PMF Sequences' fields as its path template reads them: `{method}`
+  name without the extension; for energy and awh, the energy file's). In a batch, also the Matrix's fields as its path template reads them: `{method}`
   `{column}` `{name}` `{seq}` `{time}` `{run}` `{temp}` (the preview names a token the path doesn't give).
 - **Sending** fills the *project's own* file pattern with the fields (`{*}` becomes `rdf`), so PMF
   Sequences reads the name back. RDF files are kept apart from PMF files by folder, not by name.
-- **Batch path templates** use PMF Sequences' folder-pattern rules, by its own `parsePath`: tokens never
+- **Batch path templates** use the Matrix's folder-pattern rules, by its own `parsePath`: tokens never
   cross `/`, `**` is any number of folders, `{*}` is one folder that is ignored, and the template matches
   the end of the path below the root.
 
 ## Safety
 
 gmx-cypher can:
-- read files inside the allowed folders, and read your PMF Sequences vault; (de)Cypher gets only the vault's RDF files
+- read files inside the allowed folders, and read your Matrix vault; (de)Cypher gets only the vault's RDF files
   and its rows' structures, and run records found in the allowed folders;
 - start `gmx` and the GROMACS tools it knows (never through a shell), in a trajectory's folder;
 - in the cluster view: start `qq jobs` (`qq jobs -a` with *show finished*) and `gmx-eta -a`, on this machine. The
@@ -354,7 +358,7 @@ cancels its running jobs first.
 
 ```sh
 npm run dev        # server and page with hot reload
-npm test           # checks app/ is as agreed (T144), then the tests (fake gmx)
+npm test           # checks that matrix/ is the pinned Matrix, unchanged (T144), then the tests (fake gmx)
 npm run lint
 npm run build
 npm run e2e        # the browser tests: the smoke test and (de)Cypher's (Playwright, Chromium)
@@ -364,3 +368,23 @@ GMX=/path/to/gmx npx vitest run   # also the tests that need a real gmx
 `test/fake-gmx.mjs` answers like GROMACS 2025.4, with its real text. The design decisions are in
 [`docs/decisions.md`](docs/decisions.md), the plan in [`docs/phase0.md`](docs/phase0.md), and the
 report in [`docs/report.md`](docs/report.md).
+
+## The Matrix (`matrix/`)
+
+`matrix/` is a git submodule: the Matrix, [github.com/Kikoun18/the-matrix](https://github.com/Kikoun18/the-matrix), at the
+commit this repository pins. gmx-cypher takes the vault format, the file parsers and the batch planner from its code
+(`src/lib/seq`, `src/lib/storage/…`, `src/lib/structFile`, `scripts/node-backend`) and some of its test fixtures, and
+never changes it. `npm test` fails when `matrix/` is not at the pinned commit or has changes (`scripts/matrix-pinned.mjs`).
+`matrix/` needs no `npm install` of its own.
+
+To use a newer Matrix, on purpose:
+
+```sh
+git -C matrix fetch && git -C matrix checkout <commit>
+cd runner && npm test           # the tests say whether the runner still agrees with it
+git add matrix && git commit    # the commit is the decision
+```
+
+The Matrix was called PMF Sequences, and lived in this repository's `app/` folder, until October 2026. The documents in
+`docs/` are the record of the work done then: they keep the old name, the `app/` paths and the numbers (T…, R…) of their time.
+What the Matrix *stores* keeps its old name too (a vault's manifest says `"app": "pmf-sequences"`); the Matrix's README says why.

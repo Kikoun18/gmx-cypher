@@ -15,8 +15,9 @@ import { DEFAULT_TEMPLATE } from '../lib/names'
 import type { Options } from '../lib/rdf'
 import { usePlan } from '../plan'
 import { useAwhScan } from '../terms'
-import { DEFAULT_PATTERN, FIELD_LABEL, parseName } from '../../../app/src/lib/seq'
+import { DEFAULT_PATTERN, FIELD_LABEL, parseName } from '../../../matrix/src/lib/seq'
 import { Code } from './Code'
+import { Status } from '../ui/status'
 
 type Kind = FrameChoice['kind']
 
@@ -62,7 +63,7 @@ export function Awh({ gmx, draft, setDraft, onStarted }: { gmx: GmxState; draft:
   if (!edr || !tpr) return <p className="m-0 text-control text-muted-foreground">pick the energy file and its run input in the inputs tab first</p>
   if (read?.error) return <Alert variant="destructive"><X /><AlertTitle>gmx awh could not read these files</AlertTitle><AlertDescription><p className="whitespace-pre-line">{read.error}</p></AlertDescription></Alert>
   if (!read?.scan) return <p className="m-0 text-control text-muted-foreground" aria-live="polite">reading the AWH frames of {edr.split('/').pop()} with gmx awh…</p>
-  if (!frames.length) return <Alert variant="destructive"><X /><AlertTitle>no AWH data</AlertTitle><AlertDescription><p>gmx awh found no AWH frames in {edr.split('/').pop()}: was it written by a run with AWH?</p></AlertDescription></Alert>
+  if (!frames.length) return <Alert variant="destructive"><X /><AlertTitle>no AWH data</AlertTitle><AlertDescription><p>gmx awh found no AWH frames in {edr.split('/').pop()}: was it written by a simulation with AWH?</p></AlertDescription></Alert>
 
   const setOptions = (o: Options) => setDraft(d => ({ ...d, options: o }))
   const every = Number(options.skip) > 1 ? Number(options.skip) : 4
@@ -91,7 +92,7 @@ export function Awh({ gmx, draft, setDraft, onStarted }: { gmx: GmxState; draft:
             <ToggleGroupItem value="every">every {ordinal(every)} · {count({ kind: 'every', n: every })} files</ToggleGroupItem>
             <ToggleGroupItem value="all">all · {count({ kind: 'all' })} files</ToggleGroupItem>
           </ToggleGroup>
-          <FieldHint>{choice === 'last' ? 'the usual choice for PMF Sequences: the profile at the end' : choice === 'every' ? 'for convergence: the profile as it grew' : 'one file per stored frame'} · t = {timesText(written)} ps</FieldHint>
+          <FieldHint>{choice === 'last' ? 'the usual choice for the Matrix: the profile at the end' : choice === 'every' ? 'for convergence: the profile as it grew' : 'one file per stored frame'} · t = {timesText(written)} ps</FieldHint>
         </Field>
         {choice === 'every' && (
           <Field>
@@ -105,28 +106,28 @@ export function Awh({ gmx, draft, setDraft, onStarted }: { gmx: GmxState; draft:
           <Checkbox id="awh-more" className="mt-0.5" checked={options.more === true} onCheckedChange={v => { const { more: _m, ...rest } = options; setOptions(v === true ? { ...rest, more: true } : rest) }} />
           <span><span className="font-bold">{more.label}</span><span className="block text-caption text-muted-foreground">{more.what}</span></span>
         </label>
-        <p className="m-0 text-caption text-muted-foreground">kJ/mol always: PMF Sequences reads kJ/mol (gmx awh -kt is not offered)</p>
+        <p className="m-0 text-caption text-muted-foreground">kJ/mol always: the Matrix reads kJ/mol (gmx awh -kt is not offered)</p>
 
         <Section label="Name" />
         <Field>
           <Label htmlFor="awh-template">output name</Label>
           <Input id="awh-template" size="sm" className="max-w-md" value={draft.template ?? ''} placeholder={DEFAULT_TEMPLATE} onChange={e => setDraft(d => ({ ...d, template: e.target.value || undefined }))} />
-          <FieldHint>gmx awh adds _t&lt;time&gt; to each file · a name like method_col1_SEQ1 gives PMF Sequences' own pattern, {DEFAULT_PATTERN}</FieldHint>
+          <FieldHint>gmx awh adds _t&lt;time&gt; to each file · a name like method_col1_SEQ1 gives the Matrix's own pattern, {DEFAULT_PATTERN}</FieldHint>
         </Field>
         {vaultFile && (parsed?.matched
-          ? <p className="m-0 text-control text-mint-strong" aria-live="polite">✓ PMF Sequences reads {vaultFile} as {Object.entries(parsed.fields).map(([k, v]) => FIELD_LABEL[k as keyof typeof FIELD_LABEL] + ' ' + v).join(' · ')}</p>
-          : <p className="m-0 text-control text-muted-foreground" aria-live="polite">{vaultFile} doesn't follow PMF Sequences' default pattern {DEFAULT_PATTERN}: it can still be sent, and is then named by the project's pattern</p>)}
+          ? <Status level="ok" className="text-control">the Matrix reads {vaultFile} as {Object.entries(parsed.fields).map(([k, v]) => FIELD_LABEL[k as keyof typeof FIELD_LABEL] + ' ' + v).join(' · ')}</Status>
+          : <p className="m-0 text-control text-muted-foreground" aria-live="polite">{vaultFile} doesn't follow the Matrix's default pattern {DEFAULT_PATTERN}: it can still be sent, and is then named by the project's pattern</p>)}
       </div>
 
       <aside className="flex min-w-0 flex-col gap-4">
         <Section label="Command" />
-        {planned?.error && <Alert variant="destructive"><X /><AlertTitle>gmx-cypher can't plan this run</AlertTitle><AlertDescription><p className="whitespace-pre-line">{planned.error}</p></AlertDescription></Alert>}
+        {planned?.error && <Alert variant="destructive"><X /><AlertTitle>gmx-cypher can't plan this job</AlertTitle><AlertDescription><p className="whitespace-pre-line">{planned.error}</p></AlertDescription></Alert>}
         {plan && <>
-          {plan.problems.length > 0 && <Alert variant="destructive" aria-live="polite"><X /><AlertTitle>gmx would refuse this run</AlertTitle><AlertDescription>{plan.problems.map(p => <p key={p}>{p}</p>)}</AlertDescription></Alert>}
+          {plan.problems.length > 0 && <Alert variant="destructive" aria-live="polite"><X /><AlertTitle>gmx would refuse this job</AlertTitle><AlertDescription>{plan.problems.map(p => <p key={p}>{p}</p>)}</AlertDescription></Alert>}
           <Code text={commandText({ cwd: plan.cwd, file: plan.file, args: plan.argv, env: plan.env })} label="awh command" />
           <p className="m-0 text-caption text-muted-foreground">writes {[...(plan.names.more ?? []), plan.names.xvg].length > 1 ? (plan.names.more?.length ?? 0) + 1 + ' files, ' + plan.names.more![0] + ' … ' : ''}{plan.names.xvg} and its record in {plan.outDir.split('/').slice(-2).join('/')}/ · new names, nothing overwritten · {plan.names.xvg} is the one sent to the vault</p>
         </>}
-        {refused?.key === key && <Alert variant="destructive"><X /><AlertTitle>gmx-cypher didn't start this run</AlertTitle><AlertDescription><p className="whitespace-pre-line">{refused.message}</p></AlertDescription></Alert>}
+        {refused?.key === key && <Alert variant="destructive"><X /><AlertTitle>gmx-cypher didn't start this job</AlertTitle><AlertDescription><p className="whitespace-pre-line">{refused.message}</p></AlertDescription></Alert>}
         <div className="flex flex-wrap items-center gap-3">
           <Button size="lg" disabled={!gmx.ok || !!planned?.error || !!plan?.problems.length || starting || !written.length} onClick={start}>{starting ? 'starting…' : 'run'}</Button>
           <span className="text-caption text-muted-foreground" aria-live="polite">{!gmx.ok ? 'no working gmx: see settings' : written.length + ' file' + (written.length > 1 ? 's' : '') + ' of PMF, one per frame'}</span>

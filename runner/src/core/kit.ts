@@ -1,0 +1,1481 @@
+// The visualization core's kit (R5): the structure view, the chart and the curves, shared by the page and by its
+// HTML export. Everything lives inside decypherKit() and uses no name from outside it, so an export carries this
+// very code as its source text (decypherKit.toString()) and draws exactly what the page draws; what it can't
+// import (the tones' order, the Matrix's dashes) it is given as data (KitData), and the export writes that data
+// beside it. Ported from the RDF Explorer design (v3): rdf-lib.js's structure builder, its canvas drawing and its chart.
+
+export type Tone = 'coral' | 'sky' | 'mint' | 'butter' | 'lilac' | 'aqua' | 'rose' | 'stone'
+/** The styles this renderer draws, by the one set of names (question 17); lines and cartoon it does not. */
+export type Rep = 'ball & stick' | 'sticks' | 'spheres'
+export type Rest = 'tinted' | 'grey' | 'ghost'
+export type Arrange = 'side by side' | 'frame positions'
+/** Marks and lines put on a chart (R8a, R11c): a point by its curve's key and index, a line on x or y; each may have a label of its own. */
+export interface Pins { points: { key: string; i: number; label?: string }[]; lines: { axis: 'x' | 'y'; v: number; label?: string }[] }
+/** A curve's style of its own (R11b): a dash by the Matrix's name, a width within Morpheus's 1.5–2 px, a shade in steps (−3…3). */
+export interface LineStyle { dash?: string; width?: number; shade?: number }
+/** Same scale (R11a): the axes compare's charts share, among charts of like quantities. */
+export type Scale = 'own' | 'x' | 'y' | 'both'
+export type ColorBy = 'group' | 'job'
+/** What a click on a structure takes (R8a): the atom, its residue, or its atom name in every residue of that name. */
+export type Scope = 'atom' | 'residue' | 'name'
+/** The keys a structure view reads while held (R8a, from the key registry): C centres on a group, Space pans. */
+export interface HeldKeys { centre: string; pan: string }
+
+/**
+ * A structure's atoms in file order (R5b), each with its GROMACS number (`nr`, 1-based; a subset keeps the numbers),
+ * its element as the Matrix's elementOf decides it (`virtual` and null are what toPdb leaves out), coordinates in nm,
+ * the box's lengths and the box as the file writes it (`cell`: a .gro's 3 or 9 numbers; a .pdb's a, b, c in nm and
+ * its angles; null when there is none).
+ */
+export interface Struct { title: string; n: number; nr: number[]; resnr: number[]; resn: string[]; name: string[]; el: (string | null)[]; xyz: number[]; box: [number, number, number]; cell: number[] | null }
+/** The Matrix's elementOf: an atom's element from its name, its residue (as toPdb reads it) and a .pdb's element column. */
+export type ElementOf = (name: string, resn: string, column?: string) => string | null
+export interface Peak { r: number; g: number }
+/** An atom group: `name` is gmx's, what everything is keyed by; `label` the name shown in its place (R11d), when renamed. */
+export interface Group { name: string; atoms: number[]; tone: Tone; label?: string }
+/** A group's curve, with both peak rules (R3d): `peak` is the maximum, `shell` the first shell (none if g(r) never rises above 1). */
+/** Ramp colours of an ordered curve (R7a), per theme, in place of its tone's. */
+export interface Colors { light: string; dark: string; print?: string }
+export interface Sel extends Group { y: number[]; peak: Peak | null; shell?: Peak | null; colors?: Colors }
+/** Which peak marks a chart draws (R3d): the maximum filled, the first shell hollow. */
+export type Marks = 'both' | 'maximum' | 'first shell' | 'none'
+
+/** One result (an RDF, or any command's since R10a): a gmx-cypher job, a record found on disk, an RDF of the Matrix vault, or files from disk. */
+export interface Analysis {
+  id: string
+  kind: 'job' | 'record' | 'vault' | 'file'
+  /** Its name in a card's header, and its short name in legends. */
+  title: string
+  label: string
+  /** Its facts in one line: source · frames · bin. */
+  sub: string
+  x: number[]
+  xlabel: string
+  ylabel: string
+  ref: Group | null
+  sels: Sel[]
+  /** Key of its structure, and why that one (or why none). */
+  struct: string | null
+  structNote: string
+  /** How its chart is drawn when it is not an RDF (R6a: any result as HTML): its y range, its rule, its x digits. */
+  plot?: Plot
+  /** The gmx command it is a result of, when not an RDF (R10a). */
+  command?: string
+  /** Values to paint on its structure (R10b: RMSF), by atom or residue number, the group's atoms only. */
+  paint?: { by: 'atom' | 'residue'; values: [number, number][]; label: string; unit: string }
+  /** H-bond pairs to draw (R10c): donor, hydrogen, acceptor, the nearest at the structure's positions, of `total` found. */
+  pairs?: { drawn: [number, number, number][]; total: number }
+  /** Lines measured on its structure (R10d): gmx distance's and gmx mindist's, one per group. */
+  lines?: Line[]
+  /** gmx rms's fit group (R10d), shown on its structure. */
+  fit?: { name: string; atoms: number[] }
+}
+/**
+ * A line on a structure (R10d), for one group: from the centre of `at` (the end drawn), along `v` (nm, across the box
+ * edges) to the other end; its length here and gmx's average. com: gmx measured centres of mass, drawn of geometry.
+ */
+export interface Line { group: string; kind: 'com' | 'cog' | 'pairs' | 'closest'; segs: { at: number[]; v: [number, number, number] }[]; here: number; gmx: number | null; total?: number }
+/** A structure's painted atoms (R10b): each atom's value by its GROMACS number, the range, and what the values are. */
+export interface Paint { values: Map<number, number>; min: number; max: number; label: string; unit: string }
+/** A chart's y range (from 0, or the data's own), its dashed rule (g = 1, 0, none) and its x digits. */
+export interface Plot { y: 'zero' | 'data'; rule: number | null; xDigits?: number }
+
+export interface Hue { base: string; fg: string; soft: string; strong: string }
+export interface Palette {
+  dark: boolean; bg: string; fg: string; card: string; secondary: string; muted: string; border: string; input: string; ring: string
+  bond: string; edge: string; hl: number; neutral: Record<string, string>; hues: Record<Tone, Hue>
+  /** The sequential ramp's stops, lowest first (R7a), for values painted on a structure (R10b). */
+  ramp: string[]
+}
+
+export interface Mol {
+  n: number; gnr: number[]; el: string[]; name: string[]; resn: string[]; resnr: number[]
+  local: Float64Array; comp: Int32Array; comps: { minx: number; maxx: number; miny: number; maxy: number; D: number; ox: number; oy: number; R: number[] }[]
+  bonds: Int32Array; g2l: Int32Array; ext: { w: number; h: number }; nmol: number; molOf: Int32Array; molLabels: string[]; truncated: boolean; hidden: number
+  /** The H-bond pairs it can draw (R10c), as "donor-hydrogen-acceptor" numbers: in frame positions, each atom drawn, the two not apart across the box. */
+  links: string[]; arrange: Arrange
+}
+
+/** What a structure view draws: the analysis's groups, which are plotted, its reference(s), and the style. */
+export interface SceneState {
+  mol: Mol | null
+  pal: Palette
+  rep: Rep
+  rest: Rest
+  labels: boolean
+  hydrogens: boolean
+  sels: Group[]
+  /** Indices into `sels` that are plotted. */
+  selected: number[]
+  /** The first is this analysis's reference (solid); others are compared analyses' references on the same structure (dashed). `on: false`: one that is not plotted (morphed RDFs), drawn faint. */
+  refs: { label: string; atoms: number[]; on?: boolean }[]
+  /** A group or reference hovered elsewhere (a chip, a curve), ringed here. */
+  hoverSel: number
+  hoverRef: number
+  /** Atoms painted by a value (R10b), and atoms ringed from elsewhere (a chart's point), by GROMACS number. */
+  paint?: Paint | null
+  ring?: number[]
+  /** H-bond pairs drawn dashed (R10c), those of them the Mol can draw. */
+  pairs?: [number, number, number][]
+  /** Lines drawn dashed in their group's hue (R10d), in frame positions; the fit group ringed (R10d). */
+  lines?: { line: Line; tone: Tone }[]
+  fit?: { label: string; atoms: number[] }
+}
+
+/** The atom under the pointer: its line, its group or reference (−1: none), and where its card goes. */
+export interface AtomHover { atom: string; sel: number; ref: number; left: number; top: number; nr: number; value?: number }
+
+export interface Curve {
+  key: string; name: string; source: string; analysis: string
+  x: number[]; y: number[]; color: string; dash: string; peak: Peak | null; shell?: Peak | null; atoms: number
+  hot?: boolean; dim?: boolean
+  /** Its line's width in px (R11b: 1.5 or 2; 2 when not set); the tone that coloured it; whether a style of its own was set. */
+  width?: number; tone?: Tone; styled?: boolean
+  /** Its group's label, shown in place of its name (R11d). */
+  label?: string
+  /** ± per point, drawn as a band in the curve's colour (WHAM's bootstrap error). */
+  err?: number[]
+  /** Its grey in print (an ordered curve's even grey, R7a); else the Matrix greys its colour. */
+  print?: string
+}
+
+/** A chart as data: [tag, attributes, ...children]. The page renders it with React, the export with the DOM. */
+export type VNode = [string, Record<string, unknown>, ...(VNode | string)[]]
+/** Where a chart drew: margins, plot size, the x and y domains, the grid the pointer snaps to, and the digits its x values and readings need. */
+export interface ChartGeom { m: { l: number; r: number; t: number; b: number }; iw: number; ih: number; x0: number; x1: number; y0: number; y1: number; grid: number[]; xDigits: number; yDigits: number }
+
+/** One job as an export carries it: atoms as ranges, y values rounded, its selection when exported. */
+export interface ExportAnalysis { id: string; title: string; label: string; sub: string; x: number[]; xlabel: string; ylabel: string; ref: { name: string; atoms: string; tone: Tone; label?: string } | null; sels: { name: string; atoms: string; tone: Tone; y: number[]; peak: Peak | null; shell?: Peak | null; colors?: Colors; label?: string }[]; struct: string | null; structNote: string; selected: string[]; tone: Tone; plot?: Plot; paint?: Analysis['paint']; pairs?: Analysis['pairs']; command?: string
+  lines?: (Omit<Line, 'segs'> & { segs: { at: string; v: [number, number, number] }[] })[]; fit?: { name: string; atoms: string } }
+/** Everything an exported page needs: its tokens, structures without solvent (but for H-bond pairs' molecules), the analyses, the comparison and the style. */
+export interface ExportData {
+  /** The page's heading, as chosen ('(de)Cypher' unless changed). */
+  header: string
+  made: string; by: string; theme: 'light' | 'dark'; tokens: { light: Record<string, string>; dark: Record<string, string> }
+  structs: Record<string, Struct>; analyses: ExportAnalysis[]
+  compare: { ids: string[]; focus: string; selected: string[]; colorBy: ColorBy } | null
+  /** RDFs shown as one card (they differ only in their reference): the first leads; `on` are those whose reference is plotted. */
+  morphs?: { ids: string[]; on: string[]; title: string }[]
+  view: { rep: Rep; rest: Rest; labels: boolean; hydrogens: boolean; arrange: Arrange; scale?: Scale; ownScale?: string[]; styles?: Record<string, LineStyle>
+    /** Each chart's marks and lines (R11c), by its card's lead id, or `one` for the one graph. */
+    pins?: Record<string, Pins> }
+}
+
+/** What the kit is made from (src/core/index.ts): the tones in palette order, and the Matrix's dashes with their names. */
+export interface KitData { tones: readonly Tone[]; dash: readonly string[]; dashNames: readonly string[] }
+
+export function decypherKit(data: KitData) {
+  const { tones: TONES, dash: DASH, dashNames: DASH_NAMES } = data
+  const REPS: Rep[] = ['ball & stick', 'sticks', 'spheres']
+  const RESTS: Rest[] = ['tinted', 'grey', 'ghost']
+  /** Water and ions: never drawn, so the view shows the molecules the groups are about. */
+  const SOLV = new Set(['SOL', 'WAT', 'HOH', 'TIP3', 'TIP3P', 'TIP4', 'TIP4P', 'TIP5P', 'SPC', 'SPCE', 'T3P', 'T4P', 'NA', 'CL', 'K', 'NA+', 'CL-', 'SOD', 'CLA', 'POT', 'ION', 'NIO', 'CIO'])
+  const COV: Record<string, number> = { H: 0.031, C: 0.076, N: 0.071, O: 0.066, S: 0.105, P: 0.107, X: 0.08 }
+  const RADS: Record<Rep, Record<string, number>> = {
+    'ball & stick': { H: 0.028, C: 0.042, N: 0.042, O: 0.042, S: 0.056, P: 0.052, X: 0.045 },
+    sticks: { H: 0.02, C: 0.024, N: 0.024, O: 0.024, S: 0.028, P: 0.028, X: 0.024 },
+    spheres: { H: 0.09, C: 0.136, N: 0.124, O: 0.122, S: 0.144, P: 0.144, X: 0.13 },
+  }
+  const BONDW: Record<Rep, number> = { 'ball & stick': 0.016, sticks: 0.044, spheres: 0 }
+  const MAX_ATOMS = 4000
+  /** The highlight's opacity on an atom, per theme (the colours are tokens: the role layer's atom-*, bond and edge). */
+  const HL = { light: 0.45, dark: 0.26 }
+
+  /** The canvas and chart colours of a theme, from its resolved tokens (Morpheus's with gmx-cypher's role layer). Atoms not in a group are warm greys, so the groups' pastels are the only colour in the view. */
+  function palette(dark: boolean, t: Record<string, string>): Palette {
+    const hues = {} as Record<Tone, Hue>
+    for (const k of TONES) hues[k] = { base: t[k], fg: t[k + '-foreground'], soft: t[k + '-soft'], strong: t[k + '-strong'] }
+    const neutral = { C: t['atom-c'], H: t['atom-h'], O: t['atom-o'], N: t['atom-n'], S: t['atom-s'], P: t['atom-p'], X: t['atom-x'] }
+    return { dark, bg: t.background, fg: t.foreground, card: t.card, secondary: t.secondary, muted: t['muted-foreground'], border: t.border, input: t.input, ring: t.ring, bond: t.bond, edge: t.edge, hl: dark ? HL.dark : HL.light, neutral, hues, ramp: [0, 1, 2, 3].map(i => t['ramp-' + i]) }
+  }
+  /** The ramp's colour at t from 0 (the lowest value) to 1 (the highest), between its stops. */
+  function rampAt(pal: Palette, t: number): string {
+    const r = pal.ramp, x = Math.min(1, Math.max(0, Number.isFinite(t) ? t : 0)) * (r.length - 1), i = Math.min(r.length - 2, Math.floor(x))
+    return mix(r[i], r[i + 1], x - i)
+  }
+  /**
+   * What a result's structure shows besides its groups, in words (R10c, R10d): its H-bond pairs, found and drawn, or why
+   * none is; its lines and what they measure; gmx rms's fit group. Null for nothing more.
+   */
+  function structureNote(a: Pick<Analysis, 'pairs' | 'command' | 'lines' | 'fit'> & { ref?: Analysis['ref'] }, mol: Mol | null): string | null {
+    const framed = !mol || mol.arrange === 'frame positions', place = (what: string) => what + ': arrange the molecules in frame positions to draw them'
+    if (a.command === 'hbond-legacy') return 'gmx hbond-legacy writes no pairs to draw: the selection tool, gmx hbond, does'
+    if (a.command === 'hbond') {
+      if (!a.pairs) return 'no pairs drawn: this result came without its _hbonds.ndx'
+      const { drawn, total } = a.pairs, found = total + (total === 1 ? ' pair' : ' pairs') + ' found over the trajectory'
+      if (!mol) return found
+      if (!framed) return place(found)
+      const can = new Set(mol.links), k = drawn.filter(p => can.has(p.join('-'))).length
+      return found + ', drawn dashed at the structure\'s positions: ' + (k < drawn.length ? k + ' of the ' + drawn.length + ' nearest (the rest across the box edge)' : 'the ' + k + ' nearest') + (total > k ? ' · ' + (total - k) + ' not drawn' : '')
+    }
+    if (a.command === 'rms') return a.fit ? 'fitted on ' + a.fit.name + ', which is measured first; each further group is measured after the same fit' : 'no fit: each group is measured where it is'
+    const kind = a.lines?.[0]?.kind, r = a.ref?.name ?? 'the reference'
+    if (!kind) return null
+    if (!framed) return place('lines between ' + (kind === 'closest' ? 'the closest atoms' : kind === 'pairs' ? 'the pairs' : 'the centres'))
+    if (kind === 'closest') return 'dashed: the closest atoms of ' + r + ' and each plotted group, at the structure\'s positions, their distance here beside gmx\'s mean over the frames'
+    const most = a.lines!.find(l => l.total)?.total
+    if (kind === 'pairs') return 'dashed: from atom k of ' + r + ' to atom k of each plotted group, at the structure\'s positions, their mean length here beside gmx\'s average' + (most ? ' · the first 200 of ' + most + ' pairs drawn' : '')
+    return 'dashed: from ' + r + '\'s centre to each plotted group\'s, at the structure\'s positions, its length here beside gmx\'s average · '
+      + (kind === 'com' ? 'centres of geometry: gmx measured centres of mass, which a structure file can\'t give' : 'centres of geometry, as gmx measured')
+  }
+
+  /** An analysis's values on a structure (R10b): each atom of its first group gets its own value, or its residue's. */
+  function paintOf(a: Pick<Analysis, 'paint' | 'sels'>, mol: Mol | null): Paint | null {
+    if (!a.paint || !mol) return null
+    const by = new Map(a.paint.values), within = new Set(a.sels[0]?.atoms ?? []), values = new Map<number, number>()
+    for (let k = 0; k < mol.n; k++) {
+      const nr = mol.gnr[k], v = by.get(a.paint.by === 'atom' ? nr : mol.resnr[k])
+      if (within.has(nr) && v != null && Number.isFinite(v)) values.set(nr, v)
+    }
+    const vs = [...values.values()]
+    return vs.length ? { values, min: Math.min(...vs), max: Math.max(...vs), label: a.paint.label, unit: a.paint.unit } : null
+  }
+
+  /** Sorted atom numbers as `43-3239:4, 5`: runs of three or more with one step, else single numbers. */
+  function toRanges(numbers: number[]): string {
+    const n = [...new Set(numbers)].sort((a, b) => a - b), parts: string[] = []
+    for (let i = 0; i < n.length;) {
+      const step = n[i + 1] - n[i]
+      let j = i + 1
+      while (j + 1 < n.length && n[j + 1] - n[j] === step) j++
+      if (j - i >= 2) { parts.push(n[i] + '-' + n[j] + (step === 1 ? '' : ':' + step)); i = j + 1 }
+      else { parts.push(String(n[i])); i++ }
+    }
+    return parts.join(', ')
+  }
+  /** `43-3239:4, 5` as sorted atom numbers; anything else is refused in words. */
+  function fromRanges(text: string): number[] {
+    const out = new Set<number>()
+    for (const part of text.split(',').map(p => p.trim()).filter(Boolean)) {
+      const m = /^(\d+)(?:-(\d+)(?::(\d+))?)?$/.exec(part)
+      const a = m ? Number(m[1]) : 0, b = m?.[2] ? Number(m[2]) : a, step = m?.[3] ? Number(m[3]) : 1
+      if (!m || a < 1 || b < a || step < 1) throw new Error('not an atom number or range: ' + part)
+      for (let x = a; x <= b; x += step) out.add(x)
+    }
+    return [...out].sort((x, y) => x - y)
+  }
+
+  /**
+   * The one parser for .gro and .pdb (R5b): every atom of a .gro, or of a .pdb's first model, in file order. A .gro's
+   * coordinates are read at the width its first atom is written in (more decimals widen them). A .pdb's residue name
+   * is four columns (18-21, as GROMACS writes TIP3); its element is decided on the first three, as toPdb reads them.
+   */
+  function parseStructure(text: string, format: 'gro' | 'pdb', elementOf: ElementOf): Struct {
+    const lines = text.split(/\r?\n/), s: Struct = { title: '', n: 0, nr: [], resnr: [], resn: [], name: [], el: [], xyz: [], box: [0, 0, 0], cell: null }
+    const add = (resnr: number, resn: string, name: string, el: string | null, x: number, y: number, z: number) => {
+      s.n++; s.nr.push(s.n); s.resnr.push(resnr); s.resn.push(resn); s.name.push(name); s.el.push(el); s.xyz.push(x, y, z)
+    }
+    if (format === 'gro') {
+      const n = parseInt(lines[1], 10)
+      if (!(n > 0)) throw new Error('no atom count on line 2')
+      if (lines.length < n + 2) throw new Error('it ends before its ' + n + ' atoms')
+      s.title = lines[0].trim()
+      let w = 8
+      const s0 = lines[2].slice(20), d1 = s0.indexOf('.'), d2 = s0.indexOf('.', d1 + 1)
+      if (d1 >= 0 && d2 > d1) w = d2 - d1
+      for (let i = 0; i < n; i++) {
+        const L = lines[i + 2], resn = L.slice(5, 10).trim(), name = L.slice(10, 15).trim(), at = (k: number) => parseFloat(L.slice(20 + k * w, 20 + (k + 1) * w))
+        add(parseInt(L.slice(0, 5), 10), resn, name, elementOf(name, resn), at(0), at(1), at(2))
+      }
+      const cell = (lines[n + 2] || '').trim().split(/\s+/).filter(Boolean).map(Number)
+      if (cell.length) s.cell = cell
+      s.box = [cell[0] || 0, cell[1] || 0, cell[2] || 0]
+      return s
+    }
+    for (const l of lines) {
+      if (l.startsWith('ENDMDL')) break
+      if (l.startsWith('TITLE') && !s.title) s.title = l.slice(10).trim()
+      if (l.startsWith('CRYST1')) {
+        // A blank field is no number (Number('') would be 0): a line cut short has no cell, it is not a flat one.
+        const num = (a: number, b: number) => { const t = l.slice(a, b).trim(); return t ? Number(t) : NaN }
+        s.cell = [num(6, 15) / 10, num(15, 24) / 10, num(24, 33) / 10, num(33, 40), num(40, 47), num(47, 54)]
+        s.box = [s.cell[0] || 0, s.cell[1] || 0, s.cell[2] || 0]
+      }
+      if (!/^(ATOM  |HETATM)/.test(l)) continue
+      const p = l.padEnd(80), name = p.slice(12, 16).trim()
+      add(parseInt(p.slice(22, 26), 10), p.slice(17, 21).trim(), name, elementOf(name, p.slice(17, 20).trim(), p.slice(76, 78)), parseFloat(p.slice(30, 38)) / 10, parseFloat(p.slice(38, 46)) / 10, parseFloat(p.slice(46, 54)) / 10)
+    }
+    if (!s.n) throw new Error('no ATOM or HETATM lines')
+    return s
+  }
+
+  // ---------- colour ----------
+  const hexCache: Record<string, number[]> = {}
+  function hex(c: string): number[] {
+    if (hexCache[c]) return hexCache[c]
+    const v = parseInt(c.slice(1), 16)
+    return (hexCache[c] = [(v >> 16) & 255, (v >> 8) & 255, v & 255])
+  }
+  function mix(a: string, b: string, t: number): string {
+    if (t <= 0) return a
+    const A = hex(a), B = hex(b)
+    const r = Math.round(A[0] + (B[0] - A[0]) * t), g = Math.round(A[1] + (B[1] - A[1]) * t), bb = Math.round(A[2] + (B[2] - A[2]) * t)
+    return '#' + ((1 << 24) | (r << 16) | (g << 8) | bb).toString(16).slice(1)
+  }
+  /** WCAG contrast of two colours. */
+  function contrast(a: string, b: string): number {
+    const lum = (c: string) => { const [r, g, bb] = hex(c).map(v => { v /= 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4 }); return 0.2126 * r + 0.7152 * g + 0.0722 * bb }
+    const x = lum(a), y = lum(b)
+    return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05)
+  }
+  function rgba(c: string, a: number): string { const h = hex(c); return 'rgba(' + h[0] + ',' + h[1] + ',' + h[2] + ',' + a + ')' }
+
+  // ---------- structure ----------
+  function eig3(A: number[][]) {
+    const a = A.map(r => r.slice()), v = [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
+    for (let s = 0; s < 60; s++) {
+      let p = 0, q = 1, mx = Math.abs(a[0][1])
+      if (Math.abs(a[0][2]) > mx) { p = 0; q = 2; mx = Math.abs(a[0][2]) }
+      if (Math.abs(a[1][2]) > mx) { p = 1; q = 2; mx = Math.abs(a[1][2]) }
+      if (mx < 1e-12) break
+      const th = 0.5 * Math.atan2(2 * a[p][q], a[q][q] - a[p][p]), c = Math.cos(th), sn = Math.sin(th)
+      for (let k = 0; k < 3; k++) { const kp = a[k][p], kq = a[k][q]; a[k][p] = c * kp - sn * kq; a[k][q] = sn * kp + c * kq }
+      for (let k = 0; k < 3; k++) { const pk = a[p][k], qk = a[q][k]; a[p][k] = c * pk - sn * qk; a[q][k] = sn * pk + c * qk }
+      for (let k = 0; k < 3; k++) { const kp = v[k][p], kq = v[k][q]; v[k][p] = c * kp - sn * kq; v[k][q] = sn * kp + c * kq }
+    }
+    return { vals: [a[0][0], a[1][1], a[2][2]], vecs: v }
+  }
+
+  /**
+   * The drawable structure: solvent and ions left out, bonds guessed from distances (across the box edges),
+   * each molecule made whole and, side by side, laid flat on its own and packed in rows, the molecules with
+   * plotted atoms first. Over 4000 atoms, the groups' atoms are kept and the rest cut in file order. In frame positions,
+   * the molecules of H-bond pairs (R10c: donor, hydrogen, acceptor) are kept though solvent, each moved across the box
+   * edges to its partner.
+   */
+  function buildMol(s: Struct, selNrs: Set<number>, refNrs: Set<number>, arrange: Arrange, pairs: [number, number, number][] = []): Mol | null {
+    if (arrange !== 'frame positions') pairs = []
+    const at = new Map<number, number>(), kept = new Uint8Array(s.n), solv = (i: number) => SOLV.has(String(s.resn[i]).toUpperCase())
+    if (pairs.length) for (let i = 0; i < s.n; i++) at.set(s.nr[i], i)
+    // A paired solvent atom keeps its whole residue: the run of atoms with its residue number and name.
+    for (const nr of new Set(pairs.flat())) {
+      const i = at.get(nr)
+      if (i == null || !solv(i) || kept[i]) continue
+      const same = (j: number) => s.resnr[j] === s.resnr[i] && s.resn[j] === s.resn[i]
+      let a = i, b = i
+      while (a > 0 && same(a - 1)) a--
+      while (b < s.n - 1 && same(b + 1)) b++
+      for (let j = a; j <= b; j++) kept[j] = 1
+    }
+    let idx: number[] = [], hidden = 0
+    for (let i = 0; i < s.n; i++) { if ((solv(i) && !kept[i]) || s.el[i] === 'virtual') hidden++; else idx.push(i) }
+    let truncated = false
+    if (idx.length > MAX_ATOMS) {
+      truncated = true
+      const keep = idx.filter(i => selNrs.has(s.nr[i]) || refNrs.has(s.nr[i]) || kept[i]).slice(0, MAX_ATOMS), kept2 = new Set(keep)
+      for (const i of idx) { if (keep.length >= MAX_ATOMS) break; if (!kept2.has(i)) keep.push(i) }
+      idx = keep.sort((p, q) => p - q)
+    }
+    const n = idx.length
+    if (!n) return null
+    let maxNr = 0
+    for (const i of idx) if (s.nr[i] > maxNr) maxNr = s.nr[i]
+    const el: string[] = new Array(n), raw = new Float64Array(3 * n), g2l = new Int32Array(maxNr + 1).fill(-1)
+    for (let k = 0; k < n; k++) {
+      const i = idx[k]; g2l[s.nr[i]] = k
+      raw[3 * k] = s.xyz[3 * i]; raw[3 * k + 1] = s.xyz[3 * i + 1]; raw[3 * k + 2] = s.xyz[3 * i + 2]
+      // The model's element (an undecided one, such as a coarse-grained bead, is drawn as X).
+      const e = s.el[i]
+      el[k] = e && e.length === 1 && 'HCNOSP'.includes(e) ? e : 'X'
+    }
+    const [bx, by, bz] = s.box
+    const mic = (d: number, L: number) => (L > 0 ? d - L * Math.round(d / L) : d)
+    const adj: number[][] = Array.from({ length: n }, () => []), bonds: number[] = []
+    for (let i = 0; i < n; i++) {
+      const xi = raw[3 * i], yi = raw[3 * i + 1], zi = raw[3 * i + 2], ci = COV[el[i]], hi = el[i] === 'H'
+      for (let j = i + 1; j < n; j++) {
+        if (hi && el[j] === 'H') continue
+        const dx = mic(raw[3 * j] - xi, bx); if (dx > 0.25 || dx < -0.25) continue
+        const dy = mic(raw[3 * j + 1] - yi, by); if (dy > 0.25 || dy < -0.25) continue
+        const dz = mic(raw[3 * j + 2] - zi, bz); if (dz > 0.25 || dz < -0.25) continue
+        const lim = (ci + COV[el[j]]) * 1.2, d2 = dx * dx + dy * dy + dz * dz
+        if (d2 < lim * lim && d2 > 0.0016) { bonds.push(i, j); adj[i].push(j); adj[j].push(i) }
+      }
+    }
+    // Connected components, unwrapped across the periodic boundaries.
+    const molOf = new Int32Array(n).fill(-1), un = new Float64Array(3 * n), mols: { members: number[] }[] = []
+    for (let s0 = 0; s0 < n; s0++) {
+      if (molOf[s0] >= 0) continue
+      const id = mols.length, members = [s0]; molOf[s0] = id
+      un[3 * s0] = raw[3 * s0]; un[3 * s0 + 1] = raw[3 * s0 + 1]; un[3 * s0 + 2] = raw[3 * s0 + 2]
+      for (let q = 0; q < members.length; q++) {
+        const i = members[q]
+        for (const j of adj[i]) {
+          if (molOf[j] >= 0) continue
+          molOf[j] = id; members.push(j)
+          un[3 * j] = un[3 * i] + mic(raw[3 * j] - raw[3 * i], bx)
+          un[3 * j + 1] = un[3 * i + 1] + mic(raw[3 * j + 1] - raw[3 * i + 1], by)
+          un[3 * j + 2] = un[3 * i + 2] + mic(raw[3 * j + 2] - raw[3 * i + 2], bz)
+        }
+      }
+      mols.push({ members })
+    }
+    // Each paired solvent molecule moves by whole boxes to sit by its partner (the first pair naming it), so the pair is drawn short.
+    const L = [bx, by, bz], moved = new Uint8Array(mols.length), links: string[] = []
+    for (const p of pairs) {
+      const [d, h, a] = p.map(nr => (nr < g2l.length ? g2l[nr] : -1))
+      if (d < 0 || h < 0 || a < 0) continue
+      const mh = molOf[h], ma = molOf[a]
+      if (mh !== ma) {
+        const [k, from, to] = !moved[ma] && kept[idx[a]] ? [ma, a, h] : !moved[mh] && kept[idx[h]] ? [mh, h, a] : [-1, 0, 0]
+        if (k >= 0) {
+          const shift = [0, 1, 2].map(c => (L[c] > 0 ? L[c] * Math.round((un[3 * from + c] - un[3 * to + c]) / L[c]) : 0))
+          for (const j of mols[k].members) for (let c = 0; c < 3; c++) un[3 * j + c] -= shift[c]
+        }
+        moved[mh] = moved[ma] = 1
+      }
+      // Drawn only where the drawn hydrogen…acceptor is the shortest across the box: under half a box on each axis.
+      if ([0, 1, 2].every(c => !(L[c] > 0) || Math.abs(un[3 * a + c] - un[3 * h + c]) < L[c] / 2)) links.push(p.join('-'))
+    }
+    // A paired water (R10c) is named by nothing: there are many, and the group already says what they are.
+    const molLabels = mols.map(g => {
+      if (g.members.length < 3 || g.members.every(k => kept[idx[k]])) return ''
+      const seq: string[] = []; let last: string | null = null
+      g.members.slice().sort((p, q) => idx[p] - idx[q]).forEach(k => { const i = idx[k], key = s.resnr[i] + s.resn[i]; if (key !== last) { seq.push(s.resn[i]); last = key } })
+      const u = [...new Set(seq)]
+      return u.length === 1 ? u[0] + ' × ' + seq.length : u.slice(0, 5).join(' · ') + (u.length > 5 ? ' …' : '')
+    })
+    let groups: { members: number[] }[]
+    if (arrange !== 'frame positions') {
+      const score = (g: { members: number[] }) => (g.members.some(k => selNrs.has(s.nr[idx[k]])) ? 0 : g.members.some(k => refNrs.has(s.nr[idx[k]])) ? 1 : 2)
+      groups = mols.slice().sort((p, q) => score(p) - score(q) || q.members.length - p.members.length)
+    } else groups = [{ members: mols.flatMap(g => g.members) }]
+    const local = new Float64Array(3 * n), comp = new Int32Array(n)
+    const comps = groups.map((g, gi) => {
+      let cx = 0, cy = 0, cz = 0
+      g.members.forEach(k => { cx += un[3 * k]; cy += un[3 * k + 1]; cz += un[3 * k + 2] })
+      const m = g.members.length; cx /= m; cy /= m; cz /= m
+      let R = [1, 0, 0, 0, 1, 0, 0, 0, 1]
+      if (m >= 3) {
+        const C = [[0, 0, 0], [0, 0, 0], [0, 0, 0]]
+        g.members.forEach(k => { const v = [un[3 * k] - cx, un[3 * k + 1] - cy, un[3 * k + 2] - cz]; for (let a = 0; a < 3; a++) for (let b = 0; b < 3; b++) C[a][b] += v[a] * v[b] })
+        const { vals, vecs } = eig3(C)
+        const ord = [0, 1, 2].sort((p, q) => vals[q] - vals[p])
+        const e1 = [0, 1, 2].map(r => vecs[r][ord[0]]), e2 = [0, 1, 2].map(r => vecs[r][ord[1]])
+        const e3 = [e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]]
+        R = [...e1, ...e2, ...e3]
+      }
+      let minx = Infinity, maxx = -Infinity, miny = Infinity, maxy = -Infinity, rmax = 0
+      g.members.forEach(k => {
+        const vx = un[3 * k] - cx, vy = un[3 * k + 1] - cy, vz = un[3 * k + 2] - cz
+        const lx = R[0] * vx + R[1] * vy + R[2] * vz, ly = R[3] * vx + R[4] * vy + R[5] * vz, lz = R[6] * vx + R[7] * vy + R[8] * vz
+        local[3 * k] = lx; local[3 * k + 1] = ly; local[3 * k + 2] = lz; comp[k] = gi
+        minx = Math.min(minx, lx); maxx = Math.max(maxx, lx); miny = Math.min(miny, ly); maxy = Math.max(maxy, ly)
+        rmax = Math.max(rmax, Math.hypot(lx, ly, lz))
+      })
+      const pad = 0.1
+      return { minx: minx - pad, maxx: maxx + pad, miny: miny - pad, maxy: maxy + pad, D: rmax * 4 + 0.6, ox: 0, oy: 0, R }
+    })
+    // Shelf-pack the molecules into rows.
+    const gap = 0.45
+    const area = comps.reduce((a, c) => a + (c.maxx - c.minx) * (c.maxy - c.miny), 0)
+    const W = Math.max(Math.max(...comps.map(c => c.maxx - c.minx)), Math.sqrt(area) * 2.2)
+    let cxr = 0, cyr = 0, rowH = 0, totalW = 0
+    comps.forEach(c => {
+      const w = c.maxx - c.minx, h = c.maxy - c.miny
+      if (cxr > 0 && cxr + w > W) { cyr += rowH + gap; cxr = 0; rowH = 0 }
+      c.ox = cxr - c.minx; c.oy = -cyr - c.maxy; cxr += w + gap; rowH = Math.max(rowH, h); totalW = Math.max(totalW, cxr - gap)
+    })
+    const totalH = cyr + rowH
+    comps.forEach(c => { c.ox -= totalW / 2; c.oy += totalH / 2 })
+    return {
+      n, gnr: idx.map(i => s.nr[i]), el, name: idx.map(i => s.name[i]), resn: idx.map(i => s.resn[i]), resnr: idx.map(i => s.resnr[i]),
+      local, comp, comps, bonds: Int32Array.from(bonds), g2l, ext: { w: totalW, h: totalH }, nmol: mols.length, molOf, molLabels, truncated, hidden, links, arrange,
+    }
+  }
+
+  // ---------- the structure view ----------
+  const mul = (A: number[], B: number[]) => {
+    const o = new Array(9)
+    for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) o[3 * r + c] = A[3 * r] * B[c] + A[3 * r + 1] * B[3 + c] + A[3 * r + 2] * B[6 + c]
+    return o as number[]
+  }
+  const rotX = (t: number) => { const c = Math.cos(t), s = Math.sin(t); return [1, 0, 0, 0, c, -s, 0, s, c] }
+  const rotY = (t: number) => { const c = Math.cos(t), s = Math.sin(t); return [c, 0, s, 0, 1, 0, -s, 0, c] }
+  const initRot = () => mul(rotX(-0.32), rotY(0.42))
+  function rr(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
+    ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath()
+  }
+
+  /**
+   * A canvas that draws a Mol and answers the pointer: drag rotates, right- or alt-drag pans, the wheel zooms,
+   * a double click fits the plotted groups, a click on a group's atom picks it (⌘ or Ctrl: adds it; Shift: its residue); where
+   * several references are shown (morphed RDFs), a click on a reference's atom picks that reference the same way.
+   */
+  function structureView(canvas: HTMLCanvasElement, wrap: HTMLElement, cb: { hover: (h: AtomHover | null) => void; pick: (sels: number[], add: boolean) => void; pickRef?: (ref: number, add: boolean) => void }, keys: HeldKeys = { centre: 'c', pan: ' ' }) {
+    const cam = { M: initRot(), zoom: 1, panX: 0, panY: 0 }
+    let st: SceneState | null = null, cw = 0, ch = 0, dpr = 1, fitScale = 0
+    let P: Float64Array | null = null, hitR = new Float32Array(0), vis = new Uint8Array(0)
+    let memb: { groupOf: Int16Array; ref: Uint8Array; refOwner: Int8Array; groupAtoms: number[][]; refAtoms: number[][] } | null = null
+    let hoverAtom = -1, camRaf = 0, fadeRaf = 0
+    let drag: { sx: number; sy: number; x: number; y: number; moved: boolean; pan: boolean } | null = null
+    // The keys held (R8a): Space pans with a left drag; C makes a click centre on the atom's group. Over the canvas, Space doesn't scroll the page.
+    const held = { centre: false, pan: false }
+    let over = false
+    let fade: { img: HTMLCanvasElement; t0: number; dur: number } | null = null
+
+    const cy0 = () => ch / 2 - 14
+    function fit() { const mol = st && st.mol; if (!mol || !cw) return; fitScale = Math.min(cw / (mol.ext.w + 0.5), (ch - 60) / (mol.ext.h + 0.7)) }
+    function membership() {
+      if (memb || !st || !st.mol) return memb
+      const mol = st.mol, n = mol.n, L = mol.g2l, at = (nr: number) => (nr > 0 && nr < L.length ? L[nr] : -1)
+      const groupOf = new Int16Array(n).fill(-1), ref = new Uint8Array(n), refOwner = new Int8Array(n).fill(-1)
+      const groupAtoms = st.sels.map(() => [] as number[]), refAtoms = st.refs.map(() => [] as number[])
+      st.sels.forEach((g, si) => g.atoms.forEach(nr => { const l = at(nr); if (l >= 0 && groupOf[l] < 0) { groupOf[l] = si; groupAtoms[si].push(l) } }))
+      st.refs.forEach((r, ri) => r.atoms.forEach(nr => { const l = at(nr); if (l < 0) return; refAtoms[ri].push(l); if (!ref[l]) { ref[l] = ri === 0 ? 1 : 2; refOwner[l] = ri } }))
+      return (memb = { groupOf, ref, refOwner, groupAtoms, refAtoms })
+    }
+
+    function draw() {
+      const ctx = canvas.getContext('2d'); if (!ctx) return
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, cw, ch)
+      drawScene(ctx, cw, ch)
+      drawFade(ctx)
+    }
+    function snapFade() {
+      if (!canvas.width || !st || !st.mol) return
+      const c = document.createElement('canvas'); c.width = canvas.width; c.height = canvas.height
+      const cx = c.getContext('2d'); if (!cx) return
+      cx.drawImage(canvas, 0, 0)
+      fade = { img: c, t0: 0, dur: 200 }
+      cancelAnimationFrame(fadeRaf)
+      const step = () => { if (!fade) return; draw(); if (fade) fadeRaf = requestAnimationFrame(step) }
+      fadeRaf = requestAnimationFrame(step)
+    }
+    function drawFade(ctx: CanvasRenderingContext2D) {
+      const f = fade; if (!f) return
+      const now = performance.now(); if (!f.t0) f.t0 = now
+      const t = Math.min(1, (now - f.t0) / f.dur), e = 1 - Math.pow(1 - t, 3)
+      ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0)
+      ctx.globalCompositeOperation = 'destination-in'; ctx.fillStyle = 'rgba(0,0,0,' + (0.15 + 0.85 * e) + ')'; ctx.fillRect(0, 0, canvas.width, canvas.height)
+      ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1 - e
+      const sc = 1 - 0.05 * e, W = canvas.width, H = canvas.height
+      ctx.drawImage(f.img, (W * (1 - sc)) / 2, (H * (1 - sc)) / 2, W * sc, H * sc)
+      ctx.restore()
+      if (t >= 1) fade = null
+    }
+
+    function drawScene(ctx: CanvasRenderingContext2D, w: number, h: number) {
+      if (!st || !st.mol || !w || !fitScale) return
+      const mol = st.mol, th = st.pal, T = th.hues, BG = th.card, rep = st.rep, TAU = Math.PI * 2
+      const M = cam.M, s = fitScale * cam.zoom, cx = w / 2 + cam.panX, cy = cy0() + cam.panY, n = mol.n
+      if (!P || P.length !== 4 * n) { P = new Float64Array(4 * n); hitR = new Float32Array(n); vis = new Uint8Array(n) }
+      let zmin = Infinity, zmax = -Infinity
+      for (let k = 0; k < n; k++) {
+        const c = mol.comps[mol.comp[k]], lx = mol.local[3 * k], ly = mol.local[3 * k + 1], lz = mol.local[3 * k + 2]
+        const px = M[0] * lx + M[1] * ly + M[2] * lz, py = M[3] * lx + M[4] * ly + M[5] * lz, pz = M[6] * lx + M[7] * ly + M[8] * lz
+        const f = c.D / (c.D - pz)
+        P[4 * k] = cx + (c.ox + px * f) * s; P[4 * k + 1] = cy - (c.oy + py * f) * s; P[4 * k + 2] = pz; P[4 * k + 3] = f
+        if (pz < zmin) zmin = pz
+        if (pz > zmax) zmax = pz
+      }
+      const mb = membership()!, sels = st.sels, selIdx = new Set(st.selected)
+      const refOff = (ri: number) => ri >= 0 && st!.refs[ri] != null && st!.refs[ri].on === false
+      const rest = selIdx.size ? st.rest : 'tinted', restB = rest === 'tinted' ? 0 : 0.5
+      const hovSi = st.hoverSel, hovRef = st.hoverRef
+      const R = RADS[rep] || RADS['ball & stick'], BW = BONDW[rep] ?? 0.016
+      const kind = new Uint8Array(n), fill: string[] = new Array(n), rim: string[] = new Array(n), lw = new Float32Array(n), bcol: string[] = new Array(n), ringed = new Set(st.ring ?? []), fitted = new Set(st.fit?.atoms ?? [])
+      for (let k = 0; k < n; k++) {
+        const e = mol.el[k], si = mb.groupOf[k], rk = mb.ref[k], isRef = rk > 0
+        const sel = si >= 0 && selIdx.has(si), prev = si >= 0 && si === hovSi && !sel
+        if (e === 'H' && !st.hydrogens && !sel && !prev && !isRef) { vis[k] = 0; hitR[k] = 0; continue }
+        vis[k] = 1; let rs = 1
+        if (isRef) { kind[k] = 3; fill[k] = refOff(mb.refOwner[k]) ? mix(th.fg, th.card, 0.78) : rk === 2 ? mix(th.fg, th.card, 0.3) : th.fg; rim[k] = th.bg; lw[k] = 1; rs = 1.06; bcol[k] = th.bond }
+        else if (sel) { const t = T[sels[si].tone]; kind[k] = 2; fill[k] = t.base; rim[k] = t.strong; lw[k] = 2; rs = rep === 'spheres' ? 1.03 : 1.25; bcol[k] = t.strong }
+        else if (prev) { const t = T[sels[si].tone]; kind[k] = 4; fill[k] = t.soft; rim[k] = t.strong; lw[k] = 1.6; rs = 1.12; bcol[k] = t.strong }
+        else if (si >= 0 && rest === 'tinted') { const t = T[sels[si].tone]; kind[k] = 1; fill[k] = t.soft; rim[k] = t.strong; lw[k] = 1.1; bcol[k] = th.bond }
+        else { kind[k] = 0; fill[k] = th.neutral[e]; rim[k] = mix(fill[k], th.edge, 0.45); lw[k] = 1; bcol[k] = th.bond; if (rest === 'ghost') rs = 0.7 }
+        // A painted atom (R10b) takes the ramp's colour at its value; one ringed from a chart stands out in ink.
+        const pv = !isRef && st.paint ? st.paint.values.get(mol.gnr[k]) : undefined
+        if (pv != null) { kind[k] = 2; fill[k] = rampAt(th, (pv - st.paint!.min) / (st.paint!.max - st.paint!.min || 1)); rim[k] = mix(fill[k], th.fg, 0.4); lw[k] = 1.4; bcol[k] = th.bond; rs = Math.max(rs, 1.1) }
+        if (ringed.has(mol.gnr[k])) { rim[k] = th.fg; lw[k] = 2.6; rs *= 1.35 }
+        hitR[k] = Math.max(1.5, R[e] * s * P[4 * k + 3] * rs)
+      }
+      const ghost = (k: number) => rest === 'ghost' && kind[k] === 0
+      const blend = (k: number, fog: number) => (kind[k] >= 2 ? fog * 0.35 : kind[k] === 1 ? fog : 1 - (1 - restB) * (1 - fog))
+      const items: [number, number][] = []
+      for (let k = 0; k < n; k++) if (vis[k]) items.push([P[4 * k + 2], k])
+      if (BW > 0) for (let b = 0; b < mol.bonds.length / 2; b++) { const i = mol.bonds[2 * b], j = mol.bonds[2 * b + 1]; if (vis[i] && vis[j]) items.push([(P[4 * i + 2] + P[4 * j + 2]) / 2 - 0.02, -1 - b]) }
+      // H-bond pairs (R10c), from the hydrogen (the donor while hydrogens are hidden) to the acceptor, sorted in with the atoms.
+      const drawable = new Set(mol.links), links: [number, number][] = []
+      for (const p of st.pairs ?? []) {
+        if (!drawable.has(p.join('-'))) continue
+        const [d, hh, a] = p.map(nr => mol.g2l[nr]), from = vis[hh] ? hh : d
+        if (vis[from] && vis[a]) { items.push([(P[4 * from + 2] + P[4 * a + 2]) / 2 - 0.02, n + links.length]); links.push([from, a]) }
+      }
+      items.sort((p, q) => p[0] - q[0])
+      const zr = zmax - zmin || 1
+      ctx.lineCap = 'round'
+      for (let t = 0; t < items.length; t++) {
+        const z = items[t][0], id = items[t][1], fog = Math.min(0.5, ((zmax - z) / zr) * 0.5)
+        if (id >= n) {
+          const [i, j] = links[id - n]
+          ctx.setLineDash([3, 3]); ctx.lineWidth = 1.5; ctx.strokeStyle = mix(th.fg, BG, 0.25 + fog)
+          ctx.beginPath(); ctx.moveTo(P[4 * i], P[4 * i + 1]); ctx.lineTo(P[4 * j], P[4 * j + 1]); ctx.stroke(); ctx.setLineDash([])
+          continue
+        }
+        if (id < 0) {
+          const b = -1 - id, i = mol.bonds[2 * b], j = mol.bonds[2 * b + 1]
+          const mx = (P[4 * i] + P[4 * j]) / 2, my = (P[4 * i + 1] + P[4 * j + 1]) / 2, f = (P[4 * i + 3] + P[4 * j + 3]) / 2
+          for (const k of [i, j]) {
+            let wd = BW * s * f
+            if (kind[k] === 2) wd *= rep === 'sticks' ? 1.25 : 1.6
+            if (ghost(k)) wd *= 0.6
+            ctx.globalAlpha = ghost(k) ? 0.45 : 1
+            ctx.strokeStyle = mix(rep === 'sticks' ? fill[k] : bcol[k], BG, blend(k, fog))
+            ctx.lineWidth = Math.max(1, wd)
+            ctx.beginPath(); ctx.moveTo(P[4 * k], P[4 * k + 1]); ctx.lineTo(mx, my); ctx.stroke()
+          }
+          ctx.globalAlpha = 1
+          continue
+        }
+        const k = id, x = P[4 * k], y = P[4 * k + 1], r = hitR[k], kd = kind[k], bl = blend(k, fog)
+        ctx.globalAlpha = ghost(k) ? 0.45 : 1
+        if (kd === 2) {
+          const hr = r * (rep === 'spheres' ? 1.45 : 2.2)
+          const g = ctx.createRadialGradient(x, y, r * 0.8, x, y, hr)
+          g.addColorStop(0, rgba(rim[k], 0.5 * (1 - fog))); g.addColorStop(1, rgba(rim[k], 0))
+          ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, hr, 0, TAU); ctx.fill()
+        }
+        ctx.beginPath(); ctx.arc(x, y, r, 0, TAU)
+        ctx.fillStyle = mix(fill[k], BG, bl); ctx.fill()
+        if (rep !== 'sticks' || kd >= 2) { ctx.lineWidth = lw[k]; ctx.strokeStyle = mix(rim[k], BG, bl); ctx.stroke() }
+        if (r > 3 && !ghost(k)) { ctx.beginPath(); ctx.arc(x - r * 0.32, y - r * 0.34, r * 0.3, 0, TAU); ctx.fillStyle = 'rgba(255,255,255,' + th.hl * (1 - bl) + ')'; ctx.fill() }
+        if (kd === 3) { const off = refOff(mb.refOwner[k]); if (mb.ref[k] === 2 || off) ctx.setLineDash([3, 2]); ctx.beginPath(); ctx.arc(x, y, r + 2.4, 0, TAU); ctx.lineWidth = 1.2; ctx.strokeStyle = mix(th.fg, BG, off ? 0.55 : fog * 0.5); ctx.stroke(); ctx.setLineDash([]) }
+        // gmx rms's fit group (R10d): a dashed ink ring, over whatever colour the atom has.
+        if (fitted.has(mol.gnr[k])) { ctx.setLineDash([2, 2]); ctx.beginPath(); ctx.arc(x, y, r + 2.6, 0, TAU); ctx.lineWidth = 1.2; ctx.strokeStyle = mix(th.fg, BG, fog * 0.5); ctx.stroke(); ctx.setLineDash([]) }
+        const ringed = k === hoverAtom || (kd === 3 && hovRef >= 0 && mb.refOwner[k] === hovRef) || (kd === 2 && mb.groupOf[k] === hovSi)
+        if (ringed) { ctx.beginPath(); ctx.arc(x, y, r + 3.5, 0, TAU); ctx.lineWidth = 1.5; ctx.strokeStyle = th.fg; ctx.stroke() }
+        ctx.globalAlpha = 1
+      }
+      ctx.globalAlpha = 0.24
+      for (let k = 0; k < n; k++) if (vis[k] && kind[k] === 2) { ctx.beginPath(); ctx.arc(P[4 * k], P[4 * k + 1], hitR[k] * 0.8, 0, TAU); ctx.fillStyle = fill[k]; ctx.fill() }
+      ctx.globalAlpha = 1
+      // Labels placed so far, line lengths and callouts alike, so none covers another.
+      const placed: { x: number; y: number; w: number; h: number }[] = []
+      const clash = (px: number, py: number, pw: number, ph: number) => placed.some(q => px < q.x + q.w + 4 && px + pw + 4 > q.x && py < q.y + q.h + 3 && py + ph + 3 > q.y)
+      // Lines (R10d), over the atoms, in frame positions: from the centre of the end drawn, along the vector to the other
+      // end, each end a small ring; the length here and gmx's average above the first of a group's lines.
+      if (st.lines?.length && mol.arrange === 'frame positions') {
+        const c0 = mol.comps[0], R0 = c0.R
+        const proj = (l: number[]) => { const px = M[0] * l[0] + M[1] * l[1] + M[2] * l[2], py = M[3] * l[0] + M[4] * l[1] + M[5] * l[2], pz = M[6] * l[0] + M[7] * l[1] + M[8] * l[2], f = c0.D / (c0.D - pz); return [cx + (c0.ox + px * f) * s, cy - (c0.oy + py * f) * s] }
+        ctx.font = '700 11px mononoki, ui-monospace, monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+        for (const { line, tone } of st.lines) {
+          const t = T[tone]
+          line.segs.forEach((g, gi) => {
+            const ks = g.at.map(nr => (nr < mol.g2l.length ? mol.g2l[nr] : -1)).filter(k => k >= 0)
+            if (!ks.length) return
+            const a = [0, 1, 2].map(c => ks.reduce((u, k) => u + mol.local[3 * k + c], 0) / ks.length), v = g.v
+            const b = [0, 1, 2].map(c => a[c] + R0[3 * c] * v[0] + R0[3 * c + 1] * v[1] + R0[3 * c + 2] * v[2])
+            const [x1, y1] = proj(a), [x2, y2] = proj(b)
+            ctx.setLineDash([5, 4]); ctx.lineWidth = 1.75; ctx.strokeStyle = t.strong
+            ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke(); ctx.setLineDash([])
+            for (const [ex, ey] of [[x1, y1], [x2, y2]]) { ctx.beginPath(); ctx.arc(ex, ey, 3.5, 0, TAU); ctx.fillStyle = BG; ctx.fill(); ctx.lineWidth = 1.5; ctx.stroke() }
+            if (gi) return
+            const text = +line.here.toPrecision(3) + ' nm here' + (line.gmx != null ? ' · gmx ' + +line.gmx.toPrecision(3) : ''), pw = ctx.measureText(text).width + 14, ph = 18
+            const px = Math.min(Math.max(4, (x1 + x2) / 2 - pw / 2), w - 4 - pw)
+            let py = Math.min(y1, y2) - ph - 8, guard = 0
+            while (guard++ < 30 && clash(px, py, pw, ph)) py -= ph + 4
+            py = Math.max(4, py); placed.push({ x: px, y: py, w: pw, h: ph })
+            rr(ctx, px, py, pw, ph, 9); ctx.fillStyle = t.base; ctx.fill(); ctx.lineWidth = 1; ctx.strokeStyle = t.strong; ctx.stroke(); ctx.fillStyle = t.fg; ctx.fillText(text, px + pw / 2, py + ph / 2 + 0.5)
+          })
+        }
+      }
+      if (!st.labels) return
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+      ctx.font = '400 11px mononoki, ui-monospace, monospace'; ctx.fillStyle = th.muted
+      const bb: Record<number, { x0: number; x1: number; y1: number }> = {}
+      for (let k = 0; k < n; k++) {
+        if (!vis[k]) continue
+        const m = mol.molOf[k], r = hitR[k]
+        const q = bb[m] || (bb[m] = { x0: Infinity, x1: -Infinity, y1: -Infinity })
+        q.x0 = Math.min(q.x0, P[4 * k] - r); q.x1 = Math.max(q.x1, P[4 * k] + r); q.y1 = Math.max(q.y1, P[4 * k + 1] + r)
+      }
+      Object.keys(bb).forEach(key => { const m = +key, lab = mol.molLabels[m]; if (lab) ctx.fillText(lab, (bb[m].x0 + bb[m].x1) / 2, Math.min(h - 44, bb[m].y1 + 16)) })
+      ctx.font = '700 11px mononoki, ui-monospace, monospace'
+      /** A label over the topmost atom: a group's in its hue; the reference's an ink outline (T159), dashed for a second one or one not plotted. */
+      const callout = (atoms: number[], text: string, bg: string, fgc: string, line: string, border: 'none' | 'solid' | 'dashed') => {
+        const dashed = border === 'dashed'
+        let top = -1, ty = Infinity
+        atoms.forEach(k => { if (!vis[k]) return; const yy = P![4 * k + 1] - hitR[k]; if (yy < ty) { ty = yy; top = k } })
+        if (top < 0) return
+        const ax = P![4 * top], pw = ctx.measureText(text).width + 16, ph = 20
+        let px = Math.min(Math.max(4, ax - pw / 2), w - 4 - pw), py = ty - 16 - ph, guard = 0
+        while (guard++ < 30 && clash(px, py, pw, ph)) py -= ph + 4
+        py = Math.max(4, py)
+        placed.push({ x: px, y: py, w: pw, h: ph })
+        ctx.strokeStyle = line; ctx.lineWidth = 1
+        if (dashed) ctx.setLineDash([3, 2])
+        ctx.beginPath(); ctx.moveTo(ax, ty - 3); ctx.lineTo(Math.min(Math.max(ax, px + 10), px + pw - 10), py + ph); ctx.stroke()
+        rr(ctx, px, py, pw, ph, 10); ctx.fillStyle = bg; ctx.fill()
+        if (border !== 'none') { ctx.lineWidth = 1.2; ctx.stroke(); ctx.setLineDash([]) }
+        ctx.fillStyle = fgc; ctx.fillText(text, px + pw / 2, py + ph / 2 + 0.5)
+      }
+      st.refs.forEach((r, ri) => { if (mb.refAtoms[ri].length) callout(mb.refAtoms[ri], 'ref ' + r.label, th.card, r.on === false ? th.muted : th.fg, r.on === false ? th.border : th.fg, ri > 0 || r.on === false ? 'dashed' : 'solid') })
+      st.selected.forEach(i => { const g = sels[i]; if (!g) return; const t = T[g.tone]; callout(mb.groupAtoms[i], shownName(g), t.base, t.fg, t.strong, 'none') })
+      if (st.fit) { const ks = st.fit.atoms.map(nr => (nr < mol.g2l.length ? mol.g2l[nr] : -1)).filter(k => k >= 0); callout(ks, 'fit ' + st.fit.label, th.card, th.fg, th.fg, 'dashed') }
+      if (hovSi >= 0 && sels[hovSi] && !selIdx.has(hovSi)) { const t = T[sels[hovSi].tone]; callout(mb.groupAtoms[hovSi], sels[hovSi].name, t.soft, t.strong, t.strong, 'none') }
+    }
+
+    function animateCam(to: { zoom: number; panX: number; panY: number }, ms = 380) {
+      cancelAnimationFrame(camRaf)
+      const from = { zoom: cam.zoom, panX: cam.panX, panY: cam.panY }, t0 = performance.now()
+      const step = (now: number) => {
+        const t = Math.min(1, (now - t0) / ms), e = 1 - Math.pow(1 - t, 3)
+        cam.zoom = from.zoom + (to.zoom - from.zoom) * e; cam.panX = from.panX + (to.panX - from.panX) * e; cam.panY = from.panY + (to.panY - from.panY) * e
+        draw()
+        if (t < 1) camRaf = requestAnimationFrame(step)
+      }
+      camRaf = requestAnimationFrame(step)
+    }
+    /** Zoom onto the plotted groups (none plotted: the whole view). */
+    function fitSel() {
+      const mb = membership()
+      if (!P || !st || !st.mol || !cw || !mb) return
+      let atoms: number[] = []
+      st.selected.forEach(i => { atoms = atoms.concat(mb.groupAtoms[i] || []) })
+      atoms = atoms.filter(k => vis[k])
+      if (!atoms.length) { animateCam({ zoom: 1, panX: 0, panY: 0 }); return }
+      const s = fitScale * cam.zoom, cx = cw / 2 + cam.panX, cy = cy0() + cam.panY
+      let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity
+      atoms.forEach(k => { const ux = (P![4 * k] - cx) / s, uy = (P![4 * k + 1] - cy) / s, ur = hitR[k] / s; x0 = Math.min(x0, ux - ur); x1 = Math.max(x1, ux + ur); y0 = Math.min(y0, uy - ur); y1 = Math.max(y1, uy + ur) })
+      const z = Math.min(8, Math.max(0.25, Math.min((cw - 160) / Math.max(x1 - x0, 0.3), (ch - 190) / Math.max(y1 - y0, 0.3)) / fitScale))
+      const s2 = fitScale * z
+      animateCam({ zoom: z, panX: -((x0 + x1) / 2) * s2, panY: -((y0 + y1) / 2) * s2 + 16 })
+    }
+    /** Centre the view on these atoms, keeping the zoom (C + click, R8a). */
+    function centreOn(atoms: number[]) {
+      atoms = atoms.filter(k => vis[k])
+      if (!P || !atoms.length) return
+      const s = fitScale * cam.zoom, cx = cw / 2 + cam.panX, cy = cy0() + cam.panY
+      let ux = 0, uy = 0
+      atoms.forEach(k => { ux += (P![4 * k] - cx) / s; uy += (P![4 * k + 1] - cy) / s })
+      animateCam({ zoom: cam.zoom, panX: -(ux / atoms.length) * s, panY: -(uy / atoms.length) * s })
+    }
+    function reset() { cam.M = initRot(); animateCam({ zoom: 1, panX: 0, panY: 0 }) }
+    function resize() {
+      const w = wrap.clientWidth, h = wrap.clientHeight, d = window.devicePixelRatio || 1
+      if (!w || !h) return
+      cw = w; ch = h; dpr = d
+      canvas.width = Math.round(w * d); canvas.height = Math.round(h * d)
+      fit(); draw()
+    }
+    function hit(e: { clientX: number; clientY: number }) {
+      if (!P || !st || !st.mol) return -1
+      const rect = canvas.getBoundingClientRect(), x = e.clientX - rect.left, y = e.clientY - rect.top
+      let best = -1, bz = -Infinity
+      for (let k = 0; k < st.mol.n; k++) {
+        if (!vis[k]) continue
+        const dx = x - P[4 * k], dy = y - P[4 * k + 1], r = Math.max(hitR[k], 5)
+        if (dx * dx + dy * dy <= r * r && P[4 * k + 2] > bz) { bz = P[4 * k + 2]; best = k }
+      }
+      return best
+    }
+    const selOf = (k: number) => { const mb = membership(); return mb && k >= 0 && !mb.ref[k] ? mb.groupOf[k] : -1 }
+    const refOf = (k: number) => { const mb = membership(); return mb && k >= 0 && mb.ref[k] ? mb.refOwner[k] : -1 }
+    function hoverAt(e: PointerEvent) {
+      const k = hit(e), si = selOf(k)
+      canvas.style.cursor = si >= 0 || (cb.pickRef && refOf(k) >= 0) ? 'pointer' : 'grab'
+      if (k === hoverAtom) return
+      hoverAtom = k
+      draw()
+      if (k < 0 || !st || !st.mol || !P) { cb.hover(null); return }
+      const mol = st.mol, mb = membership()!, x = P[4 * k], y = P[4 * k + 1], r = hitR[k]
+      let left = x + r + 12
+      if (left + 240 > cw - 8) left = x - r - 12 - 240
+      cb.hover({ atom: '#' + mol.gnr[k] + ' ' + mol.name[k] + ' · ' + mol.resn[k] + ' ' + mol.resnr[k], sel: si, ref: mb.ref[k] ? mb.refOwner[k] : -1, left: Math.max(8, left), top: Math.max(8, Math.min(ch - 100, y - 30)), nr: mol.gnr[k], value: st.paint?.values.get(mol.gnr[k]) })
+    }
+    const onDown = (e: PointerEvent) => {
+      drag = { sx: e.clientX, sy: e.clientY, x: e.clientX, y: e.clientY, moved: false, pan: pans(e.button, held.pan) }
+      try { canvas.setPointerCapture(e.pointerId) } catch { /* capture is a nicety */ }
+    }
+    const onMove = (e: PointerEvent) => {
+      const d = drag
+      if (!d) { hoverAt(e); return }
+      const dx = e.clientX - d.x, dy = e.clientY - d.y; d.x = e.clientX; d.y = e.clientY
+      if (!d.moved && Math.hypot(e.clientX - d.sx, e.clientY - d.sy) > 4) {
+        d.moved = true; canvas.style.cursor = 'grabbing'; cancelAnimationFrame(camRaf)
+        if (hoverAtom >= 0) { hoverAtom = -1; cb.hover(null) }
+      }
+      if (!d.moved) return
+      if (d.pan) { cam.panX += dx; cam.panY += dy } else cam.M = mul(rotX(dy * 0.01), mul(rotY(dx * 0.01), cam.M))
+      draw()
+    }
+    const onUp = (e: PointerEvent) => {
+      const d = drag; drag = null
+      if (d && !d.moved && e.button === 0 && st && st.mol) {
+        const k = hit(e), si = selOf(k), ri = refOf(k), { scope, add } = clickScope(e), mb = membership()
+        if (k >= 0 && held.centre && mb) centreOn(si >= 0 ? mb.groupAtoms[si] : ri >= 0 ? mb.refAtoms[ri] : [k])
+        else if (ri >= 0 && scope === 'atom' && cb.pickRef) cb.pickRef(ri, add)
+        else if (k >= 0) {
+          const sis = [...new Set(scopeAtoms(st.mol, k, scope).map(selOf).filter(x => x >= 0))]
+          if (sis.length) cb.pick(sis, add)
+        }
+      }
+      hoverAt(e)
+    }
+    const onLeave = () => { over = false; if (!drag && hoverAtom >= 0) { hoverAtom = -1; draw(); cb.hover(null) } }
+    const onEnter = () => { over = true }
+    const typingIn = (t: EventTarget | null) => t instanceof HTMLElement && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))
+    const onKey = (e: KeyboardEvent) => {
+      const down = e.type === 'keydown'
+      if (down && (typingIn(e.target) || e.metaKey || e.ctrlKey || e.altKey)) return
+      if (e.key.toLowerCase() === keys.centre) { held.centre = down; canvas.style.cursor = down && over ? 'crosshair' : 'grab' }
+      else if (e.key === keys.pan) { held.pan = down; if (down && over) e.preventDefault() }
+    }
+    const onBlur = () => { held.centre = held.pan = false }
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault(); cancelAnimationFrame(camRaf)
+      const z = Math.min(12, Math.max(0.25, cam.zoom * Math.exp(-e.deltaY * 0.0015))), kk = z / cam.zoom
+      const rect = canvas.getBoundingClientRect(), qx = e.clientX - rect.left, qy = e.clientY - rect.top
+      const cx = cw / 2 + cam.panX, cy = cy0() + cam.panY
+      cam.panX = qx - (qx - cx) * kk - cw / 2; cam.panY = qy - (qy - cy) * kk - cy0(); cam.zoom = z
+      draw()
+    }
+    const onCtx = (e: Event) => e.preventDefault()
+    const onDbl = () => fitSel()
+    const events: [string, EventListener, AddEventListenerOptions?][] = [
+      ['pointerdown', onDown as EventListener], ['pointermove', onMove as EventListener], ['pointerup', onUp as EventListener], ['pointerleave', onLeave],
+      ['wheel', onWheel as EventListener, { passive: false }], ['contextmenu', onCtx], ['dblclick', onDbl], ['pointerenter', onEnter],
+    ]
+    events.forEach(([t, f, o]) => canvas.addEventListener(t, f, o))
+    window.addEventListener('keydown', onKey); window.addEventListener('keyup', onKey); window.addEventListener('blur', onBlur)
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => resize()) : null
+    if (ro) ro.observe(wrap)
+    resize()
+
+    return {
+      /** New state: a new Mol fades the old view out and fits the new one; the rotation is kept. */
+      set(next: SceneState) {
+        const molChanged = !st || st.mol !== next.mol
+        if (molChanged && st && st.mol && next.mol) snapFade()
+        if (molChanged) { cam.zoom = 1; cam.panX = 0; cam.panY = 0; P = null; hoverAtom = -1 }
+        st = next; memb = null
+        if (molChanged) fit()
+        draw()
+      },
+      fit: fitSel,
+      reset,
+      redraw: draw,
+      /** Where the atom with this GROMACS number is drawn, in CSS pixels of the canvas; null if it is not drawn. */
+      where(nr: number): { x: number; y: number } | null {
+        if (!P || !st || !st.mol) return null
+        const k = nr > 0 && nr < st.mol.g2l.length ? st.mol.g2l[nr] : -1
+        return k >= 0 && vis[k] ? { x: P[4 * k], y: P[4 * k + 1] } : null
+      },
+      destroy() {
+        events.forEach(([t, f]) => canvas.removeEventListener(t, f))
+        window.removeEventListener('keydown', onKey); window.removeEventListener('keyup', onKey); window.removeEventListener('blur', onBlur)
+        if (ro) ro.disconnect()
+        cancelAnimationFrame(camRaf); cancelAnimationFrame(fadeRaf)
+      },
+    }
+  }
+
+  // ---------- curves ----------
+  /**
+   * A name without what only tells runs apart: case, punctuation, and a trailing "...x" or "…x" (gmx names a curve
+   * "group...reference"), so "NH_N...S", "nh_n" and "NH N…H" are one name.
+   */
+  function looseName(s: string): string {
+    return String(s).replace(/(?:\.{2,}|…)[\s\S]*$/, '').toLowerCase().replace(/[^a-z0-9]+/g, '')
+  }
+  /** The group of `toA` that is the same as `g` of `fromA` by its atoms (the same structure) or its name, exact and then loosely; null if none. */
+  function sameGroup<G extends Group>(g: G, toA: { sels: G[]; struct: string | null }, fromA: { sels: G[]; struct: string | null }): G | null {
+    const key = g.atoms.join(',')
+    if (key && toA.struct && toA.struct === fromA.struct) { const hit = toA.sels.find(x => x.atoms.join(',') === key); if (hit) return hit }
+    const exact = toA.sels.find(x => x.name === g.name)
+    if (exact) return exact
+    const ln = looseName(g.name), like = ln ? toA.sels.filter(x => looseName(x.name) === ln) : []
+    return like.length === 1 ? like[0] : null
+  }
+  /** The same group in another analysis: the same atoms of the same structure, else the same name (loosely), else the same place in a list as long. */
+  function matchGroup<G extends Group>(g: G, toA: { sels: G[]; struct: string | null }, fromA: { sels: G[]; struct: string | null }): G | null {
+    if (toA === fromA) return g
+    return sameGroup(g, toA, fromA) || (toA.sels.length === fromA.sels.length ? toA.sels[fromA.sels.indexOf(g)] : null) || null
+  }
+
+  // ---------- RDFs that differ only in their reference ----------
+  /**
+   * b has the groups of a: each group of a, by its atoms where they stand on the same structure, else by its name
+   * (loosely), is a group of b. Where the references differ is the only difference that matters: nothing else is compared.
+   */
+  function sameButReference(a: { struct: string | null; sels: Group[] }, b: { struct: string | null; sels: Group[] }): boolean {
+    return a !== b && a.sels.length > 0 && a.sels.every(g => sameGroup(g, b, a) != null)
+  }
+  /** Why b can't be morphed with a, in words; null if it can. */
+  function morphWhy(a: { struct: string | null; sels: Group[] }, b: { struct: string | null; sels: Group[] }): string | null {
+    if (a === b) return 'the same RDF'
+    if (!a.sels.length) return 'no groups here'
+    const lost = a.sels.filter(g => sameGroup(g, b, a) == null)
+    if (!lost.length) return null
+    if (!b.sels.length) return 'it has no groups'
+    return lost.length === a.sels.length ? 'none of its groups match: "' + a.sels[0].name + '" is not among its ' + b.sels.length + ' (' + b.sels.slice(0, 2).map(g => '"' + g.name + '"').join(', ') + (b.sels.length > 2 ? ', …' : '') + ')'
+      : lost.length + ' of the ' + a.sels.length + ' groups here have no match there, e.g. "' + lost[0].name + '"'
+  }
+  // ---------- gestures (R8a, contract §3): one meaning each, in compare, in its exported page and in the app ----------
+  /** The modifier that adds: ⌘ on Apple's systems, Ctrl elsewhere (the exported page's own hints). */
+  const modName = () => (typeof navigator !== 'undefined' && /mac|iphone|ipad|ipod/i.test(navigator.platform) ? '⌘' : 'Ctrl')
+  /** A legend's or chips' shown set after a click on `key`: it alone (again: all); with ⌘/Ctrl, it shown or hidden, in its place. */
+  function legendPick(all: string[], shown: string[], key: string, add: boolean): string[] {
+    if (add) return shown.includes(key) ? shown.filter(x => x !== key) : all.filter(x => x === key || shown.includes(x))
+    return shown.length === 1 && shown[0] === key ? all.slice() : [key]
+  }
+  /** What a click on a structure takes: Shift its residue, Alt its atom name in every residue of that name; ⌘/Ctrl adds. */
+  const clickScope = (e: { shiftKey: boolean; altKey: boolean; metaKey: boolean; ctrlKey: boolean }) => ({ scope: (e.shiftKey ? 'residue' : e.altKey ? 'name' : 'atom') as Scope, add: e.metaKey || e.ctrlKey })
+  /** Whether a drag pans: a right or middle drag, or a left one with Space held (Alt-drag no longer does). */
+  const pans = (button: number, held: boolean) => button !== 0 || held
+  /** The atoms a click takes, by index: this one, its residue (in its molecule), or its atom name in every residue of that name. */
+  function scopeAtoms(mol: { n: number; name: ArrayLike<string>; resn: ArrayLike<string>; resnr: ArrayLike<number>; molOf: ArrayLike<number> }, k: number, scope: Scope): number[] {
+    if (scope === 'atom') return [k]
+    const out: number[] = []
+    for (let j = 0; j < mol.n; j++) if (scope === 'residue' ? mol.molOf[j] === mol.molOf[k] && mol.resnr[j] === mol.resnr[k] : mol.name[j] === mol.name[k] && mol.resn[j] === mol.resn[k]) out.push(j)
+    return out
+  }
+  /** The groups plotted after a click on a structure took `names`: they alone (the same again: none); with ⌘/Ctrl added, or taken off when all are plotted. */
+  function pickGroups(list: string[], names: string[], add: boolean): string[] {
+    const all = names.every(n => list.includes(n))
+    if (add) return all ? list.filter(x => !names.includes(x)) : [...list, ...names.filter(n => !list.includes(n))]
+    return all && list.length === names.length ? [] : names
+  }
+  /** The references plotted after a click on one of `all`, as a legend does, and never none. */
+  function pickRefs(all: string[], on: string[], id: string, add: boolean): string[] {
+    const next = legendPick(all, on, id, add)
+    return next.length ? next : all.slice()
+  }
+  /** What each RDF of a morph is called in a legend: its reference's name (with the RDF's label after it when two are named alike), or, with no reference known, the RDF's label. */
+  function refLabels(members: { id: string; label: string; ref: { name: string; label?: string } | null }[]): Record<string, string> {
+    const out: Record<string, string> = {}
+    members.forEach(m => { const shown = m.ref ? m.ref.label ?? m.ref.name : ''; out[m.id] = !m.ref ? m.label : members.filter(o => o.ref && o.ref.name === m.ref!.name).length > 1 ? shown + ' · ' + m.label : shown })
+    return out
+  }
+
+  /**
+   * How each RDF of one graph is told apart, for its curves and its legend. By group: a dash each, and past the
+   * Matrix's ten dashes a lighter shade as well. By job: its tone, and when an RDF before it had that tone, the
+   * next dashes along, so two curves never share both colour and dash.
+   */
+  function rdfLooks(plotted: Analysis[], tones: Record<string, Tone>, groups: number) {
+    const seen: Record<string, number> = {}
+    return plotted.map((an, mi) => {
+      const tone = tones[an.id] || TONES[mi % TONES.length], rep = seen[tone] || 0
+      seen[tone] = rep + 1
+      return { tone, jobDash: rep * Math.max(1, groups), groupDash: mi % DASH.length, shade: mi < DASH.length ? Math.min(0.6, 0.3 * mi) : 0.45, round: Math.floor(mi / DASH.length) }
+    })
+  }
+
+  /**
+   * The curves to draw: each plotted group of `focus` in every analysis of `plotted` (focus first) that has it.
+   * By group: the group's hue, lighter for later analyses, a dash per analysis. By job: the analysis's hue,
+   * lighter for later groups, a dash per group. Two curves never differ by hue alone (rdfLooks).
+   */
+  function buildCurves(o: { focus: Analysis; plotted: Analysis[]; selected: string[]; colorBy: ColorBy; pal: Palette; tones: Record<string, Tone> }): Curve[] {
+    const { focus, plotted, pal } = o, dark = pal.dark, out: Curve[] = [], toneCount: Record<string, number> = {}
+    const names = o.selected.filter(n => focus.sels.some(g => g.name === n)), looks = rdfLooks(plotted, o.tones, names.length)
+    names.forEach((name, gi) => {
+      const g0 = focus.sels.find(g => g.name === name)!, tn = pal.hues[g0.tone]
+      const kk = toneCount[g0.tone] || 0; toneCount[g0.tone] = kk + 1
+      plotted.forEach((an, mi) => {
+        const gg = matchGroup(g0, an, focus), look = looks[mi]
+        if (!gg) return
+        let color: string, dash: string
+        if (o.colorBy === 'job') {
+          const mt = pal.hues[look.tone], ink = dark ? mt.base : mt.fg
+          color = gi === 0 ? mt.strong : mix(mt.strong, ink, Math.min(0.7, 0.35 * gi))
+          dash = DASH[(look.jobDash + gi) % DASH.length]
+        } else {
+          const ink = dark ? tn.base : tn.fg
+          // An ordered curve's ramp colour (R7a), else its tone's, lighter for a repeated tone.
+          color = g0.colors ? g0.colors[dark ? 'dark' : 'light'] : kk === 0 ? tn.strong : mix(tn.strong, ink, Math.min(0.75, 0.45 * kk))
+          if (mi > 0) color = mix(color, ink, look.shade)
+          dash = DASH[look.groupDash]
+        }
+        out.push({ key: an.id + '|' + gg.name + '|' + name, name, source: an.label, analysis: an.id, x: an.x, y: gg.y, color, dash, peak: gg.peak, shell: gg.shell ?? null, atoms: gg.atoms.length, tone: o.colorBy === 'job' ? look.tone : g0.tone, ...(g0.label ? { label: g0.label } : {}) })
+      })
+    })
+    return out
+  }
+
+  // ---------- chart ----------
+  function niceTicks(min: number, max: number, count: number) {
+    if (min === max) { min -= 1; max += 1 }
+    const raw = (max - min) / count, mag = Math.pow(10, Math.floor(Math.log10(raw))), err = raw / mag
+    const step = (err >= 7.5 ? 10 : err >= 3.5 ? 5 : err >= 1.5 ? 2 : 1) * mag
+    const ticks: number[] = []
+    for (let v = Math.ceil(min / step) * step; v <= max + step * 1e-9; v += step) ticks.push(+v.toFixed(10))
+    return { ticks, decimals: Math.max(0, -Math.floor(Math.log10(step) + 1e-9)) }
+  }
+  /** The index of the x nearest r (x ascending, evenly spaced or not: atom numbers, residues). */
+  function nearest(x: number[], r: number): number {
+    let lo = 0, hi = x.length - 1
+    if (hi < 0) return -1
+    while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (x[mid] <= r) lo = mid; else hi = mid }
+    return Math.abs(x[hi] - r) < Math.abs(r - x[lo]) ? hi : lo
+  }
+  /** The value of a curve at the point nearest r. */
+  function valAt(x: number[], y: number[], r: number) {
+    return y[nearest(x, r)] || 0
+  }
+  /** The values under the pointer at r, highest first (equal values keep the curves' order). */
+  function hoverRows(curves: Curve[], r: number): { curve: Curve; v: number }[] {
+    return curves.map((curve, i) => ({ curve, v: valAt(curve.x, curve.y, r), i })).sort((a, b) => b.v - a.v || a.i - b.i).map(({ curve, v }) => ({ curve, v }))
+  }
+  /** The grid point under a pointer at `px` from the chart's left edge, or null outside the plot. */
+  function hoverX(geom: ChartGeom, px: number): number | null {
+    const t = (px - geom.m.l) / geom.iw, X = geom.grid
+    if (t < 0 || t > 1 || X.length < 2) return null
+    return X[nearest(X, geom.x0 + t * (geom.x1 - geom.x0))]
+  }
+  /** The readout's heading: `g(r) at r = 0.374 nm`, the unit from the x label's parentheses, x at its own precision. */
+  function readoutTitle(geom: ChartGeom, xlabel: string, ylabel: string, x: number) {
+    const u = /^(.*?)\s*\(([^()]*)\)(?:\s*·.*)?$/.exec(xlabel)
+    return ylabel + ' at ' + ((u ? u[1] : xlabel) || 'x') + ' = ' + x.toFixed(geom.xDigits) + (u ? ' ' + u[2] : '')
+  }
+  /** The decimals a number is written with (at most 6): 0.374 → 3, 12 → 0. */
+  const decimalsOf = (v: number) => { const t = String(+v.toFixed(6)), i = t.indexOf('.'); return i < 0 ? 0 : t.length - i - 1 }
+  /** x as a grid's values are written (an atom number, a time), at most 4 decimals: for peak labels and the readout. */
+  function xDigitsOf(grid: number[]) {
+    let d = 0
+    for (let i = 0; i < Math.min(grid.length, 50); i++) d = Math.min(4, Math.max(d, decimalsOf(grid[i])))
+    return d
+  }
+
+  /**
+   * A chart as an SVG tree (R5c: every chart of gmx-cypher and of the export): gridlines in `border`, axes in
+   * `foreground`, a dashed rule (g = 1 for an RDF, 0 for a signed quantity, when inside the range), each curve in its
+   * colour and dash, clipped to the plot, with its error band, its maximum dotted and labelled and its first shell
+   * hollow, and at `hover` a rule with a dot on each curve. The y range starts at 0 (`zero`: g(r), counts) or is the
+   * data's own (`data`). Axis labels keep their case: data names and units are not shouted.
+   */
+  /** An analysis with its groups' and reference's labels (R11d), by original name; the same analysis when it has none. */
+  function withLabels<A extends Pick<Analysis, 'ref' | 'sels'>>(a: A, labels: Record<string, string> | undefined): A {
+    if (!labels || !Object.keys(labels).length) return a
+    const tag = <G extends Group>(g: G): G => (labels[g.name] ? { ...g, label: labels[g.name] } : g)
+    return { ...a, ref: a.ref ? tag(a.ref) : null, sels: a.sels.map(tag) }
+  }
+  /** What a group is shown as: its label, else its name. */
+  const shownName = (g: { name: string; label?: string }) => g.label ?? g.name
+  /** The renamed groups with their original names, in words (R11d); null for none. */
+  function renames(a: Pick<Analysis, 'ref' | 'sels'>): string | null {
+    const r = [...(a.ref ? [a.ref] : []), ...a.sels].filter(g => g.label).map(g => g.label + ' (gmx: ' + g.name + ')')
+    return r.length ? 'renamed here: ' + r.join(' · ') : null
+  }
+
+  /** Marks and lines kept as they may be (R11c): a point needs its curve's key and a whole index, a line its axis and a value; a label is text. */
+  function cleanPins(v: unknown): Pins {
+    const o = (v && typeof v === 'object' ? v : {}) as Record<string, unknown>, list = (x: unknown) => (Array.isArray(x) ? x.filter(e => e && typeof e === 'object') as Record<string, unknown>[] : [])
+    const label = (e: Record<string, unknown>) => (typeof e.label === 'string' && e.label.trim() ? { label: e.label } : {})
+    return {
+      points: list(o.points).flatMap(e => { const { key: k, i } = e; return typeof k === 'string' && Number.isInteger(i) && (i as number) >= 0 ? [{ key: k, i: i as number, ...label(e) }] : [] }),
+      lines: list(o.lines).filter(e => (e.axis === 'x' || e.axis === 'y') && typeof e.v === 'number' && Number.isFinite(e.v)).map(e => ({ axis: e.axis as 'x' | 'y', v: e.v as number, ...label(e) })),
+    }
+  }
+  /** Line styles kept as they may be (R11b): a known dash name, a width clamped to 1.5–2 px, a shade to three steps either way. */
+  function cleanStyles(v: unknown): Record<string, LineStyle> {
+    const out: Record<string, LineStyle> = {}
+    for (const [k, s] of Object.entries(v && typeof v === 'object' ? v : {})) {
+      if (!s || typeof s !== 'object') continue
+      const o = s as Record<string, unknown>, st: LineStyle = {}
+      if (typeof o.dash === 'string' && DASH_NAMES.includes(o.dash)) st.dash = o.dash
+      if (typeof o.width === 'number' && Number.isFinite(o.width)) st.width = Math.min(2, Math.max(1.5, o.width))
+      if (typeof o.shade === 'number' && Number.isFinite(o.shade) && Math.round(o.shade)) st.shade = Math.min(3, Math.max(-3, Math.round(o.shade)))
+      if (Object.keys(st).length) out[k] = st
+    }
+    return out
+  }
+  /**
+   * Curves with their styles of their own (R11b): the dash by name, the width, and the shade, each step a tenth of the
+   * way to the theme's light end (lighter) or its dark end (darker), as far as the colour keeps 3:1 against the card.
+   */
+  function styleCurves(curves: Curve[], styles: Record<string, LineStyle>, pal: Palette): Curve[] {
+    return curves.map(c => {
+      const s = styles[c.key]
+      if (!s) return c
+      let color = c.color
+      const end = (s.shade ?? 0) > 0 === pal.dark ? pal.fg : pal.card
+      for (let k = Math.abs(s.shade ?? 0); k > 0; k--) { const t = mix(c.color, end, 0.1 * k); if (contrast(t, pal.card) >= 3) { color = t; break } }
+      const d = s.dash ? DASH_NAMES.indexOf(s.dash) : -1
+      return { ...c, color, ...(d >= 0 ? { dash: DASH[d] } : {}), ...(s.width ? { width: s.width } : {}), styled: true }
+    })
+  }
+  /**
+   * Curves a style of their own made alike (R11b): of one tone, with the same dash and width, they differ by shade alone
+   * (Morpheus: never by hue alone), or not at all. Curves left as drawn are apart already (rdfLooks).
+   */
+  function sameLooks(curves: Curve[]): { a: Curve; b: Curve; why: 'same' | 'shade' }[] {
+    const out: { a: Curve; b: Curve; why: 'same' | 'shade' }[] = []
+    curves.forEach((a, i) => curves.slice(i + 1).forEach(b => {
+      if ((a.styled || b.styled) && a.tone === b.tone && a.dash === b.dash && (a.width ?? 2) === (b.width ?? 2)) out.push({ a, b, why: a.color === b.color ? 'same' : 'shade' })
+    }))
+    return out
+  }
+
+  /** The range of several series on one axis (R11a): every finite value, a y's error band with it; null for none. */
+  function sharedDomain(series: { x: number[]; y: number[]; err?: number[] }[], axis: 'x' | 'y'): [number, number] | null {
+    let lo = Infinity, hi = -Infinity
+    for (const c of series) (axis === 'x' ? c.x : c.y).forEach((v, i) => {
+      const e = axis === 'y' && c.err && Number.isFinite(c.err[i]) ? c.err[i] : 0
+      if (Number.isFinite(v)) { lo = Math.min(lo, v - e); hi = Math.max(hi, v + e) }
+    })
+    return lo <= hi ? [lo, hi] : null
+  }
+  /** What the same scale groups charts by, as one graph does: x by its quantity and unit, y by its unit (its name without one). */
+  const axisKey = (label: string, axis: 'x' | 'y') => {
+    const m = /^(.*?)(?:^|\s)\(([^()]*)\)$/.exec(label.trim()), name = (m ? m[1] : label).trim().toLowerCase(), unit = m ? m[2].trim() : ''
+    return axis === 'x' ? name + '|' + unit : unit || '|' + name
+  }
+  /** Each chart's shared ranges by its id (R11a), over the charts of like quantities; a chart reset to its own scale takes no part. */
+  function sharedScales(charts: { id: string; xlabel: string; ylabel: string; curves: { x: number[]; y: number[]; err?: number[] }[] }[], scale: Scale, own: string[]) {
+    const out: Record<string, { x?: [number, number]; y?: [number, number] }> = {}, taking = charts.filter(c => !own.includes(c.id))
+    for (const axis of ['x', 'y'] as const) {
+      if (scale !== 'both' && scale !== axis) continue
+      const groups = new Map<string, typeof taking>()
+      taking.forEach(c => { const k = axisKey(axis === 'x' ? c.xlabel : c.ylabel, axis); groups.set(k, [...(groups.get(k) ?? []), c]) })
+      for (const g of groups.values()) { const d = sharedDomain(g.flatMap(c => c.curves), axis); if (d) g.forEach(c => { out[c.id] = { ...out[c.id], [axis]: d } }) }
+    }
+    return out
+  }
+
+  function chart(o: { W: number; H: number; curves: Curve[]; grid: number[]; xlabel: string; ylabel: string; hover: number | null; marks: Marks; pal: Palette; animate?: boolean; y?: 'zero' | 'data'; rule?: number | null; id?: string; xDigits?: number
+    /** Marks and lines put on it (R8a, R11c): a point of a curve not drawn is left out, a line off the axes too. */
+    pins?: Pins
+    /** Ranges shared with other charts (R11a), in place of this chart's own data's. */
+    share?: { x?: [number, number]; y?: [number, number] } }): { tree: VNode; geom: ChartGeom } {
+    const th = o.pal, W = o.W, H = o.H, m = { l: 48, r: 20, t: 24, b: 40 }, rule = o.rule === undefined ? 1 : o.rule, clip = o.id || 'dc-plot'
+    const iw = Math.max(20, W - m.l - m.r), ih = Math.max(20, H - m.t - m.b)
+    const grid = o.curves.length ? o.curves[0].x : o.grid
+    let x0 = grid.length ? grid[0] : 0, x1 = grid.length ? grid[grid.length - 1] : 1
+    o.curves.forEach(c => { if (c.x.length) { x0 = Math.min(x0, c.x[0]); x1 = Math.max(x1, c.x[c.x.length - 1]) } })
+    if (o.share?.x) [x0, x1] = o.share.x
+    // The y range: every point, its error band, and the rule when it is g = 1.
+    let lo = Infinity, hi = -Infinity
+    o.curves.forEach(c => c.y.forEach((v, j) => { const e = c.err ? c.err[j] || 0 : 0; if (v - e < lo) lo = v - e; if (v + e > hi) hi = v + e }))
+    if (o.share?.y) [lo, hi] = o.share.y
+    if (!Number.isFinite(lo)) { lo = 0; hi = 1 }
+    let y0: number, y1: number
+    if ((o.y || 'zero') === 'zero') { y0 = 0; y1 = Math.max(hi, rule != null && rule > 0 ? rule : 0) * 1.12 || 1 }
+    else { const pad = (hi - lo) * 0.06 || Math.abs(hi) * 0.06 || 1; y0 = lo - pad; y1 = hi + pad * (o.marks === 'none' ? 1 : 2) }
+    const sx = (v: number) => m.l + ((v - x0) / (x1 - x0 || 1)) * iw, sy = (v: number) => m.t + ih - ((v - y0) / (y1 - y0 || 1)) * ih
+    const xt = niceTicks(x0, x1, Math.max(3, Math.round(iw / 90))), yt = niceTicks(y0, y1, Math.max(3, Math.round(ih / 48)))
+    const xDigits = o.xDigits ?? xDigitsOf(grid)
+    const yDigits = Math.max(2, yt.decimals + 1)
+    const F = 'mononoki, ui-monospace, monospace', BG = th.card, ease = 'cubic-bezier(.2,.7,.2,1)'
+    const cap = { fontFamily: F, fontSize: '11px', fill: th.muted }, lab = { fontFamily: F, fontSize: '11px', fill: th.muted }
+    const k: VNode[] = []
+    k.push(['defs', { key: 'defs' }, ['clipPath', { id: clip }, ['rect', { x: m.l, y: m.t, width: iw, height: ih }]]])
+    k.push(['text', { key: 'yl', x: 0, y: 10, style: lab }, o.ylabel])
+    xt.ticks.forEach(t => k.push(['line', { key: 'gx' + t, x1: sx(t), x2: sx(t), y1: m.t, y2: m.t + ih, stroke: th.border, strokeWidth: 1 }]))
+    yt.ticks.forEach(t => k.push(['line', { key: 'gy' + t, x1: m.l, x2: m.l + iw, y1: sy(t), y2: sy(t), stroke: th.border, strokeWidth: 1 }]))
+    if (o.curves.length && rule != null && rule >= y0 && rule <= y1) k.push(['line', { key: 'rule', x1: m.l, x2: m.l + iw, y1: sy(rule), y2: sy(rule), stroke: th.input, strokeWidth: 1, strokeDasharray: '3 3' }])
+    k.push(['path', { key: 'ax', d: 'M' + m.l + ',' + m.t + 'V' + (m.t + ih) + 'H' + (m.l + iw), fill: 'none', stroke: th.fg, strokeWidth: 1.5 }])
+    xt.ticks.forEach(t => k.push(['text', { key: 'tx' + t, x: sx(t), y: m.t + ih + 16, textAnchor: 'middle', style: cap }, t.toFixed(xt.decimals)]))
+    yt.ticks.forEach(t => k.push(['text', { key: 'ty' + t, x: m.l - 8, y: sy(t) + 4, textAnchor: 'end', style: cap }, t.toFixed(yt.decimals)]))
+    k.push(['text', { key: 'xl', x: m.l + iw, y: H - 2, textAnchor: 'end', style: lab }, o.xlabel])
+    // Peak labels never overlap: one that would is moved up a line or two, else left out (its dot stays, the hover reads it).
+    const placed: { x0: number; x1: number; y0: number; y1: number }[] = []
+    const labelAt = (x: number, y: number, text: string): number | null => {
+      const w = text.length * 6.6 + 2
+      for (let up = 0; up < 3; up++) {
+        const b = { x0: x + 7, x1: x + 9 + w, y0: y - 19 - up * 13, y1: y - 6 - up * 13 }
+        if (b.y0 < 0 || placed.some(q => b.x0 < q.x1 && b.x1 > q.x0 && b.y0 < q.y1 && b.y1 > q.y0)) continue
+        placed.push(b)
+        return -8 - up * 13
+      }
+      return null
+    }
+    o.curves.forEach(c => {
+      const d = c.y.map((v, j) => (j ? 'L' : 'M') + sx(c.x[j]).toFixed(1) + ',' + sy(v).toFixed(1)).join('')
+      const g: VNode[] = []
+      // The error band and the curve inside the plot only; the marks sit on the data.
+      const line: VNode = ['g', { key: 'in', clipPath: 'url(#' + clip + ')' }]
+      if (c.err) {
+        const up = c.y.map((v, j) => (j ? 'L' : 'M') + sx(c.x[j]).toFixed(1) + ',' + sy(v + (c.err![j] || 0)).toFixed(1)).join('')
+        const down = c.y.map((v, j) => 'L' + sx(c.x[j]).toFixed(1) + ',' + sy(v - (c.err![j] || 0)).toFixed(1)).reverse().join('')
+        line.push(['path', { key: 'band', d: up + down + 'Z', fill: c.color, fillOpacity: 0.18, stroke: 'none' }])
+      }
+      line.push(['path', { key: 'p', d, fill: 'none', stroke: c.color, strokeWidth: (c.width ?? 2) + (c.hot ? 0.8 : 0), strokeLinejoin: 'round', strokeLinecap: 'round', strokeDasharray: c.dash === 'none' ? undefined : c.dash, style: o.animate ? { d: 'path("' + d + '")', transition: 'd 360ms ' + ease + ', stroke 200ms ease' } : undefined }])
+      g.push(line)
+      // The first shell, hollow and unlabelled (R3d); the maximum below it, filled, with its r.
+      if ((o.marks === 'both' || o.marks === 'first shell') && c.shell) g.push(['circle', { key: 'sh', cx: sx(c.shell.r), cy: sy(c.shell.g), r: 3.6, fill: BG, stroke: c.color, strokeWidth: 1.8 }])
+      if ((o.marks === 'both' || o.marks === 'maximum') && c.peak) {
+        const pk = c.peak, px = sx(pk.r), py = sy(pk.g), text = pk.r.toFixed(xDigits), ty = c.dim ? null : labelAt(px, py, text)
+        const mark: VNode = ['g', { key: 'pk', style: { transform: 'translate(' + px.toFixed(1) + 'px,' + py.toFixed(1) + 'px)', transition: o.animate ? 'transform 360ms ' + ease : undefined } },
+          ['circle', { key: 'c', cx: 0, cy: 0, r: 4, fill: c.color }]]
+        if (ty != null) mark.push(['text', { key: 't', x: 8, y: ty, style: { fontFamily: F, fontSize: '11px', fill: th.fg, stroke: BG, strokeWidth: '3px', paintOrder: 'stroke', strokeLinejoin: 'round' } }, text])
+        g.push(mark)
+      }
+      k.push(['g', { key: 'c' + c.key, opacity: c.dim ? 0.4 : 1, style: { transition: 'opacity 140ms ease' } }, ...g])
+    })
+    // Marks and lines (R11c): a line dashed in the muted ink with its label, a point a dot in its curve's colour with its label, or its value.
+    const pinText = { fontFamily: F, fontSize: '10px', fill: th.muted }
+    for (const l of o.pins?.lines ?? []) {
+      const v = l.axis === 'x' ? sx(l.v) : sy(l.v), text = l.label ?? (l.axis === 'x' ? 'x = ' : 'y = ') + l.v
+      if (l.axis === 'x' ? v < m.l || v > m.l + iw : v < m.t || v > m.t + ih) continue
+      k.push(['g', { key: 'pl' + l.axis + l.v }, l.axis === 'x' ? ['line', { x1: v, x2: v, y1: m.t, y2: m.t + ih, stroke: th.muted, strokeDasharray: '2 3' }] : ['line', { x1: m.l, x2: m.l + iw, y1: v, y2: v, stroke: th.muted, strokeDasharray: '2 3' }],
+        ['text', { x: l.axis === 'x' ? v + 5 : m.l + iw - 4, y: l.axis === 'x' ? m.t + ih - 6 : v - 4, textAnchor: l.axis === 'x' ? 'start' : 'end', style: pinText }, text]])
+    }
+    for (const p of o.pins?.points ?? []) {
+      const c = o.curves.find(x => x.key === p.key)
+      if (!c || p.i >= c.x.length) continue
+      const px = sx(c.x[p.i]), py = sy(c.y[p.i])
+      k.push(['g', { key: 'pp' + p.key + p.i }, ['circle', { cx: px, cy: py, r: 6, fill: BG }], ['circle', { cx: px, cy: py, r: 4, fill: c.color }],
+        ['text', { x: px + 8, y: py - 8, style: { ...pinText, fontSize: '11px', fill: th.fg, stroke: BG, strokeWidth: '3px', paintOrder: 'stroke', strokeLinejoin: 'round' } }, p.label ?? c.x[p.i].toFixed(xDigits) + ', ' + c.y[p.i].toFixed(yDigits)]])
+    }
+    if (o.hover != null && o.curves.length) {
+      const xv = sx(o.hover)
+      k.push(['line', { key: 'hl', x1: xv, x2: xv, y1: m.t, y2: m.t + ih, stroke: th.input, strokeWidth: 1 }])
+      o.curves.forEach(c => k.push(['circle', { key: 'hd' + c.key, cx: xv, cy: sy(valAt(c.x, c.y, o.hover!)), r: 3.5, fill: c.color, stroke: BG, strokeWidth: 1.5 }]))
+    }
+    return {
+      tree: ['svg', { width: W, height: H, viewBox: '0 0 ' + W + ' ' + H, role: 'img', 'aria-label': o.ylabel + ' against ' + o.xlabel, style: { display: 'block', overflow: 'visible' } }, ...k],
+      geom: { m, iw, ih, x0, x1, y0, y1, grid, xDigits, yDigits },
+    }
+  }
+
+  // ---------- the exported page ----------
+  /** The exported page: each job's structure and g(r), and the comparison graph, from the data the export carries. */
+  function mount(root: HTMLElement, data: ExportData) {
+    const SVGNS = 'http://www.w3.org/2000/svg'
+    let theme = data.theme
+    const pals = { light: palette(false, data.tokens.light), dark: palette(true, data.tokens.dark) }
+    const pal = () => pals[theme]
+    const analyses: Analysis[] = data.analyses.map(a => ({
+      id: a.id, kind: 'job', title: a.title, label: a.label, sub: a.sub, x: a.x, xlabel: a.xlabel, ylabel: a.ylabel,
+      ref: a.ref ? { name: a.ref.name, atoms: fromRanges(a.ref.atoms), tone: a.ref.tone, ...(a.ref.label ? { label: a.ref.label } : {}) } : null,
+      sels: a.sels.map(s => ({ name: s.name, atoms: fromRanges(s.atoms), tone: s.tone, y: s.y, peak: s.peak, shell: s.shell ?? null, ...(s.colors ? { colors: s.colors } : {}), ...(s.label ? { label: s.label } : {}) })), struct: a.struct, structNote: a.structNote, ...(a.plot ? { plot: a.plot } : {}), ...(a.paint ? { paint: a.paint } : {}), ...(a.pairs ? { pairs: a.pairs } : {}), ...(a.command ? { command: a.command } : {}),
+      ...(a.lines ? { lines: a.lines.map(l => ({ ...l, segs: l.segs.map(g => ({ at: fromRanges(g.at), v: g.v })) })) } : {}), ...(a.fit ? { fit: { name: a.fit.name, atoms: fromRanges(a.fit.atoms) } } : {}),
+    }))
+    const tones: Record<string, Tone> = {}
+    data.analyses.forEach(a => { tones[a.id] = a.tone })
+    const mols: Record<string, Mol | null> = {}
+    const molOf = (key: string | null) => {
+      if (!key || !data.structs[key]) return null
+      if (!(key in mols)) {
+        const sel = new Set<number>(), ref = new Set<number>()
+        analyses.forEach(a => { if (a.struct !== key) return; a.sels.forEach(g => g.atoms.forEach(v => sel.add(v))); if (a.ref) a.ref.atoms.forEach(v => ref.add(v)) })
+        mols[key] = buildMol(data.structs[key], sel, ref, data.view.arrange, analyses.flatMap(a => (a.struct === key && a.pairs?.drawn) || []))
+      }
+      return mols[key]
+    }
+    const redraws: (() => void)[] = []
+
+    function h(tag: string, attrs?: Record<string, unknown> | null, ...kids: (Node | string | null | undefined | false)[]): HTMLElement {
+      const e = document.createElement(tag)
+      for (const [k, v] of Object.entries(attrs || {})) {
+        if (v == null || v === false) continue
+        if (k === 'class') e.className = String(v)
+        else if (k === 'style') Object.assign(e.style, v)
+        else if (k.startsWith('on')) e.addEventListener(k.slice(2).toLowerCase(), v as EventListener)
+        else e.setAttribute(k, String(v))
+      }
+      kids.forEach(c => { if (c != null && c !== false) e.append(c) })
+      return e
+    }
+    function svg(n: VNode | string): Node {
+      if (typeof n === 'string') return document.createTextNode(n)
+      const [tag, attrs, ...kids] = n, e = document.createElementNS(SVGNS, tag)
+      for (const [k, v] of Object.entries(attrs)) {
+        if (v == null || k === 'key') continue
+        if (k === 'style') { for (const [sk, sv] of Object.entries(v as Record<string, string>)) if (sv != null) e.style.setProperty(sk.replace(/[A-Z]/g, c => '-' + c.toLowerCase()), String(sv)) }
+        else e.setAttribute(k === 'viewBox' || k.startsWith('aria-') ? k : k.replace(/[A-Z]/g, c => '-' + c.toLowerCase()), String(v))
+      }
+      kids.forEach(c => e.appendChild(svg(c)))
+      return e
+    }
+    const swatch = (color: string, dash: string) => svg(['svg', { width: 22, height: 6, 'aria-hidden': 'true' }, ['line', { x1: 1, x2: 21, y1: 3, y2: 3, stroke: color, strokeWidth: 2.5, strokeLinecap: 'round', strokeDasharray: dash === 'none' ? undefined : dash }]])
+
+    /** A chart that fills its box, redrawn on resize, with a rule and a card of values under the pointer. */
+    let charts = 0
+    function chartBox(get: () => { curves: Curve[]; grid: number[]; xlabel: string; ylabel: string; plot?: Plot; share?: { x?: [number, number]; y?: [number, number] }; pins?: Pins }) {
+      const box = h('div', { class: 'dc-chart' }), card = h('div', { class: 'dc-hover', hidden: true }), id = 'dc-plot-' + ++charts
+      const wrap = h('div', { class: 'dc-chart-wrap' }, box, card)
+      let hover: number | null = null, geom: ChartGeom | null = null
+      const render = () => {
+        const W = box.clientWidth, H = box.clientHeight
+        if (!W || !H) return
+        const g = get(), out = chart({ W, H, curves: g.curves, grid: g.grid, xlabel: g.xlabel, ylabel: g.ylabel, hover, marks: 'both', pal: pal(), id, share: g.share, pins: g.pins, ...(g.plot ? { y: g.plot.y, rule: g.plot.rule, xDigits: g.plot.xDigits } : { xDigits: 3 }) })
+        geom = out.geom
+        box.replaceChildren(svg(out.tree))
+        if (hover == null || !g.curves.length) { card.hidden = true; return }
+        const xv = geom.m.l + ((hover - geom.x0) / (geom.x1 - geom.x0 || 1)) * geom.iw
+        card.hidden = false
+        card.style.left = Math.max(0, xv + 294 > W ? xv - 294 : xv + 14) + 'px'
+        card.style.top = geom.m.t + 4 + 'px'
+        card.replaceChildren(h('div', { class: 'dc-cap' }, readoutTitle(geom, g.xlabel, g.ylabel, hover)),
+          ...hoverRows(g.curves, hover).slice(0, 14).map(({ curve: c, v }) => h('div', { class: 'dc-hrow' }, swatch(c.color, c.dash), h('b', { style: { color: c.color } }, c.label ?? c.name), h('span', { class: 'dc-cap' }, c.source), h('span', null, v.toFixed(geom!.yDigits)))),
+          ...(g.curves.length > 14 ? [h('div', { class: 'dc-cap' }, '+ ' + (g.curves.length - 14) + ' more')] : []))
+      }
+      wrap.addEventListener('mousemove', e => {
+        if (!geom) return
+        const r = hoverX(geom, e.clientX - box.getBoundingClientRect().left)
+        if (r !== hover) { hover = r; render() }
+      })
+      wrap.addEventListener('mouseleave', () => { if (hover != null) { hover = null; render() } })
+      if (typeof ResizeObserver !== 'undefined') new ResizeObserver(render).observe(box)
+      redraws.push(render)
+      return { el: wrap, render }
+    }
+
+    function chips(a: Analysis, sel: () => string[], set: (s: string[]) => void, hoverTo: (i: number) => void, many?: { items: () => { id: string; label: string; count: number; on: boolean; plain: boolean }[]; pick: (id: string, add: boolean) => void }) {
+      const box = h('div', { class: 'dc-chips' })
+      const render = () => {
+        const s = sel(), T = pal().hues
+        box.replaceChildren(
+          ...(many ? many.items().map((r, i) => h('button', { type: 'button', class: 'dc-chip dc-ref dc-pick' + (i ? ' dc-alt' : '') + (r.on ? '' : ' dc-off'), 'aria-pressed': r.on ? 'true' : 'false', title: 'click: plot only this reference · ' + modName() + '-click: add or remove',
+            onclick: (e: MouseEvent) => many.pick(r.id, e.metaKey || e.ctrlKey) }, (r.plain ? '' : 'ref ') + r.label, r.plain ? null : h('span', { class: 'dc-n' }, String(r.count || '—'))))
+            : a.ref ? [h('span', { class: 'dc-chip dc-ref', title: a.ref.label ? 'gmx name: ' + a.ref.name : undefined }, 'ref ' + shownName(a.ref), h('span', { class: 'dc-n' }, String(a.ref.atoms.length || '—')))] : []),
+          ...a.sels.map((g, i) => {
+            const on = s.includes(g.name), t = T[g.tone]
+            return h('button', {
+              type: 'button', class: 'dc-chip' + (on ? ' dc-on' : ''), 'aria-pressed': on ? 'true' : 'false', title: g.label ? 'gmx name: ' + g.name : undefined,
+              style: { background: on ? t.base : t.soft, color: on ? t.fg : t.strong },
+              onclick: (e: MouseEvent) => set(legendPick(a.sels.map(x => x.name), sel(), g.name, e.metaKey || e.ctrlKey)),
+              onmouseenter: () => hoverTo(i), onmouseleave: () => hoverTo(-1),
+            }, h('span', { class: 'dc-dot', style: { background: on ? t.fg : t.strong } }), shownName(g), h('span', { class: 'dc-n' }, String(g.atoms.length || '—')))
+          }))
+      }
+      redraws.push(render)
+      render()
+      return { el: box, render }
+    }
+
+    /** The curves under a chart; an RDF's with its atoms and both peak rules, another result's (`plain`) with its series and source only. */
+    function table(get: () => Curve[], plain = false) {
+      const box = h('div', { class: 'dc-table' }), row = 'dc-trow' + (plain ? ' dc-plain' : '')
+      const render = () => {
+        const cs = get()
+        box.replaceChildren(...(cs.length ? [h('div', { class: row + ' dc-thead' }, h('span'), h('span', null, 'SERIES'), h('span', null, 'SOURCE'), ...(plain ? [] : [h('span', { class: 'dc-r' }, 'ATOMS'), h('span', { class: 'dc-r' }, 'MAXIMUM R · G'), h('span', { class: 'dc-r' }, 'FIRST SHELL R · G')]))] : []),
+          ...cs.map(c => h('div', { class: row }, swatch(c.color, c.dash), h('b', { style: { color: c.color }, title: c.label ? 'gmx name: ' + c.name : undefined }, c.label ?? c.name), h('span', { class: 'dc-cap' }, c.source),
+            ...(plain ? [] : [h('span', { class: 'dc-r' }, String(c.atoms || '—')), h('span', { class: 'dc-r' }, c.peak ? c.peak.r.toFixed(3) + ' · ' + c.peak.g.toFixed(2) : '—'), h('span', { class: 'dc-r' }, c.shell ? c.shell.r.toFixed(3) + ' · ' + c.shell.g.toFixed(2) : '—')]))))
+      }
+      redraws.push(render)
+      return { el: box, render }
+    }
+
+    function structureBox(a: Analysis, sel: () => string[], set: (s: string[]) => void, refs: () => { label: string; atoms: number[]; on?: boolean }[], pickRef?: (i: number, add: boolean) => void) {
+      const mol = molOf(a.struct)
+      if (!mol) return { el: h('div', { class: 'dc-nostruct' }, h('b', null, 'No structure'), h('span', { class: 'dc-cap' }, a.structNote || 'this job came without a structure')), set: () => {} }
+      const canvas = h('canvas', { class: 'dc-canvas' }) as HTMLCanvasElement, tip = h('div', { class: 'dc-tip', hidden: true }), paint = paintOf(a, mol)
+      // Painted values (R10b): the ramp's scale in place of the plotted / not plotted key, drawn again with the theme.
+      const scale = h('span', null), drawScale = () => paint && scale.replaceChildren(paint.label + ' (' + paint.unit + ') ' + +paint.min.toPrecision(4), h('i', { class: 'dc-ramp', style: { background: 'linear-gradient(to right, ' + pal().ramp.join(', ') + ')' } }), +paint.max.toPrecision(4) + ' · the rest neutral')
+      if (paint) { redraws.push(drawScale); drawScale() }
+      const wrap = h('div', { class: 'dc-struct' }, canvas, tip,
+        h('div', { class: 'dc-legend' }, ...(paint ? [scale] : [h('span', null, h('i', { class: 'dc-k dc-k-sel' }), 'plotted'), h('span', null, h('i', { class: 'dc-k dc-k-rest' }), 'not plotted')]), h('span', null, h('i', { class: 'dc-k dc-k-ref' }), 'reference'),
+          ...(a.fit ? [h('span', null, h('i', { class: 'dc-k dc-k-fit' }), 'fit group')] : []), h('span', { class: 'dc-grow' }), h('span', null, 'drag rotate · right- or Space-drag pan · scroll zoom · double-click fit · Shift-click residue · C + click centre')))
+      let hoverSel = -1
+      const view = structureView(canvas, wrap, {
+        hover: hv => {
+          if (!hv) { tip.hidden = true; return }
+          const g = hv.sel >= 0 ? a.sels[hv.sel] : null, r = hv.ref >= 0 ? refs()[hv.ref] : null
+          tip.hidden = false; tip.style.left = hv.left + 'px'; tip.style.top = hv.top + 'px'
+          tip.replaceChildren(h('div', { class: 'dc-cap' }, hv.atom), ...(hv.value != null && paint ? [h('b', null, paint.label + ' ' + +hv.value.toPrecision(4) + ' ' + paint.unit)] : []),
+            h('b', { style: { color: g ? pal().hues[g.tone].strong : 'var(--foreground)' } }, g ? shownName(g) + ' · ' + g.atoms.length + ' atoms' : r ? 'reference · ' + r.label : 'not in any group'),
+            h('div', { class: 'dc-cap' }, g ? 'click: plot only this · ' + modName() + '-click: add or remove · Shift: its residue' : r ? (pickRef ? 'click: plot only this one · ' + modName() + '-click: add or remove' : 'g(r) is measured from these atoms') : ''))
+        },
+        pick: (is, add) => set(pickGroups(sel(), is.map(i => a.sels[i].name), add)),
+        pickRef,
+      })
+      const update = () => {
+        const s = sel()
+        const lines = (a.lines ?? []).filter(l => s.includes(l.group)).map(l => ({ line: l, tone: a.sels.find(g => g.name === l.group)?.tone ?? a.sels[0].tone }))
+        view.set({ mol, pal: pal(), rep: data.view.rep, rest: data.view.rest, labels: data.view.labels, hydrogens: data.view.hydrogens, sels: a.sels, selected: a.sels.flatMap((g, i) => (s.includes(g.name) ? [i] : [])), refs: refs(), hoverSel, hoverRef: -1, paint, pairs: a.pairs?.drawn, lines, ...(a.fit ? { fit: { label: a.fit.name, atoms: a.fit.atoms } } : {}) })
+      }
+      redraws.push(update)
+      update()
+      const note = structureNote(a, mol)
+      return { el: note ? h('div', null, wrap, h('p', { class: 'dc-cap dc-note' }, note)) : wrap, set: (i: number) => { hoverSel = i; update() } }
+    }
+
+    function header() {
+      const seg = h('div', { class: 'dc-seg', role: 'group', 'aria-label': 'theme' })
+      const render = () => seg.replaceChildren(...(['light', 'dark'] as const).map(t => h('button', { type: 'button', class: theme === t ? 'dc-on' : '', 'aria-pressed': theme === t ? 'true' : 'false', onclick: () => { theme = t; document.documentElement.dataset.theme = t; redraws.forEach(f => f()) } }, t)))
+      redraws.push(render)
+      render()
+      return h('header', { class: 'dc-header' }, h('div', { class: 'dc-grow' }, h('h1', null, data.header || '(de)Cypher'),
+        h('div', { class: 'dc-cap' }, data.analyses.length + (data.analyses.every(a => a.plot) ? (data.analyses.length === 1 ? ' result' : ' results') : data.analyses.length === 1 ? ' RDF' : ' RDFs') + ' · exported ' + new Date(data.made).toLocaleString() + ' · ' + data.by)), seg)
+    }
+
+    function compareSection(c: NonNullable<ExportData['compare']>) {
+      const plotted = c.ids.map(id => analyses.find(a => a.id === id)).filter((a): a is Analysis => !!a)
+      const focus = plotted.find(a => a.id === c.focus) || plotted[0]
+      if (!focus) return null
+      let selected = c.selected.slice(), colorBy = c.colorBy
+      const shown: Record<string, 'on' | 'dim' | 'off'> = {}
+      const curves = () => styleCurves(buildCurves({ focus, plotted, selected, colorBy, pal: pal(), tones }), styles, pal())
+      const drawn = () => curves().filter(x => shown[x.key] !== 'off').map(x => ({ ...x, dim: shown[x.key] === 'dim' }))
+      const ch = chartBox(() => ({ curves: drawn(), grid: focus.x, xlabel: focus.xlabel, ylabel: focus.ylabel, plot: focus.plot, pins: pinsOf('one') }))
+      const legend = h('div', { class: 'dc-chips' })
+      const seg = h('div', { class: 'dc-seg', role: 'group', 'aria-label': 'colour by' })
+      const NEXT = { on: 'dim', dim: 'off', off: 'on' } as const, WORD = { on: '', dim: ' · dimmed', off: ' · hidden' }
+      const render = () => {
+        legend.replaceChildren(...curves().map(x => {
+          const s = shown[x.key] || 'on'
+          return h('button', { type: 'button', class: 'dc-chip dc-curve', style: { opacity: s === 'on' ? '1' : s === 'dim' ? '0.55' : '0.35' }, onclick: () => { shown[x.key] = NEXT[s]; update() } },
+            swatch(x.color, x.dash), h('b', { style: { color: x.color } }, x.label ?? x.name), h('span', { class: 'dc-cap' }, x.source + WORD[s]))
+        }))
+        seg.replaceChildren(...(['group', 'job'] as const).map(v => h('button', { type: 'button', class: colorBy === v ? 'dc-on' : '', onclick: () => { colorBy = v; update() } }, v === 'job' ? 'result' : v)))
+      }
+      const groupChips = chips(focus, () => selected, s => { selected = s; update() }, () => {})
+      const update = () => { render(); ch.render(); groupChips.render() }
+      redraws.push(render)
+      render()
+      return h('section', { class: 'dc-card dc-compare' },
+        h('div', { class: 'dc-bar' }, h('span', { class: 'dc-label' }, 'ONE GRAPH'), h('span', { class: 'dc-cap' }, plotted.map(a => a.label).join(' · ')), h('span', { class: 'dc-grow' }), h('span', { class: 'dc-label' }, 'COLOR BY'), seg),
+        h('div', { class: 'dc-pad' }, ch.el, h('div', { class: 'dc-cap' }, 'click a curve: shown → dimmed → hidden · groups below are matched in every result by their atoms, then their name'), legend, groupChips.el))
+    }
+
+    // The same scale (R11a), as exported: the cards' charts, each drawn on the ranges it shares; all drawn again when one changes.
+    const scaled: { id: string; xlabel: string; ylabel: string; curves: () => Curve[]; render: () => void }[] = []
+    const pinsOf = (id: string) => (data.view.pins?.[id] ? cleanPins(data.view.pins[id]) : undefined)
+    const styles = cleanStyles(data.view.styles), scale = data.view.scale ?? 'own', shareOf = (id: string) => (scale === 'own' ? undefined : sharedScales(scaled.map(c => ({ ...c, curves: c.curves() })), scale, data.view.ownScale ?? [])[id])
+
+    /** One RDF's card; or, for RDFs that differ only in their reference, one card for them all (`morph`), led by the first. */
+    function jobSection(members: Analysis[], ea: ExportAnalysis, morph: { title: string; on: string[] } | null) {
+      const a = members[0], many = !!morph && members.length > 1, ids = members.map(m => m.id), names = refLabels(members)
+      let on = many ? ids.filter(id => morph!.on.includes(id)) : ids
+      if (!on.length) on = ids
+      let selected = ea.selected.filter(n => a.sels.some(g => g.name === n))
+      let hoverSel = -1
+      const curves = () => styleCurves(buildCurves({ focus: a, plotted: members, selected, colorBy: 'group', pal: pal(), tones }).filter(c => on.includes(c.analysis)).map(c => {
+        const m = members.find(x => x.id === c.analysis)!
+        return { ...c, source: m.ref ? 'ref ' + names[m.id] : names[m.id], dim: hoverSel >= 0 && c.name !== a.sels[hoverSel]?.name }
+      }), styles, pal())
+      const ch = chartBox(() => ({ curves: curves(), grid: a.x, xlabel: a.xlabel, ylabel: a.ylabel, plot: a.plot, share: shareOf(a.id), pins: pinsOf(a.id) }))
+      scaled.push({ id: a.id, xlabel: a.xlabel, ylabel: a.ylabel, curves, render: ch.render })
+      const tb = table(curves, !!a.plot)
+      // Only references on this card's structure can be drawn on it; every RDF of a morph has its chip.
+      const onStruct = members.filter(m => m.ref && m.struct === a.struct)
+      const refs = () => onStruct.map(m => ({ label: names[m.id], atoms: m.ref!.atoms, on: on.includes(m.id) }))
+      let sv: { el: HTMLElement; set: (i: number) => void } | null = null
+      const refresh = () => { if (scale === 'own') ch.render(); else scaled.forEach(c => c.render()); tb.render(); cp.render(); if (sv) sv.set(hoverSel) }
+      const set = (s: string[]) => { selected = s; refresh() }
+      const pickRef = (id: string, add: boolean) => { on = pickRefs(ids, on, id, add); refresh() }
+      const cp = chips(a, () => selected, set, i => { hoverSel = i; ch.render(); if (sv) sv.set(i) },
+        many ? { items: () => members.map(m => ({ id: m.id, label: names[m.id], count: m.ref ? m.ref.atoms.length : 0, on: on.includes(m.id), plain: !m.ref })), pick: pickRef } : undefined)
+      sv = data.structs && a.struct ? structureBox(a, () => selected, set, refs, many ? (i, add) => pickRef(onStruct[i].id, add) : undefined) : null
+      tb.render()
+      return h('section', { class: 'dc-card' },
+        h('div', { class: 'dc-bar' }, h('h2', null, many ? morph!.title : a.title), h('span', { class: 'dc-cap' }, (many ? members.length + ' RDFs · the same groups, one chart' : a.sub) + (renames(a) ? ' · ' + renames(a) : ''))),
+        h('div', { class: sv ? 'dc-split' : 'dc-pad' }, sv ? sv.el : null, h('div', { class: 'dc-side' }, ch.el, cp.el, tb.el)))
+    }
+
+    document.documentElement.dataset.theme = theme
+    const page = h('main', { class: 'dc-page' }, header())
+    if (data.compare) { const c = compareSection(data.compare); if (c) page.append(c) }
+    // RDFs morphed into one card take the place of the first of them; the others have no card of their own.
+    const byId = new Map(analyses.map((a, i) => [a.id, { a, ea: data.analyses[i] }]))
+    const morphs = (data.morphs || []).map(m => ({ ...m, members: m.ids.map(id => byId.get(id)?.a).filter((x): x is Analysis => !!x) })).filter(m => m.members.length > 1)
+    const joined = new Set(morphs.flatMap(m => m.members))
+    analyses.forEach((a, i) => {
+      const m = morphs.find(x => x.members[0] === a)
+      if (m) page.append(jobSection(m.members, byId.get(a.id)!.ea, m))
+      else if (!joined.has(a)) page.append(jobSection([a], data.analyses[i], null))
+    })
+    root.replaceChildren(page)
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => redraws.forEach(f => f()))
+  }
+
+  return { withLabels, shownName, renames, cleanPins, contrast, cleanStyles, styleCurves, sameLooks, sharedDomain, sharedScales, rampAt, paintOf, structureNote, legendPick, pickGroups, clickScope, pans, scopeAtoms, TONES, DASH, DASH_NAMES, REPS, RESTS, SOLV, palette, toRanges, fromRanges, parseStructure, mix, buildMol, structureView, matchGroup, rdfLooks, buildCurves, looseName, sameButReference, morphWhy, pickRefs, refLabels, niceTicks, xDigitsOf, valAt, hoverRows, hoverX, readoutTitle, chart, mount }
+}
+
+export type Kit = ReturnType<typeof decypherKit>

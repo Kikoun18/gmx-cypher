@@ -99,7 +99,7 @@ function SelectItem({ className, children, ...props }: React.ComponentProps<type
       )}
       {...props}
     >
-      <span className="absolute right-2.5 flex size-3.5 items-center justify-center text-coral-strong">
+      <span className="absolute right-2.5 flex size-3.5 items-center justify-center text-foreground">
         <SelectPrimitive.ItemIndicator>
           <Check className="size-3.5" strokeWidth={2.5} />
         </SelectPrimitive.ItemIndicator>

@@ -3,6 +3,8 @@
 import * as React from 'react'
 import { getJson } from './api'
 import type { Progress } from './lib/progress'
+import { displayNames, nameFields, type Naming } from './lib/displayName'
+import type { Level } from './core/contract'
 
 export interface Job {
   id: string; kind: string; title: string; file: string; args: string[]; cwd: string; env?: Record<string, string>
@@ -10,18 +12,28 @@ export interface Job {
   created: string; started?: string; ended?: string; pid?: number
   exit?: { code: number | null; signal: string | null }; progress: Progress; error?: string; log?: string
   meta?: Record<string, unknown>
+  /** Found running at start, its end never seen: it runs on, and nothing follows it (R2a). */
+  unfollowed?: boolean
+  /** Its display name (R3c), computed on the page from its folder and the connected project; `title` is its own. */
+  name?: string
+  /** Its place in the connected project, for export file names (R6b). */
+  fields?: { project: string; sequence: string; column: string; run: string }
 }
 
-export const STATUS: Record<Job['status'], { word: string; className: string }> = {
-  running: { word: 'running…', className: 'text-butter-strong' },
-  done: { word: '✓ done', className: 'text-mint-strong' },
-  failed: { word: '✗ failed', className: 'text-destructive' },
-  cancelled: { word: 'cancelled', className: 'text-muted-foreground' },
-  interrupted: { word: 'interrupted', className: 'text-muted-foreground' },
+/** A job's state as a status level and its word (R9c, contract §4). */
+export const STATUS: Record<Job['status'], { level: Level; word: string }> = {
+  running: { level: 'info', word: 'running' },
+  done: { level: 'ok', word: 'done' },
+  failed: { level: 'error', word: 'failed' },
+  cancelled: { level: 'info', word: 'cancelled' },
+  interrupted: { level: 'warning', word: 'interrupted' },
 }
 
-/** Every job, kept current by the server's event stream; a reload or a restart loses nothing (T7). */
-export function useJobs() {
+/** A job's state: a job found running at start says it is no longer followed (R2a). */
+export const statusOf = (j: Job): { level: Level; word: string } => (j.unfollowed ? { level: 'warning', word: 'still running, not followed (pid ' + j.pid + ')' } : STATUS[j.status])
+
+/** Every job, kept current by the server's event stream; a reload or a restart loses nothing (T7). Each is named by the connected project (R3c). */
+export function useJobs(naming: Naming | null = null) {
   const [jobs, setJobs] = React.useState<Job[]>([])
   const [logs, setLogs] = React.useState<Record<string, string>>({})
   // Whether the list came: until it does, a job (de)Cypher remembers is not yet missing.
@@ -40,7 +52,15 @@ export function useJobs() {
     return () => es.close()
   }, [])
   const loadLog = React.useCallback((id: string) => { getJson<Job>('/api/jobs/' + id).then(j => setLogs(l => ({ ...l, [id]: j.log || '' })), () => {}) }, [])
-  return { jobs, logs, loadLog, loaded }
+  const named = React.useMemo(() => { const n = displayNames(jobs, naming); return jobs.map(j => ({ ...j, name: n.get(j.id), fields: nameFields(j, naming) })) }, [jobs, naming])
+  return { jobs: named, logs, loadLog, loaded }
+}
+
+/** The connected project's naming (R3c), read again when the vault or the project changes. */
+export function useNaming(vault: string | null, project: string | null): Naming | null {
+  const [n, setN] = React.useState<Naming | null>(null)
+  React.useEffect(() => { if (vault && project) getJson<Naming | null>('/api/naming').then(setN, () => setN(null)); else setN(null) }, [vault, project])
+  return n
 }
 
 type Estimate = { frames: number; start: number; end: number }

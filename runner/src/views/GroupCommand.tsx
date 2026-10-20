@@ -17,12 +17,13 @@ import type { HelpOption } from '../lib/gmxText'
 import { groupAtoms, nameProblem } from '../lib/groups'
 import { DEFAULT_TEMPLATE, NAME_TOKENS } from '../lib/names'
 import { isDefault } from '../lib/rdf'
-import { toneText } from '../lib/tones'
+import { groupText } from '../lib/tones'
 import { cn } from '../lib/utils'
 import { usePlan, type PlanView } from '../plan'
 import { useStructure } from '../structure'
 import { Code } from './Code'
 import { Recipes } from './Recipes'
+import { Status } from '../ui/status'
 
 interface Help { gmx: string; version: string; options: HelpOption[] }
 
@@ -95,7 +96,7 @@ function OptionField({ f, o, value, set }: { f: CommandOption; o: HelpOption; va
   )
 }
 
-/** The file-name template (T30, tokens as PMF Sequences' plus the runner's) and another output folder, if any. */
+/** The file-name template (T30, tokens as the Matrix's plus the runner's) and another output folder, if any. */
 function Names({ draft, setDraft, plan, tool }: { draft: Draft; setDraft: React.Dispatch<React.SetStateAction<Draft>>; plan: PlanView | undefined; tool: string }) {
   const id = React.useId()
   return (
@@ -191,8 +192,8 @@ export function GroupCommand({ command, gmx, draft, setDraft, onStarted }: ViewP
         <Recipes draft={draft} setDraft={setDraft} />
         <Section label="Command" />
         {!trajectory || !runInput ? <p className="m-0 text-control text-muted-foreground">pick a trajectory and a run input in inputs</p>
-          : planned?.error ? <FieldHint error>✗ {planned.error}</FieldHint>
-          : plan ? <Code label="command" text={commandText({ cwd: plan.cwd, file: plan.file, args: plan.argv, env: plan.env })} />
+          : planned?.error ? <Status level="error">{planned.error}</Status>
+          : plan ? <Code label="command line" text={commandText({ cwd: plan.cwd, file: plan.file, args: plan.argv, env: plan.env })} />
           : <p className="m-0 text-control text-muted-foreground" aria-live="polite">choosing names…</p>}
         {/* The tools that ask for their groups get them on stdin: part of what runs (review). */}
         {plan?.stdin != null && <p className="m-0 text-caption text-muted-foreground">answers on stdin, by group number: <span className="font-bold text-foreground">{plan.stdin.trimEnd().split('\n').join(' · ')}</span></p>}
@@ -209,7 +210,7 @@ export function GroupCommand({ command, gmx, draft, setDraft, onStarted }: ViewP
             {draft.groups.map((g, i) => (
               <tr key={i}>
                 <td className="py-0.5 pr-4 text-muted-foreground">group {i}</td>
-                <td className={cn('pr-4 font-bold', toneText[g.tone])}>{g.name}</td>
+                <td className={cn('pr-4 font-bold', groupText(g))}>{g.name}</td>
                 <td className="text-right">{counts ? counts[i] + ' atoms' : '…'}</td>
                 <td className="pl-3 text-caption text-muted-foreground">{i === 0 ? roles.first : roles.rest}</td>
               </tr>
@@ -220,11 +221,11 @@ export function GroupCommand({ command, gmx, draft, setDraft, onStarted }: ViewP
             {[plan.names.xvg, ...(options.cn === true && plan.names.cn ? [plan.names.cn] : []), ...(plan.names.more ?? []), plan.names.ndx, plan.names.record].join(' · ')} — in {where} · new names, nothing overwritten
           </p>
           {refused?.key === key && (
-            <Alert variant="destructive"><X /><AlertTitle>gmx-cypher didn't start this run</AlertTitle><AlertDescription><p className="whitespace-pre-line">{refused.message}</p></AlertDescription></Alert>
+            <Alert variant="destructive"><X /><AlertTitle>gmx-cypher didn't start this job</AlertTitle><AlertDescription><p className="whitespace-pre-line">{refused.message}</p></AlertDescription></Alert>
           )}
           <div className="flex flex-wrap items-center gap-3">
             <Button size="lg" disabled={!!blockers.length || starting} onClick={start}>{starting ? 'checking groups with gmx…' : 'run'}</Button>
-            <span className="text-caption text-muted-foreground" aria-live="polite">{blockers[0] || 'gmx select confirms each group first; the run continues if this page closes'}</span>
+            <span className="text-caption text-muted-foreground" aria-live="polite">{blockers[0] || 'gmx select confirms each group first; the job continues if this page closes'}</span>
           </div>
         </>}
       </aside>

@@ -141,3 +141,93 @@ Spec: [`batch-2.md`](batch-2.md). Phase 0 report: [`batch-2-phase0.md`](batch-2-
 - PMF Sequences: distance and H-bond distribution histograms (titles with "Histogram") are typed as Histogram, with an umbrella axis; a gmx wham profile ("Umbrella potential") is typed as Histogram too, by its keyword "umbrella" (T118). The backlog for a later PMF Sequences batch. (`GROMACS Energies` is now typed from its header: PMF Sequences batch 3, T142.)
 - Trajectory preparation (`trjconv`) is an R9 candidate; it stays out unless chosen.
 
+
+## Batch 3
+
+From [`batch-3.md`](batch-3.md) §5: one coherent app, (de)Cypher for every analysis, exports, and a vault space of its own. Baseline `a2b422e`. The Phase 0 report is [`batch-3-phase0.md`](batch-3-phase0.md); the order below is the spec's, with the three changes Phase 0 proposed and you approved (report §6).
+
+**Why this order:**
+- **Data protection comes first.** It is small, and it protects everything that comes after.
+- **The contract comes before the code it governs,** so later items aren't done twice.
+- **The core comes before the features drawn with it.** Exports, ramps and compare for every analysis all come from one place.
+- **AWH convergence comes early,** because it is the biggest scientific gain, and it is built on the core.
+- **Layout and interaction come after the core,** so the new layout uses the final components.
+- **The runner's scale, the vault and the cluster items are independent.** They come last, when your samples are in.
+
+### Phase 0: Plan and design
+- [x] Baseline recorded; section 3 confirmed or corrected
+- [x] Design pass: plan, review against the brief, screenshots
+- [x] R1a `design-contract.md` drafted
+- [x] Phase 0 report for R1–R16; samples asked for
+- [x] Questions answered; decisions recorded; order confirmed (T157–T169)
+
+### Phase 1: Protect data (R2, R3a, R14a)
+- [x] R2a SIGHUP
+- [x] R2b The record is written when the job starts, and completed atomically when it ends
+- [x] R3a Ticket references out of the UI, with the test that keeps them out
+- [x] R14a The vault space, and a copy of the record beside each sent result
+
+### Phase 2: The contract in code (R1, R3, R4, R9c)
+- [x] R1b `src/core/contract.ts`: the phrases never shown, the role → token map, the status levels (the default keys land with R8b)
+- [x] R4a Colour roles; the reference in ink; `destructive` used only for errors (the class-usage scan lands with R9c, when the status component exists)
+- [x] R4b `NEUTRAL` moved into the tokens; no hex outside the tokens
+- [x] R4c Titles in Archivo 800 (T160)
+- [x] R3b One set of words on every screen (the tabs become set-up steps with R9a; the peak words with R3d)
+- [x] R14b-1 The connected project, as a setting (moved here from Phase 8: R3c names jobs from it)
+- [x] R3c Display names from the project pattern
+- [x] R3d Both peak rules, named and shown (in the CSV with R6a)
+- [x] R9c One status component, used for every status
+
+### Phase 3: One visualization core (R5, R6)
+- [x] R5a One copy each of tones, dashes (the Matrix's 10, with names), ticks and atom ranges (T170)
+- [x] R5b One structure model (T171)
+- [x] R5c Every chart drawn by the core, with a hover readout; the Morpheus `LineChart` copy removed (T172)
+- [x] R6a Every chart exports to SVG, PDF, PNG and CSV, and any result to HTML (T173)
+- [x] R6b Export settings (T174)
+
+### Phase 4: AWH and WHAM (R7)
+- [x] R7a Ramps for ordered curves (T175)
+- [x] R7b AWH convergence (T176)
+- [x] R7c The AWH axis unit, from the run input (needs your `gmx dump -s` samples) (T177)
+
+### Phase 5: Layout and interaction (R8, R9)
+- [x] R9a Set-up and results; compare as `#compare`; old addresses still work; drops routed by type (T178)
+- [x] R9b One result page layout; (de)Cypher's controls regrouped (T179) (with the one style menu, so the display menu is built once)
+- [x] R8a One gesture scheme for structures, charts and legends (T180)
+- [x] R8b Every key in one registry, rebindable, listed by `?` (T181)
+
+### Phase 6: Compare every analysis (R10, R11)
+- [x] R10a Results of any command in compare: cards, and one graph for like quantities (T182)
+- [x] R10b RMSF on the structure (T183)
+- [x] R10c H-bond pairs on the structure (T184)
+- [x] R10d Distance and mindist lines; gmx rms's fit group (T185)
+- [x] R11a Same scale (T186)
+- [x] R11b Line styles (T187)
+- [x] R11c Marks and lines, carried into exports (T188)
+- [x] R11d Renamed groups and reference (T189)
+
+### Phase 7: The runner at scale (R12, R13)
+- [ ] R12a Logs on demand; startup without logs in memory
+- [ ] R12b Search, filters, multi-select
+- [ ] R12c Archive
+- [ ] R13 Run diff
+
+### Phase 8: Vault, cluster and commands (R14, R15, R16)
+- [ ] R14b Connect to a project: sends and saved compare views in the space (the setting itself: Phase 2, if agreed)
+- [ ] R14c Compare reads record copies from the space, giving groups for any sent RDF
+- [ ] R15 A finished cluster job offers a recipe or batch (only with a `qq jobs -e` sample)
+- [ ] R16a `gmx density` (needs your samples)
+- [ ] R16b `gmx order` (needs your samples)
+
+### Phase 9: Finish
+- [ ] `runner/README.md` updated (section 25)
+- [ ] Manual QA in Chromium, and with a real `gmx` where available; results recorded
+- [ ] Fresh-context review of the whole branch against section 26 and the design contract; findings fixed or recorded
+- [ ] Final report
+
+### Backlog (Batch 3: add to it, don't do it)
+- Job submission and killing jobs.
+- One 3D engine for the picker and compare (unless it is done in this batch; Phase 0 says it isn't small: §4, R5 of the report).
+- Requests for the Matrix and for Morpheus (section 28). From batch 2's backlog: the Matrix's typing of distance and H-bond histograms and of gmx wham's profile (T118); Morpheus's Table, Combobox and the `LineChart` error band (the error band moves into the core with R5c).
+- Trajectory preparation (`trjconv`), still only a candidate.
+- Found in Phase 0, not on lines this batch changes: none yet.

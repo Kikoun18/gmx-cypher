@@ -1,8 +1,8 @@
 import { cpSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { NodeBackend } from '../../app/scripts/node-backend';
-import { fixture, newVault, rdfFixture, withAnalysis, withPmf } from '../../app/test/helpers';
+import { NodeBackend } from '../../matrix/scripts/node-backend';
+import { fixture, newVault, rdfFixture, withAnalysis, withPmf } from '../../matrix/test/helpers';
 import { listProjects, openVault, projectSummary, readProject, ReadOnlyBackend } from '../server/vault';
 import { APP, tmp } from './helpers';
 
@@ -14,7 +14,7 @@ function listing(root: string): string[] {
   return out;
 }
 
-/** A vault made by PMF Sequences itself (schema 4, batch 3): WRWYCR with a PMF run and an RDF on HA. */
+/** A vault made by the Matrix itself (schema 4, batch 3): WRWYCR with a PMF run and an RDF on HA. */
 async function madeVault() {
   const dir = tmp('vault');
   const { svc, vault } = await newVault(new NodeBackend(dir));
@@ -22,11 +22,13 @@ async function madeVault() {
   const r = withAnalysis(a.store, { name: 'WRWYCR', col: 'ha', type: 'rdf', file: 'rdf.xvg', bytes: rdfFixture, group: 'hmr+fast+6' });
   svc.commit(r.store, new Map([...a.uploads, ...r.uploads]));
   await svc.flush();
+  // The Matrix verifies the project in the background and may write its index then: wait, so the listing below is final.
+  await svc.verified;
   await vault.close();
   return dir;
 }
 
-describe('the vault, read-only with PMF Sequences\' own code (T32)', () => {
+describe('the vault, read-only with the Matrix\'s own code (T32)', () => {
   it('a schema-4 vault: projects, columns, rows with runs and analyses, the patterns; nothing written', async () => {
     const dir = await madeVault(), before = listing(dir);
     const v = await openVault(dir);
@@ -41,7 +43,7 @@ describe('the vault, read-only with PMF Sequences\' own code (T32)', () => {
     expect(listing(dir)).toEqual(before);
   });
 
-  it('the schema-1, 2 and 3 fixtures (copies), which PMF Sequences would upgrade; nothing written', async () => {
+  it('the schema-1, 2 and 3 fixtures (copies), which the Matrix would upgrade; nothing written', async () => {
     for (const [name, rows] of [['schema-1-vault', ['WRWYCR', 'KRWYCR']], ['schema-2-vault', ['WRWYCR', 'KRWYCR']], ['schema-3-vault', ['WRWYCR', 'KRWYCR']]] as const) {
       const dir = tmp(name);
       cpSync(APP + 'test/fixtures/formats/' + name, dir, { recursive: true });
@@ -58,10 +60,10 @@ describe('the vault, read-only with PMF Sequences\' own code (T32)', () => {
   it('refuses a newer, a foreign, and a missing vault, in words', async () => {
     const dir = await madeVault(), m = join(dir, '.matrix/manifest.json'), manifest = JSON.parse(readFileSync(m, 'utf8'));
     writeFileSync(m, JSON.stringify({ ...manifest, schemaVersion: 5 }));
-    await expect(openVault(dir)).rejects.toThrow('made by a newer PMF Sequences (schema 5); gmx-cypher reads schemas 1–4');
+    await expect(openVault(dir)).rejects.toThrow('made by a newer version of the Matrix (schema 5); gmx-cypher reads schemas 1–4');
     writeFileSync(m, JSON.stringify({ ...manifest, format: 'other' }));
-    await expect(openVault(dir)).rejects.toThrow('not a PMF Sequences vault');
-    await expect(openVault(tmp('empty'))).rejects.toThrow('not a PMF Sequences vault (no .matrix/manifest.json)');
+    await expect(openVault(dir)).rejects.toThrow('not a Matrix vault');
+    await expect(openVault(tmp('empty'))).rejects.toThrow('not a Matrix vault (no .matrix/manifest.json)');
   });
 
   it('every write throws: the reader cannot change the vault', async () => {
@@ -75,8 +77,8 @@ describe('the vault over HTTP', () => {
   it('is set once in the config (checked), then lists projects and a project summary', async () => {
     const { apiServer } = await import('./helpers');
     const dir = await madeVault(), s = await apiServer();
-    expect((await s.call('/api/vault')).json).toEqual({ path: null });
-    expect((await s.call('/api/config', { vault: tmp('not-a-vault') })).json.error).toContain('is not a PMF Sequences vault');
+    expect((await s.call('/api/vault')).json).toEqual({ path: null, project: null });
+    expect((await s.call('/api/config', { vault: tmp('not-a-vault') })).json.error).toContain('is not a Matrix vault');
     expect((await s.call('/api/config', { vault: dir })).json.config.vault).toBe(dir);
     const v = await s.call('/api/vault');
     expect(v.json).toMatchObject({ path: dir, schema: 4, compat: 'ok', projects: [{ name: 'Sugar PMFs' }] });

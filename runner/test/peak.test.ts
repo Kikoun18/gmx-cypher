@@ -3,8 +3,8 @@ import { spawnSync } from 'node:child_process';
 import { join } from 'node:path';
 import { writeFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { parseTable } from '../../app/src/lib/seq';
-import { firstPeak, resultSeries } from '../src/lib/rdf';
+import { parseTable } from '../../matrix/src/lib/seq';
+import { firstPeak, peaks, resultSeries } from '../src/lib/rdf';
 import { FAKE_GMX, tmp } from './helpers';
 
 const fixture = readFileSync(new URL('./fixtures/gmx-2025.4/rdf_nvt.xvg', import.meta.url), 'utf8');
@@ -29,7 +29,7 @@ describe('the first peak (T27): the highest point of the first shell where g(r) 
   });
 });
 
-describe('the result as curves, read with PMF Sequences\' parseTable', () => {
+describe('the result as curves, read with the Matrix\'s parseTable', () => {
   it('the real 2025.4 file: one curve per selection, named after its group', () => {
     const s = resultSeries(fixture);
     expect(s.map(c => [c.label, c.points.length])).toEqual([['water_O', 866], ['sodium', 866]]);
@@ -45,3 +45,26 @@ describe('the result as curves, read with PMF Sequences\' parseTable', () => {
     expect(resultSeries(readFileSync(join(dir, 'out.xvg'), 'utf8')).map(c => c.label)).toEqual(['OW', 'Na']);
   });
 });
+
+describe('both peak rules, named (R3d, T163): the first shell and the maximum', () => {
+  const [water, sodium] = resultSeries(fixture);
+  const H = resultSeries(readFileSync(new URL('./fixtures/decypher/rdf_o111_Methionine_H.xvg', import.meta.url), 'utf8'));
+
+  it('the test system: here each curve\'s first shell is also its maximum', () => {
+    expect(peaks(water.points)).toEqual({ firstShell: { r: 0.374, g: 6.412606, rule: 'first shell' }, maximum: { r: 0.374, g: 6.412606, rule: 'maximum' } });
+    expect(peaks(sodium.points).maximum).toEqual({ r: 0.304, g: 36.625538, rule: 'maximum' });
+  });
+
+  it('your Methionine run: the first shell comes before the maximum, for every group with a shell', () => {
+    const p = peaks(H[0].points);
+    expect(H[0].label).toBe('NH_N...S');
+    expect([p.firstShell!.r, +p.firstShell!.g.toFixed(2), p.maximum!.r, +p.maximum!.g.toFixed(2)]).toEqual([0.45, 17.92, 0.6, 40.33]);
+    for (const c of H) { const q = peaks(c.points); if (q.firstShell) expect(q.firstShell.r).toBeLessThanOrEqual(q.maximum!.r); }
+  });
+
+  it('never above 1: no first shell, only the maximum; a flat zero curve: neither', () => {
+    expect(peaks([[0, 0], [0.1, 0.5], [0.2, 0.8], [0.3, 0.6]])).toEqual({ firstShell: null, maximum: { r: 0.2, g: 0.8, rule: 'maximum' } });
+    expect(peaks([[0, 0], [0.1, 0]])).toEqual({ firstShell: null, maximum: null });
+  });
+});
+

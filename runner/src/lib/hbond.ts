@@ -1,9 +1,11 @@
 // `gmx hbond` (R8): two tools under GROMACS's names. The selection tool (`gmx hbond` from 2024; -r and -t are
 // selections) and the legacy one (`gmx hbond-legacy` from 2024, and `gmx hbond` before it: 2023.3 checked; groups
 // asked on stdin). Each has its own criteria, never mixed (question 33). Every rule here was checked with 2025.4.
+import type { Struct } from '../core/kit';
 import type { CommandOption } from './commands';
 import { checkOptions, numberProblems, optionArgs, valueProblems } from './form';
 import type { HelpOption } from './gmxText';
+import { parseNdx } from './ndx';
 import type { Options } from './rdf';
 
 type FormOption = CommandOption;
@@ -28,7 +30,7 @@ export const HBOND_FORM: FormOption[] = [
   { flag: 'dt', group: 'frames', label: 'every', unit: 'ps', what: 'one frame per this many ps; 0 = every frame' },
   { flag: 'pbc', group: 'periodic boundaries', label: 'periodic boundaries', what: 'bonds across the box edges' },
   { flag: 'rmpbc', group: 'periodic boundaries', label: 'make molecules whole', what: 'from the run input, in every frame' },
-  { flag: 'dist', group: 'output', label: 'distance distribution too', what: 'not sent to the vault: PMF Sequences would read it as an umbrella histogram', switch: 'dist' },
+  { flag: 'dist', group: 'output', label: 'distance distribution too', what: 'not sent to the vault: the Matrix would read it as an umbrella histogram', switch: 'dist' },
   { flag: 'ang', group: 'output', label: 'angle distribution too', what: 'not sent to the vault, likewise', switch: 'ang' },
   { flag: 'dan', group: 'output', label: 'donors and acceptors too', what: 'their number in each frame; not sent to the vault', switch: 'dan' },
 ];
@@ -42,7 +44,7 @@ export const LEGACY_FORM: FormOption[] = [
   { flag: 'b', group: 'frames', label: 'first', unit: 'ps', what: 'frames before this time are skipped' },
   { flag: 'e', group: 'frames', label: 'last', unit: 'ps', what: '0 = to the end of the trajectory' },
   { flag: 'dt', group: 'frames', label: 'every', unit: 'ps', what: 'one frame per this many ps; 0 = every frame' },
-  { flag: 'dist', group: 'output', label: 'distance distribution too', what: 'not sent to the vault: PMF Sequences would read it as H-bonds', switch: 'dist' },
+  { flag: 'dist', group: 'output', label: 'distance distribution too', what: 'not sent to the vault: the Matrix would read it as H-bonds', switch: 'dist' },
   { flag: 'ang', group: 'output', label: 'angle distribution too', what: 'not sent to the vault; needs merging off', switch: 'ang' },
 ];
 
@@ -118,3 +120,26 @@ export const HBOND_SUMMARY = /^Selection '.*' has \d+ acceptors and \d+ donors\.
 export const LEGACY_SUMMARY = /^(Found \d+ donors and \d+ acceptors|Average number of hbonds per timeframe .*)$/;
 export const summaryLines = (text: string, re: RegExp) => text.split('\n').map(l => l.trim()).filter(l => re.test(l));
 
+
+export type Triplet = [donor: number, hydrogen: number, acceptor: number];
+
+/** The pairs the selection tool found over the trajectory (R10c): its `<stem>_hbonds.ndx` group `hbonds_…`, by three. */
+export function hbondTriplets(ndx: string): Triplet[] {
+  const atoms = parseNdx(ndx).find(g => g.name.startsWith('hbonds_'))?.atoms ?? [], out: Triplet[] = [];
+  for (let i = 0; i + 2 < atoms.length; i += 3) out.push([atoms[i], atoms[i + 1], atoms[i + 2]]);
+  return out;
+}
+
+/**
+ * The n pairs nearest at a structure's positions (question 23: 200 by default): hydrogen to acceptor, across the box
+ * edges as gmx measures them, shortest first; `total` counts every pair found. Pairs with an atom not in it are left out.
+ */
+export function nearestPairs(t: Triplet[], s: Pick<Struct, 'nr' | 'xyz' | 'box'>, n = 200): { drawn: Triplet[]; total: number } {
+  const at = new Map(s.nr.map((nr, i) => [nr, i])), mic = (d: number, L: number) => (L > 0 ? d - L * Math.round(d / L) : d);
+  const dist = ([, h, a]: Triplet) => {
+    const i = at.get(h), j = at.get(a);
+    return i == null || j == null ? Infinity : Math.hypot(...[0, 1, 2].map(k => mic(s.xyz[3 * j + k] - s.xyz[3 * i + k], s.box[k])));
+  };
+  const by = t.map(p => [dist(p), p] as const).filter(([d]) => d < Infinity).sort((p, q) => p[0] - q[0]);
+  return { drawn: by.slice(0, n).map(([, p]) => p), total: t.length };
+}

@@ -284,6 +284,8 @@ else if (tool === 'energy') energy();
 else if (tool === 'rdf') await rdf();
 // gmx dump: the real head of the test system's dump, or of an umbrella window's (300 K, 663 atoms) for those (R6).
 else if (tool === 'dump' && /umbrella\.tpr$/.test(one('-s') || '')) { process.stderr.write(banner('dump')); process.stdout.write(readFileSync(new URL('./fixtures/wham/dump-head.txt', import.meta.url), 'utf8')); }
+// The AWH test run's topol.tpr (R7c): its real 2025.4 dump, with its pull coordinate and AWH bias.
+else if (tool === 'dump' && /topol\.tpr$/.test(one('-s') || '')) { process.stderr.write(banner('dump')); process.stdout.write(readFileSync(new URL('./fixtures/awh/dumps/dump-topol-2025.txt', import.meta.url), 'utf8')); }
 else if (tool === 'dump') { process.stderr.write(banner('dump')); process.stdout.write(read('dump-head.txt').replace(/natoms = 3242/g, 'natoms = ' + natomsOf(one('-s')))); }
 else if (tool === 'select') select();
 else if (tool === 'check') { process.stdout.write('Checking file ' + one('-f') + '\n'); process.stderr.write(read('check.stderr').replace('# Atoms  3242', '# Atoms  ' + natomsOf(one('-f')))); }

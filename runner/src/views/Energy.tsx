@@ -14,6 +14,7 @@ import { cn } from '../lib/utils'
 import { Code } from './Code'
 import { useTerms } from '../terms'
 import { usePlan } from '../plan'
+import { Status } from '../ui/status'
 
 /** The energy command's own view (R4): its terms picked by number, its first and last time, and what will run. */
 export function Energy({ gmx, draft, setDraft, onStarted }: { gmx: GmxState; draft: Draft; setDraft: React.Dispatch<React.SetStateAction<Draft>>; onStarted: (id: string) => void }) {
@@ -100,21 +101,21 @@ export function Energy({ gmx, draft, setDraft, onStarted }: { gmx: GmxState; dra
               </label>
             )
           })}
-          <button className="self-start text-caption text-coral-strong hover:underline" aria-expanded={more} onClick={() => setMore(m => !m)}>{more ? 'fewer options' : 'more options'}</button>
+          <button className="self-start text-caption text-foreground underline underline-offset-[3px] hover:decoration-2" aria-expanded={more} onClick={() => setMore(m => !m)}>{more ? 'fewer options' : 'more options'}</button>
         </div>
-        {last > 0 && first >= last && <p className="m-0 text-caption text-destructive">-e must be after -b</p>}
+        {last > 0 && first >= last && <Status level="error">-e must be after -b</Status>}
       </div>
 
       <aside className="flex min-w-0 flex-col gap-4">
         <Section label="Command" />
-        {planned?.error && <Alert variant="destructive"><X /><AlertTitle>gmx-cypher can't plan this run</AlertTitle><AlertDescription><p className="whitespace-pre-line">{planned.error}</p></AlertDescription></Alert>}
+        {planned?.error && <Alert variant="destructive"><X /><AlertTitle>gmx-cypher can't plan this job</AlertTitle><AlertDescription><p className="whitespace-pre-line">{planned.error}</p></AlertDescription></Alert>}
         {plan && <>
-          {plan.problems.length > 0 && <Alert variant="destructive" aria-live="polite"><X /><AlertTitle>gmx would refuse this run</AlertTitle><AlertDescription>{plan.problems.map(p => <p key={p}>{p}</p>)}</AlertDescription></Alert>}
+          {plan.problems.length > 0 && <Alert variant="destructive" aria-live="polite"><X /><AlertTitle>gmx would refuse this job</AlertTitle><AlertDescription>{plan.problems.map(p => <p key={p}>{p}</p>)}</AlertDescription></Alert>}
           <Code text={commandText({ cwd: plan.cwd, file: plan.file, args: plan.argv, env: plan.env })} label="energy command" />
           {plan.stdin != null && <p className="m-0 text-caption text-muted-foreground">answers on stdin, then the end: <span className="font-bold text-foreground">{plan.stdin.trimEnd().split('\n').join(' · ')}</span></p>}
           <p className="m-0 text-caption text-muted-foreground">writes {plan.stem}.xvg and its record in {plan.outDir.split('/').slice(-2).join('/')}/ · new names, nothing overwritten</p>
         </>}
-        {refused?.key === key && <Alert variant="destructive"><X /><AlertTitle>gmx-cypher didn't start this run</AlertTitle><AlertDescription><p className="whitespace-pre-line">{refused.message}</p></AlertDescription></Alert>}
+        {refused?.key === key && <Alert variant="destructive"><X /><AlertTitle>gmx-cypher didn't start this job</AlertTitle><AlertDescription><p className="whitespace-pre-line">{refused.message}</p></AlertDescription></Alert>}
         <div className="flex flex-wrap items-center gap-3">
           <Button size="lg" disabled={blocked || starting || !terms.length} onClick={start}>{starting ? 'starting…' : 'run'}</Button>
           <span className="text-caption text-muted-foreground" aria-live="polite">{!gmx.ok ? 'no working gmx: see settings' : !terms.length ? 'pick at least one term' : 'the statistics come out with the result'}</span>

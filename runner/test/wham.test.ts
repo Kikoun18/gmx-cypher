@@ -48,7 +48,7 @@ describe('window lists (R6): built from a folder template over the window folder
 
 describe('the overlap check (R6): neighbouring windows, sorted by where each histogram peaks', () => {
   // Your 21-window fixture: its columns are not in pull order (Phase 0 §4.1).
-  const yours = neighbourOverlaps(parseHistograms(readFileSync(new URL('../../app/test/fixtures/gmx/hist_500000.xvg', import.meta.url), 'utf8')));
+  const yours = neighbourOverlaps(parseHistograms(readFileSync(new URL('../../matrix/test/fixtures/gmx/hist_500000.xvg', import.meta.url), 'utf8')));
 
   it('your fixture: windows sorted by peak, 1, 12, 14 … 11, 13', () => {
     expect(yours.order).toEqual([1, 12, 14, 15, 16, 17, 18, 19, 20, 21, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 13]);

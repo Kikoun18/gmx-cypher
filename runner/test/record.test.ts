@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { atomTable, fromRanges } from '../src/lib/atoms';
+import { fromRanges } from '../src/core/index';
+import { atomTable } from '../src/lib/atoms';
 import { groupAtoms } from '../src/lib/groups';
 import { parseHelp } from '../src/lib/gmxText';
 import { writeNdx } from '../src/lib/ndx';

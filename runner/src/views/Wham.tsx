@@ -7,6 +7,7 @@ import { Checkbox } from '../ui/checkbox'
 import { Input } from '../ui/input'
 import { Field, FieldHint, Label } from '../ui/label'
 import { Section } from '../ui/separator'
+import { pressed } from '../lib/shortcuts'
 import { ToggleGroup, ToggleGroupItem } from '../ui/toggle-group'
 import { postJson, type GmxState } from '../api'
 import type { Draft } from '../draft'
@@ -14,6 +15,7 @@ import { commandText } from '../lib/command'
 import { WHAM_FORM } from '../lib/wham'
 import { usePlan } from '../plan'
 import { Code } from './Code'
+import { Status } from '../ui/status'
 
 interface Found { rel: string; tpr: string; pull: string | null }
 type Pull = 'pullx' | 'pullf'
@@ -48,7 +50,7 @@ export function Wham({ gmx, draft, setDraft, onStarted }: { gmx: GmxState; draft
       setFound(r.windows); setUnread(r.unread)
       // Every window with its pull file is used until you leave it out.
       setWham({ root, glob, pull, windows: r.windows.filter(x => x.pull).map(x => ({ tpr: x.tpr, pull: x.pull! })) })
-    } catch (e) { toast.error('✗ ' + (e as Error).message) }
+    } catch (e) { toast.error((e as Error).message) }
     finally { setFinding(false) }
   }
   const used = new Set(w.windows.map(x => x.tpr))
@@ -85,12 +87,12 @@ export function Wham({ gmx, draft, setDraft, onStarted }: { gmx: GmxState; draft
         <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-4">
           <Field>
             <Label htmlFor="wham-root">folder</Label>
-            <Input id="wham-root" size="sm" value={root} placeholder="the folder that holds the window folders" onChange={e => setRoot(e.target.value)} onKeyDown={e => e.key === 'Enter' && root && find()} />
+            <Input id="wham-root" size="sm" value={root} placeholder="the folder that holds the window folders" onChange={e => setRoot(e.target.value)} onKeyDown={e => pressed(e, 'enter') && root && find()} />
             <FieldHint>inside the allowed folders</FieldHint>
           </Field>
           <Field>
             <Label htmlFor="wham-glob">each window's run input</Label>
-            <Input id="wham-glob" size="sm" value={glob} onChange={e => setGlob(e.target.value)} onKeyDown={e => e.key === 'Enter' && root && find()} />
+            <Input id="wham-glob" size="sm" value={glob} onChange={e => setGlob(e.target.value)} onKeyDown={e => pressed(e, 'enter') && root && find()} />
             <FieldHint>* matches within one name</FieldHint>
           </Field>
         </div>
@@ -113,7 +115,7 @@ export function Wham({ gmx, draft, setDraft, onStarted }: { gmx: GmxState; draft
                     <td className="py-1 pr-3"><Checkbox aria-label={'use ' + f.rel} checked={n >= 0} disabled={!f.pull || !found} onCheckedChange={() => toggle(f)} /></td>
                     <td className="pr-3 text-muted-foreground">{n >= 0 ? n + 1 : '—'}</td>
                     <td className="pr-3">{f.rel}</td>
-                    <td className={f.pull ? 'text-muted-foreground' : 'text-destructive'}>{f.pull ? '✓ ' + f.pull.split('/').pop() : '✗ none beside it'}</td>
+                    <td>{f.pull ? <Status inline level="ok" word={f.pull.split('/').pop()!} /> : <Status inline level="warning" word="none beside it" />}</td>
                   </tr>
                 )
               })}
@@ -126,21 +128,21 @@ export function Wham({ gmx, draft, setDraft, onStarted }: { gmx: GmxState; draft
         <Section label="Options" />
         <div className="grid grid-cols-3 gap-4">{FIRST.map(field)}</div>
         {more && <div className="grid grid-cols-3 gap-4">{MORE.map(field)}</div>}
-        <button className="self-start text-caption text-coral-strong hover:underline" aria-expanded={more} onClick={() => setMore(m => !m)}>{more ? 'fewer options' : 'more options'}</button>
-        <p className="m-0 text-caption text-muted-foreground">kJ/mol always (gmx wham -unit is not offered) · the histograms go to the vault; the profile stays here until you decide (question 28)</p>
+        <button className="self-start text-caption text-foreground underline underline-offset-[3px] hover:decoration-2" aria-expanded={more} onClick={() => setMore(m => !m)}>{more ? 'fewer options' : 'more options'}</button>
+        <p className="m-0 text-caption text-muted-foreground">kJ/mol always (gmx wham -unit is not offered) · the histograms go to the vault; the profile stays here, since the Matrix would read it as a histogram</p>
       </div>
 
       <aside className="flex min-w-0 flex-col gap-4">
         <Section label="Command" />
         {!body && <p className="m-0 text-control text-muted-foreground">find the windows first</p>}
-        {planned?.error && <Alert variant="destructive"><X /><AlertTitle>gmx-cypher can't plan this run</AlertTitle><AlertDescription><p className="whitespace-pre-line">{planned.error}</p></AlertDescription></Alert>}
+        {planned?.error && <Alert variant="destructive"><X /><AlertTitle>gmx-cypher can't plan this job</AlertTitle><AlertDescription><p className="whitespace-pre-line">{planned.error}</p></AlertDescription></Alert>}
         {plan && <>
-          {plan.problems.length > 0 && <Alert variant="destructive" aria-live="polite"><X /><AlertTitle>gmx would refuse this run</AlertTitle><AlertDescription>{plan.problems.map(p => <p key={p}>{p}</p>)}</AlertDescription></Alert>}
+          {plan.problems.length > 0 && <Alert variant="destructive" aria-live="polite"><X /><AlertTitle>gmx would refuse this job</AlertTitle><AlertDescription>{plan.problems.map(p => <p key={p}>{p}</p>)}</AlertDescription></Alert>}
           <Code text={commandText({ cwd: plan.cwd, file: plan.file, args: plan.argv, env: plan.env })} label="wham command" />
           {plan.notes.map(n => <p key={n} className="m-0 text-caption text-muted-foreground">{n}</p>)}
           <p className="m-0 text-caption text-muted-foreground">writes {[plan.names.xvg, ...(plan.names.more ?? [])].join(' · ')} and its record in {plan.outDir.split('/').slice(-2).join('/')}/ · new names, nothing overwritten</p>
         </>}
-        {refused?.key === key && <Alert variant="destructive"><X /><AlertTitle>gmx-cypher didn't start this run</AlertTitle><AlertDescription><p className="whitespace-pre-line">{refused.message}</p></AlertDescription></Alert>}
+        {refused?.key === key && <Alert variant="destructive"><X /><AlertTitle>gmx-cypher didn't start this job</AlertTitle><AlertDescription><p className="whitespace-pre-line">{refused.message}</p></AlertDescription></Alert>}
         <div className="flex flex-wrap items-center gap-3">
           <Button size="lg" disabled={!gmx.ok || !body || !!planned?.error || !!plan?.problems.length || starting} onClick={start}>{starting ? 'starting…' : 'run'}</Button>
           <span className="text-caption text-muted-foreground" aria-live="polite">{!gmx.ok ? 'no working gmx: see settings' : w.windows.length < 2 ? 'at least two windows' : 'the overlap of neighbouring windows comes with the result'}</span>

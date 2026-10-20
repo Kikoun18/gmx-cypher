@@ -10,6 +10,7 @@ import { Section } from '../ui/separator'
 import { postJson } from '../api'
 import { ageText, etaOf, mergeJobs, nextPoll, type ClusterRow, type EtaLine, type JobState, type QqTable } from '../lib/cluster'
 import { cn } from '../lib/utils'
+import { Status } from '../ui/status'
 
 /** What POST /api/cluster answers (server/cluster.ts): one read of qq jobs and gmx-eta -a. */
 type Part<T> = ({ ok: true } & T) | { ok: false; error: string }
@@ -159,7 +160,7 @@ export function ClusterView() {
                     <td className="pr-4">
                       {e.left ?? '—'}
                       {e.why && <div className="max-w-80 text-caption text-muted-foreground">{e.why}</div>}
-                      {e.warning && <div className="flex items-center gap-1 text-caption text-destructive"><TriangleAlert className="size-3.5" /> {e.warning}</div>}
+                      {e.warning && <Status level="warning">{e.warning}</Status>}
                     </td>
                     <td className="pr-4 tabular-nums">{e.finishes ?? ''}</td>
                     <td className="tabular-nums">{q?.node ?? (q?.planned ? 'planned: ' + q.planned : '')}</td>

@@ -10,9 +10,11 @@ export interface Config {
   gmx: string | null;
   /** Folders the file browser may show (R2a). */
   allow: string[];
-  /** The PMF Sequences vault folder (R6). */
+  /** The Matrix vault folder (R6). */
   vault: string | null;
-  /** PMF Sequences' address, for a link to the project (R6c). */
+  /** The connected project of the vault, by its Matrix ID (R14b, T158): it names jobs, is the default for sends and owns saved views. */
+  project: string | null;
+  /** The Matrix's address, for a link to the project (R6c). */
   pmfUrl: string | null;
   /** Jobs at a time (R7b). */
   concurrency: number;
@@ -23,7 +25,7 @@ export interface Config {
   gmxEta: string | null;
 }
 
-export const DEFAULT_CONFIG: Config = { gmx: null, allow: [], vault: null, pmfUrl: null, concurrency: 2, hashTrajectories: false, qq: null, gmxEta: null };
+export const DEFAULT_CONFIG: Config = { gmx: null, allow: [], vault: null, project: null, pmfUrl: null, concurrency: 2, hashTrajectories: false, qq: null, gmxEta: null };
 
 export const stateDir = (env: NodeJS.ProcessEnv = process.env) => env.GMX_CYPHER_HOME || join(homedir(), '.gmx-cypher');
 

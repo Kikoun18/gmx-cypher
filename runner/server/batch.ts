@@ -5,7 +5,7 @@
 import { EventEmitter } from 'node:events';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { basename, dirname, join, relative } from 'node:path';
-import { structFormat } from '../../app/src/lib/structFile';
+import { structFormat } from '../../matrix/src/lib/structFile';
 import { atomTable } from '../src/lib/atoms';
 import { matchTrajectory, nameValues, vaultFields, type BatchMatch } from '../src/lib/batch';
 import { renderStem } from '../src/lib/names';
@@ -19,7 +19,7 @@ import { inside, namesIn, real, within } from './files';
 import { HttpError } from './http';
 import type { Job } from './jobs';
 import { startRun } from './runs';
-import { sendToInbox } from './send';
+import { keepRecord, sendToInbox } from './send';
 import { landingFor, listProjects, openVault } from './vault';
 
 export interface BatchItem extends BatchMatch {
@@ -67,7 +67,10 @@ export function findTrajectories(rootPath: string, template: string, recipe: Rec
     let counts: number[] | null = null, atoms: number | null = null;
     if (structure) {
       const text = readFileSync(structure, 'utf8'), format = structFormat(structure, text);
-      if (format) { const table = atomTable(text, format), a = applyRecipe(recipe, table); atoms = table.length; counts = a.counts; problems.push(...a.problems); }
+      if (format) {
+        try { const table = atomTable(text, format), a = applyRecipe(recipe, table); atoms = table.length; counts = a.counts; problems.push(...a.problems); }
+        catch (e) { problems.push(basename(structure) + ': ' + (e as Error).message); }
+      }
       else problems.push(basename(structure) + ' is not a .gro or .pdb');
     }
     return [{ ...m, rel, trajectory: abs, runInput, structure, atoms, counts, problems }];
@@ -171,7 +174,7 @@ export class Batches extends EventEmitter {
 
 /**
  * Send all (R7b): each done run of the batch, file by file by the rule of R6: the fields its path gave
- * (the folder pattern of the project fills the rest), the name from the project's pattern, PMF Sequences'
+ * (the folder pattern of the project fills the rest), the name from the project's pattern, the Matrix'
  * preview; sent only when it lands where the fields say, else skipped with the reason.
  */
 export async function sendAll(ctx: Ctx, b: Batch, project: string): Promise<{ rel: string; sent?: string; skipped?: string }[]> {
@@ -189,7 +192,9 @@ export async function sendAll(ctx: Ctx, b: Batch, project: string): Promise<{ re
       const fields = { ...first.fields, ...Object.fromEntries(Object.entries(own).filter(([, x]) => x)) };
       const l = await landingFor(v, project, file, { fields });
       const why = [...l.missing.map(t => 'no value for ' + t), ...l.preview.problems, ...l.reasons];
-      out.push(why.length ? { rel: i.rel, skipped: why.join('; ') } : { rel: i.rel, sent: sendToInbox(v, p, xvg, l.name, ctx.config.pmfUrl).path });
+      if (why.length) { out.push({ rel: i.rel, skipped: why.join('; ') }); continue; }
+      out.push({ rel: i.rel, sent: sendToInbox(v, p, xvg, l.name, ctx.config.pmfUrl).path });
+      keepRecord(v, String(j.meta!.record), [...ctx.config.allow, join(ctx.home, 'uploads')], 'gmx-cypher ' + ctx.version);
     } catch (e) { out.push({ rel: i.rel, skipped: 'could not be sent: ' + (e as Error).message }); }
   }
   return out;

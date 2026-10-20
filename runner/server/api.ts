@@ -4,12 +4,12 @@ import { COMMANDS, commandOf, type OutputNames } from '../src/lib/commands';
 import { existsSync, readFileSync, realpathSync, statSync } from 'node:fs';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { basename, dirname, isAbsolute, join } from 'node:path';
-import { TOKENS } from '../../app/src/lib/seq';
+import { TOKENS } from '../../matrix/src/lib/seq';
 import { inputRole, suggestInputs } from '../src/lib/inputs';
-import { fromRanges } from '../src/lib/atoms';
+import { fromRanges } from '../src/core/index';
 import { nameProblem } from '../src/lib/groups';
 import { checkInputs, checkSizes } from './check';
-import { awhScan } from './awh';
+import { awhScan, runConvergence } from './awh';
 import { energyMenu } from './energy';
 import { findWindows } from './wham';
 import { inside, listFolder, namesIn, saveUpload } from './files';
@@ -22,7 +22,7 @@ import { listRecipes, readRecipe, saveRecipe } from './recipes';
 import { recipeFileProblems, type Recipe } from '../src/lib/recipe';
 import { cpus } from 'node:os';
 import { planRun, recordWritten, startRun } from './runs';
-import { sendToInbox } from './send';
+import { keepRecord, sendToInbox } from './send';
 import { landingFor, listProjects, openVault, projectSummary, readProject } from './vault';
 import { findRuns, listVault, readRun, vaultFile } from './decypher';
 import type { Fields } from '../src/lib/landing';
@@ -49,7 +49,7 @@ function events(jobs: Jobs, batches: Batches, res: ServerResponse) {
 }
 
 /** What the GUI may change (T5); anything else is refused. */
-const SETTABLE: (keyof Config)[] = ['gmx', 'allow', 'vault', 'pmfUrl', 'qq', 'gmxEta'];
+const SETTABLE: (keyof Config)[] = ['gmx', 'allow', 'vault', 'project', 'pmfUrl', 'qq', 'gmxEta'];
 
 /** Allowed folders as real paths; each must exist and be a folder. */
 export function realFolders(paths: string[]): string[] {
@@ -149,11 +149,19 @@ export function makeApi(ctx: Ctx): Api {
       return { body: await checkSizes(ctx.gmx, runInput, groups, ctx.home) };
     }
     if (is(req, 'GET', url, '/api/vault')) {
-      if (!ctx.config.vault) return { body: { path: null } };
+      if (!ctx.config.vault) return { body: { path: null, project: null } };
       try {
         const v = await openVault(ctx.config.vault);
-        return { body: { path: v.path, schema: v.schema, compat: v.compat, projects: (await listProjects(v)).map(p => ({ id: p.id, name: p.name, dir: p.dir, desc: p.desc })) } };
+        return { body: { path: v.path, schema: v.schema, compat: v.compat, project: ctx.config.project, projects: (await listProjects(v)).map(p => ({ id: p.id, name: p.name, dir: p.dir, desc: p.desc })) } };
       } catch (e) { return { body: { path: ctx.config.vault, error: (e as Error).message } }; }
+    }
+    // The connected project's naming (R3c): its path pattern and columns, which name jobs on the page; null without one.
+    if (is(req, 'GET', url, '/api/naming')) {
+      if (!ctx.config.vault || !ctx.config.project) return { body: null };
+      try {
+        const s = projectSummary(await readProject(await openVault(ctx.config.vault), ctx.config.project));
+        return { body: { project: s.id, name: s.name, pathPattern: s.settings.pathPattern, columns: s.columns } };
+      } catch { return { body: null }; }
     }
     if (is(req, 'GET', url, '/api/vault/project')) {
       if (!ctx.config.vault) throw new HttpError(409, 'no vault set');
@@ -164,11 +172,11 @@ export function makeApi(ctx: Ctx): Api {
     }
     if (is(req, 'GET', url, '/api/decypher/vault')) {
       // (de)Cypher: the vault's RDFs with their rows' structures, and the run that wrote each, read only.
-      if (!ctx.config.vault) throw new HttpError(409, 'no vault set: choose the PMF Sequences vault in settings');
+      if (!ctx.config.vault) throw new HttpError(409, 'no vault set: choose the Matrix vault in settings');
       return { body: await listVault(await openVault(ctx.config.vault), ctx.jobs) };
     }
     if (is(req, 'GET', url, '/api/decypher/vault/file')) {
-      if (!ctx.config.vault) throw new HttpError(409, 'no vault set: choose the PMF Sequences vault in settings');
+      if (!ctx.config.vault) throw new HttpError(409, 'no vault set: choose the Matrix vault in settings');
       const text = await vaultFile(await openVault(ctx.config.vault), ctx.jobs, url.searchParams.get('path') || '');
       res.writeHead(200, { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' });
       res.end(text);
@@ -198,8 +206,9 @@ export function makeApi(ctx: Ctx): Api {
       if (!ctx.config.vault) throw new HttpError(409, 'no vault set');
       const v = await openVault(ctx.config.vault), project = (await listProjects(v)).find(p => p.id === b.project);
       if (!project) throw new HttpError(404, 'no project ' + b.project + ' in the vault');
-      // Only g(r): the cumulative-number file is titled "Cumulative Number RDF", which PMF Sequences would read as another RDF (T35).
-      return { body: sendToInbox(v, project, join(String(j.meta!.outDir), (j.meta!.names as { xvg: string }).xvg), String(b.name ?? ''), ctx.config.pmfUrl) };
+      // Only g(r): the cumulative-number file is titled "Cumulative Number RDF", which the Matrix would read as another RDF (T35).
+      const sent = sendToInbox(v, project, join(String(j.meta!.outDir), (j.meta!.names as { xvg: string }).xvg), String(b.name ?? ''), ctx.config.pmfUrl);
+      return { body: { ...sent, record: keepRecord(v, String(j.meta!.record), roots(), 'gmx-cypher ' + ctx.version) } };
     }
     if (is(req, 'POST', url, '/api/batch/preview')) {
       const b = await readJson<{ root: string; template: string; recipe: unknown }>(req);
@@ -238,7 +247,7 @@ export function makeApi(ctx: Ctx): Api {
       if (!role || role === 'output') throw new HttpError(400, name + ' is not a GROMACS input (.xtc .trr .tng .tpr .gro .pdb .ndx .edr); not uploaded');
       return { body: await saveUpload(req, ctx.home, name) };
     }
-    const job = /^\/api\/jobs\/([\w-]+)(\/cancel|\/record|\/output)?$/.exec(url.pathname);
+    const job = /^\/api\/jobs\/([\w-]+)(\/cancel|\/record|\/output|\/awh-convergence)?$/.exec(url.pathname);
     if (job) {
       const j = ctx.jobs.get(job[1]);
       if (!j) throw new HttpError(404, 'no job ' + job[1]);
@@ -247,19 +256,27 @@ export function makeApi(ctx: Ctx): Api {
       if (req.method === 'GET' && job[2] === '/record') {
         const path = j.meta?.record as string | undefined;
         if (j.ended) await recordWritten(j.id);
-        if (!path || !existsSync(path)) throw new HttpError(404, j.ended ? 'this run has no record' : 'the record is written when the run ends');
-        // A run without groups claims its stem with an empty record (T103): one left empty never got its record (review finding 8).
+        // Written as the job starts, completed when it ends (R2b): the page asks for it once the job has ended.
+        if (!j.ended) throw new HttpError(404, 'the record is completed when the job ends');
+        if (!path || !existsSync(path)) throw new HttpError(404, 'this job has no record');
+        // A job without groups claims its stem with an empty record (T103): one from before R2b may have stayed empty (review finding 8).
         const text = readFileSync(path, 'utf8');
-        if (!text.trim()) throw new HttpError(404, j.ended ? 'this run has no record: it stopped before gmx-cypher wrote it' : 'the record is written when the run ends');
+        if (!text.trim()) throw new HttpError(404, 'this job has no record: it stopped before gmx-cypher wrote it');
         return { body: JSON.parse(text) };
+      }
+      // AWH convergence (R7b): every frame the run wrote, each against the one before and the final one.
+      if (req.method === 'GET' && job[2] === '/awh-convergence') {
+        const names = j.meta?.names as OutputNames | undefined, stem = j.meta?.stem as string | undefined;
+        if (j.kind !== 'awh' || !names || !stem) throw new HttpError(404, 'not a gmx awh run');
+        return { body: runConvergence(String(j.meta!.outDir), stem, names) };
       }
       if (req.method === 'GET' && job[2] === '/output') {
         // A run's own .xvg files only, by kind, or one of gmx awh's frames by its name (R5): the chart reads them.
         const kind = url.searchParams.get('kind') || '', file = url.searchParams.get('name'), names = j.meta?.names as OutputNames | undefined;
-        if (file != null && !names?.more?.includes(file) && file !== names?.xvg) throw new HttpError(404, 'this run wrote no file ' + file);
+        if (file != null && !names?.more?.includes(file) && file !== names?.xvg) throw new HttpError(404, 'this job wrote no file ' + file);
         if (file == null && kind !== 'xvg' && kind !== 'cn') throw new HttpError(400, 'no output ' + kind + ': xvg or cn');
         const name = file ?? names?.[kind as 'xvg' | 'cn'], path = name && join(String(j.meta!.outDir), name);
-        if (!path || !existsSync(path)) throw new HttpError(404, 'this run wrote no ' + kind + ' file');
+        if (!path || !existsSync(path)) throw new HttpError(404, 'this job wrote no ' + kind + ' file');
         sendFile(res, path, { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' });
         return 'handled';
       }
@@ -269,7 +286,7 @@ export function makeApi(ctx: Ctx): Api {
       const unknown = Object.keys(patch || {}).filter(k => !SETTABLE.includes(k as keyof Config));
       if (unknown.length) throw new HttpError(400, 'unknown setting: ' + unknown.join(', '));
       if (patch.allow) patch.allow = realFolders(patch.allow);
-      if (patch.pmfUrl && !/^https?:\/\/[^\s]+$/.test(patch.pmfUrl)) throw new HttpError(400, 'the PMF Sequences address must start with http:// or https://');
+      if (patch.pmfUrl && !/^https?:\/\/[^\s]+$/.test(patch.pmfUrl)) throw new HttpError(400, 'the Matrix address must start with http:// or https://');
       // The tool's own name, found on PATH, or the absolute path of a program that exists: never a relative path
       // resolved against the server's folder, or another program's name (review).
       for (const k of ['qq', 'gmxEta'] as const) {
@@ -277,8 +294,15 @@ export function makeApi(ctx: Ctx): Api {
         if (v != null && (typeof v !== 'string' || !(v === name || (isAbsolute(v) && /^[\w./+-]+$/.test(v) && executable(v)))))
           throw new HttpError(400, k + ': ' + name + ' (found on PATH), or the absolute path of a program that exists');
       }
-      // A vault is checked before it is kept: PMF Sequences' manifest, schemas 1–4 (T32, T142).
+      // A vault is checked before it is kept: the Matrix's manifest, schemas 1–4 (T32, T142).
       if (patch.vault) patch.vault = (await openVault(patch.vault).catch(e => { throw new HttpError(400, (e as Error).message); })).path;
+      // The connected project is one of the vault's (R14b): another vault, or none, leaves none connected unless one is given.
+      if ('vault' in patch && !('project' in patch)) patch.project = null;
+      if (patch.project != null) {
+        const vault = 'vault' in patch ? patch.vault : ctx.config.vault;
+        if (!vault) throw new HttpError(400, 'set a vault first: a project is one of its projects');
+        if (typeof patch.project !== 'string' || !(await listProjects(await openVault(vault))).some(p => p.id === patch.project)) throw new HttpError(400, 'no project ' + patch.project + ' in the vault');
+      }
       ctx.config = { ...ctx.config, ...patch };
       saveConfig(ctx.home, ctx.config);
       if ('gmx' in patch) ctx.gmx = await detectGmx(ctx.config.gmx);

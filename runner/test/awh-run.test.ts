@@ -1,9 +1,9 @@
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { NodeBackend } from '../../app/scripts/node-backend';
-import { addColumn } from '../../app/src/lib/seq';
-import { newVault } from '../../app/test/helpers';
+import { NodeBackend } from '../../matrix/scripts/node-backend';
+import { addColumn } from '../../matrix/src/lib/seq';
+import { newVault } from '../../matrix/test/helpers';
 import { recordProblems } from '../src/lib/record';
 import { planRun, startRun, type RunRequest } from '../server/runs';
 import { apiServer, FAKE_GMX, RUNNER, tmp } from './helpers';
@@ -65,6 +65,8 @@ describe('a run of gmx awh (R5)', () => {
     const { job, record } = await startRun(s.ctx, req, roots);
     const r = await record;
     expect(r).toMatchObject({ status: 'done', analysis: 'awh', groups: [], problems: [], frames: { analysed: 3, lastTime: 16 } });
+    // What ξ is, read from the run input when the job started (R7c), kept in the record.
+    expect(r.awhUnits).toEqual([{ bias: 1, unit: 'nm', what: 'pull coordinate 1, distance' }]);
     expect(r.outputs.map(o => o.path.split('/').pop())).toEqual(['awh_awh_t0.xvg', 'awh_awh_t8.xvg', 'awh_awh_t16.xvg']);
     expect(readdirSync(join(dir, 'awh')).sort()).toEqual(['awh_awh.run.json', 'awh_awh_t0.xvg', 'awh_awh_t16.xvg', 'awh_awh_t8.xvg']);
     expect(recordProblems(JSON.parse(readFileSync(join(dir, 'awh/awh_awh.run.json'), 'utf8')))).toEqual([]);
@@ -79,6 +81,19 @@ describe('a run of gmx awh (R5)', () => {
     await s.close();
   });
 
+  it('its convergence (R7b): every frame it wrote, each against the one before and the final one, in kJ/mol', async () => {
+    const { s, req, roots } = await setup({ options: { skip: '1' } });
+    const { job, record } = await startRun(s.ctx, req, roots);
+    await record;
+    const c = await (await fetch(s.base + '/api/jobs/' + job.id + '/awh-convergence', { headers: s.headers })).json();
+    expect(c).toMatchObject({ align: 'aligned by their mean over the shared grid', unit: 'kJ/mol', frames: 11, bias: null, biases: 1 });
+    expect(c.steps.map((x: { time: number }) => x.time)).toEqual([0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20]);
+    expect(c.steps[10]).toMatchObject({ prev: { max: expect.any(Number), rms: expect.any(Number) }, final: null });
+    const other = (await (await fetch(s.base + '/api/jobs/nope/awh-convergence', { headers: s.headers })).json());
+    expect(other.error).toBeTruthy();
+    await s.close();
+  });
+
   it('the scan the page shows: 11 frames, 0–20 ps, and the target error', async () => {
     const { s, req } = await setup();
     await s.call('/api/config', { allow: [req.inputs.edr!.replace(/\/awh\.edr$/, '')] });
@@ -90,7 +105,7 @@ describe('a run of gmx awh (R5)', () => {
   });
 });
 
-describe('the AWH result lands in PMF Sequences as a PMF, at its time (R5)', () => {
+describe('the AWH result lands in the Matrix as a PMF, at its time (R5)', () => {
   it('the last frame, named by the project pattern: PMF, row, column and time 20', async () => {
     const vdir = tmp('vault'), { svc, vault } = await newVault(new NodeBackend(vdir));
     const c = addColumn(svc.store, 'HA', 'histidine');

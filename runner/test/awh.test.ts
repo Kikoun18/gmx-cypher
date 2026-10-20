@@ -1,9 +1,9 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { parseHelp } from '../src/lib/gmxText';
-import { awhArgv, awhFrames, awhNames, awhOptionProblems, awhTargetError, framesWritten, frameOptions, type AwhFrame } from '../src/lib/awh';
-import { DEFAULT_PATTERN, detectAna, getAnalyses, parseName, parseTable } from '../../app/src/lib/seq';
-import { parseGmxHeader } from '../../app/src/lib/gmxHeader';
+import { awhArgv, awhAxis, awhConvergence, awhFrames, awhUnits, awhNames, awhOptionProblems, awhTargetError, framesWritten, frameOptions, type AwhFrame } from '../src/lib/awh';
+import { DEFAULT_PATTERN, detectAna, getAnalyses, parseName, parseTable } from '../../matrix/src/lib/seq';
+import { parseGmxHeader } from '../../matrix/src/lib/gmxHeader';
 
 // A real AWH run (GROMACS 2025.4, test/fixtures/awh/): one bias, AWH data every 2 ps from 0 to 20 ps, and the
 // 11 files `gmx awh -o awh/awh.xvg` wrote for it.
@@ -60,8 +60,8 @@ describe('the frame choice (R5): last, every N-th, or all, and how many files ea
   });
 });
 
-describe('names (R5): the output stem gives PMF Sequences\' own pattern', () => {
-  it('a stem like hmrfast6_ha_WRWYCR gives hmrfast6_ha_WRWYCR_t20.xvg, which PMF Sequences reads back field by field', () => {
+describe('names (R5): the output stem gives the Matrix\'s own pattern', () => {
+  it('a stem like hmrfast6_ha_WRWYCR gives hmrfast6_ha_WRWYCR_t20.xvg, which the Matrix reads back field by field', () => {
     const [name] = awhNames('hmrfast6_ha_WRWYCR', framesWritten(frames, { b: '20' }));
     expect(name).toBe('hmrfast6_ha_WRWYCR_t20.xvg');
     expect(parseName(name, DEFAULT_PATTERN)).toEqual({ matched: true, fields: { group: 'hmrfast6', col: 'ha', seq: 'WRWYCR', time: '20' } });
@@ -72,7 +72,7 @@ describe('names (R5): the output stem gives PMF Sequences\' own pattern', () => 
   });
 });
 
-describe('the AWH output in PMF Sequences (R5): a PMF, and its target error', () => {
+describe('the AWH output in the Matrix (R5): a PMF, and its target error', () => {
   const text = readFileSync(new URL('awh/out/awh_t20.xvg', FIX), 'utf8');
 
   it('is typed PMF from its header, whatever its name', () => {
@@ -114,5 +114,80 @@ describe('the awh argument list and refusals (R5)', () => {
   it('2023.3 has the same options', () => {
     const old = parseHelp(readFileSync(new URL('gmx-2023.3/awh-h.txt', FIX), 'utf8')).map(o => o.flag);
     expect(old).toEqual(help.map(o => o.flag));
+  });
+});
+
+describe('AWH convergence (R7b): every frame against the one before and the final one, after aligning', () => {
+  const frame = (time: number, y: number[], x = y.map((_, i) => 0.3 + 0.1 * i)) => ({ time, x, y });
+
+  it('two frames, by hand: aligned by their mean, the largest |ΔPMF| and the RMS over the shared grid', () => {
+    // Means 1 and 1: aligned [-1, 0, 1] and [0, 0, 0]; differences 1, 0, 1 → largest 1, RMS √(2/3).
+    const c = awhConvergence([frame(0, [0, 1, 2]), frame(2, [1, 1, 1])]);
+    if ('error' in c) throw new Error(c.error);
+    expect(c.align).toBe('aligned by their mean over the shared grid');
+    expect(c.unit).toBe('kJ/mol');
+    expect(c.steps.map(s => s.time)).toEqual([0, 2]);
+    expect(c.steps[0].prev).toBeNull();
+    expect(c.steps[0].final!.max).toBe(1);
+    expect(c.steps[0].final!.rms).toBeCloseTo(Math.sqrt(2 / 3), 12);
+    expect(c.steps[1].prev).toEqual(c.steps[0].final);
+    // The final frame against itself says nothing: none.
+    expect(c.steps[1].final).toBeNull();
+  });
+
+  it('frames that differ only by a constant have not changed', () => {
+    const c = awhConvergence([frame(0, [5, 6.5, 9]), frame(2, [0, 1.5, 4]), frame(4, [-3, -1.5, 1])]);
+    if ('error' in c) throw new Error(c.error);
+    for (const s of c.steps) for (const d of [s.prev, s.final]) if (d) { expect(d.max).toBeCloseTo(0, 12); expect(d.rms).toBeCloseTo(0, 12); }
+  });
+
+  it('frames on another grid are refused, in words', () => {
+    expect(awhConvergence([frame(0, [0, 1, 2]), frame(2, [0, 1])])).toEqual({ error: 'the frame at t = 2 ps has 2 points from 0.3 to 0.4, the one at t = 0 ps 3 points from 0.3 to 0.5: frames on different grids can\'t be compared point by point' });
+    expect(awhConvergence([frame(0, [0, 1]), frame(2, [0, 1], [0.3, 0.45])])).toMatchObject({ error: expect.stringContaining('different grids') });
+    expect(awhConvergence([frame(0, [0, 1])])).toEqual({ error: 'one frame: nothing to compare it with' });
+  });
+
+  it('in time order, whatever order they come in; the real run: 11 frames, the changes shrink toward the end', () => {
+    const real = frames.map(f => { const t = parseTable(readFileSync(new URL('awh/out/awh' + f.suffix, FIX), 'utf8')); return { time: f.time, x: t.cols[0], y: t.cols[1] } });
+    const c = awhConvergence([...real].reverse());
+    if ('error' in c) throw new Error(c.error);
+    expect(c.steps.map(s => s.time)).toEqual([0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20]);
+    // Each against the one before, by hand for the last step.
+    const al = (y: number[]) => { const m = y.reduce((a, v) => a + v, 0) / y.length; return y.map(v => v - m) };
+    const a = al(real[10].y), b = al(real[9].y), d = a.map((v, i) => v - b[i]);
+    expect(c.steps[10].prev!.max).toBeCloseTo(Math.max(...d.map(Math.abs)), 12);
+    expect(c.steps[10].prev!.rms).toBeCloseTo(Math.sqrt(d.reduce((s, v) => s + v * v, 0) / d.length), 12);
+    expect(c.steps[0].final!.rms).toBeGreaterThan(c.steps[9].final!.rms);
+  });
+});
+
+describe("the AWH axis unit (R7c): from the run input's dump, where gmx awh's own label says \"nm, deg or lambda state\"", () => {
+  // Real `gmx dump -s` output: tiny AWH run inputs made with GROMACS 2023.3 and 2025.4 (test/fixtures/awh/dumps, their
+  // .mdp beside them), and the test run's own topol.tpr (2025.4).
+  const dump = (n: string) => readFileSync(new URL('awh/dumps/' + n, FIX), 'utf8');
+  it.each([
+    ['dump-topol-2025.txt', { unit: 'nm', what: 'pull coordinate 1, distance' }],
+    ...(['2023', '2025'] as const).flatMap(v => [
+      ['dump-distance-' + v + '.txt', { unit: 'nm', what: 'pull coordinate 1, distance' }],
+      ['dump-angle-' + v + '.txt', { unit: 'deg', what: 'pull coordinate 1, angle' }],
+      ['dump-dihedral-' + v + '.txt', { unit: 'deg', what: 'pull coordinate 1, dihedral' }],
+      ['dump-lambda-' + v + '.txt', { unit: 'lambda state', what: 'the free-energy lambda state' }],
+    ]),
+  ] as [string, { unit: string; what: string }][])('%s', (file, want) => {
+    expect(awhUnits(dump(file))).toEqual([{ bias: 1, ...want }]);
+  });
+
+  it('the label shown: ξ with its unit and what it is; gmx\'s own when the unit is unknown, with the reason', () => {
+    expect(awhAxis([{ bias: 1, unit: 'nm', what: 'pull coordinate 1, distance' }], 1, '(nm, deg or lambda state)')).toEqual({ label: 'ξ (nm) · pull coordinate 1, distance' });
+    const unknown = awhUnits(dump('dump-distance-2025.txt').replace(/(geometry\s*=\s*)distance/, '$1transformation'));
+    expect(unknown).toEqual([{ bias: 1, unit: null, what: 'pull coordinate 1, transformation', why: "pull coordinate 1's geometry is transformation, whose unit gmx-cypher doesn't know" }]);
+    expect(awhAxis(unknown, 1, '(nm, deg or lambda state)')).toEqual({ label: '(nm, deg or lambda state)', why: "pull coordinate 1's geometry is transformation, whose unit gmx-cypher doesn't know" });
+    expect(awhAxis(undefined, 1, '(nm, deg or lambda state)')).toEqual({ label: '(nm, deg or lambda state)', why: "this job's record has no unit: it was run before gmx-cypher read it from the run input" });
+  });
+
+  it('a run input without AWH, or a pull coordinate it does not have: said, not guessed', () => {
+    expect(awhUnits(readFileSync(new URL('gmx-2025.4/dump-head.txt', FIX), 'utf8'))).toEqual([]);
+    const missing = awhUnits(dump('dump-distance-2025.txt').replace(/coord-index(\s*=\s*)1/, 'coord-index$12'));
+    expect(missing).toEqual([{ bias: 1, unit: null, what: 'pull coordinate 2', why: 'the run input has no pull coordinate 2' }]);
   });
 });

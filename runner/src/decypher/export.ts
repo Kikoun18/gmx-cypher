@@ -3,25 +3,30 @@
 // job's g(r) and groups, its structure without solvent, and the comparison graph as it was. Paths of this
 // machine stay out: structures and jobs are named s1, a1….
 
-import { toRanges } from '../lib/atoms'
-import { decypherKit, type Analysis, type ColorBy, type ExportAnalysis, type ExportData, type Struct, type Tone } from './kit'
-import type { ThemeTokens } from './tokens'
+import { KIT_DATA, kit, toRanges } from '../core/index'
+import { decypherKit, type Analysis, type ColorBy, type ExportAnalysis, type ExportData, type Pins, type Struct, type Tone } from '../core/kit'
+import type { ThemeTokens } from '../core/tokens'
 
-const kit = decypherKit()
 
 /** A structure's atoms without water and ions, at the 3 decimals of a .gro; over 4000, the groups' atoms first. */
-export function compactStruct(s: Struct, keep: Set<number>, max = 4000): Struct {
+export function compactStruct(s: Struct, keep: Set<number>, max = 4000, paired = new Set<number>()): Struct {
   let idx: number[] = []
-  for (let i = 0; i < s.n; i++) if (!kit.SOLV.has(String(s.resn[i]).toUpperCase())) idx.push(i)
+  // Solvent is left out, but for the molecules of H-bond pairs (R10c): the run of atoms with a paired atom's residue.
+  const solv = (i: number) => kit.SOLV.has(String(s.resn[i]).toUpperCase()), kept = new Uint8Array(s.n)
+  for (let i = 0; i < s.n; i++) if (paired.has(s.nr[i]) && solv(i)) {
+    for (let j = i; j >= 0 && s.resnr[j] === s.resnr[i] && s.resn[j] === s.resn[i]; j--) kept[j] = 1
+    for (let j = i; j < s.n && s.resnr[j] === s.resnr[i] && s.resn[j] === s.resn[i]; j++) kept[j] = 1
+  }
+  for (let i = 0; i < s.n; i++) if (!solv(i) || kept[i]) idx.push(i)
   if (idx.length > max) {
-    const first = idx.filter(i => keep.has(s.nr[i])).slice(0, max), kept = new Set(first)
-    for (const i of idx) { if (first.length >= max) break; if (!kept.has(i)) first.push(i) }
+    const first = idx.filter(i => keep.has(s.nr[i]) || kept[i]).slice(0, max), taken = new Set(first)
+    for (const i of idx) { if (first.length >= max) break; if (!taken.has(i)) first.push(i) }
     idx = first.sort((a, b) => a - b)
   }
   const r3 = (v: number) => Math.round(v * 1000) / 1000
   return {
     title: s.title, n: idx.length, nr: idx.map(i => s.nr[i]), resnr: idx.map(i => s.resnr[i]), resn: idx.map(i => s.resn[i]), name: idx.map(i => s.name[i]),
-    xyz: idx.flatMap(i => [r3(s.xyz[3 * i]), r3(s.xyz[3 * i + 1]), r3(s.xyz[3 * i + 2])]), box: s.box,
+    el: idx.map(i => s.el[i]), xyz: idx.flatMap(i => [r3(s.xyz[3 * i]), r3(s.xyz[3 * i + 1]), r3(s.xyz[3 * i + 2])]), box: s.box, cell: s.cell,
   }
 }
 
@@ -72,21 +77,41 @@ const round = (v: number, d: number) => +v.toFixed(d)
 /** A note without this machine's folders: an absolute path keeps only its last name. */
 const scrub = (s: string) => s.replace(/(^|[\s(])(\/[^\s/]+)+\/?/g, (m, pre: string) => pre + (m.slice(pre.length).replace(/\/$/, '').split('/').pop() || ''))
 
+/** Curve styles (R11b) keyed by the export's analysis ids: a curve's key starts with its analysis's id. Others' are dropped. */
+function renameKeys<T>(styles: Record<string, T>, id: Map<string, string>): Record<string, T> {
+  const out: Record<string, T> = {}
+  for (const [k, s] of Object.entries(styles)) for (const [from, to] of id) if (k.startsWith(from + '|')) { out[to + k.slice(from.length)] = s; break }
+  return out
+}
+
+/** Marks and lines (R11c) by the export's ids: each chart's (a card's lead, or `one`), its points by their curves' keys. */
+function renamePins(pins: Record<string, Pins>, id: Map<string, string>): Record<string, Pins> {
+  const out: Record<string, Pins> = {}, key = (k: string) => Object.keys(renameKeys({ [k]: 0 }, id))[0]
+  for (const [chart, p] of Object.entries(pins)) {
+    const to = chart === 'one' ? 'one' : id.get(chart)
+    if (to) out[to] = { points: p.points.flatMap(x => { const k = key(x.key); return k ? [{ ...x, key: k }] : [] }), lines: p.lines }
+  }
+  return out
+}
+
 export function exportData(o: ExportInput): ExportData {
   const id = new Map(o.analyses.map((a, i) => [a.id, 'a' + (i + 1)])), sid = new Map<string, string>(), structs: Record<string, Struct> = {}
   if (o.structures) for (const a of o.analyses) {
     if (!a.struct || !o.structs[a.struct] || sid.has(a.struct)) continue
-    const key = 's' + (sid.size + 1), keep = new Set<number>()
-    o.analyses.filter(b => b.struct === a.struct).forEach(b => [b.ref, ...b.sels].forEach(g => g?.atoms.forEach(v => keep.add(v))))
+    const key = 's' + (sid.size + 1), keep = new Set<number>(), on = o.analyses.filter(b => b.struct === a.struct)
+    on.forEach(b => [b.ref, ...b.sels].forEach(g => g?.atoms.forEach(v => keep.add(v))))
     sid.set(a.struct, key)
-    structs[key] = compactStruct(o.structs[a.struct], keep)
+    structs[key] = compactStruct(o.structs[a.struct], keep, 4000, new Set(on.flatMap(b => b.pairs?.drawn.flat() ?? [])))
   }
   const chosen = (a: Analysis | undefined) => ((a && o.titles?.[a.id]) ?? '').trim()
   const analyses: ExportAnalysis[] = o.analyses.map(a => ({
     id: id.get(a.id)!, title: chosen(a) || a.title, label: a.label, sub: a.sub, x: a.x.map(v => round(v, 5)), xlabel: a.xlabel, ylabel: a.ylabel,
-    ref: a.ref ? { name: a.ref.name, atoms: toRanges(a.ref.atoms), tone: a.ref.tone } : null,
-    sels: a.sels.map(g => ({ name: g.name, atoms: toRanges(g.atoms), tone: g.tone, y: g.y.map(v => round(v, 4)), peak: g.peak && { r: round(g.peak.r, 5), g: round(g.peak.g, 4) } })),
-    struct: a.struct ? sid.get(a.struct) ?? null : null, structNote: scrub(a.structNote), selected: o.selected(a), tone: o.tones[a.id] ?? 'coral',
+    ref: a.ref ? { name: a.ref.name, atoms: toRanges(a.ref.atoms), tone: a.ref.tone, ...(a.ref.label ? { label: a.ref.label } : {}) } : null,
+    sels: a.sels.map(g => ({ name: g.name, atoms: toRanges(g.atoms), tone: g.tone, y: g.y.map(v => round(v, 4)), peak: g.peak && { r: round(g.peak.r, 5), g: round(g.peak.g, 4) }, shell: g.shell ? { r: round(g.shell.r, 5), g: round(g.shell.g, 4) } : null, ...(g.colors ? { colors: g.colors } : {}), ...(g.label ? { label: g.label } : {}) })),
+    struct: a.struct ? sid.get(a.struct) ?? null : null, structNote: scrub(a.structNote), selected: o.selected(a), tone: o.tones[a.id] ?? 'coral', ...(a.plot ? { plot: a.plot } : {}), ...(a.paint ? { paint: a.paint } : {}),
+    ...(a.pairs ? { pairs: a.pairs } : {}), ...(a.command ? { command: a.command } : {}),
+    ...(a.lines ? { lines: a.lines.map(l => ({ ...l, segs: l.segs.map(g => ({ at: toRanges(g.at), v: g.v.map(v => round(v, 4)) as [number, number, number] })) })) } : {}),
+    ...(a.fit ? { fit: { name: a.fit.name, atoms: toRanges(a.fit.atoms) } } : {}),
   }))
   const compare = o.compare && o.compare.ids.filter(x => id.has(x)).length > 1
     ? { ids: o.compare.ids.filter(x => id.has(x)).map(x => id.get(x)!), focus: id.get(o.compare.focus) ?? id.get(o.compare.ids[0])!, selected: o.compare.selected, colorBy: o.compare.colorBy }
@@ -94,7 +119,7 @@ export function exportData(o: ExportInput): ExportData {
   // A morph keeps the RDFs that are in the export, the first of them leading; fewer than two is no morph.
   const morphs = cardsOf(o.analyses, o.morphs ?? []).filter(c => c.members.length > 1)
     .map(c => ({ ids: c.members.map(a => id.get(a.id)!), on: c.on.map(x => id.get(x)!), title: chosen(c.lead) || cardTitle(c.members) }))
-  return { header: (o.header ?? '').trim() || DEFAULT_HEADER, made: o.made ?? new Date().toISOString(), by: o.by, theme: o.theme, tokens: o.tokens, structs, analyses, compare, ...(morphs.length ? { morphs } : {}), view: o.view }
+  return { header: (o.header ?? '').trim() || DEFAULT_HEADER, made: o.made ?? new Date().toISOString(), by: o.by, theme: o.theme, tokens: o.tokens, structs, analyses, compare, ...(morphs.length ? { morphs } : {}), view: { ...o.view, ...(o.view.ownScale ? { ownScale: o.view.ownScale.filter(x => id.has(x)).map(x => id.get(x)!) } : {}), ...(o.view.styles ? { styles: renameKeys(o.view.styles, id) } : {}), ...(o.view.pins ? { pins: renamePins(o.view.pins, id) } : {}) } }
 }
 
 const CSS = `*{box-sizing:border-box}
@@ -104,9 +129,10 @@ button{font-family:inherit;color:inherit}
 button:focus-visible{outline:2px solid var(--ring);outline-offset:2px}
 .dc-page{max-width:1560px;margin:0 auto;padding:0 20px 40px;display:flex;flex-direction:column;gap:16px}
 .dc-header{display:flex;align-items:center;gap:16px;padding:14px 0;border-bottom:1px solid var(--border)}
-.dc-header h1{margin:0;font-size:22px;line-height:28px;font-weight:700;letter-spacing:-0.01em}
+.dc-header h1{margin:0;font-family:Archivo,ui-sans-serif,system-ui,sans-serif;font-size:22px;line-height:28px;font-weight:800;letter-spacing:-0.01em}
 .dc-grow{flex:1;min-width:0}
 .dc-cap{font-size:11px;line-height:16px;color:var(--muted-foreground)}
+.dc-note{margin:0;padding:8px 12px;border-top:1px solid var(--border)}
 .dc-label{font-size:10px;line-height:14px;letter-spacing:.12em;color:var(--muted-foreground);text-transform:uppercase}
 .dc-seg{display:inline-flex;gap:2px;padding:3px;border-radius:10px;border:1px solid var(--border);background:var(--muted)}
 .dc-seg button{height:24px;padding:0 10px;border:0;border-radius:7px;background:transparent;font-size:11px;cursor:pointer;transition:background-color 120ms ease}
@@ -114,7 +140,7 @@ button:focus-visible{outline:2px solid var(--ring);outline-offset:2px}
 .dc-seg button.dc-on{background:var(--primary);color:var(--primary-foreground);font-weight:700;box-shadow:var(--shadow-raised)}
 .dc-card{background:var(--card);border:1px solid var(--border);border-radius:16px;display:flex;flex-direction:column;min-width:0;overflow:hidden}
 .dc-bar{display:flex;align-items:center;flex-wrap:wrap;gap:4px 12px;padding:10px 16px;border-bottom:1px solid var(--border)}
-.dc-bar h2{margin:0;font-size:18px;line-height:24px;font-weight:700}
+.dc-bar h2{margin:0;font-family:Archivo,ui-sans-serif,system-ui,sans-serif;font-size:18px;line-height:24px;font-weight:800}
 .dc-pad{padding:12px 16px 16px;display:flex;flex-direction:column;gap:10px;min-width:0}
 .dc-split{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr))}
 .dc-side{padding:12px 16px 16px;display:flex;flex-direction:column;gap:10px;min-width:0}
@@ -123,9 +149,11 @@ button:focus-visible{outline:2px solid var(--ring);outline-offset:2px}
 .dc-legend{position:absolute;left:14px;right:14px;bottom:10px;display:flex;flex-wrap:wrap;gap:6px 14px;pointer-events:none;font-size:11px;line-height:16px;color:var(--muted-foreground)}
 .dc-legend span{display:inline-flex;align-items:center;gap:7px}
 .dc-k{display:inline-block;width:10px;height:10px;border-radius:9999px}
+.dc-ramp{display:inline-block;width:112px;height:6px;border-radius:999px}
 .dc-k-sel{background:var(--coral);box-shadow:0 0 0 1.5px var(--coral-strong),0 0 9px var(--coral-strong)}
 .dc-k-rest{background:var(--stone)}
 .dc-k-ref{width:8px;height:8px;background:var(--foreground);box-shadow:0 0 0 1.5px var(--card),0 0 0 2.7px var(--foreground)}
+.dc-k-fit{width:8px;height:8px;border:1.5px dashed var(--foreground)}
 .dc-tip,.dc-hover{position:absolute;z-index:2;pointer-events:none;background:var(--popover);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow-menu);padding:8px 10px;display:flex;flex-direction:column;gap:2px}
 .dc-tip{width:240px}
 .dc-tip b{font-size:12px}
@@ -139,7 +167,7 @@ button:focus-visible{outline:2px solid var(--ring);outline-offset:2px}
 .dc-chips{display:flex;flex-wrap:wrap;gap:6px}
 .dc-chip{height:26px;padding:0 10px;border-radius:9999px;border:0;font-size:11px;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;cursor:pointer;background:transparent;transition:background-color 120ms ease,opacity 120ms ease}
 .dc-chip.dc-on{font-weight:700}
-.dc-chip.dc-ref{background:var(--foreground);color:var(--background);cursor:default;border:1.5px solid var(--foreground)}
+.dc-chip.dc-ref{background:transparent;color:var(--foreground);cursor:default;border:1.5px solid var(--foreground)}
 .dc-chip.dc-pick{cursor:pointer}
 .dc-chip.dc-alt{background:transparent;color:var(--foreground);border-style:dashed}
 .dc-chip.dc-off{opacity:.45;background:transparent;color:var(--foreground)}
@@ -149,6 +177,7 @@ button:focus-visible{outline:2px solid var(--ring);outline-offset:2px}
 .dc-n{opacity:.7}
 .dc-table{display:flex;flex-direction:column;gap:2px}
 .dc-trow{display:grid;grid-template-columns:26px minmax(0,1fr) minmax(0,1.1fr) 44px 70px 56px;gap:8px;align-items:center;font-size:12px;line-height:16px;min-height:24px}
+.dc-trow.dc-plain{grid-template-columns:26px minmax(0,1fr) minmax(0,1.1fr)}
 .dc-thead{font-size:10px;letter-spacing:.12em;color:var(--muted-foreground)}
 .dc-r{text-align:right}
 .dc-nostruct{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:24px;min-height:220px;border-right:1px solid var(--border);text-align:center}
@@ -159,22 +188,27 @@ const vars = (t: Record<string, string>) => Object.entries(t).map(([k, v]) => '-
 const esc = (s: string) => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!)
 
 /** The whole page: fonts as data, both themes' tokens, the kit's source and the data, inline. */
-export function exportHtml(data: ExportData, fonts: { regular?: string; bold?: string } = {}): string {
+export function exportHtml(data: ExportData, fonts: Fonts = {}): string {
   const src = decypherKit.toString()
   if (/<\/script/i.test(src)) throw new Error('the kit\'s source holds </script>: it cannot be put inline')
-  const face = (b64: string | undefined, weight: number) => (b64 ? '@font-face{font-family:mononoki;src:url(data:font/woff2;base64,' + b64 + ') format("woff2");font-weight:' + weight + ';font-style:normal;font-display:swap}\n' : '')
+  const face = (b64: string | undefined, weight: number, family = 'mononoki', range = '') => (b64 ? '@font-face{font-family:' + family + ';src:url(data:font/woff2;base64,' + b64 + ') format("woff2");font-weight:' + weight + ';font-style:normal;font-display:swap' + (range ? ';unicode-range:' + range : '') + '}\n' : '')
   const title = data.header && data.header !== DEFAULT_HEADER ? data.header : DEFAULT_HEADER + ' · ' + (data.analyses.length === 1 ? data.analyses[0].title : data.analyses.length + ' RDFs')
   return '<!doctype html>\n<html lang="en" data-theme="' + data.theme + '">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1">\n'
     + '<meta name="generator" content="' + esc(data.by) + ' (de)Cypher">\n<title>' + esc(title) + '</title>\n<style>\n'
-    + face(fonts.regular, 400) + face(fonts.bold, 700)
+    + face(fonts.regular, 400) + face(fonts.bold, 700) + face(fonts.title, 800, 'Archivo', LATIN) + face(fonts.titleExt, 800, 'Archivo', LATIN_EXT)
     + ':root,[data-theme="light"]{' + vars(data.tokens.light) + ';color-scheme:light}\n[data-theme="dark"]{' + vars(data.tokens.dark) + ';color-scheme:dark}\n' + CSS + '\n</style>\n</head>\n<body>\n'
     + '<div id="app"><p style="padding:20px">This page draws with JavaScript: turn it on to see the structures and charts.</p></div>\n'
     + '<script type="application/json" id="dc-data">' + JSON.stringify(data).replace(/</g, '\\u003c') + '</script>\n'
-    + '<script>\n(function () {\nvar kit = (' + src + ')();\nkit.mount(document.getElementById("app"), JSON.parse(document.getElementById("dc-data").textContent));\n})();\n</script>\n</body>\n</html>\n'
+    + '<script>\n(function () {\nvar kit = (' + src + ')(' + JSON.stringify(KIT_DATA).replace(/</g, '\\u003c') + ');\nkit.mount(document.getElementById("app"), JSON.parse(document.getElementById("dc-data").textContent));\n})();\n</script>\n</body>\n</html>\n'
 }
 
-/** mononoki 400 and 700 as base64, from the page's own fonts; none if they can't be read (the page falls back to a mono font). */
-export async function fontData(): Promise<{ regular?: string; bold?: string }> {
+/** The page's fonts as base64: mononoki 400 and 700, and Archivo 800 for titles (T160), latin and latin-ext. */
+export interface Fonts { regular?: string; bold?: string; title?: string; titleExt?: string }
+const LATIN = 'U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD'
+const LATIN_EXT = 'U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF'
+
+/** The page's fonts as base64, from its own files; none if they can't be read (the page falls back to a mono and a sans font). */
+export async function fontData(): Promise<Fonts> {
   const b64 = async (url: string) => {
     try {
       const r = await fetch(url)
@@ -185,8 +219,8 @@ export async function fontData(): Promise<{ regular?: string; bold?: string }> {
       return btoa(s)
     } catch { return undefined }
   }
-  const [regular, bold] = await Promise.all([b64('/fonts/mononoki-latin-400-normal.woff2'), b64('/fonts/mononoki-latin-700-normal.woff2')])
-  return { regular, bold }
+  const [regular, bold, title, titleExt] = await Promise.all(['mononoki-latin-400-normal', 'mononoki-latin-700-normal', 'archivo-latin-800-normal', 'archivo-latin-ext-800-normal'].map(f => b64('/fonts/' + f + '.woff2')))
+  return { regular, bold, title, titleExt }
 }
 
 /** Saves text as a file through the browser's download. */

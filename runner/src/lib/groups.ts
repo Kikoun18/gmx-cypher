@@ -2,7 +2,8 @@
 // order to the whole atom table, so every step stays readable in the run record and rules carry over to
 // other trajectories of the same system (R7).
 
-import { fromRanges, toRanges, type Atom } from './atoms';
+import { fromRanges, toRanges } from '../core/index';
+import type { Atom } from './atoms';
 import type { Tone } from './tones';
 
 export type Rule =
