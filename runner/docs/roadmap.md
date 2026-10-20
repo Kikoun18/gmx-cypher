@@ -197,7 +197,7 @@ From [`batch-3.md`](batch-3.md) §5: one coherent app, (de)Cypher for every anal
 - [x] R8b Every key in one registry, rebindable, listed by `?` (T181)
 
 ### Phase 6: Compare every analysis (R10, R11)
-- [ ] R10a Results of any command in compare: cards, and one graph for like quantities
+- [x] R10a Results of any command in compare: cards, and one graph for like quantities (T182)
 - [ ] R10b RMSF on the structure
 - [ ] R10c H-bond pairs
 - [ ] R10d Distance and mindist lines
