@@ -1,20 +1,21 @@
 // (de)Cypher: RDFs of several jobs at once, each with the structure its groups are atoms of, side by side or on
 // one graph, from gmx-cypher's own jobs, from the Matrix's vault (with the row's structure), or from files.
-// The RDF Explorer design (v3) in Morpheus, as gmx-cypher's own view; it opens from the jobs tab or with a key.
+// The RDF Explorer design (v3) in Morpheus, as gmx-cypher's own view: compare, in the results' detail pane at
+// #compare?jobs=… (R9a), opened from the jobs list, a result, or with a key.
 
 import * as React from 'react'
-import { ChevronLeft, ChevronRight, Download, RefreshCw, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Download, RefreshCw } from 'lucide-react'
 import { Badge } from '../ui/badge'
 import { Button } from '../ui/button'
 import { Checkbox } from '../ui/checkbox'
-import { Dialog, DialogBody, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogHeading, DialogTitle } from '../ui/dialog'
+import { Dialog, DialogBody, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogHeading, DialogTitle } from '../ui/dialog'
 import { Input } from '../ui/input'
 import { Field, FieldHint, Label } from '../ui/label'
 import { Section } from '../ui/separator'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
 import { ToggleGroup, ToggleGroupItem } from '../ui/toggle-group'
 import { getJson, postJson } from '../api'
-import { jobLine, statusOf, type Job } from '../jobs'
+import type { Job } from '../jobs'
 import { Status } from '../ui/status'
 import { cn } from '../lib/utils'
 import type { Analysis, Curve, Mol, Palette, Struct, Tone } from '../core/kit'
@@ -66,20 +67,6 @@ function remap(from: Analysis | undefined, to: Analysis, names: string[]): strin
     if (t && !out.includes(t.name)) out.push(t.name)
   }
   return out
-}
-
-/** Files and folders dropped or picked: every gro, pdb, ndx, xvg and run.json in them, with its path inside a dropped folder. */
-async function readDrop(dt: DataTransfer): Promise<LoadedFile[]> {
-  const walk = (e: FileSystemEntry, prefix: string): Promise<{ path: string; file: File }[]> => new Promise(resolve => {
-    if (e.isFile) { if (!WANTED.test(e.name)) return resolve([]); (e as FileSystemFileEntry).file(f => resolve([{ path: prefix + e.name, file: f }]), () => resolve([])); return }
-    if (!e.isDirectory || e.name.startsWith('.')) return resolve([])
-    const reader = (e as FileSystemDirectoryEntry).createReader(), kids: FileSystemEntry[] = []
-    const next = () => reader.readEntries(ents => { if (ents.length) { kids.push(...ents); next(); return } Promise.all(kids.map(k => walk(k, prefix + e.name + '/'))).then(p => resolve(p.flat())) }, () => resolve([]))
-    next()
-  })
-  const ents = Array.from(dt.items || []).map(it => it.webkitGetAsEntry()).filter((e): e is FileSystemEntry => !!e)
-  const list = ents.length ? (await Promise.all(ents.map(e => walk(e, '')))).flat() : Array.from(dt.files).filter(f => WANTED.test(f.name)).map(f => ({ path: f.name, file: f }))
-  return Promise.all(list.filter(x => x.file.size < 80e6).map(async x => ({ path: x.path, text: await x.file.text() })))
 }
 
 interface CardProps {
@@ -148,7 +135,7 @@ function AnalysisCard({ members, on, tone, mol, pal, view, selected, tones, cand
         {!many && <span className="max-w-[36ch] truncate text-caption text-muted-foreground" title={a.structNote}>{a.structNote}</span>}
         {mol && <><Button variant="outline" size="sm" onClick={() => ref.current?.fit()}>fit selection</Button><Button variant="ghost" size="sm" onClick={() => ref.current?.reset()}>reset view</Button><Button variant="ghost" size="sm" onClick={() => void savePng(ref.current, a.label)} title="the structure as drawn now, as a PNG">png</Button></>}
       </div>
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,420px),1fr))]">
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,380px),1fr))]">
         <StructurePanel ref={h => { ref.current = h; handle(h) }} className="min-h-[480px] border-r border-border" mol={mol} pal={pal} view={view} sels={a.sels} selected={idx} refs={refs} hoverSel={hoverSel}
           onPick={(i, add) => onSelect(pickGroup(selected, a.sels[i].name, add))} onPickRef={pickRef} onActive={onActive}
           empty={<><span className="text-heading font-bold">No structure</span><span className="max-w-[40ch] text-caption text-muted-foreground">{a.structNote}</span></>} />
@@ -192,7 +179,7 @@ function CompareView({ shown, focus, setFocus, mols, pal, view, patch, selected,
   const curvesIn = (p: Palette) => kit.buildCurves({ focus, plotted, selected, colorBy: view.colorBy, pal: p, tones })
   const exp: ChartExport = { file: 'one-graph_' + plotted.length + '-RDFs', fields: { command: 'rdf' }, title: 'One graph · ' + plural(plotted.length, 'RDF'), csv: () => curvesCsv(curvesIn(pal).map(c => ({ ...c, name: c.name + ' · ' + c.source })), focus.xlabel, focus.ylabel) }
   return (
-    <div className="grid min-h-[660px] grid-cols-[repeat(auto-fit,minmax(min(100%,460px),1fr))] gap-4">
+    <div className="grid min-h-[660px] grid-cols-[repeat(auto-fit,minmax(min(100%,400px),1fr))] gap-4">
       <section aria-label="structure" className="flex min-w-0 flex-col rounded-xl border border-border bg-card" onMouseEnter={onActive}>
         <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-2">
           <span className="text-label uppercase text-muted-foreground">Structure of</span>
@@ -273,18 +260,18 @@ function RunsTab({ allow, row }: { allow: string[]; row: (ref: SourceRef, title:
 }
 
 /** Where the picked sources come from: this gmx-cypher's RDF jobs, runs on disk, the Matrix's vault, or files. */
-function AddPanel({ sources, jobs, allow, vaultPath, vault, loadVault, fileRows, onFiles, onClearFiles }: {
-  sources: DecypherSources; jobs: Job[]; allow: string[]; vaultPath: string | null; vault: { list?: VaultRdfs; error?: string } | null; loadVault: () => void
+function AddPanel({ sources, allow, vaultPath, vault, loadVault, fileRows, onFiles, onClearFiles }: {
+  sources: DecypherSources; allow: string[]; vaultPath: string | null; vault: { list?: VaultRdfs; error?: string } | null; loadVault: () => void
   fileRows: { path: string; kind: string; status: string; error: boolean }[]; onFiles: (f: LoadedFile[]) => void; onClearFiles: () => void
 }) {
-  const [tab, setTab] = React.useState<'jobs' | 'runs' | 'vault' | 'files'>('jobs')
+  // Jobs are picked in the jobs list beside compare; here, what is not a job.
+  const [tab, setTab] = React.useState<'runs' | 'vault' | 'files'>('runs')
   const input = React.useRef<HTMLInputElement>(null)
-  const rdfJobs = jobs.filter(j => j.kind === 'rdf')
-  const row = (ref: SourceRef, title: string, sub: React.ReactNode, disabled = false) => {
+  const row = (ref: SourceRef, title: string, sub: React.ReactNode) => {
     const id = 'add-' + refKey(ref).replace(/[^\w-]/g, '_')
     return (
       <div key={refKey(ref)} className="flex items-start gap-2.5 rounded-sm px-2 py-1.5 hover:bg-accent">
-        <Checkbox id={id} className="mt-[3px]" checked={sources.has(ref)} disabled={disabled} onCheckedChange={() => sources.toggle(ref)} />
+        <Checkbox id={id} className="mt-[3px]" checked={sources.has(ref)} onCheckedChange={() => sources.toggle(ref)} />
         <label htmlFor={id} className="flex min-w-0 flex-col">
           <span className="truncate text-control">{title}</span>
           <span className="truncate text-caption text-muted-foreground">{sub}</span>
@@ -296,11 +283,8 @@ function AddPanel({ sources, jobs, allow, vaultPath, vault, loadVault, fileRows,
     <div className="flex min-h-0 flex-col gap-2.5">
       <Section label="Add" />
       <ToggleGroup type="single" size="sm" value={tab} onValueChange={v => { if (!v) return; setTab(v as typeof tab); if (v === 'vault' && !vault) loadVault() }} aria-label="add from">
-        <ToggleGroupItem value="jobs">jobs</ToggleGroupItem><ToggleGroupItem value="runs">on disk</ToggleGroupItem><ToggleGroupItem value="vault">vault</ToggleGroupItem><ToggleGroupItem value="files">files</ToggleGroupItem>
+        <ToggleGroupItem value="runs">on disk</ToggleGroupItem><ToggleGroupItem value="vault">vault</ToggleGroupItem><ToggleGroupItem value="files">files</ToggleGroupItem>
       </ToggleGroup>
-      {tab === 'jobs' && (rdfJobs.length
-        ? <div className="flex flex-col">{rdfJobs.map(j => row({ kind: 'job', id: j.id }, j.name ?? j.title, <><Status inline level={statusOf(j).level} word={statusOf(j).word} /> · {jobLine(j)}</>, j.status === 'failed' || j.status === 'cancelled' || j.status === 'interrupted'))}</div>
-        : <p className="m-0 text-caption text-muted-foreground">no RDF jobs yet · run gmx rdf from the analysis tab</p>)}
       {tab === 'runs' && <RunsTab allow={allow} row={row} />}
       {tab === 'vault' && (!vaultPath
         ? <p className="m-0 text-caption text-muted-foreground">no vault set · choose the Matrix vault in settings, then its RDFs come here with each row's structure</p>
@@ -329,7 +313,7 @@ function AddPanel({ sources, jobs, allow, vaultPath, vault, loadVault, fileRows,
               onFiles(await Promise.all(fl.filter(f => WANTED.test(f.name)).map(async f => ({ path: f.name, text: await f.text() }))))
             }} />
           </div>
-          <p className="m-0 text-caption text-muted-foreground">or drop gro, pdb, ndx, xvg and run.json files, or a folder of them, anywhere here · read in this browser, never kept</p>
+          <p className="m-0 text-caption text-muted-foreground">or drop xvg and run.json files, with their gro, pdb and ndx, or a folder of them, anywhere on the page · read in this browser, never kept</p>
           {fileRows.map(f => (
             <div key={f.path} className="grid grid-cols-[64px_minmax(0,1fr)] items-center gap-2">
               <Badge tone={({ gro: 'stone', ndx: 'sky', xvg: 'coral', run: 'lilac', file: 'stone' } as Record<string, Tone>)[f.kind]} className="justify-self-start">{f.kind === 'run' ? 'run.json' : f.kind}</Badge>
@@ -453,23 +437,22 @@ function ExportDialog({ open, onOpenChange, analyses, structs, view, theme, tone
   )
 }
 
-export function Decypher({ open, onOpenChange, sources, jobs, jobsLoaded, allow, vaultPath, version, keyName }: {
-  open: boolean; onOpenChange: (o: boolean) => void; sources: DecypherSources; jobs: Job[]; jobsLoaded: boolean; allow: string[]; vaultPath: string | null; version: string; keyName: string | null
+export function Decypher({ sources, files, onFiles, onClearFiles, jobs, jobsLoaded, allow, vaultPath, version, keyName }: {
+  sources: DecypherSources; files: LoadedFile[]; onFiles: (f: LoadedFile[]) => void; onClearFiles: () => void; jobs: Job[]; jobsLoaded: boolean; allow: string[]; vaultPath: string | null; version: string; keyName: string | null
 }) {
   const [view, patch] = useView()
   const theme = usePageTheme(), pal = PALETTES[theme]
-  const [files, setFiles] = React.useState<LoadedFile[]>([])
   // The vault's list, for the vault set now: one read at a time, kept until asked again.
   const [vaultRead, setVaultRead] = React.useState<{ path: string; list?: VaultRdfs; error?: string } | null>(null)
   const vault = vaultRead && vaultRead.path === vaultPath ? vaultRead : null
-  const [drag, setDrag] = React.useState(false), [exporting, setExporting] = React.useState(0), [exportOpen, setExportOpen] = React.useState(false)
+  const [exporting, setExporting] = React.useState(0), [exportOpen, setExportOpen] = React.useState(false)
   const handles = React.useRef(new Map<string, StructureHandle | null>()), active = React.useRef<string | null>(null), reading = React.useRef(false)
   const loadVault = React.useCallback(() => {
     if (!vaultPath || reading.current) return
     reading.current = true
     getJson<VaultRdfs>('/api/decypher/vault').then(list => setVaultRead({ path: vaultPath, list }), e => setVaultRead({ path: vaultPath, error: (e as Error).message })).finally(() => { reading.current = false })
   }, [vaultPath])
-  const needVault = open && !!vaultPath && sources.refs.some(r => r.kind === 'vault')
+  const needVault = !!vaultPath && sources.refs.some(r => r.kind === 'vault')
   React.useEffect(() => { if (needVault && !vault) loadVault() }, [needVault, vault, loadVault])
 
   const { items, structs, fileRows } = useAnalyses(sources.refs, jobs, jobsLoaded, vault?.list ?? null, files)
@@ -524,27 +507,19 @@ export function Decypher({ open, onOpenChange, sources, jobs, jobsLoaded, allow,
     else if (e.key === 'r' || e.key === 'R') h?.reset()
     else if (view.mode === 'one' && focus && shown.length > 1 && (e.key === '[' || e.key === ']')) setFocus(shown[(shown.indexOf(focus) + (e.key === ']' ? 1 : -1) + shown.length) % shown.length].id)
   }
-  const files_ = (f: LoadedFile[]) => f.length && setFiles(old => [...old.filter(o => !f.some(n => n.path === o.path)), ...f])
   const loading = items.filter(i => i.status === 'loading').length
   const subtitle = !items.length ? 'RDFs of several jobs at once, with their structures' : [plural(ready.length, 'RDF'), plural(new Set(ready.map(a => a.struct).filter(Boolean)).size, 'structure'), loading ? 'reading ' + loading + '…' : null, shown.length < ready.length ? (ready.length - shown.length) + ' hidden' : null].filter(Boolean).join(' · ')
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent data-decypher="" showCloseButton={false} onKeyDown={onKey} aria-describedby="decypher-sub"
-        className="left-0 top-0 h-screen max-h-none w-screen max-w-none translate-x-0 translate-y-0 overflow-hidden rounded-none border-0 bg-background shadow-none"
-        onDragOver={e => { if (Array.from(e.dataTransfer.types).includes('Files')) { e.preventDefault(); if (!drag) setDrag(true) } }}
-        onDragLeave={e => { if (e.currentTarget === e.target) setDrag(false) }}
-        onDrop={async e => { if (!Array.from(e.dataTransfer.types).includes('Files')) return; e.preventDefault(); setDrag(false); files_(await readDrop(e.dataTransfer)) }}>
+    <section data-decypher="" onKeyDown={onKey} aria-labelledby="decypher-title" aria-describedby="decypher-sub" className="flex min-w-0 flex-col rounded-lg border border-border">
         <header className="flex min-h-14 shrink-0 flex-wrap items-center gap-x-4 gap-y-2 border-b border-border px-5 py-2.5">
           <div className="flex min-w-0 flex-col">
-            <DialogTitle className="text-heading">compare</DialogTitle>
-            <DialogDescription id="decypher-sub" className="tracking-normal">{subtitle}</DialogDescription>
+            <h2 id="decypher-title" className="m-0 text-heading font-bold">compare</h2>
+            <p id="decypher-sub" className="m-0 text-caption text-muted-foreground">{subtitle}</p>
           </div>
           <span className="flex-1" />
           <Seg label="show" value={view.mode === 'each' ? 'each result' : 'one graph'} options={['each result', 'one graph'] as const} onChange={v => patch({ mode: v === 'each result' ? 'each' : 'one' })} />
           <Button variant="outline" size="sm" onClick={() => { setExporting(n => n + 1); setExportOpen(true) }} disabled={!shown.length}><Download /> export</Button>
-          {keyName && <span className="text-caption text-muted-foreground">{keyName} closes</span>}
-          <DialogClose asChild><Button variant="ghost" size="icon-sm" aria-label="close compare"><X /></Button></DialogClose>
         </header>
         <div className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-2 border-b border-border px-5 py-2">
           <Seg label="style" value={view.rep} options={kit.REPS} onChange={v => patch({ rep: v })} />
@@ -558,26 +533,26 @@ export function Decypher({ open, onOpenChange, sources, jobs, jobsLoaded, allow,
             {view.mode === 'each' && <Chip on={view.link} onClick={() => patch({ link: !view.link })} title="a group picked in one result is picked in every result that has it">link groups</Chip>}
           </div>
         </div>
-        <div className="grid min-h-0 flex-1 grid-cols-[300px_minmax(0,1fr)]">
-          <aside className="flex min-h-0 flex-col gap-4 overflow-auto border-r border-border p-4" aria-label="sources">
+        <div className="grid min-h-0 flex-1 grid-cols-[280px_minmax(0,1fr)]">
+          <aside className="flex min-h-0 flex-col gap-4 border-r border-border p-4" aria-label="sources">
             <div className="flex flex-col gap-1">
               <Section label={'Sources ' + pad(items.length)}>
                 {items.length > 0 && <Button variant="ghost" size="sm" onClick={() => patch({ hidden: [] })} disabled={!view.hidden.length}>show all</Button>}
               </Section>
-              {!items.length && <p className="m-0 text-caption text-muted-foreground">nothing picked yet · tick RDF jobs below or in the jobs tab</p>}
+              {!items.length && <p className="m-0 text-caption text-muted-foreground">nothing picked yet · tick RDF jobs in the jobs list, or add below</p>}
               {items.map(it => <SourceRow key={it.key} it={it} tone={tones[it.analysis?.id ?? it.key]} pal={pal} hidden={!!it.analysis && view.hidden.includes(it.analysis.id)}
                 onShow={on => it.analysis && patch(v => ({ hidden: on ? v.hidden.filter(x => x !== it.analysis!.id) : [...v.hidden, it.analysis!.id] }))}
                 onRemove={it.kind === 'file' ? undefined : () => sources.remove(it.key)}
                 focus={view.mode === 'one' && !!focus && it.analysis?.id === focus.id} />)}
             </div>
-            <AddPanel sources={sources} jobs={jobs} allow={allow} vaultPath={vaultPath} vault={vault} loadVault={loadVault} fileRows={fileRows} onFiles={files_} onClearFiles={() => setFiles([])} />
+            <AddPanel sources={sources} allow={allow} vaultPath={vaultPath} vault={vault} loadVault={loadVault} fileRows={fileRows} onFiles={onFiles} onClearFiles={onClearFiles} />
           </aside>
-          <div role="region" aria-label="analyses" className="min-h-0 overflow-auto p-5">
+          <div role="region" aria-label="analyses" className="min-w-0 p-5">
             {!items.length ? (
               <div className="mx-auto mt-10 flex max-w-[620px] flex-col gap-4 rounded-2xl border-2 border-dashed border-input bg-card p-10">
                 <span className="text-display font-bold">Nothing to decipher yet</span>
-                <span className="max-w-[62ch] text-prose text-muted-foreground">Pick RDFs on the left: your gmx-cypher jobs, the RDFs of the Matrix vault (each with its row's structure), or files dropped here. Several at once are shown side by side, or compared on one graph.</span>
-                <span className="text-caption text-muted-foreground">{keyName ? keyName + ' opens and closes (de)Cypher · ' : ''}change the key in settings · F fits the plotted groups · R resets the view</span>
+                <span className="max-w-[62ch] text-prose text-muted-foreground">Tick RDF jobs in the jobs list, or add the RDFs of the Matrix vault (each with its row's structure), records on disk, or files dropped anywhere on the page. Several at once are shown side by side, or compared on one graph.</span>
+                <span className="text-caption text-muted-foreground">{keyName ? keyName + ' opens compare and goes back · ' : ''}change the key in settings · F fits the plotted groups · R resets the view</span>
               </div>
             ) : !shown.length ? (
               <p className="m-0 text-control text-muted-foreground">{ready.length ? 'every RDF is hidden · tick one on the left' : 'reading…'}</p>
@@ -593,16 +568,9 @@ export function Decypher({ open, onOpenChange, sources, jobs, jobsLoaded, allow,
             )}
           </div>
         </div>
-        {drag && (
-          <div className="pointer-events-none fixed inset-3 z-50 flex flex-col items-center justify-center gap-1.5 rounded-2xl border-2 border-dashed border-ring bg-secondary/90">
-            <span className="text-display font-bold">Drop files or a folder</span>
-            <span className="text-control text-muted-foreground">gro, pdb, ndx, xvg and run.json · each .xvg finds its record, index and structure</span>
-          </div>
-        )}
         <ExportDialog key={exporting} open={exportOpen} onOpenChange={setExportOpen} analyses={shown} structs={structs} view={view} theme={theme} tones={tones} selectedOf={selectedOf} morphs={view.mode === 'each' ? morphs : NO_MORPHS} version={version}
           compare={focus ? { ids: [focus.id, ...shown.filter(a => a !== focus).map(a => a.id)], focus: focus.id, selected: selectedOf(focus) } : null} />
-      </DialogContent>
-    </Dialog>
+    </section>
   )
 }
 

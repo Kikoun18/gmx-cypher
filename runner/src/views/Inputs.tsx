@@ -128,17 +128,29 @@ function Checks({ check, busy }: ReturnType<typeof useInputCheck>) {
   )
 }
 
-export function Inputs({ state, draft, setDraft, onSettings, onNext }: { state: AppState; draft: Draft; setDraft: React.Dispatch<React.SetStateAction<Draft>>; onSettings: () => void; onNext?: () => void }) {
-  // The slots the analysis asks for: an energy file alone for gmx energy; the four for the rest (section 7).
+/** Whether the inputs the command takes are ready, as gmx reads them: the set-up's first step and its state (R9a). */
+export function useInputsCheck(draft: Draft) {
   const command = commandOf(draft.analysis ?? 'rdf') ?? COMMANDS[0]
-  const slots = command.inputs.map(slot => SLOTS.find(s => s.slot === slot)!)
   // Only the slots shown are checked: a file another command uses can't hold this one up (review finding 7).
   const checked = useInputCheck(command.groups ? Object.fromEntries(Object.entries(draft.inputs).filter(([k]) => command.inputs.includes(k as Slot))) : {})
   const energy = useTerms(command.tool === 'energy' ? draft.inputs.edr?.path : undefined)
   const awh = useAwhScan(command.tool === 'awh' ? draft.inputs.edr?.path : undefined, command.tool === 'awh' ? draft.inputs.runInput?.path : undefined)
   const frames = awh?.scan?.frames
-  // gmx wham takes no input slots: its windows are found in the analysis tab (R6).
+  // gmx wham takes no input slots: its windows are found in the command step (R6).
   const ready = command.tool === 'energy' ? !!energy?.terms : command.tool === 'awh' ? !!frames?.length : command.tool === 'wham' ? true : !!checked.check?.ok
+  const failed = command.tool === 'energy' ? !!energy?.error : command.tool === 'awh' ? !!awh?.error || frames?.length === 0 : !!checked.check && !checked.check.ok
+  const busy = command.tool === 'energy' ? !!draft.inputs.edr && !energy : command.tool === 'awh' ? !!draft.inputs.edr && !!draft.inputs.runInput && !awh : checked.busy
+  return { command, checked, energy, awh, frames, ready, failed, busy }
+}
+
+export function Inputs({ state, draft, setDraft, check, uploads, onUploaded, onSettings, onNext }: {
+  state: AppState; draft: Draft; setDraft: React.Dispatch<React.SetStateAction<Draft>>; check: ReturnType<typeof useInputsCheck>
+  /** Files dropped elsewhere on the page that belong here (R9a): uploaded as if dropped here. */
+  uploads: File[]; onUploaded: () => void; onSettings: () => void; onNext?: () => void
+}) {
+  // The slots the analysis asks for: an energy file alone for gmx energy; the four for the rest (section 7).
+  const { command, checked, energy, awh, frames, ready } = check
+  const slots = command.inputs.map(slot => SLOTS.find(s => s.slot === slot)!)
   const roots = state.config.allow
   const [path, setPath] = React.useState<string | null>(() => { const t = draft.inputs.trajectory?.path; return t ? t.slice(0, t.lastIndexOf('/')) : roots[0] || null })
   const [picking, setPicking] = React.useState<Slot | null>(null)
@@ -172,6 +184,7 @@ export function Inputs({ state, draft, setDraft, onSettings, onNext }: { state: 
       } catch (e) { toast.error(f.name + ': ' + (e as Error).message) }
     }
   }
+  React.useEffect(() => { if (!uploads.length) return; onUploaded(); upload(uploads) }, [uploads]) // eslint-disable-line react-hooks/exhaustive-deps -- once per drop
 
   return (
     <div className="grid grid-cols-[minmax(0,1fr)_360px] gap-5">
@@ -185,8 +198,9 @@ export function Inputs({ state, draft, setDraft, onSettings, onNext }: { state: 
         {picking && <p className="m-0 text-control" aria-live="polite">pick the {SLOTS.find(s => s.slot === picking)!.label} · <button className="text-foreground underline underline-offset-[3px] hover:decoration-2" onClick={() => setPicking(null)}>stop picking</button></p>}
         {path && <Browser roots={[...roots, ...Object.values(draft.inputs).map(p => p!.path.slice(0, p!.path.lastIndexOf('/')))]} path={path} onPath={setPath} used={used} onFile={(p, e) => assign(p, e.role)} />}
         <input ref={fileRef} type="file" multiple hidden onChange={e => { upload(Array.from(e.target.files || [])); e.target.value = '' }} />
+        {/* A drop anywhere on the page lands here when it holds inputs (R9a); this zone says so, and offers the picker. */}
         <Dropzone className="max-w-none py-6" title="Drop files here" description="any GROMACS input, by upload into gmx-cypher's own folder · large trajectories are better picked by path, where they are"
-          onFiles={upload} action={<Button variant="outline" onClick={() => fileRef.current?.click()}><Upload /> choose files</Button>} />
+          action={<Button variant="outline" onClick={() => fileRef.current?.click()}><Upload /> choose files</Button>} />
       </div>
       <div className="flex flex-col gap-4">
         <Section label="This job" />

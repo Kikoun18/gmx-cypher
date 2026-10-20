@@ -58,13 +58,19 @@ test('pick inputs, make groups, run, see the chart', async ({ page }) => {
   expect(await refCard.getByText('ref', { exact: true }).evaluate(e => [getComputedStyle(e).color, getComputedStyle(e).borderTopColor])).toEqual([ink, ink])
   expect(await refCard.getByText('6 atoms').evaluate(e => getComputedStyle(e).color)).toBe(ink)
 
-  // RDF: the command is the planned one; run it.
-  await page.getByRole('tab', { name: 'command' }).click()
+  // Set-up's steps say where each stands (R9a); the command step plans the command; run it.
+  const steps = page.getByRole('navigation', { name: 'set-up steps' })
+  await expect(steps.getByRole('button', { name: /^1\s*inputs\s*checked/ })).toBeVisible()
+  await expect(steps.getByRole('button', { name: /^2\s*groups\s*2 groups/ })).toHaveAttribute('aria-current', 'step')
+  await expect(page).toHaveURL(/#setup\/groups$/)
+  await steps.getByRole('button', { name: /command/ }).click()
+  await expect(page).toHaveURL(/#setup\/command$/)
   await expect(page.getByLabel('command line', { exact: true })).toContainText("-o rdf/rdf_nvt.xvg -ref 'group 0' -sel 'group 1'")
   await page.getByRole('button', { name: 'run', exact: true }).click()
 
-  // Jobs: it runs, ends, and shows its chart, first peak and record.
+  // Results: it runs, ends, and shows its chart, first peak and record, at its own address.
   await expect(page.getByRole('heading', { name: /rdf_nvt · sulfur → water_O/ })).toBeVisible()
+  await expect(page).toHaveURL(/#results\/j[a-z0-9]+$/)
   const chart = page.locator('[data-slot=chart]').first()
   await expect(chart.locator('svg')).toBeVisible({ timeout: 30_000 })
   // The core chart's readout (R5c): under the pointer, every curve's value, highest first.
@@ -151,5 +157,39 @@ test('Shift+Enter adds a rule and keeps the form open in the same group, with th
   // Enter closes the form; and no group was made on the way.
   await expect(names).toBeHidden()
   await expect(page.locator('section[aria-label^="selection "]')).toHaveCount(1)
+  expect(errors).toEqual([])
+})
+
+test('the old addresses open their view; a drop anywhere is split by type, and the page says where each file went', async ({ page }) => {
+  const errors: string[] = []
+  page.on('console', m => { if (m.type() === 'error') errors.push(m.text()) })
+  page.on('pageerror', e => errors.push(e.message))
+  for (const [old, now] of [['#jobs', /#results$/], ['#analysis', /#setup\/command$/], ['#rdf', /#setup\/command$/], ['#results/NOT-AN-ID', /#results$/], ['#batch', /#setup\/inputs\?mode=batch$/]] as const) {
+    await page.goto(url + old)
+    await expect(page).toHaveURL(now)
+  }
+  await expect(page.getByRole('radio', { name: 'batch' })).toBeChecked()
+  await page.getByRole('radio', { name: 'one trajectory' }).click()
+  await expect(page).toHaveURL(/#setup\/inputs$/)
+
+  // A run input, an RDF and a note, dropped on the page at once.
+  const xvg = readFileSync(join(RUNNER, 'test/fixtures/decypher/rdf_o111_Methionine_H.xvg'), 'utf8')
+  const dt = await page.evaluateHandle(text => {
+    const d = new DataTransfer()
+    d.items.add(new File(['not really a run input'], 'drop.tpr'))
+    d.items.add(new File([text], 'rdf_dropped.xvg'))
+    d.items.add(new File(['a note'], 'notes.txt'))
+    return d
+  }, xvg)
+  await page.dispatchEvent('body', 'dragover', { dataTransfer: dt })
+  await expect(page.getByText('Drop files or a folder')).toBeVisible()
+  await page.dispatchEvent('body', 'drop', { dataTransfer: dt })
+  await expect(page.getByText('1 file to inputs: drop.tpr · 1 file to compare: rdf_dropped.xvg · not read: notes.txt (not a file gmx-cypher reads)')).toBeVisible()
+  // The run input is uploaded and takes its slot; the RDF waits in compare.
+  await expect(page.getByText('drop.tpr', { exact: true })).toBeVisible()
+  await page.getByRole('tab', { name: /results/ }).click()
+  await page.getByRole('button', { name: /^compare/ }).first().click()
+  await expect(page).toHaveURL(/#compare$/)
+  await expect(page.getByRole('region', { name: 'compare', exact: true }).getByText('rdf_dropped', { exact: false }).first()).toBeVisible()
   expect(errors).toEqual([])
 })

@@ -3,7 +3,6 @@ import { X } from 'lucide-react'
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert'
 import { Button } from '../ui/button'
 import { Checkbox } from '../ui/checkbox'
-import type { DecypherSources, SourceRef } from '../decypher/state'
 import { Kbd } from '../ui/kbd'
 import { Section } from '../ui/separator'
 import { postJson } from '../api'
@@ -15,6 +14,8 @@ import { cn } from '../lib/utils'
 import { Code } from './Code'
 import { RunResult } from './Result'
 import type { RunRecord } from '../lib/record'
+import type { Route } from '../lib/route'
+import { modsOf, pickInList } from '../core/gestures'
 
 /** Destructive actions arm on the first click and act on the second, within 2.6 s. */
 function useArmed(): [boolean, () => boolean] {
@@ -30,10 +31,7 @@ function useNow(on: boolean) {
   return now
 }
 
-/** What the jobs tab needs of (de)Cypher: the picked RDFs, a way to open it, and its key. */
-export interface DecypherLink { sources: DecypherSources; open: (add?: SourceRef[]) => void; keyName: string | null }
-
-function JobDetail({ job, log, onRunAgain, vault, decypher }: { job: Job; log: string | undefined; onRunAgain: (r: RunRecord) => void; vault: string | null; decypher: DecypherLink }) {
+function JobDetail({ job, log, onRunAgain, vault, onCompare }: { job: Job; log: string | undefined; onRunAgain: (r: RunRecord) => void; vault: string | null; onCompare: () => void }) {
   const [armed, press] = useArmed()
   const logRef = React.useRef<HTMLDivElement>(null)
   React.useEffect(() => { const el = logRef.current?.querySelector('pre'); if (el) el.scrollTop = el.scrollHeight }, [log])
@@ -46,7 +44,7 @@ function JobDetail({ job, log, onRunAgain, vault, decypher }: { job: Job; log: s
         <h2 className="m-0 text-title font-bold">{job.name ?? job.title}</h2>
         <Status inline level={s.level} word={s.word} className="text-control" />
         <span className="flex-1" />
-        {job.kind === 'rdf' && job.status === 'done' && <Button variant="outline" onClick={() => decypher.open([{ kind: 'job', id: job.id }])}>compare</Button>}
+        {job.kind === 'rdf' && job.status === 'done' && <Button variant="outline" onClick={onCompare}>compare</Button>}
         {job.status === 'running' && !job.unfollowed && <Button variant="destructive" onClick={cancel}>{armed ? 'click again to cancel' : 'cancel'}</Button>}
       </div>
       {job.name && job.name !== job.title && <p className="-mt-3 m-0 text-caption text-muted-foreground">{job.title}</p>}
@@ -71,31 +69,41 @@ function JobDetail({ job, log, onRunAgain, vault, decypher }: { job: Job; log: s
   )
 }
 
-export function JobsView({ jobs, logs, loadLog, selected, onSelect, onRunAgain, vault, decypher }: ReturnType<typeof useJobs> & { selected: string | null; onSelect: (id: string) => void; onRunAgain: (r: RunRecord) => void; vault: string | null; decypher: DecypherLink }) {
-  const job = jobs.find(j => j.id === selected) || jobs[0]
+type ResultsRoute = Extract<Route, { view: 'results' | 'compare' }>
+
+/**
+ * Results (R9a): one jobs list with multi-select (click: one; ⌘/Ctrl-click or its box: one more or less; Shift-click: a
+ * range), and a detail pane: the result for one job, compare for several. The selection is in the address.
+ */
+export function JobsView({ jobs, logs, loadLog, route, go, onRunAgain, vault, compare, keyName }: ReturnType<typeof useJobs> & {
+  route: ResultsRoute; go: (r: Route) => void; onRunAgain: (r: RunRecord) => void; vault: string | null; compare: React.ReactNode; keyName: string | null
+}) {
+  const job = route.view === 'results' ? jobs.find(j => j.id === route.job) || jobs[0] : undefined
+  const selected = route.view === 'compare' ? route.jobs : job ? [job.id] : []
+  const anchor = React.useRef<string | null>(selected[0] ?? null)
   React.useEffect(() => { if (job && !(job.id in logs)) loadLog(job.id) }, [job, logs, loadLog])
-  const anyRdf = jobs.some(j => j.kind === 'rdf'), picked = decypher.sources.refs.length
-  if (!jobs.length) return (
-    <div className="flex flex-wrap items-center gap-3">
-      <p className="m-0 text-control text-muted-foreground">no jobs yet</p>
-      <Button variant="outline" size="sm" onClick={() => decypher.open()}>compare{decypher.keyName ? ' · ' + decypher.keyName : ''}</Button>
-    </div>
-  )
+  // In compare, a change of selection stays in compare; elsewhere, two or more open it.
+  const pick = (id: string, m: { shift?: boolean; add?: boolean }) => {
+    const next = pickInList(jobs.map(j => j.id), selected, anchor.current, id, m)
+    if (!m.shift) anchor.current = id
+    go(route.view === 'compare' && (m.add || m.shift) ? { view: 'compare', jobs: next } : next.length > 1 ? { view: 'compare', jobs: next } : { view: 'results', job: next[0] ?? null })
+  }
+  const openCompare = <Button variant="outline" size="sm" className="mb-1 justify-between" onClick={() => go({ view: 'compare', jobs: selected })} aria-current={route.view === 'compare' ? 'page' : undefined}
+    title={(keyName ? keyName + ' opens it too (settings → keyboard) · ' : 'set a key in settings → keyboard · ') + '⌘/Ctrl-click or tick jobs to compare them'}>
+    <span>compare{selected.length > 1 ? ' · ' + String(selected.length).padStart(2, '0') : ''}</span>{keyName && <Kbd>{keyName}</Kbd>}
+  </Button>
   return (
     <div className="grid grid-cols-[220px_minmax(0,1fr)] gap-5">
       <nav className="flex flex-col gap-1" aria-label="jobs">
         <Section label={'Jobs ' + String(jobs.length).padStart(2, '0')} />
-        {/* Compare: tick RDF jobs to see their results together, with their structures; the button or its key opens it. */}
-        <Button variant="outline" size="sm" className="mb-1 justify-between" onClick={() => decypher.open()} title={decypher.keyName ? decypher.keyName + ' opens it too (settings → keyboard)' : 'set a key in settings → keyboard'}>
-          <span>compare{picked ? ' · ' + String(picked).padStart(2, '0') : ''}</span>{decypher.keyName && <Kbd>{decypher.keyName}</Kbd>}
-        </Button>
+        {openCompare}
+        {!jobs.length && <p className="m-0 text-control text-muted-foreground">no jobs yet</p>}
         {jobs.map(j => {
-          const rdf = j.kind === 'rdf', ref: SourceRef = { kind: 'job', id: j.id }
+          const on = selected.includes(j.id)
           return (
-            <div key={j.id} className={cn('flex items-start gap-1 rounded-lg hover:bg-muted', j.id === job?.id && 'bg-muted ring-1 ring-inset ring-border')}>
-              {rdf ? <Checkbox className="ml-2.5 mt-[11px]" checked={decypher.sources.has(ref)} onCheckedChange={() => decypher.sources.toggle(ref)} aria-label={'compare ' + (j.name ?? j.title)} disabled={j.status === 'failed' || j.status === 'cancelled' || j.status === 'interrupted'} />
-                : anyRdf && <span className="ml-2.5 w-[13px] shrink-0" />}
-              <button onClick={() => onSelect(j.id)} aria-current={j.id === job?.id ? 'true' : undefined} className={cn('flex min-w-0 flex-1 flex-col items-start gap-0.5 py-2 pr-3 text-left', anyRdf ? 'pl-1.5' : 'pl-3')}>
+            <div key={j.id} className={cn('flex items-start gap-1 rounded-lg hover:bg-muted', on && 'bg-muted ring-1 ring-inset ring-border')}>
+              <Checkbox className="ml-2.5 mt-[11px]" checked={on} onCheckedChange={() => pick(j.id, { add: true })} aria-label={'select ' + (j.name ?? j.title)} />
+              <button onClick={e => pick(j.id, modsOf(e))} aria-current={on ? 'true' : undefined} className="flex min-w-0 flex-1 flex-col items-start gap-0.5 py-2 pl-1.5 pr-3 text-left">
                 <span className="text-control font-bold">{j.name ?? j.title}</span>
                 <span className="block w-full truncate text-caption"><Status inline level={statusOf(j).level} word={statusOf(j).word} /> <span className="text-muted-foreground">· {jobLine(j)}</span></span>
               </button>
@@ -103,7 +111,7 @@ export function JobsView({ jobs, logs, loadLog, selected, onSelect, onRunAgain, 
           )
         })}
       </nav>
-      {job && <JobDetail key={job.id} job={job} log={logs[job.id]} onRunAgain={onRunAgain} vault={vault} decypher={decypher} />}
+      {route.view === 'compare' ? compare : job && <JobDetail key={job.id} job={job} log={logs[job.id]} onRunAgain={onRunAgain} vault={vault} onCompare={() => go({ view: 'compare', jobs: [job.id] })} />}
     </div>
   )
 }

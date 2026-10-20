@@ -87,7 +87,7 @@ function BatchCard({ b, jobs, vault, onOpenJob }: { b: Batch; jobs: Job[]; vault
 }
 
 /** Batches (R7b): one recipe over the trajectories a path template finds under a root; a preview first, then a queue. */
-export function BatchView({ state, draft, jobs, onOpenJob }: { state: AppState; draft: Draft; jobs: Job[]; onOpenJob: (id: string) => void }) {
+export function BatchView({ state, draft, jobs, onOpenJob, onMatches }: { state: AppState; draft: Draft; jobs: Job[]; onOpenJob: (id: string) => void; onMatches: (n: number | null) => void }) {
   const [recipes, setRecipes] = React.useState<{ id: string; name: string }[]>([])
   const [recipeId, setRecipeId] = React.useState(FORM)
   const [root, setRoot] = React.useState(state.config.allow[0] || '')
@@ -99,6 +99,7 @@ export function BatchView({ state, draft, jobs, onOpenJob }: { state: AppState; 
   const [error, setError] = React.useState('')
   const [busy, setBusy] = React.useState(false)
   const batches = useBatches()
+  React.useEffect(() => onMatches(items ? items.length : null), [items]) // eslint-disable-line react-hooks/exhaustive-deps -- the count, as the preview changes
   React.useEffect(() => { getJson<{ id: string; name: string }[]>('/api/recipes').then(setRecipes, () => {}) }, [])
   const recipe = async (): Promise<Recipe> => (recipeId === FORM ? recipeFromDraft(draft, 'the ' + (draft.analysis ?? 'rdf') + ' form') : getJson<Recipe>('/api/recipes/' + encodeURIComponent(recipeId)))
   const preview = async () => {

@@ -18,7 +18,7 @@ function KeyField() {
   const b = bindings.decypher, problem = keyProblem(b)
   return (
     <Field>
-      <Label id="key-decypher-label">open and close compare</Label>
+      <Label id="key-decypher-label">open compare and go back</Label>
       <div className="flex flex-wrap items-center gap-2">
         <Kbd className="h-6 min-w-6 text-[11px]">{keyLabel(b)}</Kbd>
         <Button id="key-decypher" variant="outline" size="sm" aria-pressed={listening} aria-labelledby="key-decypher-label key-decypher"

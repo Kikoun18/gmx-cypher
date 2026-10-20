@@ -1,5 +1,6 @@
-// (de)Cypher in a browser: two finished RDF jobs (your Methionine runs) ticked in the jobs tab, side by side with
-// their structure, on one graph, exported as one HTML file that works on its own; its key rebound in settings.
+// (de)Cypher in a browser: two finished RDF jobs (your Methionine runs) selected in the results' jobs list open
+// compare (R9a), side by side with their structure, on one graph, exported as one HTML file that works on its own;
+// its key rebound in settings.
 import { execFileSync, spawn, type ChildProcess } from 'node:child_process'
 import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -53,15 +54,29 @@ function watch(page: Page) {
 test('tick two jobs, see them side by side and on one graph, export them as one HTML file', async ({ page, context }) => {
   const errors = watch(page)
   await page.goto(url)
-  await page.getByRole('tab', { name: /jobs/ }).click()
-  for (const k of ['H', 'S']) await page.getByRole('checkbox', { name: new RegExp('compare rdf_o111_Methionine_' + k) }).click()
-  await page.getByRole('button', { name: /^compare · 02/ }).click()
+  await page.getByRole('tab', { name: /results/ }).click()
+  // A click shows one job's result; ticking another selects two, and two open compare in the detail pane.
+  await page.getByRole('navigation', { name: 'jobs' }).getByRole('button', { name: /^rdf_o111_Methionine_H/ }).click()
+  await expect(page).toHaveURL(/#results\/jaaaaaaaaaaa1$/)
+  await expect(page.getByRole('checkbox', { name: 'select rdf_o111_Methionine_H' })).toBeChecked()
+  await page.getByRole('checkbox', { name: 'select rdf_o111_Methionine_S' }).click()
+  await expect(page.getByRole('button', { name: /^compare · 02/ })).toBeVisible()
+  await expect(page).toHaveURL(/#compare\?jobs=jaaaaaaaaaaa1,jaaaaaaaaaaa2$/)
 
   // Each job: its structure (solvent hidden) beside its g(r), the first group plotted.
-  const dialog = page.getByRole('dialog', { name: 'compare' })
+  const dialog = page.getByRole('region', { name: 'compare', exact: true })
   const h = dialog.getByRole('region', { name: /rdf_o111_Methionine_H/ }), s = dialog.getByRole('region', { name: /rdf_o111_Methionine_S/ })
   await expect(h).toBeVisible()
   await expect(s).toBeVisible()
+  // A reload keeps the view; back returns to the one result, forward to compare.
+  await page.reload()
+  await expect(h).toBeVisible()
+  await expect(s).toBeVisible()
+  await page.goBack()
+  await expect(page.getByRole('heading', { name: /^rdf_o111_Methionine_H/ })).toBeVisible()
+  await expect(dialog).toBeHidden()
+  await page.goForward()
+  await expect(h).toBeVisible()
   await expect(h.getByText('249 atoms · solvent hidden', { exact: false })).toBeVisible()
   await expect(h.getByText('Groups 13 · plotted 01')).toBeVisible()
   await h.getByRole('button', { name: /^O5\.\.\.S/ }).click({ modifiers: ['Shift'] })
@@ -104,19 +119,21 @@ test('tick two jobs, see them side by side and on one graph, export them as one 
   expect(errors).toEqual([])
 })
 
-test('the key opens and closes (de)Cypher; settings rebind it; runs on disk are found by their records', async ({ page }) => {
+test('the key opens compare and goes back; settings rebind it; records on disk are found', async ({ page }) => {
   const errors = watch(page)
   await page.goto(url)
   // The key works once the page has drawn (its handler is attached then); a press before that is lost under load.
   await expect(page.getByRole('button', { name: 'settings' })).toBeVisible()
   await page.keyboard.press('d')
-  const dialog = page.getByRole('dialog', { name: 'compare' })
+  const dialog = page.getByRole('region', { name: 'compare', exact: true })
   await expect(dialog).toBeVisible()
+  await expect(page).toHaveURL(/#compare$/)
   await page.keyboard.press('d')
   await expect(dialog).toBeHidden()
+  await expect(page).toHaveURL(/#results$/)
 
   await page.getByRole('button', { name: 'settings' }).click()
-  await page.getByRole('button', { name: 'open and close compare change' }).click()
+  await page.getByRole('button', { name: 'open compare and go back change' }).click()
   await page.keyboard.press('k')
   await expect(page.getByRole('dialog', { name: 'Settings' }).getByText('K', { exact: true })).toBeVisible()
   await page.keyboard.press('Escape')
@@ -137,10 +154,10 @@ test('the key opens and closes (de)Cypher; settings rebind it; runs on disk are 
 test('morph the two runs into one card, pick their references, sorted values, headings of my own in the export', async ({ page, context }) => {
   const errors = watch(page)
   await page.goto(url)
-  await page.getByRole('tab', { name: /jobs/ }).click()
-  for (const k of ['H', 'S']) await page.getByRole('checkbox', { name: new RegExp('compare rdf_o111_Methionine_' + k) }).click()
-  await page.getByRole('button', { name: /^compare · 02/ }).click()
-  const dialog = page.getByRole('dialog', { name: 'compare' })
+  await page.getByRole('tab', { name: /results/ }).click()
+  await page.getByRole('navigation', { name: 'jobs' }).getByRole('button', { name: /^rdf_o111_Methionine_H/ }).click()
+  await page.getByRole('checkbox', { name: 'select rdf_o111_Methionine_S' }).click()
+  const dialog = page.getByRole('region', { name: 'compare', exact: true })
   await expect(dialog.getByRole('region', { name: /rdf_o111_Methionine_S/ })).toBeVisible()
 
   // The two runs share their structure and groups and differ in their reference: they can be morphed.
@@ -224,8 +241,9 @@ test('morph the two runs into one card, pick their references, sorted values, he
 test('two RDFs of the vault, whose runs are unknown: the morph menu is there, and they morph by their group names', async ({ page }) => {
   const errors = watch(page)
   await page.goto(url)
+  await expect(page.getByRole('button', { name: 'settings' })).toBeVisible()
   await page.keyboard.press('d')
-  const dialog = page.getByRole('dialog', { name: 'compare' })
+  const dialog = page.getByRole('region', { name: 'compare', exact: true })
   await dialog.getByRole('radio', { name: 'vault' }).click()
   await dialog.getByText('Methionine × PG · run a', { exact: true }).click()
   await dialog.getByText('Methionine × PG · run b', { exact: true }).click()
