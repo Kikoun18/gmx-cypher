@@ -213,8 +213,8 @@ From [`batch-3.md`](batch-3.md) §5: one coherent app, (de)Cypher for every anal
 - [x] R13 Run diff (T193)
 
 ### Phase 8: Vault, cluster and commands (R14, R15, R16)
-- [ ] R14b Connect to a project: sends and saved compare views in the space (the setting itself: Phase 2, if agreed)
-- [ ] R14c Compare reads record copies from the space, giving groups for any sent RDF
+- [x] R14b Connect to a project: sends and saved compare views in the space (the setting itself: Phase 2) (T194)
+- [x] R14c Compare reads record copies from the space, giving groups for any sent RDF (T195)
 - [ ] R15 A finished cluster job offers a recipe or batch (only with a `qq jobs -e` sample)
 - [ ] R16a `gmx density` (needs your samples)
 - [ ] R16b `gmx order` (needs your samples)
