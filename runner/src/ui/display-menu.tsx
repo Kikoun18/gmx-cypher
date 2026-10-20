@@ -4,6 +4,7 @@
 import * as React from "react"
 import { ChevronDown } from "lucide-react"
 import { STYLES, type Style } from "../core/contract"
+import { pressed } from "../lib/shortcuts"
 import { Button } from "./button"
 import { ToggleGroup, ToggleGroupItem } from "./toggle-group"
 
@@ -16,7 +17,7 @@ function DisplayMenu({ summary, children }: { summary: string; children: React.R
     return () => document.removeEventListener("pointerdown", out)
   }, [open])
   return (
-    <div ref={box} className="relative" onKeyDown={e => { if (open && e.key === "Escape") { e.stopPropagation(); setOpen(false); box.current?.querySelector("button")?.focus() } }}>
+    <div ref={box} className="relative" onKeyDown={e => { if (open && pressed(e, "escape")) { e.stopPropagation(); setOpen(false); box.current?.querySelector("button")?.focus() } }}>
       <Button variant="outline" size="sm" aria-expanded={open} aria-controls={id} onClick={() => setOpen(o => !o)}>
         display <span className="font-normal text-muted-foreground">· {summary}</span><ChevronDown />
       </Button>

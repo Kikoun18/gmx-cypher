@@ -375,7 +375,7 @@ export function decypherKit(data: KitData) {
 
   /**
    * A canvas that draws a Mol and answers the pointer: drag rotates, right- or alt-drag pans, the wheel zooms,
-   * a double click fits the plotted groups, a click on a group's atom picks it (⌘, ctrl or shift: adds it); where
+   * a double click fits the plotted groups, a click on a group's atom picks it (⌘ or Ctrl: adds it; Shift: its residue); where
    * several references are shown (morphed RDFs), a click on a reference's atom picks that reference the same way.
    */
   function structureView(canvas: HTMLCanvasElement, wrap: HTMLElement, cb: { hover: (h: AtomHover | null) => void; pick: (sels: number[], add: boolean) => void; pickRef?: (ref: number, add: boolean) => void }, keys: HeldKeys = { centre: 'c', pan: ' ' }) {
@@ -742,6 +742,8 @@ export function decypherKit(data: KitData) {
       : lost.length + ' of the ' + a.sels.length + ' groups here have no match there, e.g. "' + lost[0].name + '"'
   }
   // ---------- gestures (R8a, contract §3): one meaning each, in compare, in its exported page and in the app ----------
+  /** The modifier that adds: ⌘ on Apple's systems, Ctrl elsewhere (the exported page's own hints). */
+  const modName = () => (typeof navigator !== 'undefined' && /mac|iphone|ipad|ipod/i.test(navigator.platform) ? '⌘' : 'Ctrl')
   /** A legend's or chips' shown set after a click on `key`: it alone (again: all); with ⌘/Ctrl, it shown or hidden, in its place. */
   function legendPick(all: string[], shown: string[], key: string, add: boolean): string[] {
     if (add) return shown.includes(key) ? shown.filter(x => x !== key) : all.filter(x => x === key || shown.includes(x))
@@ -1036,7 +1038,7 @@ export function decypherKit(data: KitData) {
       const render = () => {
         const s = sel(), T = pal().hues
         box.replaceChildren(
-          ...(many ? many.items().map((r, i) => h('button', { type: 'button', class: 'dc-chip dc-ref dc-pick' + (i ? ' dc-alt' : '') + (r.on ? '' : ' dc-off'), 'aria-pressed': r.on ? 'true' : 'false', title: 'click: plot only this reference · ⌘-click: add or remove',
+          ...(many ? many.items().map((r, i) => h('button', { type: 'button', class: 'dc-chip dc-ref dc-pick' + (i ? ' dc-alt' : '') + (r.on ? '' : ' dc-off'), 'aria-pressed': r.on ? 'true' : 'false', title: 'click: plot only this reference · ' + modName() + '-click: add or remove',
             onclick: (e: MouseEvent) => many.pick(r.id, e.metaKey || e.ctrlKey) }, (r.plain ? '' : 'ref ') + r.label, r.plain ? null : h('span', { class: 'dc-n' }, String(r.count || '—'))))
             : a.ref ? [h('span', { class: 'dc-chip dc-ref' }, 'ref ' + a.ref.name, h('span', { class: 'dc-n' }, String(a.ref.atoms.length || '—')))] : []),
           ...a.sels.map((g, i) => {
@@ -1082,7 +1084,7 @@ export function decypherKit(data: KitData) {
           tip.hidden = false; tip.style.left = hv.left + 'px'; tip.style.top = hv.top + 'px'
           tip.replaceChildren(h('div', { class: 'dc-cap' }, hv.atom),
             h('b', { style: { color: g ? pal().hues[g.tone].strong : 'var(--foreground)' } }, g ? g.name + ' · ' + g.atoms.length + ' atoms' : r ? 'reference · ' + r.label : 'not in any group'),
-            h('div', { class: 'dc-cap' }, g ? 'click: plot only this · ⌘-click: add or remove · Shift: its residue' : r ? (pickRef ? 'click: plot only this one · ⌘-click: add or remove' : 'g(r) is measured from these atoms') : ''))
+            h('div', { class: 'dc-cap' }, g ? 'click: plot only this · ' + modName() + '-click: add or remove · Shift: its residue' : r ? (pickRef ? 'click: plot only this one · ' + modName() + '-click: add or remove' : 'g(r) is measured from these atoms') : ''))
         },
         pick: (is, add) => set(pickGroups(sel(), is.map(i => a.sels[i].name), add)),
         pickRef,

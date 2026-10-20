@@ -57,3 +57,31 @@ export const RESULT_ORDER = ['actions', 'charts', 'settings', 'provenance'] as c
 /** The one set of structure styles (question 17): each 3D view offers these; one its renderer can't draw is shown disabled, with the reason. */
 export const STYLES = ['ball & stick', 'sticks', 'spheres', 'lines', 'cartoon'] as const
 export type Style = (typeof STYLES)[number]
+
+/** The actions that have a key (R8b, contract §3): what each does, in words, where it works, and its key by default. Settings → keyboard rebinds them. */
+export type KeyAction = 'compare' | 'export' | 'sheet' | 'fit' | 'reset' | 'box' | 'centre' | 'hydrogens' | 'labels' | 'prev' | 'next'
+export type KeyWhere = 'anywhere' | 'structures' | 'compare'
+export const KEYS: readonly { action: KeyAction; words: string; where: KeyWhere; key: string; held?: boolean }[] = [
+  { action: 'compare', words: 'opens compare with the jobs selected, and goes back', where: 'anywhere', key: 'd' },
+  { action: 'export', words: 'exports the focused chart, in the default format', where: 'anywhere', key: 'e' },
+  { action: 'sheet', words: 'opens this list of keys', where: 'anywhere', key: '?' },
+  { action: 'fit', words: 'fits the plotted groups', where: 'structures', key: 'f' },
+  { action: 'reset', words: 'resets the view', where: 'structures', key: 'r' },
+  { action: 'box', words: 'shows or hides the box', where: 'structures', key: 'b' },
+  { action: 'centre', words: 'held, makes a click centre on the group', where: 'structures', key: 'c', held: true },
+  { action: 'hydrogens', words: 'shows or hides hydrogens', where: 'structures', key: 'h' },
+  { action: 'labels', words: 'shows or hides labels', where: 'compare', key: 'l' },
+  { action: 'prev', words: 'leads the one graph with the previous result', where: 'compare', key: '[' },
+  { action: 'next', words: 'leads the one graph with the next result', where: 'compare', key: ']' },
+]
+
+/** The keys that are not rebound (contract §3), for the sheet: what they do, and where. */
+export const FIXED_KEYS: readonly { keys: string[]; words: string; where: string }[] = [
+  { keys: ['Esc'], words: 'backs out or closes', where: 'anywhere' },
+  { keys: ['Enter'], words: 'submits a field', where: 'fields' },
+  { keys: ['Space'], words: 'held, makes a drag pan', where: 'structures' },
+  { keys: ['←', '→'], words: 'step along a curve (with Shift: ten points)', where: 'charts' },
+  { keys: ['↑', '↓'], words: 'the previous or next curve', where: 'charts' },
+  { keys: ['Home', 'End'], words: 'the first or last point', where: 'charts' },
+  { keys: ['Enter'], words: 'marks the point; with the add key, draws a vertical line (with Shift too: horizontal)', where: 'charts' },
+]

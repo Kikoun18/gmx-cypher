@@ -7,6 +7,7 @@ import { Input } from '../ui/input'
 import { Field, FieldHint, Label } from '../ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
 import { Section } from '../ui/separator'
+import { pressed } from '../lib/shortcuts'
 import { getJson, postJson, type AppState } from '../api'
 import type { Draft } from '../draft'
 import { statusOf, type Job } from '../jobs'
@@ -134,7 +135,7 @@ export function BatchView({ state, draft, jobs, onOpenJob, onMatches }: { state:
         </Field>
         <Field>
           <Label htmlFor="b-template">path template</Label>
-          <Input id="b-template" size="sm" value={template} placeholder="hmr+fast+6/{column}/{seq}/9.multiwalker/{run}/07_md.xtc" onChange={e => { setTemplate(e.target.value); setItems(null) }} onKeyDown={e => e.key === 'Enter' && template && preview()} />
+          <Input id="b-template" size="sm" value={template} placeholder="hmr+fast+6/{column}/{seq}/9.multiwalker/{run}/07_md.xtc" onChange={e => { setTemplate(e.target.value); setItems(null) }} onKeyDown={e => pressed(e, 'enter') && template && preview()} />
           <FieldHint>The Matrix's tokens ({'{method} {column} {name} {seq} {run} {time}'}), {'{*}'} for any one folder, ** for any folders</FieldHint>
         </Field>
         <Field>

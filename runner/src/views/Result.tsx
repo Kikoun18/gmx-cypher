@@ -21,6 +21,7 @@ import { csvMeta, curvesCsv, xvgCsv } from '../lib/csv'
 import type { RunRecord } from '../lib/record'
 import { groupText, toneText, type Tone } from '../lib/tones'
 import { cn } from '../lib/utils'
+import { modName } from '../lib/platform'
 import { SendDialog } from './SendDialog'
 import { Status } from '../ui/status'
 import { PathText, ResultPage } from '../ui/result-page'
@@ -104,7 +105,7 @@ function RdfChart({ job, record }: { job: Job; record: RunRecord }) {
   return (
     <div className="flex flex-col gap-3">
       <Curves text={xvg} tones={tones} yLabel="g(r)" height={300} exp={chartExport(job, record, outName(job, record), columns(xvg, curves.map(c => c.label)), 'r (nm)', 'g(r)')} />
-      <p className="m-0 text-caption text-muted-foreground">a curve's name: click shows it alone (again: all), ⌘-click shows or hides it · ● maximum · ○ first shell</p>
+      <p className="m-0 text-caption text-muted-foreground">a curve's name: click shows it alone (again: all), {modName()}-click shows or hides it · ● maximum · ○ first shell</p>
       <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3">
         {curves.flatMap((c, i) => {
           const { firstShell, maximum } = peaks(c.points)

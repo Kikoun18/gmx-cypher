@@ -93,6 +93,11 @@ test('pick inputs, make groups, run, see the chart', async ({ page }) => {
     await d.saveAs(f)
     return f
   }
+  // E exports the chart under the pointer, in the default format (R8b).
+  await page.mouse.move(box.x + box.width * 0.5, box.y + box.height / 2)
+  const [byKey] = await Promise.all([page.waitForEvent('download'), page.keyboard.press('e')])
+  expect(byKey.suggestedFilename()).toMatch(/^rdf_nvt\.(png|svg|pdf)$/)
+  await page.mouse.move(0, 0)
   const png = await exportAs(/^png/)
   expect(png.endsWith('rdf_nvt.png')).toBe(true)
   expect(readFileSync(png).subarray(0, 8).toString('hex')).toBe('89504e470d0a1a0a')

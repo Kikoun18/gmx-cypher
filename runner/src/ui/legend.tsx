@@ -4,6 +4,7 @@
 
 import * as React from "react"
 import { legendPick } from "../core/gestures"
+import { modName } from "../lib/platform"
 import { cn } from "../lib/utils"
 import { Select, SelectContent, SelectItem, SelectTrigger } from "./select"
 
@@ -20,7 +21,7 @@ function Legend<T extends { key: string; label: string }>({ items, shown, onShow
       {items.map(it => {
         const on = shown.includes(it.key)
         return (
-          <button key={it.key} type="button" aria-pressed={on} title="click: this one alone (again: all) · ⌘-click: show or hide" className={itemClass?.(it, on)} style={itemStyle?.(it, on)}
+          <button key={it.key} type="button" aria-pressed={on} title={"click: this one alone (again: all) · " + modName() + "-click: show or hide"} className={itemClass?.(it, on)} style={itemStyle?.(it, on)}
             onClick={e => onShown(legendPick(all, shown, it.key, e.metaKey || e.ctrlKey))} onMouseEnter={() => onHover?.(it.key)} onMouseLeave={() => onHover?.(null)}>
             {item(it, on)}
           </button>

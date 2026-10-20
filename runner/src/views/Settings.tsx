@@ -7,35 +7,51 @@ import { Kbd } from '../ui/kbd'
 import { Section } from '../ui/separator'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
 import { getJson, postJson, type AppState } from '../api'
-import { bindingOf, DEFAULT_BINDINGS, keyLabel, keyProblem, useBindings } from '../lib/shortcuts'
+import { bindingOf, DEFAULT_BINDINGS, keyLabel, keyProblem, pressed, useBindings, type Bindings } from '../lib/shortcuts'
+import { KEYS, type KeyAction } from '../core/contract'
 import { Status } from '../ui/status'
 import { ExportSettings } from './ExportSettings'
 
-/** The key that opens and closes (de)Cypher: change it by pressing the new one; Escape keeps the old one. */
-function KeyField() {
-  const [bindings, setBindings] = useBindings()
+/** The key of one action: change it by pressing the new one (Escape keeps the old one); what it would clash with, in words. */
+function KeyField({ action, words, bindings, setBindings }: { action: KeyAction; words: string; bindings: Bindings; setBindings: (b: Bindings) => void }) {
   const [listening, setListening] = React.useState(false)
-  const b = bindings.decypher, problem = keyProblem(b)
+  const b = bindings[action], problem = keyProblem(b, action, bindings), id = 'key-' + action
   return (
-    <Field>
-      <Label id="key-decypher-label">open compare and go back</Label>
-      <div className="flex flex-wrap items-center gap-2">
+    <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1">
+      <span id={id + '-label'} className="text-control">{words}</span>
+      <div className="flex items-center gap-1.5">
         <Kbd className="h-6 min-w-6 text-[11px]">{keyLabel(b)}</Kbd>
-        <Button id="key-decypher" variant="outline" size="sm" aria-pressed={listening} aria-labelledby="key-decypher-label key-decypher"
+        <Button id={id} variant="outline" size="sm" aria-pressed={listening} aria-labelledby={id + '-label ' + id} data-key-listening={listening || undefined}
           onClick={() => setListening(l => !l)} onBlur={() => setListening(false)}
           onKeyDown={e => {
             if (!listening) return
             e.preventDefault(); e.stopPropagation()
-            if (e.key === 'Escape') { setListening(false); return }
+            if (pressed(e, 'escape')) { setListening(false); return }
             const next = bindingOf(e)
             if (!next) return
-            setBindings({ ...bindings, decypher: next }); setListening(false)
-          }}>{listening ? 'press a key… (Escape keeps ' + keyLabel(b) + ')' : 'change'}</Button>
-        {b && <Button variant="ghost" size="sm" onClick={() => setBindings({ ...bindings, decypher: null })}>no key</Button>}
-        {keyLabel(b) !== keyLabel(DEFAULT_BINDINGS.decypher) && <Button variant="ghost" size="sm" onClick={() => setBindings(DEFAULT_BINDINGS)}>back to {keyLabel(DEFAULT_BINDINGS.decypher)}</Button>}
+            setBindings({ ...bindings, [action]: next }); setListening(false)
+          }}>{listening ? 'press a key…' : 'change'}</Button>
+        {b && <Button variant="ghost" size="sm" onClick={() => setBindings({ ...bindings, [action]: null })}>no key</Button>}
+        {keyLabel(b) !== keyLabel(DEFAULT_BINDINGS[action]) && <Button variant="ghost" size="sm" onClick={() => setBindings({ ...bindings, [action]: DEFAULT_BINDINGS[action] })}>back to {keyLabel(DEFAULT_BINDINGS[action])}</Button>}
       </div>
-      {problem ? <Status level="error">{problem}</Status> : <FieldHint>{b ? keyLabel(b) + ' anywhere but in a field; the jobs tab has the same as a button.' : 'no key: open compare from the jobs tab.'} Inside it, F fits the plotted groups, R resets the view and [ ] step through results. Kept in this browser.</FieldHint>}
-    </Field>
+      {problem && <Status level="error" className="col-span-2">{problem}</Status>}
+    </div>
+  )
+}
+
+/** Every key (R8b), by where it works; kept in this browser. */
+function Keyboard() {
+  const [bindings, setBindings] = useBindings()
+  return (
+    <div className="flex flex-col gap-3">
+      {(['anywhere', 'structures', 'compare'] as const).map(w => (
+        <div key={w} className="flex flex-col gap-2">
+          <span className="text-label uppercase text-muted-foreground">{w}</span>
+          {KEYS.filter(k => k.where === w).map(k => <KeyField key={k.action} action={k.action} words={k.words} bindings={bindings} setBindings={setBindings} />)}
+        </div>
+      ))}
+      <FieldHint>keys work anywhere but in a field · {keyLabel(bindings.sheet)} lists them all, with the keys that are not rebound · kept in this browser</FieldHint>
+    </div>
   )
 }
 
@@ -73,7 +89,7 @@ export function Settings({ state, open, onOpenChange, onState, returnFocus }: { 
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent onCloseAutoFocus={e => { if (returnFocus?.current) { e.preventDefault(); returnFocus.current.focus() } }}
         // While the key field listens, Escape is its answer (keep the old key), not the dialog's.
-        onEscapeKeyDown={e => { const el = document.activeElement; if (el?.id === 'key-decypher' && el.getAttribute('aria-pressed') === 'true') e.preventDefault() }}>
+        onEscapeKeyDown={e => { if (document.activeElement?.hasAttribute('data-key-listening')) e.preventDefault() }}>
         <DialogHeader>
           <DialogHeading>
             <DialogTitle>Settings</DialogTitle>
@@ -85,7 +101,7 @@ export function Settings({ state, open, onOpenChange, onState, returnFocus }: { 
           <Field>
             <Label htmlFor="gmx">gmx</Label>
             <div className="flex gap-2">
-              <Input id="gmx" size="sm" value={gmx} placeholder="gmx_mpi, then gmx, on PATH" onChange={e => setGmx(e.target.value)} onKeyDown={e => e.key === 'Enter' && check()} />
+              <Input id="gmx" size="sm" value={gmx} placeholder="gmx_mpi, then gmx, on PATH" onChange={e => setGmx(e.target.value)} onKeyDown={e => pressed(e, 'enter') && check()} />
               <Button variant="outline" onClick={check} disabled={busy}>{busy ? 'checking…' : 'check'}</Button>
             </div>
             {state.gmx.ok ? <Status level="ok">{state.gmx.path + ' · ' + state.gmx.version}</Status> : <Status level="error">{state.gmx.error}</Status>}
@@ -102,7 +118,7 @@ export function Settings({ state, open, onOpenChange, onState, returnFocus }: { 
           <Field>
             <Label htmlFor="folder">add a folder</Label>
             <div className="flex gap-2">
-              <Input id="folder" size="sm" value={folder} placeholder="/home/you/simulations" onChange={e => setFolder(e.target.value)} onKeyDown={e => e.key === 'Enter' && folder.trim() && setAllow([...state.config.allow, folder.trim()])} />
+              <Input id="folder" size="sm" value={folder} placeholder="/home/you/simulations" onChange={e => setFolder(e.target.value)} onKeyDown={e => pressed(e, 'enter') && folder.trim() && setAllow([...state.config.allow, folder.trim()])} />
               <Button variant="outline" onClick={() => setAllow([...state.config.allow, folder.trim()])} disabled={!folder.trim()}>add</Button>
             </div>
             {folderError && <Status level="error">{folderError}</Status>}
@@ -111,7 +127,7 @@ export function Settings({ state, open, onOpenChange, onState, returnFocus }: { 
           <Field>
             <Label htmlFor="vault">vault folder</Label>
             <div className="flex gap-2">
-              <Input id="vault" size="sm" value={vault} placeholder="/home/you/pmf-vault" onChange={e => setVault(e.target.value)} onKeyDown={e => e.key === 'Enter' && vault.trim() && chooseVault(vault.trim())} />
+              <Input id="vault" size="sm" value={vault} placeholder="/home/you/pmf-vault" onChange={e => setVault(e.target.value)} onKeyDown={e => pressed(e, 'enter') && vault.trim() && chooseVault(vault.trim())} />
               <Button variant="outline" onClick={() => chooseVault(vault.trim())} disabled={!vault.trim() || vault.trim() === state.config.vault}>use</Button>
               {state.config.vault && <Button variant="ghost" onClick={() => chooseVault(null)}>forget</Button>}
             </div>
@@ -134,7 +150,7 @@ export function Settings({ state, open, onOpenChange, onState, returnFocus }: { 
           <Field>
             <Label htmlFor="pmf-url">The Matrix address · optional</Label>
             <div className="flex gap-2">
-              <Input id="pmf-url" size="sm" value={pmfUrl} placeholder="http://localhost:5173/" onChange={e => setPmfUrl(e.target.value)} onKeyDown={e => e.key === 'Enter' && savePmfUrl()} />
+              <Input id="pmf-url" size="sm" value={pmfUrl} placeholder="http://localhost:5173/" onChange={e => setPmfUrl(e.target.value)} onKeyDown={e => pressed(e, 'enter') && savePmfUrl()} />
               <Button variant="outline" onClick={savePmfUrl} disabled={pmfUrl.trim() === (state.config.pmfUrl || '')}>save</Button>
             </div>
             {pmfError ? <Status level="error">{pmfError}</Status> : <FieldHint>Where you open the Matrix; after sending, gmx-cypher links to the project there.</FieldHint>}
@@ -142,16 +158,16 @@ export function Settings({ state, open, onOpenChange, onState, returnFocus }: { 
           <Section label="Export" />
           <ExportSettings />
           <Section label="Keyboard" />
-          <KeyField />
+          <Keyboard />
           <Section label="Cluster" />
           <div className="grid grid-cols-2 gap-x-4 gap-y-2">
             <Field>
               <Label htmlFor="qq">qq</Label>
-              <Input id="qq" size="sm" value={tools.qq} placeholder="qq, on PATH" onChange={e => setTools(t => ({ ...t, qq: e.target.value }))} onKeyDown={e => e.key === 'Enter' && saveTools()} />
+              <Input id="qq" size="sm" value={tools.qq} placeholder="qq, on PATH" onChange={e => setTools(t => ({ ...t, qq: e.target.value }))} onKeyDown={e => pressed(e, 'enter') && saveTools()} />
             </Field>
             <Field>
               <Label htmlFor="gmx-eta">gmx-eta</Label>
-              <Input id="gmx-eta" size="sm" value={tools.gmxEta} placeholder="gmx-eta, on PATH" onChange={e => setTools(t => ({ ...t, gmxEta: e.target.value }))} onKeyDown={e => e.key === 'Enter' && saveTools()} />
+              <Input id="gmx-eta" size="sm" value={tools.gmxEta} placeholder="gmx-eta, on PATH" onChange={e => setTools(t => ({ ...t, gmxEta: e.target.value }))} onKeyDown={e => pressed(e, 'enter') && saveTools()} />
             </Field>
           </div>
           <div className="flex items-center gap-2">

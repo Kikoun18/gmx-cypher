@@ -5,7 +5,9 @@ import * as React from 'react'
 import { cn } from '../lib/utils'
 import { Swatch } from '../core/Chart'
 import { Legend } from '../ui/legend'
-import type { AtomHover, Curve, Group, Mol, Palette, SceneState } from '../core/kit'
+import type { AtomHover, Curve, Group, HeldKeys, Mol, Palette, SceneState } from '../core/kit'
+import { useBindings } from '../lib/shortcuts'
+import { modName } from '../lib/platform'
 import type { View } from './state'
 import { kit } from '../core/theme'
 
@@ -20,11 +22,14 @@ export const StructurePanel = React.forwardRef<StructureHandle, {
   const ctl = React.useRef<ReturnType<typeof kit.structureView> | null>(null)
   const [tip, setTip] = React.useState<AtomHover | null>(null)
   const pick = React.useRef(onPick), pickRef = React.useRef(onPickRef)
+  // The held keys, from the registry: read by the view at each press, so a key rebound in settings applies at once.
+  const [bindings] = useBindings(), held = React.useRef<HeldKeys>({ centre: 'c', pan: ' ' })
+  held.current.centre = bindings.centre?.key ?? ''
   React.useLayoutEffect(() => { pick.current = onPick; pickRef.current = onPickRef })
   React.useImperativeHandle(ref, () => ({ fit: () => ctl.current?.fit(), reset: () => ctl.current?.reset(), where: nr => ctl.current?.where(nr) ?? null, png: () => new Promise(ok => (canvas.current ? canvas.current.toBlob(ok, 'image/png') : ok(null))) }), [])
   React.useEffect(() => {
     if (!wrap.current || !canvas.current || !mol) return
-    const c = kit.structureView(canvas.current, wrap.current, { hover: setTip, pick: (i, add) => pick.current(i, add), pickRef: (i, add) => pickRef.current?.(i, add) })
+    const c = kit.structureView(canvas.current, wrap.current, { hover: setTip, pick: (i, add) => pick.current(i, add), pickRef: (i, add) => pickRef.current?.(i, add) }, held.current)
     ctl.current = c
     if (document.fonts?.ready) document.fonts.ready.then(() => c.redraw())
     return () => { c.destroy(); ctl.current = null }
@@ -34,7 +39,7 @@ export const StructurePanel = React.forwardRef<StructureHandle, {
     ctl.current?.set(st)
   }, [mol, pal, view.rep, view.rest, view.labels, view.hydrogens, sels, selected, refs, hoverSel, hoverRef])
   if (!mol) return <div className={cn('flex flex-col items-center justify-center gap-1.5 p-6 text-center', className)}>{empty}</div>
-  const g = tip && tip.sel >= 0 ? sels[tip.sel] : null, r = tip && tip.ref >= 0 ? refs[tip.ref] : null, on = g ? selected.includes(sels.indexOf(g)) : false
+  const mod = modName(), g = tip && tip.sel >= 0 ? sels[tip.sel] : null, r = tip && tip.ref >= 0 ? refs[tip.ref] : null, on = g ? selected.includes(sels.indexOf(g)) : false
   return (
     <div ref={wrap} className={cn('relative min-h-[340px]', className)} onPointerDown={onActive} onMouseEnter={onActive}>
       <canvas ref={canvas} className="absolute inset-0 block size-full cursor-grab touch-none" aria-label="structure: drag to rotate, right- or Space-drag to pan, scroll to zoom, double-click to fit the plotted groups; Shift-click takes a residue, Alt-click an atom name, C + click centres" />
@@ -52,7 +57,7 @@ export const StructurePanel = React.forwardRef<StructureHandle, {
           <span className="text-control font-bold" style={{ color: g ? pal.hues[g.tone].strong : r ? 'var(--foreground)' : 'var(--muted-foreground)' }}>
             {g ? g.name + ' · ' + g.atoms.length + ' atoms' : r ? 'reference · ' + r.label : 'not in any group'}
           </span>
-          {(g || r) && <span className="text-caption text-muted-foreground">{g ? (on ? (selected.length > 1 ? 'click: plot alone · ⌘-click: remove' : 'click: remove') : 'click: plot alone · ⌘-click: add') + ' · Shift: its residue' : onPickRef ? 'click: plot only this one · ⌘-click: add or remove' : 'g(r) is measured from these atoms'}</span>}
+          {(g || r) && <span className="text-caption text-muted-foreground">{g ? (on ? (selected.length > 1 ? 'click: plot alone · ' + mod + '-click: remove' : 'click: remove') : 'click: plot alone · ' + mod + '-click: add') + ' · Shift: its residue' : onPickRef ? 'click: plot only this one · ' + mod + '-click: add or remove' : 'g(r) is measured from these atoms'}</span>}
         </div>
       )}
     </div>
@@ -83,7 +88,7 @@ export function CurveTable({ curves, onRemove, onHover, source = true }: { curve
   )
 }
 
-/** The reference and the groups as chips: a click plots one group (or clears it), ⌘, ctrl or shift adds it. */
+/** The reference and the groups as chips, by the one legend's rules (R8a). */
 export function GroupChips({ refs, sels, selected, pal, dim, hover, onShown, onPickRef, onHover }: {
   refs: { label: string; count: number; dashed: boolean; on?: boolean; plain?: boolean }[]; sels: Group[]; selected: string[]; pal: Palette; dim: boolean; hover: string | null
   /** The groups plotted after a click, by the one legend's rules (R8a). */
@@ -97,7 +102,7 @@ export function GroupChips({ refs, sels, selected, pal, dim, hover, onShown, onP
         const cls = cn('inline-flex h-[26px] items-center gap-1.5 whitespace-nowrap rounded-full border-[1.5px] border-foreground px-2.5 text-caption', r.dashed || r.on === false ? 'border-dashed text-foreground' : 'text-foreground', r.on === false && 'opacity-45')
         const body = <>{r.plain ? '' : 'ref '}{r.label}{!r.plain && <span className="opacity-70">{r.count || '—'}</span>}</>
         return onPickRef
-          ? <button key={r.label} type="button" aria-pressed={r.on !== false} title="click: plot only this reference · ⌘-click: add or remove" className={cn(cls, 'cursor-pointer')} onClick={e => onPickRef(i, e.metaKey || e.ctrlKey)}>{body}</button>
+          ? <button key={r.label} type="button" aria-pressed={r.on !== false} title={'click: plot only this reference · ' + modName() + '-click: add or remove'} className={cn(cls, 'cursor-pointer')} onClick={e => onPickRef(i, e.metaKey || e.ctrlKey)}>{body}</button>
           : <span key={r.label} className={cls}>{body}</span>
       })}
       <Legend label="groups" className="contents" items={sels.map(g => ({ key: g.name, label: g.name, g }))} shown={selected} onShown={onShown} onHover={onHover}

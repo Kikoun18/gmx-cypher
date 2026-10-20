@@ -9,3 +9,6 @@ export const altName = (platform: string) => (isApple(platform) ? 'option' : 'al
 /** The browser's platform string, wherever the browser keeps it. */
 export const browserPlatform = () =>
   typeof navigator === 'undefined' ? '' : ((navigator as Navigator & { userAgentData?: { platform?: string } }).userAgentData?.platform || navigator.platform || '');
+
+/** The modifier that adds (to a selection, a plot): ⌘ on Apple's systems, Ctrl elsewhere. */
+export const modName = (platform: string = browserPlatform()) => (isApple(platform) ? '⌘' : 'Ctrl');

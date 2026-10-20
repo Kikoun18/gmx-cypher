@@ -2,6 +2,7 @@
 // charts at once: format, size (the journals' column widths), theme, text size, title, grid, legend, file name.
 
 import * as React from 'react'
+import { pressed } from '../lib/shortcuts'
 import { SIZE_PRESETS } from '../../../matrix/src/lib/exportPrefs'
 import { fileName, NAME_FIELDS, PREFS, useExportPrefs, type ExportPrefs } from '../core/exportPrefs'
 import { Button } from '../ui/button'
@@ -31,7 +32,7 @@ function NumberField({ id, label, value, onChange, hint }: { id: string; label: 
   return (
     <Field>
       <Label htmlFor={id}>{label}</Label>
-      <Input id={id} size="sm" inputMode="decimal" value={text} onChange={e => setText(e.target.value)} onBlur={keep} onKeyDown={e => e.key === 'Enter' && keep()} />
+      <Input id={id} size="sm" inputMode="decimal" value={text} onChange={e => setText(e.target.value)} onBlur={keep} onKeyDown={e => pressed(e, 'enter') && keep()} />
       {hint && <FieldHint>{hint}</FieldHint>}
     </Field>
   )

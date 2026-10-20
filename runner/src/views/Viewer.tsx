@@ -6,6 +6,8 @@ import { ToggleGroup, ToggleGroupItem } from '../ui/toggle-group'
 import { DisplayMenu, DisplayRow, StyleRow } from '../ui/display-menu'
 import type { Style } from '../core/contract'
 import { clickScope, pans } from '../core/gestures'
+import type { KeyAction } from '../core/contract'
+import { holds, isKey, keyLabel, pressed, typing, useBindings } from '../lib/shortcuts'
 import { defaultView, structStyle, toPdb, type Look } from '../../../matrix/src/lib/structFile'
 import { drawnNumbers, type Atom } from '../lib/atoms'
 import type { Tone } from '../lib/tones'
@@ -37,8 +39,6 @@ function useColourBy() {
   return [by, (v: ColourBy) => { setBy(v); try { localStorage.setItem(COLOUR_KEY, v) } catch { /* kept for this page only */ } }] as const
 }
 
-/** What is typed into: C then means the letter, not the rotation centre. */
-const typing = (t: EventTarget | null) => t instanceof HTMLElement && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))
 
 /** Where to rotate the view around (T140): the atoms of a group, or one atom, named for the caption. */
 export interface Centre { label: string; atoms: number[]; id: number }
@@ -103,16 +103,19 @@ export function Viewer({ text, format, model, atoms, colour, onPick, describe, g
   // C held: a click sets the centre of rotation instead of picking (T140).
   const [cHeld, setCHeld] = React.useState(false)
   const cDown = React.useRef(false), spaceDown = React.useRef(false), overView = React.useRef(false)
+  // The keys, from the registry (R8b); the window's listeners read the latest.
+  const [bindings] = useBindings(), keys = React.useRef(bindings)
+  keys.current = bindings
   const [centre, setCentre] = React.useState<{ label: string; count: number } | null>(null)
   React.useEffect(() => {
     const set = (v: boolean) => { cDown.current = v; setCHeld(v) }
     // Space held over the view pans with a left drag (R8a), and doesn't scroll the page.
     const down = (e: KeyboardEvent) => {
       if (e.ctrlKey || e.metaKey || e.altKey || typing(e.target)) return
-      if (e.key.toLowerCase() === 'c') set(true)
-      else if (e.key === ' ' && overView.current) { spaceDown.current = true; e.preventDefault() }
+      if (holds(keys.current.centre, e)) set(true)
+      else if (pressed(e, 'space') && overView.current) { spaceDown.current = true; e.preventDefault() }
     }
-    const up = (e: KeyboardEvent) => { if (e.key.toLowerCase() === 'c') set(false); else if (e.key === ' ') spaceDown.current = false }
+    const up = (e: KeyboardEvent) => { if (holds(keys.current.centre, e)) set(false); else if (pressed(e, 'space')) spaceDown.current = false }
     const off = () => { set(false); spaceDown.current = false }
     window.addEventListener('keydown', down); window.addEventListener('keyup', up); window.addEventListener('blur', off)
     return () => { window.removeEventListener('keydown', down); window.removeEventListener('keyup', up); window.removeEventListener('blur', off) }
@@ -209,7 +212,7 @@ export function Viewer({ text, format, model, atoms, colour, onPick, describe, g
           <DisplayRow label="show">
             <label className="flex items-center gap-2 text-control"><Checkbox checked={hydrogens} onCheckedChange={c => setHydrogens(c === true)} /> hydrogens</label>
             <label className="flex items-center gap-2 text-control"><Checkbox checked={solvent} onCheckedChange={c => setSolvent(c === true)} /> water & ions</label>
-            <label className="flex items-center gap-2 text-control"><Checkbox checked={showCell && !!cell.vectors} disabled={!cell.vectors} onCheckedChange={c => setShowCell(c === true)} /> box <Kbd>B</Kbd></label>
+            <label className="flex items-center gap-2 text-control"><Checkbox checked={showCell && !!cell.vectors} disabled={!cell.vectors} onCheckedChange={c => setShowCell(c === true)} /> box <Kbd>{keyLabel(bindings.box)}</Kbd></label>
           </DisplayRow>
         </DisplayMenu>
       </div>
@@ -229,10 +232,18 @@ export function Viewer({ text, format, model, atoms, colour, onPick, describe, g
         {centre && <button type="button" className="rounded text-caption text-foreground underline underline-offset-2 hover:no-underline" onClick={resetCentre}>reset</button>}
       </p>
       {/* B toggles the box while the 3D view has focus (a click in it gives it focus), as section 9.2 asks: a control and a key. */}
-      <div className={'relative h-[460px] overflow-hidden rounded-xl border border-border bg-card focus-visible:outline-2 focus-visible:outline-ring' + (cHeld ? ' cursor-crosshair' : '')} tabIndex={0} role="group" aria-label="3D view · B shows or hides the box · right- or Space-drag pans"
+      <div className={'relative h-[460px] overflow-hidden rounded-xl border border-border bg-card focus-visible:outline-2 focus-visible:outline-ring' + (cHeld ? ' cursor-crosshair' : '')} tabIndex={0} role="group" aria-label={'3D view · ' + keyLabel(bindings.box) + ' shows or hides the box · right- or Space-drag pans'}
         onPointerDownCapture={panDown} onPointerMoveCapture={panMove} onPointerUpCapture={() => { panFrom.current = null }} onContextMenu={e => e.preventDefault()}
         onPointerEnter={() => { overView.current = true }} onPointerLeave={() => { overView.current = false }}
-        onKeyDown={e => { if (e.key.toLowerCase() === 'b' && !e.ctrlKey && !e.metaKey && !e.altKey && cell.vectors) { e.preventDefault(); setShowCell(v => !v) } }}>
+        onKeyDown={e => {
+          const is = (a: KeyAction) => isKey(bindings, a, e), ks = [...colour.keys()].flatMap(n => index.get(n) ?? [])
+          if (is('box') && cell.vectors) setShowCell(v => !v)
+          else if (is('hydrogens')) setHydrogens(v => !v)
+          else if (is('fit') && viewer) viewer.zoomTo(ks.length && main.current ? ({ model: main.current, index: ks } as never) : {}, 400)
+          else if (is('reset') && viewer) { viewer.zoomTo({}, 400); resetCentre() }
+          else return
+          e.preventDefault()
+        }}>
         <div ref={box} className="absolute inset-0" role="img" aria-label="3D structure: atoms can also be picked by rule or as a list" />
         {h && (
           <div className="pointer-events-none absolute left-3 top-3 rounded-lg border border-border bg-popover px-3 py-2 text-caption shadow-menu" aria-live="polite">

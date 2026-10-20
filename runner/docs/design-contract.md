@@ -69,9 +69,13 @@ Morpheus is the brief; the Matrix is the neighbour. Where gmx-cypher and the Mat
 | F · R | fit · reset | structures | yes |
 | B | the box | structures | yes |
 | C (held) | click centres on a group | structures | yes |
-| H · L | hydrogens · labels | structures | yes |
-| [ · ] | previous · next structure | compare | yes |
+| H | hydrogens | structures | yes |
+| L | labels | compare | yes |
+| [ · ] | the one graph led by the previous · next result | compare | yes |
 | Esc | back / close | everywhere | no |
+| Enter · Space (held) · arrows, Home, End | submit a field, mark a point · pan · step along a chart | fields, charts · structures · charts | no |
+
+The registry is `KEYS` (and `FIXED_KEYS`) in `contract.ts`; `lib/shortcuts.ts` reads it, rebinds it in settings → keyboard, explains clashes in words, and is the only file that writes a key; `?` opens the list made from it.
 
 - Keys are ignored while typing. ⌘ on macOS where other platforms use Ctrl, shown with `Kbd` everywhere.
 - Differences from the Matrix, on purpose: C (held) centres here, where the Matrix's C is compare; D is compare here.

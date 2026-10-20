@@ -5,6 +5,7 @@ import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 import { Kbd } from '../ui/kbd'
 import { altName, browserPlatform } from '../lib/platform'
+import { keyLabel, pressed, useBindings } from '../lib/shortcuts'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
 import { Section } from '../ui/separator'
 import { postJson } from '../api'
@@ -99,7 +100,7 @@ function RuleForm({ atoms, index, onStep }: { atoms: Atom[]; index: { file: stri
         ) : (
           <Input ref={valueRef} size="sm" className={kind === 'name' ? 'w-64' : 'w-28'} value={value} onChange={e => setValue(e.target.value)} list={kind === 'name' ? undefined : id}
             placeholder={kind === 'resnr' ? '1-6' : kind === 'name' ? 'O1, O2 O3 and O4' : 'value'} aria-label={kind === 'name' ? 'atom names' : 'value'}
-            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); go('add', e.shiftKey && kind === 'name') } }} />
+            onKeyDown={e => { if (pressed(e, 'enter')) { e.preventDefault(); go('add', e.shiftKey && kind === 'name') } }} />
         )}
         <datalist id={id}>{options.map(o => <option key={o} value={o} />)}</datalist>
         {kind === 'name' && <Input size="sm" className="w-24" value={within} onChange={e => setWithin(e.target.value)} list={id + 'r'} placeholder="in every…" aria-label="in every residue named" />}
@@ -166,7 +167,7 @@ function GroupCard({ group, atoms, index, nrs, others, current, onCurrent, onCha
         </ul>
       )}
       <Input size="sm" value={typed ?? toRanges(nrs)} placeholder="atoms, e.g. 5-30:5, 47" aria-label={group.name + ' atoms'} aria-invalid={!!typedError}
-        onChange={e => setTyped(e.target.value)} onBlur={commitTyped} onKeyDown={e => { if (e.key === 'Enter') commitTyped(); if (e.key === 'Escape') setTyped(null) }} />
+        onChange={e => setTyped(e.target.value)} onBlur={commitTyped} onKeyDown={e => { if (pressed(e, 'enter')) commitTyped(); if (pressed(e, 'escape')) setTyped(null) }} />
       {typedError && <Status level="error">{typedError}</Status>}
       {beyond.length > 0 && <Status level="error">atoms {toRanges(beyond)} are beyond the structure's {atoms.length}</Status>}
       {rule ? <RuleForm atoms={atoms} index={index} onStep={(s, keep) => { steps([...group.steps, s]); setRule(!!keep) }} /> : <Button variant="ghost" size="sm" className="self-start" onClick={() => setRule(true)}>+ rule</Button>}
@@ -175,6 +176,7 @@ function GroupCard({ group, atoms, index, nrs, others, current, onCurrent, onCha
 }
 
 export function Groups({ draft, setDraft }: { draft: Draft; setDraft: React.Dispatch<React.SetStateAction<Draft>> }) {
+  const [bindings] = useBindings()
   const structure = useStructure(draft.inputs.structure?.path)
   const indexGroups = useIndex(draft.inputs.index?.path)
   const index = React.useMemo(() => ({ file: draft.inputs.index?.path.split('/').pop() || '', groups: indexGroups }), [draft.inputs.index, indexGroups])
@@ -218,7 +220,7 @@ export function Groups({ draft, setDraft }: { draft: Draft; setDraft: React.Disp
           <span className="whitespace-nowrap">click an atom: in or out of <b className={draft.groups[current] ? groupText(draft.groups[current]) : undefined}>{draft.groups[current]?.name}</b></span>
           <span className="whitespace-nowrap"><Kbd>shift</Kbd> click: its residue</span>
           <span className="whitespace-nowrap"><Kbd>{altName(browserPlatform())}</Kbd> click: its atom name in every residue of that name</span>
-          <span className="whitespace-nowrap"><Kbd>C</Kbd> click: rotate around its group (or the atom, in none)</span>
+          <span className="whitespace-nowrap"><Kbd>{keyLabel(bindings.centre)}</Kbd> click: rotate around its group (or the atom, in none)</span>
           <span className="whitespace-nowrap">right-drag or <Kbd>space</Kbd> drag: pan</span>
         </p>
       </div>

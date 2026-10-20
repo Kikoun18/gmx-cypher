@@ -19,7 +19,9 @@ import type { Job } from '../jobs'
 import { Status } from '../ui/status'
 import { cn } from '../lib/utils'
 import type { Analysis, Curve, Marks, Mol, Palette, Rep, Struct, Tone } from '../core/kit'
-import type { Style } from '../core/contract'
+import type { KeyAction, Style } from '../core/contract'
+import { isKey, keyLabel, pressed, useBindings } from '../lib/shortcuts'
+import { modName } from '../lib/platform'
 import { DisplayMenu, DisplayRow, StyleRow } from '../ui/display-menu'
 import { ResultPage } from '../ui/result-page'
 import { ChartPanel, ExportMenu, Swatch, type ChartExport } from '../core/Chart'
@@ -168,7 +170,7 @@ export function AnalysisCard({ members, on, tone, mol, pal, view, selected, tone
           <div className="flex min-w-0 flex-col gap-2">
             <div className="flex items-center justify-end gap-1">{marks}{curves.length > 0 && <ExportMenu exp={exp} curves={curvesIn} xlabel={a.xlabel} ylabel={a.ylabel} marks={view.marks} xDigits={3} />}</div>
             <ChartPanel className="h-[300px] flex-none" curves={curves} grid={a.x} xlabel={a.xlabel} ylabel={a.ylabel} pal={pal} marks={view.marks} xDigits={3}
-              empty={curves.length ? null : { title: 'Pick an atom group', hint: 'Click atoms in the structure or a chip below. ⌘-click adds more groups to the plot.' }} />
+              empty={curves.length ? null : { title: 'Pick an atom group', hint: 'Click atoms in the structure or a chip below. ' + modName() + '-click adds more groups to the plot.' }} />
             <CurveTable curves={curves} source={many} onRemove={n => onSelect(selected.filter(x => x !== n))} onHover={c => { setHot(c?.key ?? null); setHover(c?.name ?? null) }} />
           </div>
         </div>}
@@ -193,7 +195,7 @@ function CompareView({ shown, focus, setFocus, mols, pal, view, patch, selected,
   display: React.ReactNode; marks: React.ReactNode
 }) {
   const [hover, setHover] = React.useState<string | null>(null), [hot, setHot] = React.useState<string | null>(null)
-  const ref = React.useRef<StructureHandle | null>(null)
+  const ref = React.useRef<StructureHandle | null>(null), [bindings] = useBindings()
   const plotted = React.useMemo(() => [focus, ...shown.filter(a => a !== focus)], [focus, shown])
   const curves: Curve[] = React.useMemo(() => kit.buildCurves({ focus, plotted, selected, colorBy: view.colorBy, pal, tones })
     .map(c => ({ ...c, hot: c.key === hot, dim: hot ? c.key !== hot : !!hover && c.name !== hover && selected.includes(hover) })), [focus, plotted, selected, view.colorBy, pal, tones, hover, hot])
@@ -218,7 +220,7 @@ function CompareView({ shown, focus, setFocus, mols, pal, view, patch, selected,
             <SelectContent>{shown.map(a => <SelectItem key={a.id} value={a.id}>{a.label}</SelectItem>)}</SelectContent>
           </Select>
           {shown.length > 1 && <Button variant="ghost" size="icon-sm" aria-label="next job" onClick={() => step(1)}><ChevronRight /></Button>}
-          <span className="text-caption text-muted-foreground">{shown.length > 1 ? (i + 1) + '/' + shown.length + ' · [ ] step' : ''}</span>
+          <span className="text-caption text-muted-foreground">{shown.length > 1 ? (i + 1) + '/' + shown.length + ' · ' + keyLabel(bindings.prev) + ' ' + keyLabel(bindings.next) + ' step' : ''}</span>
           {display}
           <span className="flex-1" />
           {mols.get(focus.struct ?? '') && <><Button variant="outline" size="sm" onClick={() => ref.current?.fit()}>fit selection</Button><Button variant="ghost" size="sm" onClick={() => ref.current?.reset()}>reset view</Button><Button variant="ghost" size="sm" onClick={() => void savePng(ref.current, focus.label)} title="the structure as drawn now, as a PNG">png</Button></>}
@@ -276,7 +278,7 @@ function RunsTab({ allow, row }: { allow: string[]; row: (ref: SourceRef, title:
   return (
     <div className="flex flex-col gap-2">
       <div className="flex gap-2">
-        <Input size="sm" aria-label="folder to look in" value={root} onChange={e => setRoot(e.target.value)} onKeyDown={e => e.key === 'Enter' && root.trim() && find()} />
+        <Input size="sm" aria-label="folder to look in" value={root} onChange={e => setRoot(e.target.value)} onKeyDown={e => pressed(e, 'enter') && root.trim() && find()} />
         <Button variant="outline" size="sm" className="h-8" onClick={find} disabled={!root.trim() || busy}>{busy ? 'looking…' : 'find'}</Button>
       </div>
       <p className="m-0 text-caption text-muted-foreground">every RDF record (.run.json) under this folder, newest first, with the structure each ran on</p>
@@ -453,7 +455,7 @@ function ExportDialog({ open, onOpenChange, analyses, structs, view, theme, tone
           </div>
           <Field>
             <Label htmlFor="export-name">file name</Label>
-            <Input id="export-name" size="sm" value={name} onChange={e => setName(e.target.value)} onKeyDown={e => e.key === 'Enter' && go()} />
+            <Input id="export-name" size="sm" value={name} onChange={e => setName(e.target.value)} onKeyDown={e => pressed(e, 'enter') && go()} />
             <FieldHint>{data ? '≈ ' + (size / 1024 > 1024 ? (size / 1048576).toFixed(1) + ' MB' : Math.round(size / 1024) + ' kB') + ' · mononoki and the data inside · opens in ' + theme + ', with a light/dark switch' : 'pick a job to export'}</FieldHint>
           </Field>
         </DialogBody>
@@ -531,12 +533,18 @@ export function Decypher({ sources, files, onFiles, onClearFiles, jobs, jobsLoad
     patch(v => ({ focus: id, selected: v.selected[id] || !names.length ? v.selected : { ...v.selected, [id]: names } }))
   }
 
+  // Compare's keys (R8b), from the registry: on the structure last pointed at, and the one graph's lead.
+  const [bindings] = useBindings()
   const onKey = (e: React.KeyboardEvent) => {
-    if (e.metaKey || e.ctrlKey || e.altKey || /INPUT|TEXTAREA|SELECT/.test((e.target as HTMLElement).tagName) || (e.target as HTMLElement).closest('[role=listbox],[data-decypher-export]')) return
-    const h = active.current ? handles.current.get(active.current) : null
-    if (e.key === 'f' || e.key === 'F') h?.fit()
-    else if (e.key === 'r' || e.key === 'R') h?.reset()
-    else if (view.mode === 'one' && focus && shown.length > 1 && (e.key === '[' || e.key === ']')) setFocus(shown[(shown.indexOf(focus) + (e.key === ']' ? 1 : -1) + shown.length) % shown.length].id)
+    if ((e.target as HTMLElement).closest('[role=listbox],[data-decypher-export]')) return
+    const h = active.current ? handles.current.get(active.current) : null, is = (a: KeyAction) => isKey(bindings, a, e), step = is('next') ? 1 : is('prev') ? -1 : 0
+    if (is('fit')) h?.fit()
+    else if (is('reset')) h?.reset()
+    else if (is('hydrogens')) patch({ hydrogens: !view.hydrogens })
+    else if (is('labels')) patch({ labels: !view.labels })
+    else if (step && view.mode === 'one' && focus && shown.length > 1) setFocus(shown[(shown.indexOf(focus) + step + shown.length) % shown.length].id)
+    else return
+    e.preventDefault()
   }
   // How structures are drawn, the same on every 3D view (R9b): the one style menu, the rest, the layout, labels and hydrogens.
   const toggles = <T extends string>(label: string, value: T, options: readonly T[], onChange: (v: T) => void) => (
@@ -588,7 +596,7 @@ export function Decypher({ sources, files, onFiles, onClearFiles, jobs, jobsLoad
               <div className="mx-auto mt-10 flex max-w-[620px] flex-col gap-4 rounded-2xl border-2 border-dashed border-input bg-card p-10">
                 <span className="text-display font-bold">Nothing to decipher yet</span>
                 <span className="max-w-[62ch] text-prose text-muted-foreground">Tick RDF jobs in the jobs list, or add the RDFs of the Matrix vault (each with its row's structure), records on disk, or files dropped anywhere on the page. Several at once are shown side by side, or compared on one graph.</span>
-                <span className="text-caption text-muted-foreground">{keyName ? keyName + ' opens compare and goes back · ' : ''}change the key in settings · F fits the plotted groups · R resets the view</span>
+                <span className="text-caption text-muted-foreground">{keyName ? keyName + ' opens compare and goes back · ' : ''}{keyLabel(bindings.fit)} fits the plotted groups · {keyLabel(bindings.reset)} resets the view · {keyLabel(bindings.sheet)} lists every key</span>
               </div>
             ) : !shown.length ? (
               <p className="m-0 text-control text-muted-foreground">{ready.length ? 'every RDF is hidden · tick one on the left' : 'reading…'}</p>

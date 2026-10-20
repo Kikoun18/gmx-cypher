@@ -7,6 +7,7 @@ import { Checkbox } from '../ui/checkbox'
 import { Input } from '../ui/input'
 import { Field, FieldHint, Label } from '../ui/label'
 import { Section } from '../ui/separator'
+import { pressed } from '../lib/shortcuts'
 import { ToggleGroup, ToggleGroupItem } from '../ui/toggle-group'
 import { postJson, type GmxState } from '../api'
 import type { Draft } from '../draft'
@@ -86,12 +87,12 @@ export function Wham({ gmx, draft, setDraft, onStarted }: { gmx: GmxState; draft
         <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-4">
           <Field>
             <Label htmlFor="wham-root">folder</Label>
-            <Input id="wham-root" size="sm" value={root} placeholder="the folder that holds the window folders" onChange={e => setRoot(e.target.value)} onKeyDown={e => e.key === 'Enter' && root && find()} />
+            <Input id="wham-root" size="sm" value={root} placeholder="the folder that holds the window folders" onChange={e => setRoot(e.target.value)} onKeyDown={e => pressed(e, 'enter') && root && find()} />
             <FieldHint>inside the allowed folders</FieldHint>
           </Field>
           <Field>
             <Label htmlFor="wham-glob">each window's run input</Label>
-            <Input id="wham-glob" size="sm" value={glob} onChange={e => setGlob(e.target.value)} onKeyDown={e => e.key === 'Enter' && root && find()} />
+            <Input id="wham-glob" size="sm" value={glob} onChange={e => setGlob(e.target.value)} onKeyDown={e => pressed(e, 'enter') && root && find()} />
             <FieldHint>* matches within one name</FieldHint>
           </Field>
         </div>

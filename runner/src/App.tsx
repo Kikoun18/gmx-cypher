@@ -22,6 +22,8 @@ import type { LoadedFile } from './decypher/parse'
 import { keyLabel, matches, typing, useBindings } from './lib/shortcuts'
 import { formatRoute, parseRoute, type Route } from './lib/route'
 import { dropEntries, dropSummary, routeDrop } from './lib/drop'
+import { exportFocused } from './core/Chart'
+import { ShortcutSheet } from './ui/shortcut-sheet'
 
 // (de)Cypher is loaded the first time compare opens, as 3Dmol is: the page starts without it.
 const Decypher = React.lazy(() => import('./decypher/Decypher').then(m => ({ default: m.Decypher })))
@@ -91,16 +93,20 @@ export function App() {
   const [files, setFiles] = React.useState<LoadedFile[]>([]), [uploads, setUploads] = React.useState<File[]>([])
   const addFiles = (f: LoadedFile[]) => f.length && setFiles(old => [...old.filter(o => !f.some(n => n.path === o.path)), ...f])
   const [bindings] = useBindings()
-  // The compare key opens compare with the jobs selected, and goes back to the result from it.
+  const [sheet, setSheet] = React.useState(false)
+  // The keys that work anywhere (R8b): compare (and back from it), export the focused chart, the list of keys.
   React.useEffect(() => {
     const on = (e: KeyboardEvent) => {
-      if (e.repeat || typing(e.target) || !matches(bindings.decypher, e)) return
+      if (e.repeat || typing(e.target)) return
       // A list or menu that is open, or a select that has the focus, types its own letters.
       if ((e.target as HTMLElement | null)?.closest?.('[role=listbox],[role=menu],[role=combobox]')) return
       // Not over a dialog (settings, send…): the key belongs to it.
       if (inDialog()) return
+      if (matches(bindings.compare, e)) go(route.view === 'compare' ? { view: 'results', job: route.jobs[0] ?? null } : { view: 'compare', jobs: selection })
+      else if (matches(bindings.export, e)) { if (!exportFocused()) toast(keyLabel(bindings.export) + ' exports the chart you hover or focus: none is') }
+      else if (matches(bindings.sheet, e)) setSheet(true)
+      else return
       e.preventDefault()
-      go(route.view === 'compare' ? { view: 'results', job: route.jobs[0] ?? null } : { view: 'compare', jobs: selection })
     }
     window.addEventListener('keydown', on)
     return () => window.removeEventListener('keydown', on)
@@ -161,17 +167,18 @@ export function App() {
         )}
         <TabsContent value="setup">{state && route.view === 'setup' && <Setup route={route} go={go} state={state} draft={draft} setDraft={setDraft} jobs={jobs.jobs} uploads={uploads} onUploaded={() => setUploads([])} onSettings={() => setSettings(true)} onOpenJob={openJob} />}</TabsContent>
         <TabsContent value="results">{(route.view === 'results' || route.view === 'compare') && (
-          <JobsView {...jobs} route={route} go={go} vault={state?.config.vault ?? null} allow={state?.config.allow ?? []} keyName={bindings.decypher ? keyLabel(bindings.decypher) : null}
+          <JobsView {...jobs} route={route} go={go} vault={state?.config.vault ?? null} allow={state?.config.allow ?? []} keyName={bindings.compare ? keyLabel(bindings.compare) : null}
             onRunAgain={r => { setDraft(d => ({ ...withCommand(d, r.analysis ?? 'rdf'), ...recipeFromRecord(r) })); go({ view: 'setup', step: 'command', batch: false }) }}
             compare={<React.Suspense fallback={<p className="m-0 text-control text-muted-foreground" aria-live="polite">opening compare…</p>}>
               <Decypher sources={sources} files={files} onFiles={addFiles} onClearFiles={() => setFiles([])} jobs={jobs.jobs} jobsLoaded={jobs.loaded} allow={state?.config.allow ?? []} vaultPath={state?.config.vault ?? null} version={state?.version ?? ''}
-                keyName={bindings.decypher ? keyLabel(bindings.decypher) : null} />
+                keyName={bindings.compare ? keyLabel(bindings.compare) : null} />
             </React.Suspense>} />
         )}</TabsContent>
         <TabsContent value="cluster"><ClusterView /></TabsContent>
       </main>
       </Tabs>
       <Toaster />
+      <ShortcutSheet open={sheet} onOpenChange={setSheet} bindings={bindings} />
       {state && <Settings state={state} open={settings} onOpenChange={setSettings} onState={setState} returnFocus={settingsButton} />}
       {dragging && (
         <div className="pointer-events-none fixed inset-3 z-50 flex flex-col items-center justify-center gap-1.5 rounded-2xl border-2 border-dashed border-ring bg-secondary/90">

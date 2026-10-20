@@ -38,6 +38,16 @@ export interface ChartOptions {
   xDigits?: number
 }
 
+/** The export key's charts (R8b): each export menu by its trigger, and the chart under the pointer. */
+const menus = new Map<HTMLElement, () => void>()
+let pointed: HTMLElement | null = null
+/** The export key: the focused chart, else the one under the pointer, in the default format; false when there is none. */
+export function exportFocused(): boolean {
+  let el = (document.activeElement as HTMLElement | null)?.closest<HTMLElement>('[data-slot=chart]') ?? pointed
+  for (; el; el = el.parentElement) for (const [t, go] of menus) if (el.contains(t)) { go(); return true }
+  return false
+}
+
 /**
  * The chart, filling its box (or `height` tall); under the pointer, a rule, a dot on each curve and their values. The
  * gestures are the Matrix's (R8a): a click marks the nearest point (again: unmarks it), ⌘/Ctrl-click draws a vertical
@@ -107,7 +117,7 @@ export function ChartPanel({ curves, grid, xlabel, ylabel, pal, marks, y, rule, 
   return (
     <div ref={box} data-slot="chart" className={cn('relative outline-offset-2', height ? null : 'min-h-[260px]', className)} style={height ? { height } : undefined}
       tabIndex={curves.length ? 0 : undefined} role={curves.length ? 'group' : undefined} aria-label={curves.length ? ylabel + ' against ' + xlabel + ': hover or use the arrow keys to read values; click marks a point' : undefined}
-      onClick={onClick} onKeyDown={onKey} onBlur={() => { setHover(null); setNear(null) }}
+      onClick={onClick} onKeyDown={onKey} onBlur={() => { setHover(null); setNear(null) }} onMouseEnter={e => { pointed = e.currentTarget }}
       onMouseMove={e => {
         if (!geom) return
         const box = e.currentTarget.getBoundingClientRect(), r = kit.hoverX(geom, e.clientX - box.left), py = e.clientY - box.top
@@ -117,7 +127,7 @@ export function ChartPanel({ curves, grid, xlabel, ylabel, pal, marks, y, rule, 
         if (r != null) for (const c of curves) { const at = geom.m.t + geom.ih - ((kit.valAt(c.x, c.y, r) - geom.y0) / (geom.y1 - geom.y0 || 1)) * geom.ih; if (Math.abs(at - py) < d) { d = Math.abs(at - py); best = c.key } }
         if (best !== near) setNear(best)
       }}
-      onMouseLeave={() => { setHover(null); setNear(null) }}>
+      onMouseLeave={e => { setHover(null); setNear(null); if (pointed === e.currentTarget) pointed = null }}>
       <div className="absolute inset-0">{out && toReact(out.tree, 0)}</div>
       {geom && (shownPins.length > 0 || lines.length > 0) && (
         <svg className="pointer-events-none absolute inset-0 size-full overflow-visible" aria-hidden>
@@ -175,6 +185,9 @@ export function ExportMenu({ exp, curves, xlabel, ylabel, marks, className, ...o
   exp: ChartExport; curves: (pal: Palette) => Curve[]; xlabel: string; ylabel: string; marks: Marks; className?: string
 }) {
   const [busy, setBusy] = React.useState(false), [prefs] = useExportPrefs(), hints = formatHints(prefs, '')
+  const trigger = React.useRef<HTMLButtonElement>(null)
+  // The export key exports this chart in the default format while it is focused or under the pointer (R8b).
+  React.useEffect(() => { const t = trigger.current; if (!t) return; menus.set(t, () => void go(prefs.format)); return () => { menus.delete(t) } })
   const go = async (f: string) => {
     setBusy(true)
     try {
@@ -189,7 +202,7 @@ export function ExportMenu({ exp, curves, xlabel, ylabel, marks, className, ...o
   }
   return (
     <Select value="" onValueChange={v => void go(v)}>
-      <SelectTrigger size="sm" className={cn('h-7 gap-1.5 border-transparent bg-transparent px-2 text-muted-foreground hover:text-foreground', className)} aria-label={'export ' + exp.title} disabled={busy}>
+      <SelectTrigger ref={trigger} size="sm" className={cn('h-7 gap-1.5 border-transparent bg-transparent px-2 text-muted-foreground hover:text-foreground', className)} aria-label={'export ' + exp.title} disabled={busy}>
         <Download className="size-3.5" />{busy ? 'exporting…' : 'export'}
       </SelectTrigger>
       <SelectContent align="end">
