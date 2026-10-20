@@ -136,7 +136,8 @@ greys out the one your gmx doesn't have, with the reason. Times are in ps and fi
 - **`gmx mindist`**: the minimum distance from the reference to each group; the contacts within `-d` when asked (kept
   here). Vault: typed Distance.
 - **`gmx density`**: the density of each group along one box axis (`-d` X, Y or Z), in slices (`-sl`); by mass,
-  number or charge, or electron density once an electrons file (`-ei`, its whole path) is given. `-center` bins around
+  number or charge, or electron density once an electrons file (`-ei`, inside the allowed folders; recorded with its
+  SHA-256) is given. `-center` bins around
   the first group's centre each frame (a bilayer stays put while the box breathes); `-symm` symmetrises the profile.
   One curve per group, the units as gmx writes them. Vault: typed Density (every curve).
 - **`gmx order`**: S_CD per carbon of a lipid tail. The groups are the carbons in tail order, one per carbon (at least
@@ -176,7 +177,9 @@ structure) and *files* (dropped or picked, never kept).
   for a horizontal one (as in the Matrix); each with a note; carried into every export and the CSV.
 - **Saved views**: *views* saves what compare shows (its sources, how it shows them, the labels and marks) by name,
   with the connected project, in the vault's gmx-cypher folder; *open* brings one back. A name is used once: nothing is
-  replaced. Without a connected project the working state stays in this browser only.
+  replaced. A view keeps only its sources' state, each record by its path relative to its allowed folder; two records
+  that would be saved under one path are refused, in words. Without a connected project the working state stays in this
+  browser only.
 - **A vault RDF** gets its groups' atoms from the job that wrote it: one of this gmx-cypher's, found by the file's
   SHA-256, else the record copy the sending gmx-cypher kept in the vault (*groups from … (its record in the vault)*).
 
@@ -253,8 +256,9 @@ the job is backed up by GROMACS and named in the record.
 `<vault>/gmx-cypher/` is gmx-cypher's own folder in your vault, at its top, outside every project folder: the Matrix
 reads only project folders and `.matrix/`, so it never sees it (proved with the Matrix's own code in the tests). It
 holds `space.json` (what wrote it), a `README.md`, a **record copy** for each result sent (named by the sent file's
-SHA-256, its paths relative to their allowed folder and its environment's names only, since a vault may be shared or
-put in Git), and the **saved compare views** of each project. Every file there is created once and never changed or
+SHA-256; every path it names, the gmx, the command's arguments and option values included, relative to its allowed
+folder or `~`, and its environment's names only, since a vault may be shared or put in Git), and the **saved compare
+views** of each project. A send whose copy can't be kept still lands, and says why there is no copy. Every file there is created once and never changed or
 deleted; a folder of that name that isn't gmx-cypher's (no `space.json`) is refused, in words.
 
 With a project's `_inbox/`, that is all gmx-cypher ever writes in a vault. It never writes in `.matrix/` or anywhere
