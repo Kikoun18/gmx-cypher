@@ -30,6 +30,12 @@ async function madeVault() {
   svc.commit(s.store, new Map([...a.uploads, ...r.uploads, ...s.uploads]))
   await svc.flush()
   await vault.close()
+  // The Matrix may still be writing its PMF cache (a .tmp- file, then renamed): the vault is made once it holds still.
+  for (let i = 0, last = ''; i < 40; i++) {
+    const now = listing(dir).join('\n')
+    if (now === last && !now.includes('.tmp-')) break
+    last = now; await new Promise(ok => setTimeout(ok, 50))
+  }
   return dir
 }
 
