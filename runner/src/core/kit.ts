@@ -5,7 +5,8 @@
 // beside it. Ported from the RDF Explorer design (v3): rdf-lib.js's structure builder, its canvas drawing and its chart.
 
 export type Tone = 'coral' | 'sky' | 'mint' | 'butter' | 'lilac' | 'aqua' | 'rose' | 'stone'
-export type Rep = 'ball & stick' | 'licorice' | 'spacefill'
+/** The styles this renderer draws, by the one set of names (question 17); lines and cartoon it does not. */
+export type Rep = 'ball & stick' | 'sticks' | 'spheres'
 export type Rest = 'tinted' | 'grey' | 'ghost'
 export type Arrange = 'side by side' | 'frame positions'
 export type ColorBy = 'group' | 'job'
@@ -118,17 +119,17 @@ export interface KitData { tones: readonly Tone[]; dash: readonly string[]; dash
 
 export function decypherKit(data: KitData) {
   const { tones: TONES, dash: DASH, dashNames: DASH_NAMES } = data
-  const REPS: Rep[] = ['ball & stick', 'licorice', 'spacefill']
+  const REPS: Rep[] = ['ball & stick', 'sticks', 'spheres']
   const RESTS: Rest[] = ['tinted', 'grey', 'ghost']
   /** Water and ions: never drawn, so the view shows the molecules the groups are about. */
   const SOLV = new Set(['SOL', 'WAT', 'HOH', 'TIP3', 'TIP3P', 'TIP4', 'TIP4P', 'TIP5P', 'SPC', 'SPCE', 'T3P', 'T4P', 'NA', 'CL', 'K', 'NA+', 'CL-', 'SOD', 'CLA', 'POT', 'ION', 'NIO', 'CIO'])
   const COV: Record<string, number> = { H: 0.031, C: 0.076, N: 0.071, O: 0.066, S: 0.105, P: 0.107, X: 0.08 }
   const RADS: Record<Rep, Record<string, number>> = {
     'ball & stick': { H: 0.028, C: 0.042, N: 0.042, O: 0.042, S: 0.056, P: 0.052, X: 0.045 },
-    licorice: { H: 0.02, C: 0.024, N: 0.024, O: 0.024, S: 0.028, P: 0.028, X: 0.024 },
-    spacefill: { H: 0.09, C: 0.136, N: 0.124, O: 0.122, S: 0.144, P: 0.144, X: 0.13 },
+    sticks: { H: 0.02, C: 0.024, N: 0.024, O: 0.024, S: 0.028, P: 0.028, X: 0.024 },
+    spheres: { H: 0.09, C: 0.136, N: 0.124, O: 0.122, S: 0.144, P: 0.144, X: 0.13 },
   }
-  const BONDW: Record<Rep, number> = { 'ball & stick': 0.016, licorice: 0.044, spacefill: 0 }
+  const BONDW: Record<Rep, number> = { 'ball & stick': 0.016, sticks: 0.044, spheres: 0 }
   const MAX_ATOMS = 4000
   /** The highlight's opacity on an atom, per theme (the colours are tokens: the role layer's atom-*, bond and edge). */
   const HL = { light: 0.45, dark: 0.26 }
@@ -449,7 +450,7 @@ export function decypherKit(data: KitData) {
         if (e === 'H' && !st.hydrogens && !sel && !prev && !isRef) { vis[k] = 0; hitR[k] = 0; continue }
         vis[k] = 1; let rs = 1
         if (isRef) { kind[k] = 3; fill[k] = refOff(mb.refOwner[k]) ? mix(th.fg, th.card, 0.78) : rk === 2 ? mix(th.fg, th.card, 0.3) : th.fg; rim[k] = th.bg; lw[k] = 1; rs = 1.06; bcol[k] = th.bond }
-        else if (sel) { const t = T[sels[si].tone]; kind[k] = 2; fill[k] = t.base; rim[k] = t.strong; lw[k] = 2; rs = rep === 'spacefill' ? 1.03 : 1.25; bcol[k] = t.strong }
+        else if (sel) { const t = T[sels[si].tone]; kind[k] = 2; fill[k] = t.base; rim[k] = t.strong; lw[k] = 2; rs = rep === 'spheres' ? 1.03 : 1.25; bcol[k] = t.strong }
         else if (prev) { const t = T[sels[si].tone]; kind[k] = 4; fill[k] = t.soft; rim[k] = t.strong; lw[k] = 1.6; rs = 1.12; bcol[k] = t.strong }
         else if (si >= 0 && rest === 'tinted') { const t = T[sels[si].tone]; kind[k] = 1; fill[k] = t.soft; rim[k] = t.strong; lw[k] = 1.1; bcol[k] = th.bond }
         else { kind[k] = 0; fill[k] = th.neutral[e]; rim[k] = mix(fill[k], th.edge, 0.45); lw[k] = 1; bcol[k] = th.bond; if (rest === 'ghost') rs = 0.7 }
@@ -470,10 +471,10 @@ export function decypherKit(data: KitData) {
           const mx = (P[4 * i] + P[4 * j]) / 2, my = (P[4 * i + 1] + P[4 * j + 1]) / 2, f = (P[4 * i + 3] + P[4 * j + 3]) / 2
           for (const k of [i, j]) {
             let wd = BW * s * f
-            if (kind[k] === 2) wd *= rep === 'licorice' ? 1.25 : 1.6
+            if (kind[k] === 2) wd *= rep === 'sticks' ? 1.25 : 1.6
             if (ghost(k)) wd *= 0.6
             ctx.globalAlpha = ghost(k) ? 0.45 : 1
-            ctx.strokeStyle = mix(rep === 'licorice' ? fill[k] : bcol[k], BG, blend(k, fog))
+            ctx.strokeStyle = mix(rep === 'sticks' ? fill[k] : bcol[k], BG, blend(k, fog))
             ctx.lineWidth = Math.max(1, wd)
             ctx.beginPath(); ctx.moveTo(P[4 * k], P[4 * k + 1]); ctx.lineTo(mx, my); ctx.stroke()
           }
@@ -483,14 +484,14 @@ export function decypherKit(data: KitData) {
         const k = id, x = P[4 * k], y = P[4 * k + 1], r = hitR[k], kd = kind[k], bl = blend(k, fog)
         ctx.globalAlpha = ghost(k) ? 0.45 : 1
         if (kd === 2) {
-          const hr = r * (rep === 'spacefill' ? 1.45 : 2.2)
+          const hr = r * (rep === 'spheres' ? 1.45 : 2.2)
           const g = ctx.createRadialGradient(x, y, r * 0.8, x, y, hr)
           g.addColorStop(0, rgba(rim[k], 0.5 * (1 - fog))); g.addColorStop(1, rgba(rim[k], 0))
           ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, hr, 0, TAU); ctx.fill()
         }
         ctx.beginPath(); ctx.arc(x, y, r, 0, TAU)
         ctx.fillStyle = mix(fill[k], BG, bl); ctx.fill()
-        if (rep !== 'licorice' || kd >= 2) { ctx.lineWidth = lw[k]; ctx.strokeStyle = mix(rim[k], BG, bl); ctx.stroke() }
+        if (rep !== 'sticks' || kd >= 2) { ctx.lineWidth = lw[k]; ctx.strokeStyle = mix(rim[k], BG, bl); ctx.stroke() }
         if (r > 3 && !ghost(k)) { ctx.beginPath(); ctx.arc(x - r * 0.32, y - r * 0.34, r * 0.3, 0, TAU); ctx.fillStyle = 'rgba(255,255,255,' + th.hl * (1 - bl) + ')'; ctx.fill() }
         if (kd === 3) { const off = refOff(mb.refOwner[k]); if (mb.ref[k] === 2 || off) ctx.setLineDash([3, 2]); ctx.beginPath(); ctx.arc(x, y, r + 2.4, 0, TAU); ctx.lineWidth = 1.2; ctx.strokeStyle = mix(th.fg, BG, off ? 0.55 : fog * 0.5); ctx.stroke(); ctx.setLineDash([]) }
         const ringed = k === hoverAtom || (kd === 3 && hovRef >= 0 && mb.refOwner[k] === hovRef) || (kd === 2 && mb.groupOf[k] === hovSi)

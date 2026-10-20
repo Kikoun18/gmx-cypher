@@ -18,7 +18,10 @@ import { getJson, postJson } from '../api'
 import type { Job } from '../jobs'
 import { Status } from '../ui/status'
 import { cn } from '../lib/utils'
-import type { Analysis, Curve, Mol, Palette, Struct, Tone } from '../core/kit'
+import type { Analysis, Curve, Marks, Mol, Palette, Rep, Struct, Tone } from '../core/kit'
+import type { Style } from '../core/contract'
+import { DisplayMenu, DisplayRow, StyleRow } from '../ui/display-menu'
+import { ResultPage } from '../ui/result-page'
 import { ChartPanel, ExportMenu, Swatch, type ChartExport } from '../core/Chart'
 import { curvesCsv } from '../lib/csv'
 import { download as downloadBlob, renderBatch } from '../../../matrix/src/lib/export'
@@ -37,6 +40,19 @@ const pad = (n: number) => String(n).padStart(2, '0')
 const plural = (n: number, one: string, many = one + 's') => n + ' ' + (n === 1 ? one : many)
 const WANTED = /\.(gro|pdb|ndx|xvg|json)$/i
 const NO_MORPHS: ActiveMorph[] = []
+/** What compare's renderer can't draw of the one set of styles, and why (question 17). */
+export const CANNOT: Partial<Record<Style, string>> = { lines: 'compare draws every atom, so no bonds alone', cartoon: 'compare reads no secondary structure, so no ribbon' }
+const MARKS: readonly Marks[] = ['both', 'maximum', 'first shell', 'none']
+
+/** The peak marks a chart draws (R3d), in the chart's header (R9b): the maximum filled, the first shell hollow. */
+function MarksSelect({ value, onChange }: { value: Marks; onChange: (m: Marks) => void }) {
+  return (
+    <Select value={value} onValueChange={v => onChange(v as Marks)}>
+      <SelectTrigger size="sm" className="h-7 gap-1.5 border-transparent bg-transparent px-2" aria-label="marks" title="● maximum · ○ first shell"><span className="text-muted-foreground">marks</span><SelectValue /></SelectTrigger>
+      <SelectContent>{MARKS.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent>
+    </Select>
+  )
+}
 
 /** A toggle chip: an ink fill when on (UI state, T159), its state also in weight and in aria-pressed. */
 function Chip({ on, onClick, children, title }: { on: boolean; onClick: () => void; children: React.ReactNode; title?: string }) {
@@ -79,6 +95,8 @@ interface CardProps {
   candidates: { a: Analysis; why: string | null }[]
   onMorph: (id: string) => void; onSplit: () => void; onRefs: (on: string[]) => void
   onSelect: (names: string[]) => void; handle: (h: StructureHandle | null) => void; onActive: () => void
+  /** The 3D view's display menu and the chart's marks, the same on every card (R9b). */
+  display: React.ReactNode; marks: React.ReactNode
 }
 
 /** A structure view's picture as a PNG file (R6a). */
@@ -88,7 +106,7 @@ async function savePng(h: StructureHandle | null, label: string) {
 }
 
 /** One analysis: its structure beside its g(r), its groups as chips, its curves with their highest points. Morphed: one card for RDFs that differ only in their reference, which one picks, atom or chip, one, the other or both. */
-function AnalysisCard({ members, on, tone, mol, pal, view, selected, tones, candidates, onMorph, onSplit, onRefs, onSelect, handle, onActive }: CardProps) {
+export function AnalysisCard({ members, on, tone, mol, pal, view, selected, tones, candidates, onMorph, onSplit, onRefs, onSelect, handle, onActive, display, marks }: CardProps) {
   const a = members[0], many = members.length > 1
   const [hover, setHover] = React.useState<string | null>(null), [hot, setHot] = React.useState<string | null>(null)
   const ref = React.useRef<StructureHandle | null>(null)
@@ -112,56 +130,66 @@ function AnalysisCard({ members, on, tone, mol, pal, view, selected, tones, cand
   // The chart's export (R6a): the curves in the export theme's palette; its CSV, each curve named with its source.
   const curvesIn = (p: Palette) => kit.buildCurves({ focus: a, plotted: members, selected, colorBy: 'group', pal: p, tones }).filter(c => on.includes(c.analysis)).map(c => { const m = members.find(x => x.id === c.analysis)!; return { ...c, source: many ? (m.ref ? 'ref ' + names[m.id] : names[m.id]) : '' } })
   const exp: ChartExport = { file: a.label, fields: { command: 'rdf' }, title, csv: () => curvesCsv(curvesIn(pal).map(c => ({ ...c, name: c.source ? c.name + ' · ' + c.source : c.name })), a.xlabel, a.ylabel) }
+  // One result page's order (R9b): its actions, its structure beside its chart, its settings and groups, where it came from.
   return (
-    <section aria-label={title} className="flex flex-col overflow-hidden rounded-xl border border-border bg-card" onMouseEnter={onActive}>
+    <section aria-label={title} className="flex flex-col rounded-xl border border-border bg-card" onMouseEnter={onActive}>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-border px-4 py-2.5">
         <span className="size-2 shrink-0 rounded-full" style={{ background: pal.hues[tone].strong }} />
         <h3 className="m-0 text-heading font-bold">{title}</h3>
-        <span className="text-caption text-muted-foreground">{many ? plural(members.length, 'RDF') + ' · the same groups, one chart' : a.sub}</span>
-        <span className="flex-1" />
-        {candidates.length > 0 && (
-          <Select value="" onValueChange={onMorph}>
-            <SelectTrigger size="sm" className="w-40" aria-label={'morph ' + (many ? title : a.label) + ' with another RDF'} title="show RDFs with the same groups as one card; those that can't are greyed, with the reason"><SelectValue placeholder="morph with…" /></SelectTrigger>
-            <SelectContent>
-              {candidates.map(({ a: p, why }) => (
-                <SelectItem key={p.id} value={p.id} disabled={!!why}>
-                  <span className="flex flex-col"><span>{p.label}{p.ref ? ' · ref ' + p.ref.name : ''}</span>{why && <span className="text-caption text-muted-foreground">{why}</span>}</span>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
-        {many && <Button variant="outline" size="sm" onClick={onSplit} title="show each RDF as its own card again">split</Button>}
-        {!many && <span className="max-w-[36ch] truncate text-caption text-muted-foreground" title={a.structNote}>{a.structNote}</span>}
-        {mol && <><Button variant="outline" size="sm" onClick={() => ref.current?.fit()}>fit selection</Button><Button variant="ghost" size="sm" onClick={() => ref.current?.reset()}>reset view</Button><Button variant="ghost" size="sm" onClick={() => void savePng(ref.current, a.label)} title="the structure as drawn now, as a PNG">png</Button></>}
+        {many && <span className="text-caption text-muted-foreground">{plural(members.length, 'RDF') + ' · the same groups, one chart'}</span>}
       </div>
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,380px),1fr))]">
-        <StructurePanel ref={h => { ref.current = h; handle(h) }} className="min-h-[480px] border-r border-border" mol={mol} pal={pal} view={view} sels={a.sels} selected={idx} refs={refs} hoverSel={hoverSel}
-          onPick={(i, add) => onSelect(pickGroup(selected, a.sels[i].name, add))} onPickRef={pickRef} onActive={onActive}
-          empty={<><span className="text-heading font-bold">No structure</span><span className="max-w-[40ch] text-caption text-muted-foreground">{a.structNote}</span></>} />
-        <div className="flex min-w-0 flex-col gap-3 p-4">
-          <div className="relative">
-            {curves.length > 0 && <ExportMenu className="absolute right-0 top-0 z-[1]" exp={exp} curves={curvesIn} xlabel={a.xlabel} ylabel={a.ylabel} marks={view.marks} xDigits={3} />}
+      <ResultPage className="p-4" summary="Provenance · structure"
+        actions={(candidates.length > 0 || many) && <>
+          {candidates.length > 0 && (
+            <Select value="" onValueChange={onMorph}>
+              <SelectTrigger size="sm" className="w-40" aria-label={'morph ' + (many ? title : a.label) + ' with another RDF'} title="show RDFs with the same groups as one card; those that can't are greyed, with the reason"><SelectValue placeholder="morph with…" /></SelectTrigger>
+              <SelectContent>
+                {candidates.map(({ a: p, why }) => (
+                  <SelectItem key={p.id} value={p.id} disabled={!!why}>
+                    <span className="flex flex-col"><span>{p.label}{p.ref ? ' · ref ' + p.ref.name : ''}</span>{why && <span className="text-caption text-muted-foreground">{why}</span>}</span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          {many && <Button variant="outline" size="sm" onClick={onSplit} title="show each RDF as its own card again">split</Button>}
+        </>}
+        charts={<div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,380px),1fr))] gap-4">
+          <div className="flex min-w-0 flex-col rounded-lg border border-border">
+            <div className="flex flex-wrap items-center gap-2 border-b border-border px-3 py-2">
+              {display}<span className="flex-1" />
+              {mol && <><Button variant="outline" size="sm" onClick={() => ref.current?.fit()}>fit selection</Button><Button variant="ghost" size="sm" onClick={() => ref.current?.reset()}>reset view</Button><Button variant="ghost" size="sm" onClick={() => void savePng(ref.current, a.label)} title="the structure as drawn now, as a PNG">png</Button></>}
+            </div>
+            <StructurePanel ref={h => { ref.current = h; handle(h) }} className="min-h-[420px]" mol={mol} pal={pal} view={view} sels={a.sels} selected={idx} refs={refs} hoverSel={hoverSel}
+              onPick={(i, add) => onSelect(pickGroup(selected, a.sels[i].name, add))} onPickRef={pickRef} onActive={onActive}
+              empty={<><span className="text-heading font-bold">No structure</span><span className="max-w-[40ch] text-caption text-muted-foreground">{a.structNote}</span></>} />
+          </div>
+          <div className="flex min-w-0 flex-col gap-2">
+            <div className="flex items-center justify-end gap-1">{marks}{curves.length > 0 && <ExportMenu exp={exp} curves={curvesIn} xlabel={a.xlabel} ylabel={a.ylabel} marks={view.marks} xDigits={3} />}</div>
             <ChartPanel className="h-[300px] flex-none" curves={curves} grid={a.x} xlabel={a.xlabel} ylabel={a.ylabel} pal={pal} marks={view.marks} xDigits={3}
               empty={curves.length ? null : { title: 'Pick an atom group', hint: 'Click atoms in the structure or a chip below. ⌘-click adds more groups to the plot.' }} />
+            <CurveTable curves={curves} source={many} onRemove={n => onSelect(selected.filter(x => x !== n))} onHover={c => { setHot(c?.key ?? null); setHover(c?.name ?? null) }} />
           </div>
+        </div>}
+        settings={<>
+          {!many && <p className="m-0 text-caption text-muted-foreground">{a.sub}</p>}
           <Section label={'Groups ' + pad(a.sels.length) + ' · plotted ' + pad(idx.length)}>
             <Button variant="ghost" size="sm" onClick={() => onSelect(a.sels.map(g => g.name))}>all</Button>
             <Button variant="ghost" size="sm" onClick={() => onSelect([])}>none</Button>
           </Section>
           <GroupChips refs={chipRefs} sels={a.sels} selected={selected} pal={pal} dim={selected.length > 0 && view.rest !== 'tinted'} hover={hover}
             onPick={(n, add) => onSelect(pickGroup(selected, n, add))} onPickRef={pickChip} onHover={setHover} />
-          <CurveTable curves={curves} source={many} onRemove={n => onSelect(selected.filter(x => x !== n))} onHover={c => { setHot(c?.key ?? null); setHover(c?.name ?? null) }} />
-        </div>
-      </div>
+        </>}
+        provenance={members.map(m => <p key={m.id} className="m-0 text-caption text-muted-foreground">{many ? m.label + ' · ' : ''}{m.structNote}</p>)} />
     </section>
   )
 }
 
 /** Every shown analysis on one graph, led by one whose structure and groups are shown beside it. */
-function CompareView({ shown, focus, setFocus, mols, pal, view, patch, selected, onSelect, tones, handle, onActive }: {
+function CompareView({ shown, focus, setFocus, mols, pal, view, patch, selected, onSelect, tones, handle, onActive, display, marks }: {
   shown: Analysis[]; focus: Analysis; setFocus: (id: string) => void; mols: Map<string, Mol | null>; pal: Palette; view: View; patch: ReturnType<typeof useView>[1]
   selected: string[]; onSelect: (n: string[]) => void; tones: Record<string, Tone>; handle: (h: StructureHandle | null) => void; onActive: () => void
+  display: React.ReactNode; marks: React.ReactNode
 }) {
   const [hover, setHover] = React.useState<string | null>(null), [hot, setHot] = React.useState<string | null>(null)
   const ref = React.useRef<StructureHandle | null>(null)
@@ -179,7 +207,7 @@ function CompareView({ shown, focus, setFocus, mols, pal, view, patch, selected,
   const curvesIn = (p: Palette) => kit.buildCurves({ focus, plotted, selected, colorBy: view.colorBy, pal: p, tones })
   const exp: ChartExport = { file: 'one-graph_' + plotted.length + '-RDFs', fields: { command: 'rdf' }, title: 'One graph · ' + plural(plotted.length, 'RDF'), csv: () => curvesCsv(curvesIn(pal).map(c => ({ ...c, name: c.name + ' · ' + c.source })), focus.xlabel, focus.ylabel) }
   return (
-    <div className="grid min-h-[660px] grid-cols-[repeat(auto-fit,minmax(min(100%,400px),1fr))] gap-4">
+    <div className="grid min-h-[660px] grid-cols-[repeat(auto-fit,minmax(min(100%,460px),1fr))] gap-4">
       <section aria-label="structure" className="flex min-w-0 flex-col rounded-xl border border-border bg-card" onMouseEnter={onActive}>
         <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-2">
           <span className="text-label uppercase text-muted-foreground">Structure of</span>
@@ -190,6 +218,7 @@ function CompareView({ shown, focus, setFocus, mols, pal, view, patch, selected,
           </Select>
           {shown.length > 1 && <Button variant="ghost" size="icon-sm" aria-label="next job" onClick={() => step(1)}><ChevronRight /></Button>}
           <span className="text-caption text-muted-foreground">{shown.length > 1 ? (i + 1) + '/' + shown.length + ' · [ ] step' : ''}</span>
+          {display}
           <span className="flex-1" />
           {mols.get(focus.struct ?? '') && <><Button variant="outline" size="sm" onClick={() => ref.current?.fit()}>fit selection</Button><Button variant="ghost" size="sm" onClick={() => ref.current?.reset()}>reset view</Button><Button variant="ghost" size="sm" onClick={() => void savePng(ref.current, focus.label)} title="the structure as drawn now, as a PNG">png</Button></>}
         </div>
@@ -216,6 +245,7 @@ function CompareView({ shown, focus, setFocus, mols, pal, view, patch, selected,
           ) })}
           <span className="flex-1" />
           <Seg label="color by" value={view.colorBy} options={['group', 'job'] as const} labels={{ job: 'result' }} onChange={v => patch({ colorBy: v })} />
+          {marks}
           {curves.length > 0 && <ExportMenu exp={exp} curves={curvesIn} xlabel={focus.xlabel} ylabel={focus.ylabel} marks={view.marks} xDigits={3} />}
         </div>
         <ChartPanel className="mx-4 mb-1.5 mt-3.5 flex-1" curves={curves} grid={focus.x} xlabel={focus.xlabel} ylabel={focus.ylabel} pal={pal} marks={view.marks} xDigits={3}
@@ -507,6 +537,22 @@ export function Decypher({ sources, files, onFiles, onClearFiles, jobs, jobsLoad
     else if (e.key === 'r' || e.key === 'R') h?.reset()
     else if (view.mode === 'one' && focus && shown.length > 1 && (e.key === '[' || e.key === ']')) setFocus(shown[(shown.indexOf(focus) + (e.key === ']' ? 1 : -1) + shown.length) % shown.length].id)
   }
+  // How structures are drawn, the same on every 3D view (R9b): the one style menu, the rest, the layout, labels and hydrogens.
+  const toggles = <T extends string>(label: string, value: T, options: readonly T[], onChange: (v: T) => void) => (
+    <DisplayRow label={label}><ToggleGroup type="single" size="sm" value={value} onValueChange={v => v && onChange(v as T)} aria-label={label}>{options.map(o => <ToggleGroupItem key={o} value={o}>{o}</ToggleGroupItem>)}</ToggleGroup></DisplayRow>
+  )
+  const display = (
+    <DisplayMenu summary={view.rep + ' · ' + view.rest}>
+      <StyleRow value={view.rep} onChange={s => patch({ rep: s as Rep })} cannot={CANNOT} />
+      {toggles('not plotted', view.rest, kit.RESTS, v => patch({ rest: v }))}
+      {toggles('molecules', view.arrange, ['side by side', 'frame positions'] as const, v => patch({ arrange: v }))}
+      <DisplayRow label="show">
+        <label className="flex items-center gap-2 text-control"><Checkbox checked={view.labels} onCheckedChange={c => patch({ labels: c === true })} /> labels</label>
+        <label className="flex items-center gap-2 text-control"><Checkbox checked={view.hydrogens} onCheckedChange={c => patch({ hydrogens: c === true })} /> hydrogens</label>
+      </DisplayRow>
+    </DisplayMenu>
+  )
+  const marks = <MarksSelect value={view.marks} onChange={m => patch({ marks: m })} />
   const loading = items.filter(i => i.status === 'loading').length
   const subtitle = !items.length ? 'RDFs of several jobs at once, with their structures' : [plural(ready.length, 'RDF'), plural(new Set(ready.map(a => a.struct).filter(Boolean)).size, 'structure'), loading ? 'reading ' + loading + '…' : null, shown.length < ready.length ? (ready.length - shown.length) + ' hidden' : null].filter(Boolean).join(' · ')
 
@@ -519,20 +565,9 @@ export function Decypher({ sources, files, onFiles, onClearFiles, jobs, jobsLoad
           </div>
           <span className="flex-1" />
           <Seg label="show" value={view.mode === 'each' ? 'each result' : 'one graph'} options={['each result', 'one graph'] as const} onChange={v => patch({ mode: v === 'each result' ? 'each' : 'one' })} />
+          {view.mode === 'each' && <Chip on={view.link} onClick={() => patch({ link: !view.link })} title="a group picked in one result is picked in every result that has it">link groups</Chip>}
           <Button variant="outline" size="sm" onClick={() => { setExporting(n => n + 1); setExportOpen(true) }} disabled={!shown.length}><Download /> export</Button>
         </header>
-        <div className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-2 border-b border-border px-5 py-2">
-          <Seg label="style" value={view.rep} options={kit.REPS} onChange={v => patch({ rep: v })} />
-          <Seg label="not plotted" value={view.rest} options={kit.RESTS} onChange={v => patch({ rest: v })} />
-          <Seg label="molecules" value={view.arrange} options={['side by side', 'frame positions'] as const} onChange={v => patch({ arrange: v })} />
-          <Seg label="marks" value={view.marks} options={['both', 'maximum', 'first shell', 'none'] as const} onChange={v => patch({ marks: v })} />
-          <span className="flex-1" />
-          <div className="flex flex-wrap gap-1.5">
-            <Chip on={view.labels} onClick={() => patch({ labels: !view.labels })}>labels</Chip>
-            <Chip on={view.hydrogens} onClick={() => patch({ hydrogens: !view.hydrogens })}>hydrogens</Chip>
-            {view.mode === 'each' && <Chip on={view.link} onClick={() => patch({ link: !view.link })} title="a group picked in one result is picked in every result that has it">link groups</Chip>}
-          </div>
-        </div>
         <div className="grid min-h-0 flex-1 grid-cols-[280px_minmax(0,1fr)]">
           <aside className="flex min-h-0 flex-col gap-4 border-r border-border p-4" aria-label="sources">
             <div className="flex flex-col gap-1">
@@ -560,11 +595,11 @@ export function Decypher({ sources, files, onFiles, onClearFiles, jobs, jobsLoad
               <div className="flex flex-col gap-4">
                 {cards.map(({ lead: a, members, on, candidates }) => <AnalysisCard key={a.id} members={members} on={on} candidates={candidates} tone={tones[a.id]} mol={a.struct ? mols.get(a.struct) ?? null : null} pal={pal} view={view} selected={selectedOf(a)} tones={tones}
                   onMorph={id => patch(v => ({ morphed: joinMorph(v.morphed, a.id, id) }))} onSplit={() => patch(v => ({ morphed: splitMorph(v.morphed, a.id) }))} onRefs={next => patch(v => ({ morphed: setMorphRefs(v.morphed, a.id, next) }))}
-                  onSelect={n => select(a, n)} handle={h => handles.current.set(a.id, h)} onActive={() => { active.current = a.id }} />)}
+                  onSelect={n => select(a, n)} handle={h => handles.current.set(a.id, h)} onActive={() => { active.current = a.id }} display={display} marks={marks} />)}
               </div>
             ) : focus && (
               <CompareView shown={shown} focus={focus} setFocus={setFocus} mols={mols} pal={pal} view={view} patch={patch} selected={selectedOf(focus)} onSelect={n => select(focus, n)} tones={tones}
-                handle={h => handles.current.set('one', h)} onActive={() => { active.current = 'one' }} />
+                handle={h => handles.current.set('one', h)} onActive={() => { active.current = 'one' }} display={display} marks={marks} />
             )}
           </div>
         </div>

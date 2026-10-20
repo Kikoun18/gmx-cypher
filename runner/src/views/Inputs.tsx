@@ -14,6 +14,7 @@ import { COMMANDS, commandOf } from '../lib/commands'
 import { inputRole, type Role, type Slot } from '../lib/inputs'
 import { useAwhScan, useTerms } from '../terms'
 import { cn } from '../lib/utils'
+import { shortPath } from '../lib/paths'
 import { fmtBytes } from '../../../matrix/src/lib/structFile'
 import { Status } from '../ui/status'
 
@@ -29,8 +30,6 @@ const SLOTS: { slot: Slot; label: string; accepts: Role[]; optional?: boolean }[
 ]
 const SLOT_OF: Partial<Record<Role, Slot>> = { trajectory: 'trajectory', 'run input': 'runInput', structure: 'structure', index: 'index', 'energy file': 'edr' }
 
-/** A folder as `root-name/rest`, relative to the allowed folder it is in. */
-const short = (dir: string, roots: string[]) => { const r = roots.find(x => dir === x || dir.startsWith(x + '/')); return r ? r.split('/').pop() + dir.slice(r.length) : dir }
 const join = (dir: string, name: string) => (dir.endsWith('/') ? dir : dir + '/') + name
 const when = (ms: number) => { const d = new Date(ms), p = (n: number) => String(n).padStart(2, '0'); return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes()) }
 
@@ -213,7 +212,7 @@ export function Inputs({ state, draft, setDraft, check, uploads, onUploaded, onS
               <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                 <span className="text-label uppercase text-muted-foreground">{label}{optional && ' · optional'}</span>
                 <span className="truncate text-body font-bold">{p ? p.path.split('/').pop() : '—'}</span>
-                {p && <span className="truncate text-caption text-muted-foreground" title={p.path}>{short(p.path.slice(0, p.path.lastIndexOf('/')), roots)}</span>}
+                {p && <span className="truncate text-caption text-muted-foreground" title={p.path}>{shortPath(p.path.slice(0, p.path.lastIndexOf('/')), roots)}</span>}
                 {p && <span className="text-caption text-muted-foreground">{p.why}</span>}
               </div>
               {p && optional && <Button variant="ghost" size="sm" onClick={() => setDraft(d => { const { [slot]: _gone, ...rest } = d.inputs; return { ...d, inputs: rest } })}>clear</Button>}

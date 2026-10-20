@@ -82,7 +82,8 @@ function checkView(v: unknown): View | null {
   const morphed = (Array.isArray(o.morphed) ? o.morphed : []).map(m => ({ ids: strs((m as Morph)?.ids), off: strs((m as Morph)?.off) })).filter(m => m.ids.length > 1)
   return {
     mode: one(o.mode, ['each', 'one'] as const, d.mode), colorBy: one(o.colorBy, ['group', 'job'] as const, d.colorBy),
-    rep: one(o.rep, ['ball & stick', 'licorice', 'spacefill'] as const, d.rep), rest: one(o.rest, ['tinted', 'grey', 'ghost'] as const, d.rest),
+    // A view saved before the one set of style names (R9b) said licorice and spacefill.
+    rep: one(({ licorice: 'sticks', spacefill: 'spheres' } as Record<string, string>)[o.rep as string] ?? o.rep, ['ball & stick', 'sticks', 'spheres'] as const, d.rep), rest: one(o.rest, ['tinted', 'grey', 'ghost'] as const, d.rest),
     arrange: one(o.arrange, ['side by side', 'frame positions'] as const, d.arrange),
     labels: bool(o.labels, d.labels), hydrogens: bool(o.hydrogens, d.hydrogens), marks: one(o.marks, ['both', 'maximum', 'first shell', 'none'] as const, (o as { peaks?: boolean }).peaks === false ? 'none' : d.marks), link: bool(o.link, d.link),
     hidden: Array.isArray(o.hidden) ? o.hidden.filter(x => typeof x === 'string') : [], selected, focus: typeof o.focus === 'string' ? o.focus : null, morphed,

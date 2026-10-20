@@ -118,7 +118,14 @@ test('pick inputs, make groups, run, see the chart', async ({ page }) => {
   await expect(page.getByText('maximum · water_O')).toBeVisible()
   // Here the first shell is the maximum: both stats read 0.374 nm.
   await expect(page.getByText('0.374 nm')).toHaveCount(2)
-  await expect(page.getByText('rdf_nvt.run.json')).toBeVisible()
+  // Provenance, collapsed (R9b): the files within their allowed folder, the full path a copy away.
+  const record = page.getByText(/\/rdf\/rdf_nvt\.run\.json$/)
+  await expect(record).toBeHidden()
+  await page.getByText('Provenance · files, command, log').click()
+  await expect(record).toBeVisible()
+  await expect(page.getByRole('button', { name: 'copy the full path of rdf_nvt.run.json' })).toBeVisible()
+  // The page's one order: actions, charts, settings and groups, provenance.
+  expect(await page.locator('[data-landmark]').evaluateAll(l => l.map(e => e.getAttribute('data-landmark')))).toEqual(['actions', 'charts', 'settings', 'provenance'])
   // The result's group table: the reference's name in ink too.
   expect(await page.getByRole('cell', { name: 'sulfur', exact: true }).evaluate(e => getComputedStyle(e).color)).toBe(ink)
   expect(errors).toEqual([])
@@ -189,7 +196,8 @@ test('the old addresses open their view; a drop anywhere is split by type, and t
   await expect(page.getByText('drop.tpr', { exact: true })).toBeVisible()
   await page.getByRole('tab', { name: /results/ }).click()
   await page.getByRole('button', { name: /^compare/ }).first().click()
-  await expect(page).toHaveURL(/#compare$/)
+  // With the shown job, when an earlier test made one: the job shown counts as selected.
+  await expect(page).toHaveURL(/#compare(\?jobs=j[a-z0-9]+)?$/)
   await expect(page.getByRole('region', { name: 'compare', exact: true }).getByText('rdf_dropped', { exact: false }).first()).toBeVisible()
   expect(errors).toEqual([])
 })

@@ -4,7 +4,7 @@ import { Alert, AlertDescription, AlertTitle } from '../ui/alert'
 import { Button } from '../ui/button'
 import { Stat } from '../ui/card'
 import { TONES, type Series } from '../core/index'
-import { SeriesChart, Swatch, type ChartExport } from '../core/Chart'
+import { ExportAll, FiguresContext, SeriesChart, Swatch, type ChartExport, type PageFigure } from '../core/Chart'
 import { rampColors } from '../core/ramp'
 import { TOKENS_BY_THEME } from '../core/theme'
 import { Section } from '../ui/separator'
@@ -23,6 +23,10 @@ import { groupText, toneText, toneVar, type Tone } from '../lib/tones'
 import { cn } from '../lib/utils'
 import { SendDialog } from './SendDialog'
 import { Status } from '../ui/status'
+import { PathText, ResultPage } from '../ui/result-page'
+import { commandText } from '../lib/command'
+import { asTerminal } from '../lib/progress'
+import { Code } from './Code'
 
 const size = (n: number) => (n < 1024 ? n + ' B' : n < 1048576 ? (n / 1024).toFixed(1) + ' kB' : (n / 1048576).toFixed(1) + ' MB')
 
@@ -139,7 +143,6 @@ function RdfChart({ job, record }: { job: Job; record: RunRecord }) {
         })}
         {record.frames && <Stat label="frames" value={String(record.frames.analysed)} hint={start + '–' + record.frames.lastTime + ' ps · ' + (dt ? 'every ' + dt + ' ps' : 'every frame')} />}
       </div>
-      <p className="m-0 text-caption text-muted-foreground">{optionsLine(record)} · reference {record.groups[0].name}</p>
       {cn && <>
         <Section label="Cumulative number" />
         <Curves text={cn} tones={tones} yLabel="n(r)" height={180} shown={shown} setShown={setShown} marked={false} exp={chartExport(job, record, outName(job, record, 'cn'), columns(cn, resultSeries(cn).map(c => c.label)), 'r (nm)', 'n(r)')} />
@@ -161,7 +164,6 @@ function EnergyChart({ job, record }: { job: Job; record: RunRecord }) {
   const rows: EnergyRow[] = record.statistics?.rows ?? [], stats = record.statistics
   const flagged = rows.filter(driftLarger)
   if (!xvg) return <p className="m-0 text-caption text-muted-foreground" aria-live="polite">reading {String((job.meta?.names as { xvg: string })?.xvg)}…</p>
-  const b = Number(record.options.find(o => o.flag === 'b')?.value) || 0
   return (
     <div className="flex flex-col gap-3">
       <div className="grid grid-cols-[repeat(auto-fill,minmax(420px,1fr))] gap-4">
@@ -180,7 +182,6 @@ function EnergyChart({ job, record }: { job: Job; record: RunRecord }) {
         {stats && <Stat label="frames" value={String(stats.frames)} hint={stats.t0 + '–' + stats.t1 + ' ps · ' + stats.steps + ' steps'} />}
       </div>
       {flagged.length > 0 && <Status level="warning" className="text-control">{flagged.map(r => r.name).join(', ')}: the drift is larger than the error estimate, so the average is not steady within its error</Status>}
-      <p className="m-0 text-caption text-muted-foreground">{b > 0 ? 'first ' + b + ' ps left out · ' : ''}{record.options.filter(o => !o.isDefault && o.flag !== 'b').map(o => '-' + o.flag + (o.value === true ? '' : ' ' + o.value)).join(' · ') || 'gmx energy defaults'}</p>
     </div>
   )
 }
@@ -497,44 +498,78 @@ function MindistChart({ job, record }: { job: Job; record: RunRecord }) {
   )
 }
 
-/** What a run wrote, its result, its groups as gmx counted them, and "run again" (sections 10.5, 11.4). */
-export function RunResult({ job, onRunAgain, vault }: { job: Job; onRunAgain: (r: RunRecord) => void; vault: string | null }) {
-  const r = useRecord(job)
-  const [sending, setSending] = React.useState(false)
-  const sendButton = React.useRef<HTMLButtonElement>(null)
-  if (!isRun(job.kind) || !job.ended) return null
-  if (!r) return <p className="m-0 text-caption text-muted-foreground" aria-live="polite">reading the record…</p>
-  if (r.error) return <p className="m-0 text-caption text-muted-foreground">no run record: {r.error}</p>
-  const rec = r.record!, dir = (job.meta?.outDir as string) || ''
+/** The options a job changed, in gmx's own words (`-b 2 · -nofit`): the settings line of a result that has none in words. */
+const flagsLine = (r: RunRecord) => r.options.filter(o => !o.isDefault).map(o => (o.value === true ? '-' + o.flag : o.value === false ? '-no' + o.flag : '-' + o.flag + ' ' + o.value)).join(' · ') || 'gmx ' + (r.analysis ?? 'rdf') + ' defaults'
+
+/** The result of one kind of job: its charts and their stats. */
+function Charts({ job, record }: { job: Job; record: RunRecord }) {
+  const k = job.kind
+  return k === 'energy' ? <EnergyChart job={job} record={record} /> : k === 'awh' ? <AwhChart job={job} record={record} /> : k === 'wham' ? <WhamChart job={job} record={record} />
+    : k === 'distance' ? <DistanceChart job={job} record={record} /> : k === 'hbond' || k === 'hbond-legacy' ? <HbondChart job={job} record={record} /> : k === 'rms' ? <RmsChart job={job} record={record} />
+    : k === 'rmsf' ? <RmsfChart job={job} record={record} /> : k === 'gyrate' || k === 'gyrate-legacy' ? <GyrateChart job={job} record={record} /> : k === 'mindist' ? <MindistChart job={job} record={record} /> : <RdfChart job={job} record={record} />
+}
+
+/**
+ * A job's result page (R9b, contract §5): compare, send, open in set-up and export; its charts with their stats; the
+ * settings line and the groups as gmx counted them; and, collapsed, its files (within their allowed folder), its
+ * command and its log. While it runs or when it failed, the log is open.
+ */
+export function ResultView({ job, record: rec, recordError, log, allow, vault, onRunAgain, onCompare, actions }: {
+  job: Job; record: RunRecord | null; recordError?: string; log: string | undefined; allow: string[]; vault: string | null
+  onRunAgain: (r: RunRecord) => void; onCompare: () => void; actions?: React.ReactNode
+}) {
+  const [sending, setSending] = React.useState(false), [figures] = React.useState(() => new Map<string, PageFigure>())
+  const sendButton = React.useRef<HTMLButtonElement>(null), logRef = React.useRef<HTMLDivElement>(null)
+  React.useEffect(() => { const el = logRef.current?.querySelector('pre'); if (el) el.scrollTop = el.scrollHeight }, [log])
+  const done = job.status === 'done' && !!rec, live = job.status === 'running' && !job.unfollowed
+  const recordPath = String(job.meta?.record ?? ''), stem = recordPath.split('/').pop()!.replace(/\.run\.json$/, '')
+  const files = rec ? [...rec.outputs.map(o => ({ path: o.path, size: size(o.size), hash: 'sha256 ' + o.sha256.slice(0, 12) + '…' })), ...(recordPath ? [{ path: recordPath, size: '', hash: 'this record' }] : [])] : []
   return (
-    <div className="flex flex-col gap-3">
-      {rec.problems.length > 0 && (
+    <FiguresContext.Provider value={figures}>
+      {rec && rec.problems.length > 0 && (
         <Alert variant="warning"><TriangleAlert /><AlertTitle>gmx-cypher's promise was broken</AlertTitle><AlertDescription>{rec.problems.map(p => <p key={p}>{p}</p>)}</AlertDescription></Alert>
       )}
-      {job.status === 'done' && (job.kind === 'energy' ? <EnergyChart job={job} record={rec} /> : job.kind === 'awh' ? <AwhChart job={job} record={rec} /> : job.kind === 'wham' ? <WhamChart job={job} record={rec} /> : job.kind === 'distance' ? <DistanceChart job={job} record={rec} /> : job.kind === 'hbond' || job.kind === 'hbond-legacy' ? <HbondChart job={job} record={rec} /> : job.kind === 'rms' ? <RmsChart job={job} record={rec} /> : job.kind === 'rmsf' ? <RmsfChart job={job} record={rec} /> : job.kind === 'gyrate' || job.kind === 'gyrate-legacy' ? <GyrateChart job={job} record={rec} /> : job.kind === 'mindist' ? <MindistChart job={job} record={rec} /> : <RdfChart job={job} record={rec} />)}
-      {rec.groups.length > 0 && <Section label="Groups" />}
-      {rec.groups.length > 0 && <table className="text-control"><tbody>
-        {rec.groups.map(g => (
-          <tr key={g.index}>
-            <td className="py-0.5 pr-4 text-muted-foreground">group {g.index}</td>
-            <td className={cn('pr-4 font-bold', groupText(g))}>{g.name}</td>
-            <td className="pr-4 text-right">{g.count} atoms</td>
-            <td className="text-caption text-muted-foreground"> {g.gmxCount === g.count ? <Status inline level="ok" word="gmx agrees" /> : <Status inline level="warning" word={'gmx: ' + g.gmxCount} />} · {g.atoms.length > 40 ? g.atoms.slice(0, 40) + '…' : g.atoms}</td>
-          </tr>
-        ))}
-      </tbody></table>}
-      <Section label="Files"><span className="text-caption text-muted-foreground">{dir}</span></Section>
-      <table className="text-control"><tbody>
-        {[...rec.outputs.map(o => ({ name: o.path.split('/').pop()!, size: size(o.size), hash: 'sha256 ' + o.sha256.slice(0, 12) + '…' })), { name: String(job.meta?.record ?? '').split('/').pop()!, size: '', hash: 'this record' }].map(f => (
-          <tr key={f.name}><td className="py-0.5 pr-4">{f.name}</td><td className="pr-4 text-right text-muted-foreground">{f.size}</td><td className="text-caption text-muted-foreground">{f.hash}</td></tr>
-        ))}
-      </tbody></table>
-      <div className="flex flex-wrap items-center gap-3">
-        {job.status === 'done' && vault && <Button ref={sendButton} onClick={() => setSending(true)}>send to vault…</Button>}
-        <Button variant="outline" onClick={() => onRunAgain(rec)}>open in set-up</Button>
-        <span className="text-caption text-muted-foreground">{job.status === 'done' && !vault ? 'set a Matrix vault in settings to send this result · ' : ''}open in set-up fills the steps with this job's inputs, groups and options ({rec.analysis ?? 'rdf'}); a new job gets new names</span>
-      </div>
+      <ResultPage open={live || job.status === 'failed'}
+        actions={<>
+          {actions}
+          {job.kind === 'rdf' && job.status === 'done' && <Button onClick={onCompare}>compare</Button>}
+          {done && vault && <Button ref={sendButton} variant="outline" onClick={() => setSending(true)}>send to vault…</Button>}
+          {rec && <Button variant="outline" onClick={() => onRunAgain(rec)}>open in set-up</Button>}
+          {done && <ExportAll figures={figures} file={stem} fields={{ ...job.fields, command: job.kind }} />}
+          <span className="text-caption text-muted-foreground">{done && !vault ? 'set a Matrix vault in settings to send this result · ' : ''}{rec ? 'open in set-up fills the steps with this job\'s inputs, groups and options; a new job gets new names' : recordError ? 'no job record: ' + recordError : ''}</span>
+        </>}
+        charts={done ? <Charts job={job} record={rec} /> : undefined}
+        settings={rec ? <>
+          <p className="m-0 text-caption text-muted-foreground">{job.kind === 'rdf' ? optionsLine(rec) + ' · reference ' + rec.groups[0]?.name : flagsLine(rec)}</p>
+          {rec.groups.length > 0 && <><Section label="Groups" /><table className="text-control"><tbody>
+            {rec.groups.map(g => (
+              <tr key={g.index}>
+                <td className="py-0.5 pr-4 text-muted-foreground">group {g.index}</td>
+                <td className={cn('pr-4 font-bold', groupText(g))}>{g.name}</td>
+                <td className="pr-4 text-right">{g.count} atoms</td>
+                <td className="text-caption text-muted-foreground"> {g.gmxCount === g.count ? <Status inline level="ok" word="gmx agrees" /> : <Status inline level="warning" word={'gmx: ' + g.gmxCount} />} · {g.atoms.length > 40 ? g.atoms.slice(0, 40) + '…' : g.atoms}</td>
+              </tr>
+            ))}
+          </tbody></table></>}
+        </> : undefined}
+        provenance={<>
+          {files.length > 0 && <><Section label="Files" /><table className="w-full table-fixed text-control"><tbody>
+            {files.map(f => (
+              <tr key={f.path}><td className="py-0.5 pr-4"><PathText path={f.path} roots={allow} name={f.path.split('/').pop()!} /></td><td className="w-20 pr-4 text-right text-muted-foreground">{f.size}</td><td className="w-48 text-caption text-muted-foreground">{f.hash}</td></tr>
+            ))}
+          </tbody></table></>}
+          <Section label="Command" />
+          <Code label="command line" text={commandText(job)} />
+          <Section label="Log"><span className="text-caption text-muted-foreground">{live ? 'live · stdout and stderr' : 'stdout and stderr'}</span></Section>
+          <div ref={logRef}><Code label="log" text={asTerminal(log ?? '')} className="max-h-80 text-muted-foreground" /></div>
+        </>} />
       {vault && <SendDialog job={job} open={sending} onOpenChange={setSending} returnFocus={sendButton} />}
-    </div>
+    </FiguresContext.Provider>
   )
+}
+
+/** A job's result page, its record read from the server once the job has ended (T31). */
+export function RunResult(props: Omit<React.ComponentProps<typeof ResultView>, 'record' | 'recordError'>) {
+  const r = useRecord(props.job)
+  return <ResultView {...props} record={r?.record ?? null} recordError={r?.error} />
 }

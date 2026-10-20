@@ -30,7 +30,8 @@ let current: ExportPrefs | null = null
 
 /** This browser's export settings, shared by every chart's menu and the settings dialog. */
 export function useExportPrefs(): [ExportPrefs, (patch: Partial<ExportPrefs>) => void] {
-  const p = React.useSyncExternalStore(on => { listeners.add(on); return () => listeners.delete(on) }, () => (current ??= read()))
+  // Without a browser (the page-order test renders on the server), the defaults.
+  const p = React.useSyncExternalStore(on => { listeners.add(on); return () => listeners.delete(on) }, () => (current ??= read()), () => PREFS)
   const set = React.useCallback((patch: Partial<ExportPrefs>) => {
     current = cleanPrefs({ ...(current ?? read()), ...patch })
     try { localStorage.setItem(PREFS_KEY, JSON.stringify(current)) } catch { /* kept for this page only */ }

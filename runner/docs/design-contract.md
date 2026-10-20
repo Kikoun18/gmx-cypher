@@ -75,6 +75,7 @@ Morpheus is the brief; the Matrix is the neighbour. Where gmx-cypher and the Mat
 
 - Keys are ignored while typing. ⌘ on macOS where other platforms use Ctrl, shown with `Kbd` everywhere.
 - Differences from the Matrix, on purpose: C (held) centres here, where the Matrix's C is compare; D is compare here.
+- **Structure styles:** ball & stick · sticks · spheres · lines · cartoon, the same names in every 3D view's *display* menu (`STYLES` in `contract.ts`). A style a renderer can't draw is shown disabled, with the reason: compare draws no lines and no cartoon.
 
 ## 4. Status levels
 
@@ -94,7 +95,7 @@ Icon, word, then the text; an optional *why?* opens the long explanation (HoverC
 3. **The settings line and the groups** (reference outlined in ink).
 4. **Provenance, collapsed:** files, command, log. Paths relative to the allowed folder, with a button that copies the full path.
 
-A compare card follows the same order.
+A compare card follows the same order (`RESULT_ORDER` in `contract.ts`). The action bar's *export* takes every chart of the page, as settings → export lays them out; each chart's own menu, in its header, exports that chart. Chart options (marks, colour by) sit in the chart's header; structure options in the 3D view's *display* menu.
 
 ## 6. Writing
 

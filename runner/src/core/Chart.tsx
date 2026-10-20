@@ -4,11 +4,11 @@
 
 import * as React from 'react'
 import { Download } from 'lucide-react'
-import { download } from '../../../matrix/src/lib/export'
+import { download, renderBatch } from '../../../matrix/src/lib/export'
 import { formatHints } from '../../../matrix/src/lib/exportPrefs'
 import { Select, SelectContent, SelectItem, SelectTrigger } from '../ui/select'
 import { cn } from '../lib/utils'
-import { figureFile, resultAnalysis } from './export'
+import { figureFile, graphData, resultAnalysis, type Figure } from './export'
 import { fileName, useExportPrefs, type NameFields } from './exportPrefs'
 import { curvesOf, kit, type Series } from './index'
 import type { ChartGeom, Curve, Marks, Palette, VNode } from './kit'
@@ -129,6 +129,40 @@ export function ExportMenu({ exp, curves, xlabel, ylabel, marks, className, ...o
   )
 }
 
+/** A page's charts, for its one export (R9b): each chart that exports is listed while it is drawn, in page order. */
+export interface PageFigure { exp: ChartExport; figure: (pal: Palette) => Figure }
+export const FiguresContext = React.createContext<Map<string, PageFigure> | null>(null)
+
+/**
+ * A result's export (R9b, the action bar's): every chart of the page as figures, laid out as settings → export says
+ * (one PDF, a file each, or one grid), or every chart's CSV, a file each.
+ */
+export function ExportAll({ figures, file, fields }: { figures: Map<string, PageFigure>; file: string; fields?: NameFields }) {
+  const [busy, setBusy] = React.useState(false), [prefs] = useExportPrefs()
+  const go = async (what: string) => {
+    const list = [...figures.values()]
+    if (!list.length) return
+    setBusy(true)
+    try {
+      const taken = new Set<string>(), name = (f: PageFigure, ext: string) => fileName(prefs.name, { ...f.exp.fields, file: f.exp.file }, ext, taken)
+      if (what === 'csv') { list.forEach(f => download(new Blob([f.exp.csv()], { type: 'text/csv;charset=utf-8' }), name(f, 'csv'))); return }
+      const pal = PALETTES[prefs.theme === 'dark' ? 'dark' : 'light'], ext = prefs.layout === 'pdf' ? 'pdf' : prefs.format
+      const out = await renderBatch(list.map(f => ({ data: graphData(f.figure(pal), prefs.theme), name: name(f, ext) })), prefs, fileName(prefs.name, { ...fields, file }, 'x').replace(/\.x$/, ''))
+      out.forEach(f => download(f.blob, f.name))
+    } finally { setBusy(false) }
+  }
+  const layout = prefs.layout === 'pdf' ? 'one PDF, a page each' : prefs.layout === 'grid' ? 'one ' + prefs.format + ' grid' : 'a ' + prefs.format + ' each'
+  return (
+    <Select value="" onValueChange={v => void go(v)}>
+      <SelectTrigger size="sm" aria-label="export this result" disabled={busy}><Download className="size-3.5" />{busy ? 'exporting…' : 'export'}</SelectTrigger>
+      <SelectContent align="end">
+        <SelectItem value="figures">figures · every chart, {layout} (settings → export)</SelectItem>
+        <SelectItem value="csv">csv · every chart's points, a file each</SelectItem>
+      </SelectContent>
+    </Select>
+  )
+}
+
 /** The interactive page of a result's chart (R6a), from the (de)Cypher export, loaded when asked. */
 async function resultHtml(exp: ChartExport, series: Series[], xlabel: string, ylabel: string, o: ChartOptions) {
   const { exportData, exportHtml, fontData } = await import('../decypher/export')
@@ -149,6 +183,13 @@ export function SeriesChart({ series, xlabel, ylabel, marks = 'none', height = 2
 }) {
   const pal = PALETTES[usePageTheme()]
   const curves = React.useMemo(() => curvesOf(series, pal), [series, pal])
+  // On a result page, the chart is one of its figures (R9b) while it is drawn.
+  const figures = React.useContext(FiguresContext), fid = React.useId()
+  React.useEffect(() => {
+    if (!figures || !exp) return
+    figures.set(fid, { exp, figure: p => ({ title: exp.title, sub: exp.sub, file: exp.file, xlabel, ylabel, curves: curvesOf(series, p), marks, ...o }) })
+    return () => { figures.delete(fid) }
+  })
   const full = React.useMemo(() => exp && { ...exp, ...(resultAnalysis({ id: 'r', title: '', sub: '', xlabel, ylabel, series }) ? { html: () => resultHtml(exp, series, xlabel, ylabel, o) } : { html: null, why: 'its curves are on different x grids' }) },
     [exp, series, xlabel, ylabel, o.y, o.rule, o.xDigits])
   return (

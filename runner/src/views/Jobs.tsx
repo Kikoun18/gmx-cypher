@@ -8,10 +8,7 @@ import { Section } from '../ui/separator'
 import { postJson } from '../api'
 import { clock, fraction, jobLine, progressText, statusOf, type Job, type useJobs } from '../jobs'
 import { Status } from '../ui/status'
-import { commandText } from '../lib/command'
-import { asTerminal } from '../lib/progress'
 import { cn } from '../lib/utils'
-import { Code } from './Code'
 import { RunResult } from './Result'
 import type { RunRecord } from '../lib/record'
 import type { Route } from '../lib/route'
@@ -31,10 +28,8 @@ function useNow(on: boolean) {
   return now
 }
 
-function JobDetail({ job, log, onRunAgain, vault, onCompare }: { job: Job; log: string | undefined; onRunAgain: (r: RunRecord) => void; vault: string | null; onCompare: () => void }) {
+function JobDetail({ job, log, onRunAgain, vault, allow, onCompare }: { job: Job; log: string | undefined; onRunAgain: (r: RunRecord) => void; vault: string | null; allow: string[]; onCompare: () => void }) {
   const [armed, press] = useArmed()
-  const logRef = React.useRef<HTMLDivElement>(null)
-  React.useEffect(() => { const el = logRef.current?.querySelector('pre'); if (el) el.scrollTop = el.scrollHeight }, [log])
   const cancel = () => { if (press()) postJson('/api/jobs/' + job.id + '/cancel', {}).catch(() => {}) }
   const s = statusOf(job), running = job.status === 'running', now = useNow(running), f = fraction(job)
   const took = job.started ? clock((job.ended ? Date.parse(job.ended) : now) - Date.parse(job.started)) : ''
@@ -43,9 +38,6 @@ function JobDetail({ job, log, onRunAgain, vault, onCompare }: { job: Job; log: 
       <div className="flex items-center gap-3">
         <h2 className="m-0 text-title font-bold">{job.name ?? job.title}</h2>
         <Status inline level={s.level} word={s.word} className="text-control" />
-        <span className="flex-1" />
-        {job.kind === 'rdf' && job.status === 'done' && <Button variant="outline" onClick={onCompare}>compare</Button>}
-        {job.status === 'running' && !job.unfollowed && <Button variant="destructive" onClick={cancel}>{armed ? 'click again to cancel' : 'cancel'}</Button>}
       </div>
       {job.name && job.name !== job.title && <p className="-mt-3 m-0 text-caption text-muted-foreground">{job.title}</p>}
       {job.status === 'failed' && job.error && (
@@ -59,11 +51,8 @@ function JobDetail({ job, log, onRunAgain, vault, onCompare }: { job: Job; log: 
       {job.unfollowed && <p className="m-0 text-caption text-muted-foreground">gmx-cypher restarted while this job ran: it still runs (pid {job.pid}), but its output and its end are no longer read here, and its record is not completed</p>}
       {(running || job.progress.frame != null) && !job.unfollowed && <p className="m-0 text-control" aria-live="polite">{job.status === 'failed' || job.status === 'cancelled' ? 'stopped at ' : ''}{progressText(job)}{took && ' · ' + took}</p>}
       {job.status === 'interrupted' && <p className="m-0 text-caption text-muted-foreground">{job.error}</p>}
-      <RunResult job={job} onRunAgain={onRunAgain} vault={vault} />
-      <Section label="Command" />
-      <Code label="command line" text={commandText(job)} />
-      <Section label="Log"><span className="text-caption text-muted-foreground">{job.status === 'running' && !job.unfollowed ? 'live · stdout and stderr' : 'stdout and stderr'}</span></Section>
-      <div ref={logRef}><Code label="log" text={asTerminal(log ?? '')} className="max-h-80 text-muted-foreground" /></div>
+      <RunResult job={job} log={log} allow={allow} vault={vault} onRunAgain={onRunAgain} onCompare={onCompare}
+        actions={job.status === 'running' && !job.unfollowed && <Button variant="destructive" onClick={cancel}>{armed ? 'click again to cancel' : 'cancel'}</Button>} />
       <p className="m-0 text-caption text-muted-foreground">a job keeps running when this page is closed or reloaded · started {new Date(job.created).toLocaleString()}</p>
     </div>
   )
@@ -75,8 +64,8 @@ type ResultsRoute = Extract<Route, { view: 'results' | 'compare' }>
  * Results (R9a): one jobs list with multi-select (click: one; ⌘/Ctrl-click or its box: one more or less; Shift-click: a
  * range), and a detail pane: the result for one job, compare for several. The selection is in the address.
  */
-export function JobsView({ jobs, logs, loadLog, route, go, onRunAgain, vault, compare, keyName }: ReturnType<typeof useJobs> & {
-  route: ResultsRoute; go: (r: Route) => void; onRunAgain: (r: RunRecord) => void; vault: string | null; compare: React.ReactNode; keyName: string | null
+export function JobsView({ jobs, logs, loadLog, route, go, onRunAgain, vault, allow, compare, keyName }: ReturnType<typeof useJobs> & {
+  route: ResultsRoute; go: (r: Route) => void; onRunAgain: (r: RunRecord) => void; vault: string | null; allow: string[]; compare: React.ReactNode; keyName: string | null
 }) {
   const job = route.view === 'results' ? jobs.find(j => j.id === route.job) || jobs[0] : undefined
   const selected = route.view === 'compare' ? route.jobs : job ? [job.id] : []
@@ -111,7 +100,7 @@ export function JobsView({ jobs, logs, loadLog, route, go, onRunAgain, vault, co
           )
         })}
       </nav>
-      {route.view === 'compare' ? compare : job && <JobDetail key={job.id} job={job} log={logs[job.id]} onRunAgain={onRunAgain} vault={vault} onCompare={() => go({ view: 'compare', jobs: [job.id] })} />}
+      {route.view === 'compare' ? compare : job && <JobDetail key={job.id} job={job} log={logs[job.id]} onRunAgain={onRunAgain} vault={vault} allow={allow} onCompare={() => go({ view: 'compare', jobs: [job.id] })} />}
     </div>
   )
 }

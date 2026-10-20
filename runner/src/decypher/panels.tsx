@@ -65,7 +65,7 @@ export function CurveTable({ curves, onRemove, onHover, source = true }: { curve
   return (
     <div className="flex max-h-64 flex-col gap-0.5 overflow-auto">
       <div className={cn('grid items-center gap-2 pb-1 text-label uppercase text-muted-foreground', cols)}>
-        <span /><span>series</span>{source && <span>source</span>}<span className="text-right">atoms</span><span className="text-right">maximum r · g</span><span className="text-right">first shell r · g</span><span />
+        <span /><span className="truncate">series</span>{source && <span className="truncate">source</span>}<span className="text-right">atoms</span><span className="text-right">maximum r · g</span><span className="text-right">first shell r · g</span><span />
       </div>
       {curves.map(c => (
         <div key={c.key} className={cn('grid min-h-[26px] items-center gap-2 text-control', cols)} onMouseEnter={() => onHover(c)} onMouseLeave={() => onHover(null)}>

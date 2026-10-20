@@ -50,3 +50,10 @@ export const STATUS: Record<Level, { icon: string; word: string; token: string; 
 /** The only files whose classes may colour text or a ground `destructive` (R4a, R9c): the status component and destructive buttons. */
 export const DESTRUCTIVE_FILES = ['src/ui/status.tsx', 'src/ui/button.tsx']
 
+
+/** The order of a result page (R9b, contract §5), for every result kind and every compare card. */
+export const RESULT_ORDER = ['actions', 'charts', 'settings', 'provenance'] as const
+
+/** The one set of structure styles (question 17): each 3D view offers these; one its renderer can't draw is shown disabled, with the reason. */
+export const STYLES = ['ball & stick', 'sticks', 'spheres', 'lines', 'cartoon'] as const
+export type Style = (typeof STYLES)[number]

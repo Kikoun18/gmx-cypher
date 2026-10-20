@@ -161,7 +161,7 @@ export function App() {
         )}
         <TabsContent value="setup">{state && route.view === 'setup' && <Setup route={route} go={go} state={state} draft={draft} setDraft={setDraft} jobs={jobs.jobs} uploads={uploads} onUploaded={() => setUploads([])} onSettings={() => setSettings(true)} onOpenJob={openJob} />}</TabsContent>
         <TabsContent value="results">{(route.view === 'results' || route.view === 'compare') && (
-          <JobsView {...jobs} route={route} go={go} vault={state?.config.vault ?? null} keyName={bindings.decypher ? keyLabel(bindings.decypher) : null}
+          <JobsView {...jobs} route={route} go={go} vault={state?.config.vault ?? null} allow={state?.config.allow ?? []} keyName={bindings.decypher ? keyLabel(bindings.decypher) : null}
             onRunAgain={r => { setDraft(d => ({ ...withCommand(d, r.analysis ?? 'rdf'), ...recipeFromRecord(r) })); go({ view: 'setup', step: 'command', batch: false }) }}
             compare={<React.Suspense fallback={<p className="m-0 text-control text-muted-foreground" aria-live="polite">opening compare…</p>}>
               <Decypher sources={sources} files={files} onFiles={addFiles} onClearFiles={() => setFiles([])} jobs={jobs.jobs} jobsLoaded={jobs.loaded} allow={state?.config.allow ?? []} vaultPath={state?.config.vault ?? null} version={state?.version ?? ''}

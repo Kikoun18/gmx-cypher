@@ -3,6 +3,8 @@ import type { GLModel, GLViewer } from '3dmol'
 import { Checkbox } from '../ui/checkbox'
 import { Kbd } from '../ui/kbd'
 import { ToggleGroup, ToggleGroupItem } from '../ui/toggle-group'
+import { DisplayMenu, DisplayRow, StyleRow } from '../ui/display-menu'
+import type { Style } from '../core/contract'
 import { defaultView, structStyle, toPdb, type Look } from '../../../matrix/src/lib/structFile'
 import { drawnNumbers, type Atom } from '../lib/atoms'
 import type { Tone } from '../lib/tones'
@@ -12,7 +14,12 @@ import { Status } from '../ui/status'
 
 export type PickHow = 'atom' | 'residue' | 'name'
 
-const LOOKS: { v: Look; label: string }[] = [{ v: 'cartoon', label: 'cartoon' }, { v: 'stick', label: 'sticks' }, { v: 'sphere', label: 'spheres' }, { v: 'line', label: 'lines' }]
+/** The Matrix's look for each of the one set of styles (question 17); ball & stick is its sticks with a ball on each atom. */
+const LOOK: Record<Style, Look> = { 'ball & stick': 'stick', sticks: 'stick', spheres: 'sphere', lines: 'line', cartoon: 'cartoon' }
+const drawn = (info: Parameters<typeof structStyle>[0], style: Style, solvent: boolean) => {
+  const s = structStyle(info, LOOK[style], solvent)
+  return style === 'ball & stick' ? { ...s, styles: s.styles.map(([sel, st]): [object, Record<string, unknown>] => [sel, 'stick' in st ? { ...st, sphere: { scale: 0.25 } } : st]) } : s
+}
 /** A group's atoms in the current look: spheres stay spheres, the rest are sticks with a small ball. In `color`, else by element. */
 const groupStyle = (look: Look, color?: string) => {
   const c = color ? { color } : {}
@@ -80,7 +87,7 @@ export function Viewer({ text, format, model, atoms, colour, onPick, describe, g
   const index = React.useMemo(() => new Map(numbers.map((nr, k) => [nr, k])), [numbers])
   const byNr = React.useMemo(() => new Map(atoms.map(a => [a.nr, a])), [atoms])
   const def = React.useMemo(() => defaultView(info), [info])
-  const [look, setLook] = React.useState<Look>(def.look)
+  const [style, setStyle] = React.useState<Style>(def.look === 'cartoon' ? 'cartoon' : 'sticks'), look = LOOK[style]
   const [solvent, setSolvent] = React.useState(def.solvent)
   const [hydrogens, setHydrogens] = React.useState(false)
   const [hover, setHover] = React.useState<number | null>(null)
@@ -141,7 +148,7 @@ export function Viewer({ text, format, model, atoms, colour, onPick, describe, g
     m.setStyle({}, {})
     // By group hue the rest is drawn in a neutral grey, so a group's hue never hides among element colours (oxygen red vs coral).
     const hues = colourBy === 'group' && colour.size > 0, rest = hues ? cssVar('--input') : null
-    for (const [sel, style] of structStyle(info, look, solvent).styles) m.setStyle(sel as never, (rest ? neutral(style, rest) : style) as never)
+    for (const [sel, st] of drawn(info, style, solvent).styles) m.setStyle(sel as never, (rest ? neutral(st, rest) : st) as never)
     if (!hydrogens) m.setStyle({ elem: 'H' } as never, {} as never)
     const byTone = new Map<Tone | 'reference', number[]>()
     // A group's strong hue; the reference in ink (T159).
@@ -156,7 +163,7 @@ export function Viewer({ text, format, model, atoms, colour, onPick, describe, g
       if (!hues) for (const [tone, ks] of byTone) halo.current.setStyle({ index: ks } as never, haloStyle(look, ink(tone)) as never)
     }
     viewer.render()
-  }, [viewer, pdb, info, look, solvent, hydrogens, colour, colourBy, index, theme])
+  }, [viewer, pdb, info, style, look, solvent, hydrogens, colour, colourBy, index, theme])
 
   // The box is shapes, not styles: its own layer, redrawn when it is switched or the theme changes.
   React.useEffect(() => {
@@ -174,20 +181,24 @@ export function Viewer({ text, format, model, atoms, colour, onPick, describe, g
   return (
     <div className="flex min-w-0 flex-col gap-3">
       <div className="flex flex-wrap items-center gap-3">
-        <ToggleGroup type="single" value={look} onValueChange={v => v && setLook(v as Look)} aria-label="look">
-          {LOOKS.map(l => <ToggleGroupItem key={l.v} value={l.v}>{l.label}</ToggleGroupItem>)}
-        </ToggleGroup>
-        <ToggleGroup type="single" value={colourBy} onValueChange={v => v && setColourBy(v as ColourBy)} aria-label="colours">
-          <ToggleGroupItem value="element" aria-label="element colours, groups as halos">element colours</ToggleGroupItem>
-          <ToggleGroupItem value="group" aria-label="group hues, the rest grey">group hues</ToggleGroupItem>
-        </ToggleGroup>
-        <label className="flex items-center gap-2 text-control"><Checkbox checked={hydrogens} onCheckedChange={c => setHydrogens(c === true)} /> hydrogens</label>
-        <label className="flex items-center gap-2 text-control"><Checkbox checked={solvent} onCheckedChange={c => setSolvent(c === true)} /> water & ions</label>
-        <label className="flex items-center gap-2 text-control"><Checkbox checked={showCell && !!cell.vectors} disabled={!cell.vectors} onCheckedChange={c => setShowCell(c === true)} /> box <Kbd>B</Kbd></label>
+        <DisplayMenu summary={style + ' · ' + (colourBy === 'element' ? 'element colours' : 'group hues')}>
+          <StyleRow value={style} onChange={setStyle} />
+          <DisplayRow label="colours">
+            <ToggleGroup type="single" size="sm" value={colourBy} onValueChange={v => v && setColourBy(v as ColourBy)} aria-label="colours">
+              <ToggleGroupItem value="element" aria-label="element colours, groups as halos">element colours</ToggleGroupItem>
+              <ToggleGroupItem value="group" aria-label="group hues, the rest grey">group hues</ToggleGroupItem>
+            </ToggleGroup>
+          </DisplayRow>
+          <DisplayRow label="show">
+            <label className="flex items-center gap-2 text-control"><Checkbox checked={hydrogens} onCheckedChange={c => setHydrogens(c === true)} /> hydrogens</label>
+            <label className="flex items-center gap-2 text-control"><Checkbox checked={solvent} onCheckedChange={c => setSolvent(c === true)} /> water & ions</label>
+            <label className="flex items-center gap-2 text-control"><Checkbox checked={showCell && !!cell.vectors} disabled={!cell.vectors} onCheckedChange={c => setShowCell(c === true)} /> box <Kbd>B</Kbd></label>
+          </DisplayRow>
+        </DisplayMenu>
       </div>
       <p className="m-0 text-caption text-muted-foreground">
         {info.atoms} of {atoms.length} atoms drawn{virtual ? ' · ' + virtual + ' virtual sites not drawn' : ''}{unknown.length ? ' · ' + unknown.length + ' not drawn, element unknown (' + unknown.slice(0, 3).join(', ') + ')' : ''}
-        {structStyle(info, look, solvent).note && ' · ' + structStyle(info, look, solvent).note}
+        {drawn(info, style, solvent).note && ' · ' + drawn(info, style, solvent).note}
       </p>
       <p className="m-0 text-caption text-muted-foreground" aria-live="polite">
         {cell.vectors && dims ? <>box of the structure file · a {dims.a.toFixed(2)} · b {dims.b.toFixed(2)} · c {dims.c.toFixed(2)} nm · α {degrees(dims.alpha)}° β {degrees(dims.beta)}° γ {degrees(dims.gamma)}° · V {dims.volume.toFixed(3)} nm³</> : 'no box: ' + cell.problems.join(' ')}
