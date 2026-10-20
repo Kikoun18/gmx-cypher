@@ -203,7 +203,7 @@ From [`batch-3.md`](batch-3.md) §5: one coherent app, (de)Cypher for every anal
 - [x] R10d Distance and mindist lines; gmx rms's fit group (T185)
 - [x] R11a Same scale (T186)
 - [x] R11b Line styles (T187)
-- [ ] R11c Marks and lines, carried into exports
+- [x] R11c Marks and lines, carried into exports (T188)
 - [ ] R11d Renamed groups and reference
 
 ### Phase 7: The runner at scale (R12, R13)
