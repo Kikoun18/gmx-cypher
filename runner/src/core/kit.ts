@@ -43,7 +43,11 @@ export interface Analysis {
   /** Key of its structure, and why that one (or why none). */
   struct: string | null
   structNote: string
+  /** How its chart is drawn when it is not an RDF (R6a: any result as HTML): its y range, its rule, its x digits. */
+  plot?: Plot
 }
+/** A chart's y range (from 0, or the data's own), its dashed rule (g = 1, 0, none) and its x digits. */
+export interface Plot { y: 'zero' | 'data'; rule: number | null; xDigits?: number }
 
 export interface Hue { base: string; fg: string; soft: string; strong: string }
 export interface Palette {
@@ -92,7 +96,7 @@ export type VNode = [string, Record<string, unknown>, ...(VNode | string)[]]
 export interface ChartGeom { m: { l: number; r: number; t: number; b: number }; iw: number; ih: number; x0: number; x1: number; y0: number; y1: number; grid: number[]; xDigits: number; yDigits: number }
 
 /** One job as an export carries it: atoms as ranges, y values rounded, its selection when exported. */
-export interface ExportAnalysis { id: string; title: string; label: string; sub: string; x: number[]; xlabel: string; ylabel: string; ref: { name: string; atoms: string; tone: Tone } | null; sels: { name: string; atoms: string; tone: Tone; y: number[]; peak: Peak | null; shell?: Peak | null }[]; struct: string | null; structNote: string; selected: string[]; tone: Tone }
+export interface ExportAnalysis { id: string; title: string; label: string; sub: string; x: number[]; xlabel: string; ylabel: string; ref: { name: string; atoms: string; tone: Tone } | null; sels: { name: string; atoms: string; tone: Tone; y: number[]; peak: Peak | null; shell?: Peak | null }[]; struct: string | null; structNote: string; selected: string[]; tone: Tone; plot?: Plot }
 /** Everything an exported page needs: its tokens, structures without solvent, the analyses, the comparison and the style. */
 export interface ExportData {
   /** The page's heading, as chosen ('(de)Cypher' unless changed). */
@@ -798,6 +802,12 @@ export function decypherKit(data: KitData) {
   }
   /** The decimals a number is written with (at most 6): 0.374 → 3, 12 → 0. */
   const decimalsOf = (v: number) => { const t = String(+v.toFixed(6)), i = t.indexOf('.'); return i < 0 ? 0 : t.length - i - 1 }
+  /** x as a grid's values are written (an atom number, a time), at most 4 decimals: for peak labels and the readout. */
+  function xDigitsOf(grid: number[]) {
+    let d = 0
+    for (let i = 0; i < Math.min(grid.length, 50); i++) d = Math.min(4, Math.max(d, decimalsOf(grid[i])))
+    return d
+  }
 
   /**
    * A chart as an SVG tree (R5c: every chart of gmx-cypher and of the export): gridlines in `border`, axes in
@@ -821,9 +831,7 @@ export function decypherKit(data: KitData) {
     else { const pad = (hi - lo) * 0.06 || Math.abs(hi) * 0.06 || 1; y0 = lo - pad; y1 = hi + pad * (o.marks === 'none' ? 1 : 2) }
     const sx = (v: number) => m.l + ((v - x0) / (x1 - x0 || 1)) * iw, sy = (v: number) => m.t + ih - ((v - y0) / (y1 - y0 || 1)) * ih
     const xt = niceTicks(x0, x1, Math.max(3, Math.round(iw / 90))), yt = niceTicks(y0, y1, Math.max(3, Math.round(ih / 48)))
-    // x as the grid's values are written (an atom number, a time; at most 4 decimals), unless asked (an RDF's r: 3, as its tables).
-    let xDigits = o.xDigits ?? 0
-    if (o.xDigits == null) for (let i = 0; i < Math.min(grid.length, 50); i++) xDigits = Math.min(4, Math.max(xDigits, decimalsOf(grid[i])))
+    const xDigits = o.xDigits ?? xDigitsOf(grid)
     const yDigits = Math.max(2, yt.decimals + 1)
     const F = 'mononoki, ui-monospace, monospace', BG = th.card, ease = 'cubic-bezier(.2,.7,.2,1)'
     const cap = { fontFamily: F, fontSize: '11px', fill: th.muted }, lab = { fontFamily: F, fontSize: '11px', fill: th.muted }
@@ -893,7 +901,7 @@ export function decypherKit(data: KitData) {
     const analyses: Analysis[] = data.analyses.map(a => ({
       id: a.id, kind: 'job', title: a.title, label: a.label, sub: a.sub, x: a.x, xlabel: a.xlabel, ylabel: a.ylabel,
       ref: a.ref ? { name: a.ref.name, atoms: fromRanges(a.ref.atoms), tone: a.ref.tone } : null,
-      sels: a.sels.map(s => ({ name: s.name, atoms: fromRanges(s.atoms), tone: s.tone, y: s.y, peak: s.peak, shell: s.shell ?? null })), struct: a.struct, structNote: a.structNote,
+      sels: a.sels.map(s => ({ name: s.name, atoms: fromRanges(s.atoms), tone: s.tone, y: s.y, peak: s.peak, shell: s.shell ?? null })), struct: a.struct, structNote: a.structNote, ...(a.plot ? { plot: a.plot } : {}),
     }))
     const tones: Record<string, Tone> = {}
     data.analyses.forEach(a => { tones[a.id] = a.tone })
@@ -936,14 +944,14 @@ export function decypherKit(data: KitData) {
 
     /** A chart that fills its box, redrawn on resize, with a rule and a card of values under the pointer. */
     let charts = 0
-    function chartBox(get: () => { curves: Curve[]; grid: number[]; xlabel: string; ylabel: string }) {
+    function chartBox(get: () => { curves: Curve[]; grid: number[]; xlabel: string; ylabel: string; plot?: Plot }) {
       const box = h('div', { class: 'dc-chart' }), card = h('div', { class: 'dc-hover', hidden: true }), id = 'dc-plot-' + ++charts
       const wrap = h('div', { class: 'dc-chart-wrap' }, box, card)
       let hover: number | null = null, geom: ChartGeom | null = null
       const render = () => {
         const W = box.clientWidth, H = box.clientHeight
         if (!W || !H) return
-        const g = get(), out = chart({ W, H, curves: g.curves, grid: g.grid, xlabel: g.xlabel, ylabel: g.ylabel, hover, marks: 'both', pal: pal(), id, xDigits: 3 })
+        const g = get(), out = chart({ W, H, curves: g.curves, grid: g.grid, xlabel: g.xlabel, ylabel: g.ylabel, hover, marks: 'both', pal: pal(), id, ...(g.plot ? { y: g.plot.y, rule: g.plot.rule, xDigits: g.plot.xDigits } : { xDigits: 3 }) })
         geom = out.geom
         box.replaceChildren(svg(out.tree))
         if (hover == null || !g.curves.length) { card.hidden = true; return }
@@ -994,12 +1002,14 @@ export function decypherKit(data: KitData) {
       return { el: box, render }
     }
 
-    function table(get: () => Curve[]) {
-      const box = h('div', { class: 'dc-table' })
+    /** The curves under a chart; an RDF's with its atoms and both peak rules, another result's (`plain`) with its series and source only. */
+    function table(get: () => Curve[], plain = false) {
+      const box = h('div', { class: 'dc-table' }), row = 'dc-trow' + (plain ? ' dc-plain' : '')
       const render = () => {
         const cs = get()
-        box.replaceChildren(...(cs.length ? [h('div', { class: 'dc-trow dc-thead' }, h('span'), h('span', null, 'SERIES'), h('span', null, 'SOURCE'), h('span', { class: 'dc-r' }, 'ATOMS'), h('span', { class: 'dc-r' }, 'MAXIMUM R · G'), h('span', { class: 'dc-r' }, 'FIRST SHELL R · G'))] : []),
-          ...cs.map(c => h('div', { class: 'dc-trow' }, swatch(c.color, c.dash), h('b', { style: { color: c.color } }, c.name), h('span', { class: 'dc-cap' }, c.source), h('span', { class: 'dc-r' }, String(c.atoms || '—')), h('span', { class: 'dc-r' }, c.peak ? c.peak.r.toFixed(3) + ' · ' + c.peak.g.toFixed(2) : '—'), h('span', { class: 'dc-r' }, c.shell ? c.shell.r.toFixed(3) + ' · ' + c.shell.g.toFixed(2) : '—'))))
+        box.replaceChildren(...(cs.length ? [h('div', { class: row + ' dc-thead' }, h('span'), h('span', null, 'SERIES'), h('span', null, 'SOURCE'), ...(plain ? [] : [h('span', { class: 'dc-r' }, 'ATOMS'), h('span', { class: 'dc-r' }, 'MAXIMUM R · G'), h('span', { class: 'dc-r' }, 'FIRST SHELL R · G')]))] : []),
+          ...cs.map(c => h('div', { class: row }, swatch(c.color, c.dash), h('b', { style: { color: c.color } }, c.name), h('span', { class: 'dc-cap' }, c.source),
+            ...(plain ? [] : [h('span', { class: 'dc-r' }, String(c.atoms || '—')), h('span', { class: 'dc-r' }, c.peak ? c.peak.r.toFixed(3) + ' · ' + c.peak.g.toFixed(2) : '—'), h('span', { class: 'dc-r' }, c.shell ? c.shell.r.toFixed(3) + ' · ' + c.shell.g.toFixed(2) : '—')]))))
       }
       redraws.push(render)
       return { el: box, render }
@@ -1040,7 +1050,7 @@ export function decypherKit(data: KitData) {
       redraws.push(render)
       render()
       return h('header', { class: 'dc-header' }, h('div', { class: 'dc-grow' }, h('h1', null, data.header || '(de)Cypher'),
-        h('div', { class: 'dc-cap' }, data.analyses.length + (data.analyses.length === 1 ? ' RDF' : ' RDFs') + ' · exported ' + new Date(data.made).toLocaleString() + ' · ' + data.by)), seg)
+        h('div', { class: 'dc-cap' }, data.analyses.length + (data.analyses.every(a => a.plot) ? (data.analyses.length === 1 ? ' result' : ' results') : data.analyses.length === 1 ? ' RDF' : ' RDFs') + ' · exported ' + new Date(data.made).toLocaleString() + ' · ' + data.by)), seg)
     }
 
     function compareSection(c: NonNullable<ExportData['compare']>) {
@@ -1051,7 +1061,7 @@ export function decypherKit(data: KitData) {
       const shown: Record<string, 'on' | 'dim' | 'off'> = {}
       const curves = () => buildCurves({ focus, plotted, selected, colorBy, pal: pal(), tones })
       const drawn = () => curves().filter(x => shown[x.key] !== 'off').map(x => ({ ...x, dim: shown[x.key] === 'dim' }))
-      const ch = chartBox(() => ({ curves: drawn(), grid: focus.x, xlabel: focus.xlabel, ylabel: focus.ylabel }))
+      const ch = chartBox(() => ({ curves: drawn(), grid: focus.x, xlabel: focus.xlabel, ylabel: focus.ylabel, plot: focus.plot }))
       const legend = h('div', { class: 'dc-chips' })
       const seg = h('div', { class: 'dc-seg', role: 'group', 'aria-label': 'colour by' })
       const NEXT = { on: 'dim', dim: 'off', off: 'on' } as const, WORD = { on: '', dim: ' · dimmed', off: ' · hidden' }
@@ -1083,8 +1093,8 @@ export function decypherKit(data: KitData) {
         const m = members.find(x => x.id === c.analysis)!
         return { ...c, source: m.ref ? 'ref ' + names[m.id] : names[m.id], dim: hoverSel >= 0 && c.name !== a.sels[hoverSel]?.name }
       })
-      const ch = chartBox(() => ({ curves: curves(), grid: a.x, xlabel: a.xlabel, ylabel: a.ylabel }))
-      const tb = table(curves)
+      const ch = chartBox(() => ({ curves: curves(), grid: a.x, xlabel: a.xlabel, ylabel: a.ylabel, plot: a.plot }))
+      const tb = table(curves, !!a.plot)
       // Only references on this card's structure can be drawn on it; every RDF of a morph has its chip.
       const onStruct = members.filter(m => m.ref && m.struct === a.struct)
       const refs = () => onStruct.map(m => ({ label: names[m.id], atoms: m.ref!.atoms, on: on.includes(m.id) }))
@@ -1117,7 +1127,7 @@ export function decypherKit(data: KitData) {
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => redraws.forEach(f => f()))
   }
 
-  return { TONES, DASH, DASH_NAMES, REPS, RESTS, SOLV, palette, toRanges, fromRanges, parseStructure, mix, buildMol, structureView, matchGroup, rdfLooks, buildCurves, looseName, sameButReference, morphWhy, pickRefs, refLabels, niceTicks, valAt, hoverRows, hoverX, readoutTitle, chart, mount }
+  return { TONES, DASH, DASH_NAMES, REPS, RESTS, SOLV, palette, toRanges, fromRanges, parseStructure, mix, buildMol, structureView, matchGroup, rdfLooks, buildCurves, looseName, sameButReference, morphWhy, pickRefs, refLabels, niceTicks, xDigitsOf, valAt, hoverRows, hoverX, readoutTitle, chart, mount }
 }
 
 export type Kit = ReturnType<typeof decypherKit>

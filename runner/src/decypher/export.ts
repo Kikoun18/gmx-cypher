@@ -85,7 +85,7 @@ export function exportData(o: ExportInput): ExportData {
     id: id.get(a.id)!, title: chosen(a) || a.title, label: a.label, sub: a.sub, x: a.x.map(v => round(v, 5)), xlabel: a.xlabel, ylabel: a.ylabel,
     ref: a.ref ? { name: a.ref.name, atoms: toRanges(a.ref.atoms), tone: a.ref.tone } : null,
     sels: a.sels.map(g => ({ name: g.name, atoms: toRanges(g.atoms), tone: g.tone, y: g.y.map(v => round(v, 4)), peak: g.peak && { r: round(g.peak.r, 5), g: round(g.peak.g, 4) }, shell: g.shell ? { r: round(g.shell.r, 5), g: round(g.shell.g, 4) } : null })),
-    struct: a.struct ? sid.get(a.struct) ?? null : null, structNote: scrub(a.structNote), selected: o.selected(a), tone: o.tones[a.id] ?? 'coral',
+    struct: a.struct ? sid.get(a.struct) ?? null : null, structNote: scrub(a.structNote), selected: o.selected(a), tone: o.tones[a.id] ?? 'coral', ...(a.plot ? { plot: a.plot } : {}),
   }))
   const compare = o.compare && o.compare.ids.filter(x => id.has(x)).length > 1
     ? { ids: o.compare.ids.filter(x => id.has(x)).map(x => id.get(x)!), focus: id.get(o.compare.focus) ?? id.get(o.compare.ids[0])!, selected: o.compare.selected, colorBy: o.compare.colorBy }
@@ -148,6 +148,7 @@ button:focus-visible{outline:2px solid var(--ring);outline-offset:2px}
 .dc-n{opacity:.7}
 .dc-table{display:flex;flex-direction:column;gap:2px}
 .dc-trow{display:grid;grid-template-columns:26px minmax(0,1fr) minmax(0,1.1fr) 44px 70px 56px;gap:8px;align-items:center;font-size:12px;line-height:16px;min-height:24px}
+.dc-trow.dc-plain{grid-template-columns:26px minmax(0,1fr) minmax(0,1.1fr)}
 .dc-thead{font-size:10px;letter-spacing:.12em;color:var(--muted-foreground)}
 .dc-r{text-align:right}
 .dc-nostruct{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:24px;min-height:220px;border-right:1px solid var(--border);text-align:center}

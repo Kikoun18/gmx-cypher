@@ -3,10 +3,15 @@
 // it, and the HTML export draws the same tree with the DOM.
 
 import * as React from 'react'
+import { Download } from 'lucide-react'
+import { download } from '../../../matrix/src/lib/export'
+import { EXPORT_DEFAULTS, fileBase, formatHints } from '../../../matrix/src/lib/exportPrefs'
+import { Select, SelectContent, SelectItem, SelectTrigger } from '../ui/select'
 import { cn } from '../lib/utils'
+import { figureFile, resultAnalysis } from './export'
 import { curvesOf, kit, type Series } from './index'
 import type { ChartGeom, Curve, Marks, Palette, VNode } from './kit'
-import { PALETTES, usePageTheme } from './theme'
+import { PALETTES, TOKENS_BY_THEME, usePageTheme } from './theme'
 
 /** A line of a curve in its colour and dash, for legends, tables and readouts. */
 export function Swatch({ color, dash, width = 22 }: { color: string; dash: string; width?: number }) {
@@ -76,17 +81,68 @@ export function ChartPanel({ curves, grid, xlabel, ylabel, pal, marks, y, rule, 
   )
 }
 
+/** What a chart exports under (R6a): its file name, its title, its data as CSV, and (when it can be one) an HTML page. */
+export interface ChartExport { file: string; title: string; sub?: string; csv: () => string; html?: (() => Promise<string>) | null; why?: string }
+
+/**
+ * A chart's export menu (R6a): SVG, PDF and PNG through the Matrix's figures, in the export theme's palette; CSV at
+ * gmx's own precision; the interactive HTML page when the chart can be one (else why not).
+ */
+export function ExportMenu({ exp, curves, xlabel, ylabel, marks, className, ...o }: ChartOptions & {
+  exp: ChartExport; curves: (pal: Palette) => Curve[]; xlabel: string; ylabel: string; marks: Marks; className?: string
+}) {
+  const [busy, setBusy] = React.useState(false), prefs = EXPORT_DEFAULTS, hints = formatHints(prefs, '')
+  const go = async (f: string) => {
+    setBusy(true)
+    try {
+      const name = (ext: string) => fileBase(exp.file) + '.' + ext
+      if (f === 'csv') download(new Blob([exp.csv()], { type: 'text/csv;charset=utf-8' }), name('csv'))
+      else if (f === 'html') { if (exp.html) download(new Blob([await exp.html()], { type: 'text/html;charset=utf-8' }), name('html')) }
+      else if (f === 'svg' || f === 'pdf' || f === 'png') {
+        const pal = PALETTES[prefs.theme === 'dark' ? 'dark' : 'light']
+        download(await figureFile({ title: exp.title, sub: exp.sub, file: exp.file, xlabel, ylabel, curves: curves(pal), marks, ...o }, f, prefs), name(f))
+      }
+    } finally { setBusy(false) }
+  }
+  return (
+    <Select value="" onValueChange={v => void go(v)}>
+      <SelectTrigger size="sm" className={cn('h-7 gap-1.5 border-transparent bg-transparent px-2 text-muted-foreground hover:text-foreground', className)} aria-label={'export ' + exp.title} disabled={busy}>
+        <Download className="size-3.5" />{busy ? 'exporting…' : 'export'}
+      </SelectTrigger>
+      <SelectContent align="end">
+        <SelectItem value="svg">svg · {hints.svg}</SelectItem>
+        <SelectItem value="pdf">pdf · {hints.pdf}</SelectItem>
+        <SelectItem value="png">png · {hints.png}</SelectItem>
+        <SelectItem value="csv">csv · every point as gmx wrote it</SelectItem>
+        {exp.html !== undefined && <SelectItem value="html" disabled={!exp.html}>html · {exp.html ? 'interactive page, one file' : exp.why}</SelectItem>}
+      </SelectContent>
+    </Select>
+  )
+}
+
+/** The interactive page of a result's chart (R6a), from the (de)Cypher export, loaded when asked. */
+async function resultHtml(exp: ChartExport, series: Series[], xlabel: string, ylabel: string, o: ChartOptions) {
+  const { exportData, exportHtml, fontData } = await import('../decypher/export')
+  const a = resultAnalysis({ id: 'result', title: exp.title, sub: exp.sub ?? '', xlabel, ylabel, series, y: o.y ?? 'zero', rule: o.rule === undefined ? 1 : o.rule, xDigits: o.xDigits })!
+  const theme = document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light'
+  const d = exportData({ analyses: [a], structs: {}, selected: () => a.sels.map(g => g.name), tones: {}, compare: null, view: { rep: 'ball & stick', rest: 'grey', labels: true, hydrogens: true, arrange: 'side by side' }, theme, tokens: TOKENS_BY_THEME, structures: false, by: 'gmx-cypher', header: exp.title })
+  return exportHtml(d, await fontData())
+}
+
 /**
  * A result's chart (R5c): its series as the core's curves, in the page's theme, and under it, when asked, a legend
- * of each curve's line and name (dimmed ones dimmed).
+ * of each curve's line and name (dimmed ones dimmed); with `exp`, its export menu (R6a).
  */
-export function SeriesChart({ series, xlabel, ylabel, marks = 'none', height = 240, legend = false, ...o }: ChartOptions & {
-  series: Series[]; xlabel: string; ylabel: string; marks?: Marks; height?: number; legend?: boolean
+export function SeriesChart({ series, xlabel, ylabel, marks = 'none', height = 240, legend = false, exp, ...o }: ChartOptions & {
+  series: Series[]; xlabel: string; ylabel: string; marks?: Marks; height?: number; legend?: boolean; exp?: ChartExport
 }) {
   const pal = PALETTES[usePageTheme()]
   const curves = React.useMemo(() => curvesOf(series, pal), [series, pal])
+  const full = React.useMemo(() => exp && { ...exp, ...(resultAnalysis({ id: 'r', title: '', sub: '', xlabel, ylabel, series }) ? { html: () => resultHtml(exp, series, xlabel, ylabel, o) } : { html: null, why: 'its curves are on different x grids' }) },
+    [exp, series, xlabel, ylabel, o.y, o.rule, o.xDigits])
   return (
-    <figure className="m-0 flex flex-col gap-2">
+    <figure className="relative m-0 flex flex-col gap-2">
+      {full && <ExportMenu className="absolute right-0 top-0 z-[1]" exp={full} curves={p => curvesOf(series, p)} xlabel={xlabel} ylabel={ylabel} marks={marks} {...o} />}
       <ChartPanel curves={curves} grid={curves[0]?.x ?? []} xlabel={xlabel} ylabel={ylabel} pal={pal} marks={marks} height={height} {...o} />
       {legend && (
         <figcaption className="flex flex-wrap items-center gap-x-4 gap-y-1 text-caption text-muted-foreground">

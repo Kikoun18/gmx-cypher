@@ -101,6 +101,8 @@ test('tick two jobs, see them side by side and on one graph, export them as one 
 test('the key opens and closes (de)Cypher; settings rebind it; runs on disk are found by their records', async ({ page }) => {
   const errors = watch(page)
   await page.goto(url)
+  // The key works once the page has drawn (its handler is attached then); a press before that is lost under load.
+  await expect(page.getByRole('button', { name: 'settings' })).toBeVisible()
   await page.keyboard.press('d')
   const dialog = page.getByRole('dialog', { name: 'compare' })
   await expect(dialog).toBeVisible()

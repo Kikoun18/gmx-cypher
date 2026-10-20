@@ -8,7 +8,8 @@ import type { AtomHover, Curve, Group, Mol, Palette, SceneState } from '../core/
 import type { View } from './state'
 import { kit } from '../core/theme'
 
-export interface StructureHandle { fit: () => void; reset: () => void; where: (nr: number) => { x: number; y: number } | null }
+/** The view's controls; `png` is the picture as drawn now (R6a), at the screen's resolution. */
+export interface StructureHandle { fit: () => void; reset: () => void; where: (nr: number) => { x: number; y: number } | null; png: () => Promise<Blob | null> }
 
 export const StructurePanel = React.forwardRef<StructureHandle, {
   mol: Mol | null; pal: Palette; view: View; sels: Group[]; selected: number[]; refs: { label: string; atoms: number[]; on?: boolean }[]
@@ -19,7 +20,7 @@ export const StructurePanel = React.forwardRef<StructureHandle, {
   const [tip, setTip] = React.useState<AtomHover | null>(null)
   const pick = React.useRef(onPick), pickRef = React.useRef(onPickRef)
   React.useLayoutEffect(() => { pick.current = onPick; pickRef.current = onPickRef })
-  React.useImperativeHandle(ref, () => ({ fit: () => ctl.current?.fit(), reset: () => ctl.current?.reset(), where: nr => ctl.current?.where(nr) ?? null }), [])
+  React.useImperativeHandle(ref, () => ({ fit: () => ctl.current?.fit(), reset: () => ctl.current?.reset(), where: nr => ctl.current?.where(nr) ?? null, png: () => new Promise(ok => (canvas.current ? canvas.current.toBlob(ok, 'image/png') : ok(null))) }), [])
   React.useEffect(() => {
     if (!wrap.current || !canvas.current || !mol) return
     const c = kit.structureView(canvas.current, wrap.current, { hover: setTip, pick: (i, add) => pick.current(i, add), pickRef: (i, add) => pickRef.current?.(i, add) })

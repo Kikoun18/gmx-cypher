@@ -18,7 +18,10 @@ import { jobLine, statusOf, type Job } from '../jobs'
 import { Status } from '../ui/status'
 import { cn } from '../lib/utils'
 import type { Analysis, Curve, Mol, Palette, Struct, Tone } from '../core/kit'
-import { ChartPanel, Swatch } from '../core/Chart'
+import { ChartPanel, ExportMenu, Swatch, type ChartExport } from '../core/Chart'
+import { curvesCsv } from '../lib/csv'
+import { download as downloadBlob } from '../../../matrix/src/lib/export'
+import { fileBase } from '../../../matrix/src/lib/exportPrefs'
 import { CurveTable, GroupChips, StructurePanel, type StructureHandle } from './panels'
 import type { LoadedFile } from './parse'
 import { useAnalyses, type Item } from './sources'
@@ -89,6 +92,12 @@ interface CardProps {
   onSelect: (names: string[]) => void; handle: (h: StructureHandle | null) => void; onActive: () => void
 }
 
+/** A structure view's picture as a PNG file (R6a). */
+async function savePng(h: StructureHandle | null, label: string) {
+  const blob = await h?.png()
+  if (blob) downloadBlob(blob, fileBase(label + '_structure') + '.png')
+}
+
 /** One analysis: its structure beside its g(r), its groups as chips, its curves with their highest points. Morphed: one card for RDFs that differ only in their reference, which one picks, atom or chip, one, the other or both. */
 function AnalysisCard({ members, on, tone, mol, pal, view, selected, tones, candidates, onMorph, onSplit, onRefs, onSelect, handle, onActive }: CardProps) {
   const a = members[0], many = members.length > 1
@@ -111,6 +120,9 @@ function AnalysisCard({ members, on, tone, mol, pal, view, selected, tones, cand
   const pickChip = many ? (i: number, add: boolean) => onRefs(kit.pickRefs(ids, on, members[i].id, add)) : undefined
   const hoverSel = hover ? a.sels.findIndex(g => g.name === hover) : -1
   const title = cardTitle(members)
+  // The chart's export (R6a): the curves in the export theme's palette; its CSV, each curve named with its source.
+  const curvesIn = (p: Palette) => kit.buildCurves({ focus: a, plotted: members, selected, colorBy: 'group', pal: p, tones }).filter(c => on.includes(c.analysis)).map(c => { const m = members.find(x => x.id === c.analysis)!; return { ...c, source: many ? (m.ref ? 'ref ' + names[m.id] : names[m.id]) : '' } })
+  const exp: ChartExport = { file: a.label, title, csv: () => curvesCsv(curvesIn(pal).map(c => ({ ...c, name: c.source ? c.name + ' · ' + c.source : c.name })), a.xlabel, a.ylabel) }
   return (
     <section aria-label={title} className="flex flex-col overflow-hidden rounded-xl border border-border bg-card" onMouseEnter={onActive}>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-border px-4 py-2.5">
@@ -132,15 +144,18 @@ function AnalysisCard({ members, on, tone, mol, pal, view, selected, tones, cand
         )}
         {many && <Button variant="outline" size="sm" onClick={onSplit} title="show each RDF as its own card again">split</Button>}
         {!many && <span className="max-w-[36ch] truncate text-caption text-muted-foreground" title={a.structNote}>{a.structNote}</span>}
-        {mol && <><Button variant="outline" size="sm" onClick={() => ref.current?.fit()}>fit selection</Button><Button variant="ghost" size="sm" onClick={() => ref.current?.reset()}>reset view</Button></>}
+        {mol && <><Button variant="outline" size="sm" onClick={() => ref.current?.fit()}>fit selection</Button><Button variant="ghost" size="sm" onClick={() => ref.current?.reset()}>reset view</Button><Button variant="ghost" size="sm" onClick={() => void savePng(ref.current, a.label)} title="the structure as drawn now, as a PNG">png</Button></>}
       </div>
       <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,420px),1fr))]">
         <StructurePanel ref={h => { ref.current = h; handle(h) }} className="min-h-[480px] border-r border-border" mol={mol} pal={pal} view={view} sels={a.sels} selected={idx} refs={refs} hoverSel={hoverSel}
           onPick={(i, add) => onSelect(pickGroup(selected, a.sels[i].name, add))} onPickRef={pickRef} onActive={onActive}
           empty={<><span className="text-heading font-bold">No structure</span><span className="max-w-[40ch] text-caption text-muted-foreground">{a.structNote}</span></>} />
         <div className="flex min-w-0 flex-col gap-3 p-4">
-          <ChartPanel className="h-[300px] flex-none" curves={curves} grid={a.x} xlabel={a.xlabel} ylabel={a.ylabel} pal={pal} marks={view.marks} xDigits={3}
-            empty={curves.length ? null : { title: 'Pick an atom group', hint: 'Click atoms in the structure or a chip below. ⌘-click adds more groups to the plot.' }} />
+          <div className="relative">
+            {curves.length > 0 && <ExportMenu className="absolute right-0 top-0 z-[1]" exp={exp} curves={curvesIn} xlabel={a.xlabel} ylabel={a.ylabel} marks={view.marks} xDigits={3} />}
+            <ChartPanel className="h-[300px] flex-none" curves={curves} grid={a.x} xlabel={a.xlabel} ylabel={a.ylabel} pal={pal} marks={view.marks} xDigits={3}
+              empty={curves.length ? null : { title: 'Pick an atom group', hint: 'Click atoms in the structure or a chip below. ⌘-click adds more groups to the plot.' }} />
+          </div>
           <Section label={'Groups ' + pad(a.sels.length) + ' · plotted ' + pad(idx.length)}>
             <Button variant="ghost" size="sm" onClick={() => onSelect(a.sels.map(g => g.name))}>all</Button>
             <Button variant="ghost" size="sm" onClick={() => onSelect([])}>none</Button>
@@ -171,6 +186,9 @@ function CompareView({ shown, focus, setFocus, mols, pal, view, patch, selected,
   // Plotted groups an RDF has no match for: said, not left to look like a curve that is missing.
   const unmatched = React.useMemo(() => plotted.slice(1).map(an => ({ an, names: selected.filter(n => { const g = focus.sels.find(x => x.name === n); return !!g && !kit.matchGroup(g, an, focus) }) })).filter(u => u.names.length), [plotted, selected, focus])
   const i = shown.indexOf(focus), step = (d: number) => setFocus(shown[(i + d + shown.length) % shown.length].id)
+  // One graph's export (R6a): every curve, named with its RDF, in the export theme's palette.
+  const curvesIn = (p: Palette) => kit.buildCurves({ focus, plotted, selected, colorBy: view.colorBy, pal: p, tones })
+  const exp: ChartExport = { file: 'one-graph_' + plotted.length + '-RDFs', title: 'One graph · ' + plural(plotted.length, 'RDF'), csv: () => curvesCsv(curvesIn(pal).map(c => ({ ...c, name: c.name + ' · ' + c.source })), focus.xlabel, focus.ylabel) }
   return (
     <div className="grid min-h-[660px] grid-cols-[repeat(auto-fit,minmax(min(100%,460px),1fr))] gap-4">
       <section aria-label="structure" className="flex min-w-0 flex-col rounded-xl border border-border bg-card" onMouseEnter={onActive}>
@@ -184,7 +202,7 @@ function CompareView({ shown, focus, setFocus, mols, pal, view, patch, selected,
           {shown.length > 1 && <Button variant="ghost" size="icon-sm" aria-label="next job" onClick={() => step(1)}><ChevronRight /></Button>}
           <span className="text-caption text-muted-foreground">{shown.length > 1 ? (i + 1) + '/' + shown.length + ' · [ ] step' : ''}</span>
           <span className="flex-1" />
-          {mols.get(focus.struct ?? '') && <><Button variant="outline" size="sm" onClick={() => ref.current?.fit()}>fit selection</Button><Button variant="ghost" size="sm" onClick={() => ref.current?.reset()}>reset view</Button></>}
+          {mols.get(focus.struct ?? '') && <><Button variant="outline" size="sm" onClick={() => ref.current?.fit()}>fit selection</Button><Button variant="ghost" size="sm" onClick={() => ref.current?.reset()}>reset view</Button><Button variant="ghost" size="sm" onClick={() => void savePng(ref.current, focus.label)} title="the structure as drawn now, as a PNG">png</Button></>}
         </div>
         <StructurePanel ref={h => { ref.current = h; handle(h) }} className="flex-1" mol={mols.get(focus.struct ?? '') ?? null} pal={pal} view={view} sels={focus.sels} selected={idx} refs={refs}
           hoverSel={hover ? focus.sels.findIndex(g => g.name === hover) : -1} onPick={(k, add) => onSelect(pickGroup(selected, focus.sels[k].name, add))} onActive={onActive}
@@ -209,6 +227,7 @@ function CompareView({ shown, focus, setFocus, mols, pal, view, patch, selected,
           ) })}
           <span className="flex-1" />
           <Seg label="color by" value={view.colorBy} options={['group', 'job'] as const} labels={{ job: 'result' }} onChange={v => patch({ colorBy: v })} />
+          {curves.length > 0 && <ExportMenu exp={exp} curves={curvesIn} xlabel={focus.xlabel} ylabel={focus.ylabel} marks={view.marks} xDigits={3} />}
         </div>
         <ChartPanel className="mx-4 mb-1.5 mt-3.5 flex-1" curves={curves} grid={focus.x} xlabel={focus.xlabel} ylabel={focus.ylabel} pal={pal} marks={view.marks} xDigits={3}
           empty={curves.length ? null : { title: 'Pick an atom group', hint: 'Each group you pick is drawn for every result that has it: the same atoms of the same structure, else the same name.' }} />

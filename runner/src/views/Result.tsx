@@ -4,7 +4,7 @@ import { Alert, AlertDescription, AlertTitle } from '../ui/alert'
 import { Button } from '../ui/button'
 import { Stat } from '../ui/card'
 import { TONES, type Series } from '../core/index'
-import { SeriesChart, Swatch } from '../core/Chart'
+import { SeriesChart, Swatch, type ChartExport } from '../core/Chart'
 import { Section } from '../ui/separator'
 import { getJson } from '../api'
 import { estimateOf, type Job } from '../jobs'
@@ -15,6 +15,7 @@ import { driftLarger, type EnergyRow } from '../lib/energy'
 import { curveStats } from '../lib/curves'
 import { peaks, resultSeries } from '../lib/rdf'
 import { parseTable } from '../../../matrix/src/lib/seq'
+import { csvMeta, xvgCsv } from '../lib/csv'
 import type { RunRecord } from '../lib/record'
 import { groupText, toneText, toneVar, type Tone } from '../lib/tones'
 import { cn } from '../lib/utils'
@@ -52,6 +53,20 @@ function useOutput(id: string, kind: 'xvg' | 'cn' | null) {
   return t?.key === key ? t.text : null
 }
 
+/** A run's main file (`xvg`) or n(r) (`cn`), as the server names them, or another of its files by the end of its name (`_profile.xvg`). */
+const outName = (job: Job, r: RunRecord, which: 'xvg' | 'cn' | string = 'xvg') => (which === 'xvg' || which === 'cn'
+  ? String((job.meta?.names as Record<string, string> | undefined)?.[which] ?? '').split('/').pop()!
+  : r.outputs.map(o => o.path.split('/').pop()!).find(n => n.endsWith(which)) ?? '')
+/** A result chart's export (R6a): named after the run's file (and the chart, when a run draws several); its CSV the columns `parts`, with where they came from. */
+function chartExport(job: Job, record: RunRecord, source: string, parts: { text: string; col: number; name: string }[], xlabel: string, ylabel: string, part = ''): ChartExport {
+  return {
+    file: source.replace(/\.xvg$/i, '') + (part ? '_' + part : ''), title: (job.name ?? job.title) + (part ? ' · ' + part : ''),
+    csv: () => xvgCsv(parts, xlabel, ylabel, csvMeta(record, String(job.meta?.record ?? ''), source, g => g.name)),
+  }
+}
+/** Every y column of an xvg, named. */
+const columns = (text: string, names: string[]) => names.map((name, i) => ({ text, col: i + 1, name }))
+
 type Shown = 'on' | 'dim' | 'off'
 const NEXT: Record<Shown, Shown> = { on: 'dim', dim: 'off', off: 'on' }
 const WORD: Record<Shown, string> = { on: 'shown', dim: 'dimmed', off: 'hidden' }
@@ -60,8 +75,8 @@ const WORD: Record<Shown, string> = { on: 'shown', dim: 'dimmed', off: 'hidden' 
  * Curves in their groups' hues, drawn by the core with both peak rules marked (g(r): the maximum filled, the first
  * shell hollow); a click on a name cycles shown → dimmed → hidden, and hidden curves leave the scale.
  */
-function Curves({ text, tones, yLabel, height, shown, setShown, marked = true }: {
-  text: string; tones: Tone[]; yLabel: string; height: number; shown: Shown[]; setShown: (s: Shown[]) => void; marked?: boolean
+function Curves({ text, tones, yLabel, height, shown, setShown, marked = true, exp }: {
+  text: string; tones: Tone[]; yLabel: string; height: number; shown: Shown[]; setShown: (s: Shown[]) => void; marked?: boolean; exp: ChartExport
 }) {
   const curves = React.useMemo(() => resultSeries(text), [text])
   const state = (i: number) => shown[i] ?? 'on'
@@ -72,7 +87,7 @@ function Curves({ text, tones, yLabel, height, shown, setShown, marked = true }:
   }), [curves, tones, shown, marked])
   return (
     <div className="flex flex-col gap-2">
-      {series.length ? <SeriesChart series={series} xlabel="r (nm)" ylabel={yLabel} height={height} marks={marked ? 'both' : 'none'} rule={marked ? 1 : null} xDigits={3} />
+      {series.length ? <SeriesChart series={series} xlabel="r (nm)" ylabel={yLabel} height={height} marks={marked ? 'both' : 'none'} rule={marked ? 1 : null} xDigits={3} exp={exp} />
         : <p className="m-0 text-caption text-muted-foreground">every curve is hidden</p>}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
         {curves.map((c, i) => (
@@ -109,7 +124,7 @@ function RdfChart({ job, record }: { job: Job; record: RunRecord }) {
   const dt = Number(record.options.find(o => o.flag === 'dt')?.value) || 0, start = estimateOf(job)?.start ?? 0
   return (
     <div className="flex flex-col gap-3">
-      <Curves text={xvg} tones={tones} yLabel="g(r)" height={300} shown={shown} setShown={setShown} />
+      <Curves text={xvg} tones={tones} yLabel="g(r)" height={300} shown={shown} setShown={setShown} exp={chartExport(job, record, outName(job, record), columns(xvg, curves.map(c => c.label)), 'r (nm)', 'g(r)')} />
       <p className="m-0 text-caption text-muted-foreground">click a curve's name: shown → dimmed → hidden · ● maximum · ○ first shell</p>
       <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3">
         {curves.flatMap((c, i) => {
@@ -124,7 +139,7 @@ function RdfChart({ job, record }: { job: Job; record: RunRecord }) {
       <p className="m-0 text-caption text-muted-foreground">{optionsLine(record)} · reference {record.groups[0].name}</p>
       {cn && <>
         <Section label="Cumulative number" />
-        <Curves text={cn} tones={tones} yLabel="n(r)" height={180} shown={shown} setShown={setShown} marked={false} />
+        <Curves text={cn} tones={tones} yLabel="n(r)" height={180} shown={shown} setShown={setShown} marked={false} exp={chartExport(job, record, outName(job, record, 'cn'), columns(cn, resultSeries(cn).map(c => c.label)), 'r (nm)', 'n(r)')} />
       </>}
     </div>
   )
@@ -150,7 +165,8 @@ function EnergyChart({ job, record }: { job: Job; record: RunRecord }) {
         {curves.map((c, i) => (
           <div key={c.label} className="flex min-w-0 flex-col gap-1">
             <span className={cn('text-label uppercase', toneText[TONES[i % TONES.length]])}>{c.label}</span>
-            <SeriesChart series={[{ label: c.label, points: c.points, tone: TONES[i % TONES.length] }]} xlabel="time (ps)" ylabel={rows.find(r => r.name === c.label)?.unit ?? ''} height={180} y="data" rule={0} />
+            <SeriesChart series={[{ label: c.label, points: c.points, tone: TONES[i % TONES.length] }]} xlabel="time (ps)" ylabel={rows.find(r => r.name === c.label)?.unit ?? ''} height={180} y="data" rule={0}
+              exp={chartExport(job, record, outName(job, record), [{ text: xvg, col: i + 1, name: c.label }], 'time (ps)', rows.find(r => r.name === c.label)?.unit ?? '', c.label)} />
           </div>
         ))}
       </div>
@@ -191,7 +207,8 @@ function AwhChart({ job, record }: { job: Job; record: RunRecord }) {
   const last = texts[shown[shown.length - 1]], target = awhTargetError(last), xLabel = parseTable(last).head.xLabel || 'coordinate'
   return (
     <div className="flex flex-col gap-3">
-      <SeriesChart series={series} xlabel={xLabel} ylabel="PMF (kJ/mol)" height={300} legend={series.length > 1} y="data" rule={0} />
+      <SeriesChart series={series} xlabel={xLabel} ylabel="PMF (kJ/mol)" height={300} legend={series.length > 1} y="data" rule={0}
+        exp={chartExport(job, record, shown[shown.length - 1], shown.map((n, i) => ({ text: texts[n], col: 1, name: series[i].label })), xLabel, 'PMF (kJ/mol)')} />
       {names.length > shown.length && <p className="m-0 text-caption text-muted-foreground">{shown.length} of {names.length} frames drawn, evenly spaced; every file is in the folder</p>}
       <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3">
         <Stat label="frames written" value={String(names.length)} hint={'t = ' + time(names[0]) + (names.length > 1 ? ' … ' + time(names[names.length - 1]) : '') + ' ps · one PMF file each'} />
@@ -232,10 +249,12 @@ function WhamChart({ job, record }: { job: Job; record: RunRecord }) {
   const hist: Series[] = h!.windows.map((c, j) => ({ label: 'window ' + label(j + 1), points: h!.x.map((x, i) => [x, c[i]] as [number, number]), tone: TONES[j % 8], dash: Math.floor(j / 8) }))
   return (
     <div className="flex flex-col gap-3">
-      <SeriesChart series={[{ label: 'profile', points: prof, tone: 'coral', ...(errors ? { err: errors } : {}) }]} xlabel="ξ (nm)" ylabel="E (kJ/mol)" height={260} y="data" rule={0} />
+      <SeriesChart series={[{ label: 'profile', points: prof, tone: 'coral', ...(errors ? { err: errors } : {}) }]} xlabel="ξ (nm)" ylabel="E (kJ/mol)" height={260} y="data" rule={0}
+        exp={chartExport(job, record, outName(job, record, '_profile.xvg'), [{ text: profile, col: 1, name: 'profile' }, ...(errors ? [{ text: bsres, col: 2, name: 'σ (bootstrap)' }] : [])], 'ξ (nm)', 'E (kJ/mol)')} />
       <p className="m-0 text-caption text-muted-foreground">{errors ? 'the band: ± one standard deviation over ' + (record.options.find(o => o.flag === 'nBootstrap')?.value ?? '') + ' bootstraps' : 'no error estimate: run with bootstraps for one'} · the profile is not sent to the vault: the Matrix would read it as a histogram</p>
       <Section label={'Histograms · ' + h!.windows.length + ' windows'} />
-      <SeriesChart series={hist} xlabel="ξ (nm)" ylabel="count" height={220} y="zero" rule={null} />
+      <SeriesChart series={hist} xlabel="ξ (nm)" ylabel="count" height={220} y="zero" rule={null}
+        exp={chartExport(job, record, outName(job, record), columns(histo, hist.map(x => x.label)), 'ξ (nm)', 'count')} />
       <Section label="Overlap of neighbouring windows" />
       <table className="text-control" aria-label="overlap of neighbouring windows">
         <thead><tr className="text-left text-label uppercase text-muted-foreground"><th className="py-1 pr-4 font-normal">windows</th><th className="pr-4 font-normal">peaks at</th><th className="font-normal">overlap</th></tr></thead>
@@ -264,13 +283,13 @@ function DistanceChart({ job, record }: { job: Job; record: RunRecord }) {
   if (xvg == null || hist == null) return <p className="m-0 text-caption text-muted-foreground" aria-live="polite">reading the distances…</p>
   const sels = record.groups.slice(1), ref = record.groups[0]
   const measure = String(record.options.find(o => o.flag === 'measure')?.value ?? 'com')
-  const named = (text: string, xLabel: string, yLabel: string, y: 'zero' | 'data') => {
+  const named = (text: string, source: string, xLabel: string, yLabel: string, y: 'zero' | 'data') => {
     const series: Series[] = resultSeries(text).map((c, i) => ({ label: sels[i]?.name ?? c.label, points: c.points, tone: sels[i]?.tone ?? TONES[i % TONES.length] }))
-    return <SeriesChart series={series} xlabel={xLabel} ylabel={yLabel} height={240} legend y={y} rule={null} />
+    return <SeriesChart series={series} xlabel={xLabel} ylabel={yLabel} height={240} legend y={y} rule={null} exp={chartExport(job, record, source, columns(text, series.map(x => x.label)), xLabel, yLabel)} />
   }
   return (
     <div className="flex flex-col gap-3">
-      {named(xvg, 'time (ps)', measure === 'pairs' ? 'average over pairs (nm)' : 'distance (nm)', 'data')}
+      {named(xvg, outName(job, record), 'time (ps)', measure === 'pairs' ? 'average over pairs (nm)' : 'distance (nm)', 'data')}
       <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3">
         {(record.distances ?? []).map((d, i) => (
           <Stat key={i} label={(sels[i]?.name ?? d.selection) + ' · average'} value={d.average.toFixed(3) + ' nm'} hint={'± ' + d.sd.toFixed(3) + ' nm (standard deviation) · ' + d.samples + ' samples · ' + d.selection} />
@@ -282,7 +301,7 @@ function DistanceChart({ job, record }: { job: Job; record: RunRecord }) {
       </p>
       {hist && <>
         <Section label="Histogram" />
-        {named(hist, 'distance (nm)', 'probability', 'zero')}
+        {named(hist, outName(job, record, '_hist.xvg'), 'distance (nm)', 'probability', 'zero')}
         <p className="m-0 text-caption text-muted-foreground">not sent to the vault: the Matrix would read it as an umbrella histogram</p>
       </>}
     </div>
@@ -300,13 +319,14 @@ function HbondChart({ job, record }: { job: Job; record: RunRecord }) {
   const [ref, target] = record.groups, curves = resultSeries(xvg), stats = curveStats(curves[0]?.points ?? [])
   const series: Series[] = curves.map((c, i) => ({ label: i ? c.label.toLowerCase() : 'H-bonds', points: c.points, tone: target?.tone ?? 'coral', ...(i ? { dash: 1, dim: true } : {}) }))
   const legacy = record.analysis === 'hbond-legacy'
-  const distribution = (text: string, label: string, xLabel: string, yLabel: string) => <>
+  const distribution = (text: string, suffix: string, label: string, xLabel: string, yLabel: string) => <>
     <Section label={label} />
-    <SeriesChart series={resultSeries(text).map((c, i): Series => ({ label: c.label, points: c.points, tone: i ? 'sky' : target?.tone ?? 'coral', ...(i ? { dash: 1 } : {}) }))} xlabel={xLabel} ylabel={yLabel} height={200} legend={resultSeries(text).length > 1} y="zero" rule={null} />
+    <SeriesChart series={resultSeries(text).map((c, i): Series => ({ label: c.label, points: c.points, tone: i ? 'sky' : target?.tone ?? 'coral', ...(i ? { dash: 1 } : {}) }))} xlabel={xLabel} ylabel={yLabel} height={200} legend={resultSeries(text).length > 1} y="zero" rule={null}
+      exp={chartExport(job, record, named(suffix) ?? '', columns(text, resultSeries(text).map(c => c.label)), xLabel, yLabel)} />
   </>
   return (
     <div className="flex flex-col gap-3">
-      <SeriesChart series={series} xlabel="time (ps)" ylabel="H-bonds" height={240} legend={series.length > 1} y="zero" rule={null} />
+      <SeriesChart series={series} xlabel="time (ps)" ylabel="H-bonds" height={240} legend={series.length > 1} y="zero" rule={null} exp={chartExport(job, record, outName(job, record), columns(xvg, series.map(x => x.label)), 'time (ps)', 'H-bonds')} />
       <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3">
         {stats && <Stat label="H-bonds · mean per frame" value={stats.mean.toFixed(1)} hint={'from ' + stats.min + ' to ' + stats.max + ' · ' + stats.frames + ' frames'} />}
         {(record.summary ?? []).map(l => <Stat key={l} label="gmx printed" value={<span className="text-control">{l}</span>} />)}
@@ -315,9 +335,9 @@ function HbondChart({ job, record }: { job: Job; record: RunRecord }) {
         between {ref?.name} and {target?.name} · {legacy ? 'legacy criteria (' + (record.command.args[0] === 'hbond' ? 'gmx hbond of this GROMACS' : 'gmx hbond-legacy') + ')' : 'the selection tool, gmx hbond'} · the count over time is the file for the vault
       </p>
       {/* Both tools write densities: each integrates to 1 (checked on their 2025.4 output). */}
-      {dist && distribution(dist, 'Distance distribution', legacy ? 'donor – acceptor (nm)' : 'distance (nm)', 'density (1/nm)')}
-      {ang && distribution(ang, 'Angle distribution', 'angle (°)', 'density (1/°)')}
-      {dan && distribution(dan, 'Donors and acceptors', 'time (ps)', 'number')}
+      {dist && distribution(dist, '_dist.xvg', 'Distance distribution', legacy ? 'donor – acceptor (nm)' : 'distance (nm)', 'density (1/nm)')}
+      {ang && distribution(ang, '_ang.xvg', 'Angle distribution', 'angle (°)', 'density (1/°)')}
+      {dan && distribution(dan, '_dan.xvg', 'Donors and acceptors', 'time (ps)', 'number')}
       {(dist || ang || dan) && <p className="m-0 text-caption text-muted-foreground">not sent to the vault: the Matrix would read these as an umbrella histogram or as H-bonds</p>}
     </div>
   )
@@ -327,13 +347,14 @@ function HbondChart({ job, record }: { job: Job; record: RunRecord }) {
  * A quantity per group over time (R9), one curve each in the group's tone, and a tile each: the mean with its standard
  * deviation over the frames, and the last value. `groups` are the curves' groups, in the file's column order.
  */
-function GroupSeries({ job, groups, yLabel, unit, note }: { job: Job; groups: { name: string; tone: Tone }[]; yLabel: string; unit: string; note: string }) {
+function GroupSeries({ job, record, groups, yLabel, unit, note }: { job: Job; record: RunRecord; groups: { name: string; tone: Tone }[]; yLabel: string; unit: string; note: string }) {
   const xvg = useOutput(job.id, 'xvg')
   if (xvg == null) return <p className="m-0 text-caption text-muted-foreground" aria-live="polite">reading the result…</p>
   const curves = resultSeries(xvg), at = (i: number) => groups[i] ?? { name: curves[i].label, tone: TONES[i % 8] }
   return (
     <div className="flex flex-col gap-3">
-      <SeriesChart series={curves.map((c, i) => ({ label: at(i).name, points: c.points, tone: at(i).tone }))} xlabel="time (ps)" ylabel={yLabel} height={240} legend={curves.length > 1} y="data" rule={null} />
+      <SeriesChart series={curves.map((c, i) => ({ label: at(i).name, points: c.points, tone: at(i).tone }))} xlabel="time (ps)" ylabel={yLabel} height={240} legend={curves.length > 1} y="data" rule={null}
+        exp={chartExport(job, record, outName(job, record), columns(xvg, curves.map((_, i) => at(i).name)), 'time (ps)', yLabel)} />
       <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3">
         {curves.map((c, i) => {
           const st = curveStats(c.points)
@@ -350,7 +371,7 @@ function RmsChart({ job, record }: { job: Job; record: RunRecord }) {
   const fit = String(record.options.find(o => o.flag === 'fit')?.value ?? 'rot+trans'), prev = Number(record.options.find(o => o.flag === 'prev')?.value ?? 0)
   const against = prev > 0 ? 'the frame ' + prev + ' frame' + (prev > 1 ? 's' : '') + ' before' : "the run input's structure"
   const how = fit === 'none' ? 'without a fit' : 'after a fit of ' + record.groups[0]?.name + ' (' + (fit === 'translation' ? 'translation only' : 'rotation and translation') + ')'
-  return <GroupSeries job={job} groups={record.groups} yLabel="RMSD (nm)" unit="nm" note={'against ' + against + ', ' + how + (record.groups.length > 1 ? ' · the Matrix takes the first curve, ' + record.groups[0].name : '')} />
+  return <GroupSeries job={job} record={record} groups={record.groups} yLabel="RMSD (nm)" unit="nm" note={'against ' + against + ', ' + how + (record.groups.length > 1 ? ' · the Matrix takes the first curve, ' + record.groups[0].name : '')} />
 }
 
 /** gmx rmsf (R9b): the fluctuation along the group's atoms or residues, its highest point marked. */
@@ -362,7 +383,8 @@ function RmsfChart({ job, record }: { job: Job; record: RunRecord }) {
   const top = curve?.points.reduce((a, p) => (p[1] > a[1] ? p : a), curve.points[0])
   return (
     <div className="flex flex-col gap-3">
-      {curve && <SeriesChart series={[{ label: g?.name ?? 'RMSF', points: curve.points, tone: g?.tone ?? 'coral', peak: top ? { r: top[0], g: top[1] } : null }]} xlabel={unit} ylabel="RMSF (nm)" height={240} marks="maximum" y="data" rule={null} />}
+      {curve && <SeriesChart series={[{ label: g?.name ?? 'RMSF', points: curve.points, tone: g?.tone ?? 'coral', peak: top ? { r: top[0], g: top[1] } : null }]} xlabel={unit} ylabel="RMSF (nm)" height={240} marks="maximum" y="data" rule={null}
+        exp={chartExport(job, record, outName(job, record), [{ text: xvg, col: 1, name: g?.name ?? 'RMSF' }], unit, 'RMSF (nm)')} />}
       <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3">
         {st && <Stat label={'mean over ' + st.frames + ' ' + unit + 's'} value={st.mean.toFixed(3) + ' nm'} hint={'± ' + st.sd.toFixed(3) + ' (standard deviation) · lowest ' + st.min.toFixed(3)} />}
         {top && <Stat label={'highest · ' + unit + ' ' + top[0]} value={top[1].toFixed(3) + ' nm'} hint={g?.name} />}
@@ -383,7 +405,8 @@ function GyrateChart({ job, record }: { job: Job; record: RunRecord }) {
   const stats = curves.map(c => curveStats(c.points))
   return (
     <div className="flex flex-col gap-3">
-      <SeriesChart series={curves.map((c, i): Series => ({ label: label(i), points: c.points, tone: i ? TONES[i] : g?.tone ?? 'coral', ...(i ? { dash: 1, dim: true } : {}) }))} xlabel="time (ps)" ylabel="radius (nm)" height={240} legend y="data" rule={null} />
+      <SeriesChart series={curves.map((c, i): Series => ({ label: label(i), points: c.points, tone: i ? TONES[i] : g?.tone ?? 'coral', ...(i ? { dash: 1, dim: true } : {}) }))} xlabel="time (ps)" ylabel="radius (nm)" height={240} legend y="data" rule={null}
+        exp={chartExport(job, record, outName(job, record), columns(xvg, curves.map((_, i) => label(i))), 'time (ps)', 'radius (nm)')} />
       <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3">
         {stats[0] && <Stat label={'Rg · ' + g?.name + ' · mean'} value={stats[0].mean.toFixed(3) + ' nm'} hint={'± ' + stats[0].sd.toFixed(3) + ' (standard deviation) · last ' + stats[0].last.toFixed(3) + ' · ' + stats[0].frames + ' frames'} />}
         {stats.length === 4 && <Stat label="about x, y, z · mean" value={stats.slice(1).map(x => x!.mean.toFixed(3)).join(' · ')} hint="nm" />}
@@ -404,7 +427,8 @@ function MindistChart({ job, record }: { job: Job; record: RunRecord }) {
   const curves = named(xvg)
   return (
     <div className="flex flex-col gap-3">
-      <SeriesChart series={curves} xlabel="time (ps)" ylabel={'minimum distance to ' + ref?.name + ' (nm)'} height={240} legend={curves.length > 1} y="data" rule={null} />
+      <SeriesChart series={curves} xlabel="time (ps)" ylabel={'minimum distance to ' + ref?.name + ' (nm)'} height={240} legend={curves.length > 1} y="data" rule={null}
+        exp={chartExport(job, record, outName(job, record), columns(xvg, curves.map(c => c.label)), 'time (ps)', 'minimum distance to ' + ref?.name + ' (nm)')} />
       <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3">
         {curves.map((c, i) => {
           const st = curveStats(c.points), at = c.points.find(p => p[1] === st?.min)
@@ -414,7 +438,8 @@ function MindistChart({ job, record }: { job: Job; record: RunRecord }) {
       <p className="m-0 text-caption text-muted-foreground">between any atom of {ref?.name} and any atom of each group{curves.length > 1 ? ' · the Matrix takes the first curve, ' + curves[0].label : ''}</p>
       {contacts && <>
         <Section label={'Contacts within ' + d + ' nm'} />
-        <SeriesChart series={named(contacts)} xlabel="time (ps)" ylabel="atom pairs" height={200} legend={curves.length > 1} y="zero" rule={null} />
+        <SeriesChart series={named(contacts)} xlabel="time (ps)" ylabel="atom pairs" height={200} legend={curves.length > 1} y="zero" rule={null}
+          exp={chartExport(job, record, outName(job, record, '_contacts.xvg'), columns(contacts, named(contacts).map(c => c.label)), 'time (ps)', 'atom pairs')} />
         <p className="m-0 text-caption text-muted-foreground">not sent to the vault: the Matrix gives this file no type</p>
       </>}
     </div>

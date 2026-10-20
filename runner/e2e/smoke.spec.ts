@@ -1,6 +1,6 @@
 // Start, pick inputs, make two groups, run with the fake gmx, see the chart: the whole path once, in a browser.
 import { spawn, type ChildProcess } from 'node:child_process'
-import { copyFileSync, mkdtempSync } from 'node:fs'
+import { copyFileSync, mkdtempSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { expect, test } from '@playwright/test'
@@ -77,6 +77,31 @@ test('pick inputs, make groups, run, see the chart', async ({ page }) => {
   expect(await rows.count()).toBeGreaterThan(0)
   const values = (await rows.locator('span:last-child').allTextContents()).map(Number)
   expect(values).toEqual([...values].sort((a, b) => b - a))
+  // Every chart exports (R6a): a PNG through the Matrix's figures, the CSV with where it came from, and the result as
+  // an HTML page that draws on its own, offline.
+  await page.mouse.move(0, 0)
+  const exportAs = async (what: RegExp) => {
+    await chart.locator('xpath=ancestor::figure').getByRole('combobox', { name: /^export / }).click()
+    const [d] = await Promise.all([page.waitForEvent('download'), page.getByRole('option', { name: what }).click()])
+    const f = join(mkdtempSync(join(tmpdir(), 'gmxc-e2e-export-')), d.suggestedFilename())
+    await d.saveAs(f)
+    return f
+  }
+  const png = await exportAs(/^png/)
+  expect(png.endsWith('rdf_nvt.png')).toBe(true)
+  expect(readFileSync(png).subarray(0, 8).toString('hex')).toBe('89504e470d0a1a0a')
+  const csv = readFileSync(await exportAs(/^csv/), 'utf8')
+  expect(csv).toMatch(/^# command: \S+ rdf -f nvt\.xtc /)
+  expect(csv).toMatch(/# source: rdf_nvt\.xvg sha256 [0-9a-f]{64}\n/)
+  expect(csv).toContain('\n# group water_O: gmx name water_O, atoms 43-3239:4\nr (nm),water_O\n')
+  const html = await exportAs(/^html/)
+  const exported = await page.context().newPage(), requests: string[] = []
+  exported.on('request', r => { if (!/^(file|data):/.test(r.url())) requests.push(r.url()) })
+  await exported.goto('file://' + html)
+  await expect(exported.locator('.dc-chart svg').first()).toBeVisible()
+  await expect(exported.getByText('water_O').first()).toBeVisible()
+  expect(requests).toEqual([])
+  await exported.close()
   await expect(page.getByText('first shell · water_O')).toBeVisible()
   await expect(page.getByText('maximum · water_O')).toBeVisible()
   // Here the first shell is the maximum: both stats read 0.374 nm.
