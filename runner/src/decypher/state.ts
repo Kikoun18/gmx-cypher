@@ -2,7 +2,7 @@
 // picked, and how you last looked at them. Jobs are in the address; files from disk are read in the page, not kept.
 
 import * as React from 'react'
-import type { ColorBy, Arrange, Marks, Rep, Rest } from '../core/kit'
+import type { ColorBy, Arrange, Marks, Rep, Rest, Scale } from '../core/kit'
 
 export type SourceRef =
   | { kind: 'job'; id: string }
@@ -68,9 +68,12 @@ export interface View {
   focus: string | null
   /** RDFs morphed into one card each (while each job is shown). */
   morphed: Morph[]
+  /** The axes the cards' charts share (R11a), among like quantities; the cards reset to their own scale, by lead id. */
+  scale: Scale
+  ownScale: string[]
 }
 
-export const DEFAULT_VIEW: View = { mode: 'each', colorBy: 'group', rep: 'ball & stick', rest: 'grey', arrange: 'side by side', labels: true, hydrogens: true, marks: 'both', link: false, hidden: [], selected: {}, focus: null, morphed: [] }
+export const DEFAULT_VIEW: View = { mode: 'each', colorBy: 'group', rep: 'ball & stick', rest: 'grey', arrange: 'side by side', labels: true, hydrogens: true, marks: 'both', link: false, hidden: [], selected: {}, focus: null, morphed: [], scale: 'own', ownScale: [] }
 
 function checkView(v: unknown): View | null {
   if (!v || typeof v !== 'object') return null
@@ -87,6 +90,7 @@ function checkView(v: unknown): View | null {
     arrange: one(o.arrange, ['side by side', 'frame positions'] as const, d.arrange),
     labels: bool(o.labels, d.labels), hydrogens: bool(o.hydrogens, d.hydrogens), marks: one(o.marks, ['both', 'maximum', 'first shell', 'none'] as const, (o as { peaks?: boolean }).peaks === false ? 'none' : d.marks), link: bool(o.link, d.link),
     hidden: Array.isArray(o.hidden) ? o.hidden.filter(x => typeof x === 'string') : [], selected, focus: typeof o.focus === 'string' ? o.focus : null, morphed,
+    scale: one(o.scale, ['own', 'x', 'y', 'both'] as const, d.scale), ownScale: strs(o.ownScale),
   }
 }
 

@@ -36,6 +36,8 @@ export interface ChartOptions {
   rule?: number | null
   /** Digits of x in peak labels and the readout (an RDF's r: 3); by default as the grid's values are written. */
   xDigits?: number
+  /** Ranges shared with other charts (R11a), in place of this chart's own. */
+  share?: { x?: [number, number]; y?: [number, number] }
 }
 
 /** The export key's charts (R8b): each export menu by its trigger, and the chart under the pointer. */
@@ -54,7 +56,7 @@ export function exportFocused(): boolean {
  * line, with Shift a horizontal one; focused, ← → step along a curve (Shift: ten), ↑ ↓ change curve, Enter marks,
  * Esc hides the cursor.
  */
-export function ChartPanel({ curves, grid, xlabel, ylabel, pal, marks, y, rule, xDigits, height, className, empty, at = null, onAt }: ChartOptions & {
+export function ChartPanel({ curves, grid, xlabel, ylabel, pal, marks, y, rule, xDigits, share, height, className, empty, at = null, onAt }: ChartOptions & {
   curves: Curve[]; grid: number[]; xlabel: string; ylabel: string; pal: Palette; marks: Marks; height?: number; className?: string; empty?: { title: string; hint: string } | null
   /** An x pointed at elsewhere (a structure's atom, R10b), read out while the pointer is not on the chart; and the x under the pointer, told back. */
   at?: number | null; onAt?: (x: number | null) => void
@@ -76,7 +78,7 @@ export function ChartPanel({ curves, grid, xlabel, ylabel, pal, marks, y, rule, 
   }, [])
   // The curve nearest the pointer is drawn over the others, which dim (Morpheus's 40 %, R7a).
   const drawn = React.useMemo(() => (near && curves.length > 1 ? curves.map(c => (c.key === near ? { ...c, hot: true, dim: false } : { ...c, dim: true })) : curves), [curves, near])
-  const out = React.useMemo(() => (size.w && size.h ? kit.chart({ W: size.w, H: size.h, curves: drawn, grid, xlabel, ylabel, hover, marks, pal, animate: true, y, rule, id, xDigits }) : null), [size, drawn, grid, xlabel, ylabel, hover, marks, pal, y, rule, id, xDigits])
+  const out = React.useMemo(() => (size.w && size.h ? kit.chart({ W: size.w, H: size.h, curves: drawn, grid, xlabel, ylabel, hover, marks, pal, animate: true, y, rule, id, xDigits, share }) : null), [size, drawn, grid, xlabel, ylabel, hover, marks, pal, y, rule, id, xDigits, share])
   const geom: ChartGeom | null = out?.geom ?? null
   const xv = geom && hover != null ? geom.m.l + ((hover - geom.x0) / (geom.x1 - geom.x0 || 1)) * geom.iw : 0
   // Data ↔ pixels on this chart's axes.

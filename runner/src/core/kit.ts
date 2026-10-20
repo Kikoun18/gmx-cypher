@@ -9,6 +9,8 @@ export type Tone = 'coral' | 'sky' | 'mint' | 'butter' | 'lilac' | 'aqua' | 'ros
 export type Rep = 'ball & stick' | 'sticks' | 'spheres'
 export type Rest = 'tinted' | 'grey' | 'ghost'
 export type Arrange = 'side by side' | 'frame positions'
+/** Same scale (R11a): the axes compare's charts share, among charts of like quantities. */
+export type Scale = 'own' | 'x' | 'y' | 'both'
 export type ColorBy = 'group' | 'job'
 /** What a click on a structure takes (R8a): the atom, its residue, or its atom name in every residue of that name. */
 export type Scope = 'atom' | 'residue' | 'name'
@@ -145,7 +147,7 @@ export interface ExportData {
   compare: { ids: string[]; focus: string; selected: string[]; colorBy: ColorBy } | null
   /** RDFs shown as one card (they differ only in their reference): the first leads; `on` are those whose reference is plotted. */
   morphs?: { ids: string[]; on: string[]; title: string }[]
-  view: { rep: Rep; rest: Rest; labels: boolean; hydrogens: boolean; arrange: Arrange }
+  view: { rep: Rep; rest: Rest; labels: boolean; hydrogens: boolean; arrange: Arrange; scale?: Scale; ownScale?: string[] }
 }
 
 /** What the kit is made from (src/core/index.ts): the tones in palette order, and the Matrix's dashes with their names. */
@@ -1028,15 +1030,45 @@ export function decypherKit(data: KitData) {
    * hollow, and at `hover` a rule with a dot on each curve. The y range starts at 0 (`zero`: g(r), counts) or is the
    * data's own (`data`). Axis labels keep their case: data names and units are not shouted.
    */
-  function chart(o: { W: number; H: number; curves: Curve[]; grid: number[]; xlabel: string; ylabel: string; hover: number | null; marks: Marks; pal: Palette; animate?: boolean; y?: 'zero' | 'data'; rule?: number | null; id?: string; xDigits?: number }): { tree: VNode; geom: ChartGeom } {
+  /** The range of several series on one axis (R11a): every finite value, a y's error band with it; null for none. */
+  function sharedDomain(series: { x: number[]; y: number[]; err?: number[] }[], axis: 'x' | 'y'): [number, number] | null {
+    let lo = Infinity, hi = -Infinity
+    for (const c of series) (axis === 'x' ? c.x : c.y).forEach((v, i) => {
+      const e = axis === 'y' && c.err && Number.isFinite(c.err[i]) ? c.err[i] : 0
+      if (Number.isFinite(v)) { lo = Math.min(lo, v - e); hi = Math.max(hi, v + e) }
+    })
+    return lo <= hi ? [lo, hi] : null
+  }
+  /** What the same scale groups charts by, as one graph does: x by its quantity and unit, y by its unit (its name without one). */
+  const axisKey = (label: string, axis: 'x' | 'y') => {
+    const m = /^(.*?)(?:^|\s)\(([^()]*)\)$/.exec(label.trim()), name = (m ? m[1] : label).trim().toLowerCase(), unit = m ? m[2].trim() : ''
+    return axis === 'x' ? name + '|' + unit : unit || '|' + name
+  }
+  /** Each chart's shared ranges by its id (R11a), over the charts of like quantities; a chart reset to its own scale takes no part. */
+  function sharedScales(charts: { id: string; xlabel: string; ylabel: string; curves: { x: number[]; y: number[]; err?: number[] }[] }[], scale: Scale, own: string[]) {
+    const out: Record<string, { x?: [number, number]; y?: [number, number] }> = {}, taking = charts.filter(c => !own.includes(c.id))
+    for (const axis of ['x', 'y'] as const) {
+      if (scale !== 'both' && scale !== axis) continue
+      const groups = new Map<string, typeof taking>()
+      taking.forEach(c => { const k = axisKey(axis === 'x' ? c.xlabel : c.ylabel, axis); groups.set(k, [...(groups.get(k) ?? []), c]) })
+      for (const g of groups.values()) { const d = sharedDomain(g.flatMap(c => c.curves), axis); if (d) g.forEach(c => { out[c.id] = { ...out[c.id], [axis]: d } }) }
+    }
+    return out
+  }
+
+  function chart(o: { W: number; H: number; curves: Curve[]; grid: number[]; xlabel: string; ylabel: string; hover: number | null; marks: Marks; pal: Palette; animate?: boolean; y?: 'zero' | 'data'; rule?: number | null; id?: string; xDigits?: number
+    /** Ranges shared with other charts (R11a), in place of this chart's own data's. */
+    share?: { x?: [number, number]; y?: [number, number] } }): { tree: VNode; geom: ChartGeom } {
     const th = o.pal, W = o.W, H = o.H, m = { l: 48, r: 20, t: 24, b: 40 }, rule = o.rule === undefined ? 1 : o.rule, clip = o.id || 'dc-plot'
     const iw = Math.max(20, W - m.l - m.r), ih = Math.max(20, H - m.t - m.b)
     const grid = o.curves.length ? o.curves[0].x : o.grid
     let x0 = grid.length ? grid[0] : 0, x1 = grid.length ? grid[grid.length - 1] : 1
     o.curves.forEach(c => { if (c.x.length) { x0 = Math.min(x0, c.x[0]); x1 = Math.max(x1, c.x[c.x.length - 1]) } })
+    if (o.share?.x) [x0, x1] = o.share.x
     // The y range: every point, its error band, and the rule when it is g = 1.
     let lo = Infinity, hi = -Infinity
     o.curves.forEach(c => c.y.forEach((v, j) => { const e = c.err ? c.err[j] || 0 : 0; if (v - e < lo) lo = v - e; if (v + e > hi) hi = v + e }))
+    if (o.share?.y) [lo, hi] = o.share.y
     if (!Number.isFinite(lo)) { lo = 0; hi = 1 }
     let y0: number, y1: number
     if ((o.y || 'zero') === 'zero') { y0 = 0; y1 = Math.max(hi, rule != null && rule > 0 ? rule : 0) * 1.12 || 1 }
@@ -1157,14 +1189,14 @@ export function decypherKit(data: KitData) {
 
     /** A chart that fills its box, redrawn on resize, with a rule and a card of values under the pointer. */
     let charts = 0
-    function chartBox(get: () => { curves: Curve[]; grid: number[]; xlabel: string; ylabel: string; plot?: Plot }) {
+    function chartBox(get: () => { curves: Curve[]; grid: number[]; xlabel: string; ylabel: string; plot?: Plot; share?: { x?: [number, number]; y?: [number, number] } }) {
       const box = h('div', { class: 'dc-chart' }), card = h('div', { class: 'dc-hover', hidden: true }), id = 'dc-plot-' + ++charts
       const wrap = h('div', { class: 'dc-chart-wrap' }, box, card)
       let hover: number | null = null, geom: ChartGeom | null = null
       const render = () => {
         const W = box.clientWidth, H = box.clientHeight
         if (!W || !H) return
-        const g = get(), out = chart({ W, H, curves: g.curves, grid: g.grid, xlabel: g.xlabel, ylabel: g.ylabel, hover, marks: 'both', pal: pal(), id, ...(g.plot ? { y: g.plot.y, rule: g.plot.rule, xDigits: g.plot.xDigits } : { xDigits: 3 }) })
+        const g = get(), out = chart({ W, H, curves: g.curves, grid: g.grid, xlabel: g.xlabel, ylabel: g.ylabel, hover, marks: 'both', pal: pal(), id, share: g.share, ...(g.plot ? { y: g.plot.y, rule: g.plot.rule, xDigits: g.plot.xDigits } : { xDigits: 3 }) })
         geom = out.geom
         box.replaceChildren(svg(out.tree))
         if (hover == null || !g.curves.length) { card.hidden = true; return }
@@ -1295,6 +1327,10 @@ export function decypherKit(data: KitData) {
         h('div', { class: 'dc-pad' }, ch.el, h('div', { class: 'dc-cap' }, 'click a curve: shown → dimmed → hidden · groups below are matched in every result by their atoms, then their name'), legend, groupChips.el))
     }
 
+    // The same scale (R11a), as exported: the cards' charts, each drawn on the ranges it shares; all drawn again when one changes.
+    const scaled: { id: string; xlabel: string; ylabel: string; curves: () => Curve[]; render: () => void }[] = []
+    const scale = data.view.scale ?? 'own', shareOf = (id: string) => (scale === 'own' ? undefined : sharedScales(scaled.map(c => ({ ...c, curves: c.curves() })), scale, data.view.ownScale ?? [])[id])
+
     /** One RDF's card; or, for RDFs that differ only in their reference, one card for them all (`morph`), led by the first. */
     function jobSection(members: Analysis[], ea: ExportAnalysis, morph: { title: string; on: string[] } | null) {
       const a = members[0], many = !!morph && members.length > 1, ids = members.map(m => m.id), names = refLabels(members)
@@ -1306,13 +1342,14 @@ export function decypherKit(data: KitData) {
         const m = members.find(x => x.id === c.analysis)!
         return { ...c, source: m.ref ? 'ref ' + names[m.id] : names[m.id], dim: hoverSel >= 0 && c.name !== a.sels[hoverSel]?.name }
       })
-      const ch = chartBox(() => ({ curves: curves(), grid: a.x, xlabel: a.xlabel, ylabel: a.ylabel, plot: a.plot }))
+      const ch = chartBox(() => ({ curves: curves(), grid: a.x, xlabel: a.xlabel, ylabel: a.ylabel, plot: a.plot, share: shareOf(a.id) }))
+      scaled.push({ id: a.id, xlabel: a.xlabel, ylabel: a.ylabel, curves, render: ch.render })
       const tb = table(curves, !!a.plot)
       // Only references on this card's structure can be drawn on it; every RDF of a morph has its chip.
       const onStruct = members.filter(m => m.ref && m.struct === a.struct)
       const refs = () => onStruct.map(m => ({ label: names[m.id], atoms: m.ref!.atoms, on: on.includes(m.id) }))
       let sv: { el: HTMLElement; set: (i: number) => void } | null = null
-      const refresh = () => { ch.render(); tb.render(); cp.render(); if (sv) sv.set(hoverSel) }
+      const refresh = () => { if (scale === 'own') ch.render(); else scaled.forEach(c => c.render()); tb.render(); cp.render(); if (sv) sv.set(hoverSel) }
       const set = (s: string[]) => { selected = s; refresh() }
       const pickRef = (id: string, add: boolean) => { on = pickRefs(ids, on, id, add); refresh() }
       const cp = chips(a, () => selected, set, i => { hoverSel = i; ch.render(); if (sv) sv.set(i) },
@@ -1340,7 +1377,7 @@ export function decypherKit(data: KitData) {
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => redraws.forEach(f => f()))
   }
 
-  return { rampAt, paintOf, structureNote, legendPick, pickGroups, clickScope, pans, scopeAtoms, TONES, DASH, DASH_NAMES, REPS, RESTS, SOLV, palette, toRanges, fromRanges, parseStructure, mix, buildMol, structureView, matchGroup, rdfLooks, buildCurves, looseName, sameButReference, morphWhy, pickRefs, refLabels, niceTicks, xDigitsOf, valAt, hoverRows, hoverX, readoutTitle, chart, mount }
+  return { sharedDomain, sharedScales, rampAt, paintOf, structureNote, legendPick, pickGroups, clickScope, pans, scopeAtoms, TONES, DASH, DASH_NAMES, REPS, RESTS, SOLV, palette, toRanges, fromRanges, parseStructure, mix, buildMol, structureView, matchGroup, rdfLooks, buildCurves, looseName, sameButReference, morphWhy, pickRefs, refLabels, niceTicks, xDigitsOf, valAt, hoverRows, hoverX, readoutTitle, chart, mount }
 }
 
 export type Kit = ReturnType<typeof decypherKit>

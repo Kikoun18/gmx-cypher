@@ -50,6 +50,16 @@ const MARKS: readonly Marks[] = ['both', 'maximum', 'first shell', 'none']
 
 /** How an analysis's chart is drawn: an RDF from zero with g = 1 and its peak marks; any other result as its plot says (R10a). */
 const chartOf = (a: Analysis, marks: Marks) => (a.plot ? { y: a.plot.y, rule: a.plot.rule, xDigits: a.plot.xDigits, marks: 'none' as Marks } : { marks, xDigits: 3 })
+type Share = { x?: [number, number]; y?: [number, number] }
+const SCALE_WORDS = ['off', 'x', 'y', 'x and y'] as const
+const SCALE_WORD: Record<View['scale'], (typeof SCALE_WORDS)[number]> = { own: 'off', x: 'x', y: 'y', both: 'x and y' }
+const SCALE_OF = { off: 'own', x: 'x', y: 'y', 'x and y': 'both' } as const
+/** Each card's ranges shared with the others (R11a), from the curves it draws, by its lead's id. */
+function cardShares(cards: { lead: Analysis; members: Analysis[]; on: string[] }[], selectedOf: (a: Analysis) => string[], pal: Palette, tones: Record<string, Tone>, view: View): Record<string, Share> {
+  if (view.scale === 'own') return {}
+  return kit.sharedScales(cards.map(c => ({ id: c.lead.id, xlabel: c.lead.xlabel, ylabel: c.lead.ylabel,
+    curves: kit.buildCurves({ focus: c.lead, plotted: c.members, selected: selectedOf(c.lead), colorBy: 'group', pal, tones }).filter(x => c.on.includes(x.analysis)) })), view.scale, view.ownScale)
+}
 
 /** The peak marks a chart draws (R3d), in the chart's header (R9b): the maximum filled, the first shell hollow. */
 function MarksSelect({ value, onChange }: { value: Marks; onChange: (m: Marks) => void }) {
@@ -104,6 +114,8 @@ interface CardProps {
   onSelect: (names: string[]) => void; handle: (h: StructureHandle | null) => void; onActive: () => void
   /** The 3D view's display menu and the chart's marks, the same on every card (R9b). */
   display: React.ReactNode; marks: React.ReactNode
+  /** While charts share a scale (R11a): this one's ranges, whether it is reset to its own, and the switch. */
+  scale?: { share?: Share; own: boolean; toggle: () => void }
 }
 
 /** A structure view's picture as a PNG file (R6a). */
@@ -113,7 +125,7 @@ async function savePng(h: StructureHandle | null, label: string) {
 }
 
 /** One analysis: its structure beside its g(r), its groups as chips, its curves with their highest points. Morphed: one card for RDFs that differ only in their reference, which one picks, atom or chip, one, the other or both. */
-export function AnalysisCard({ members, on, tone, mol, pal, view, selected, tones, candidates, onMorph, onSplit, onRefs, onSelect, handle, onActive, display, marks }: CardProps) {
+export function AnalysisCard({ members, on, tone, mol, pal, view, selected, tones, candidates, onMorph, onSplit, onRefs, onSelect, handle, onActive, display, marks, scale }: CardProps) {
   const a = members[0], many = members.length > 1
   const [hover, setHover] = React.useState<string | null>(null), [hot, setHot] = React.useState<string | null>(null)
   const ref = React.useRef<StructureHandle | null>(null)
@@ -185,8 +197,11 @@ export function AnalysisCard({ members, on, tone, mol, pal, view, selected, tone
             {note && <p className="m-0 border-t border-border px-3 py-2 text-caption text-muted-foreground">{note}</p>}
           </div>}
           <div className="flex min-w-0 flex-col gap-2">
-            <div className="flex items-center justify-end gap-1">{rdf && marks}{curves.length > 0 && <ExportMenu exp={exp} curves={curvesIn} xlabel={a.xlabel} ylabel={a.ylabel} {...chartOf(a, view.marks)} />}</div>
-            <ChartPanel className="h-[300px] flex-none" curves={curves} grid={a.x} xlabel={a.xlabel} ylabel={a.ylabel} pal={pal} {...chartOf(a, view.marks)} at={atomX} onAt={paint ? setChartX : undefined}
+            <div className="flex items-center justify-end gap-1">
+              {scale && <Button variant="ghost" size="sm" onClick={scale.toggle} title={scale.own ? 'back to the scale the other charts share' : 'this chart on its own scale'}>{scale.own ? 'same scale' : 'own scale'}</Button>}
+              {rdf && marks}{curves.length > 0 && <ExportMenu exp={exp} curves={curvesIn} xlabel={a.xlabel} ylabel={a.ylabel} {...chartOf(a, view.marks)} share={scale?.share} />}
+            </div>
+            <ChartPanel className="h-[300px] flex-none" curves={curves} grid={a.x} xlabel={a.xlabel} ylabel={a.ylabel} pal={pal} {...chartOf(a, view.marks)} share={scale?.share} at={atomX} onAt={paint ? setChartX : undefined}
               empty={curves.length ? null : rdf ? { title: 'Pick an atom group', hint: 'Click atoms in the structure or a chip below. ' + modName() + '-click adds more groups to the plot.' } : { title: 'Pick a curve', hint: 'Click a chip below. ' + modName() + '-click adds more.' }} />
             <CurveTable curves={curves} source={many} stats={rdf ? 'peaks' : 'series'} onRemove={n => onSelect(selected.filter(x => x !== n))} onHover={c => { setHot(c?.key ?? null); setHover(c?.name ?? null) }} />
           </div>
@@ -397,7 +412,7 @@ function ExportDialog({ open, onOpenChange, analyses, structs, view, theme, tone
   const build = (headings: { header?: string; titles?: Record<string, string> }) => exportData({
     analyses: picked, structs, selected: selectedOf, tones, theme, tokens: TOKENS_BY_THEME, structures, by: 'gmx-cypher ' + version, morphs, ...headings,
     compare: withCompare && compare && view.mode === 'one' ? { ...compare, colorBy: view.colorBy } : withCompare && picked.length > 1 ? { ids: picked.map(a => a.id), focus: picked[0].id, selected: selectedOf(picked[0]), colorBy: view.colorBy } : null,
-    view: { rep: view.rep, rest: view.rest, labels: view.labels, hydrogens: view.hydrogens, arrange: view.arrange },
+    view: { rep: view.rep, rest: view.rest, labels: view.labels, hydrogens: view.hydrogens, arrange: view.arrange, scale: view.mode === 'each' ? view.scale : 'own', ownScale: view.ownScale },
   })
   // Built without the headings (they change with every key typed; the size and the button need only this), and again with them on export.
   const data = React.useMemo(() => (open && picked.length ? build({}) : null), [open, pickedKey, structures, withCompare, theme, view, compare, morphs]) // eslint-disable-line react-hooks/exhaustive-deps -- picked is what its key says
@@ -418,9 +433,11 @@ function ExportDialog({ open, onOpenChange, analyses, structs, view, theme, tone
     setBusy(true)
     try {
       const pal = PALETTES[prefs.theme === 'dark' ? 'dark' : 'light'], taken = new Set<string>(), ext = prefs.layout === 'pdf' ? 'pdf' : prefs.format
-      const fig = (title: string, file: string, a: Analysis, curves: Curve[]) => ({ data: graphData({ title, file, xlabel: a.xlabel, ylabel: a.ylabel, curves, marks: view.marks, xDigits: 3 }, prefs.theme), name: fileName(prefs.name, { file, command: 'rdf' }, ext, taken) })
+      // Each card drawn as its chart is: a result that is not an RDF by its own range and rule; the shared y (R11a) kept.
+      const shares = view.mode === 'each' ? cardShares(cards, selectedOf, pal, tones, view) : {}
+      const fig = (title: string, file: string, a: Analysis, curves: Curve[], share?: Share) => ({ data: graphData({ title, file, xlabel: a.xlabel, ylabel: a.ylabel, curves, ...chartOf(a, view.marks), share }, prefs.theme), name: fileName(prefs.name, { file, command: a.command ?? 'rdf' }, ext, taken) })
       const gs = cards.map(c => fig((titles[c.lead.id] ?? '').trim() || cardTitle(c.members), c.lead.label, c.lead,
-        kit.buildCurves({ focus: c.lead, plotted: c.members, selected: selectedOf(c.lead), colorBy: 'group', pal, tones }).filter(x => c.on.includes(x.analysis))))
+        kit.buildCurves({ focus: c.lead, plotted: c.members, selected: selectedOf(c.lead), colorBy: 'group', pal, tones }).filter(x => c.on.includes(x.analysis)), shares[c.lead.id]))
       if (withCompare && picked.length > 1) {
         const focus = picked.find(a => a.id === compare?.focus) ?? picked[0]
         gs.push(fig('One graph · ' + plural(picked.length, 'RDF'), 'one-graph_' + picked.length + '-RDFs', focus,
@@ -539,6 +556,7 @@ export function Decypher({ sources, files, onFiles, onClearFiles, jobs, jobsLoad
   }, [ready, structs, view.arrange, molCache])
 
   const selectedOf = React.useCallback((a: Analysis) => view.selected[a.id] ?? (a.sels[0] ? [a.sels[0].name] : []), [view.selected])
+  const shares = React.useMemo(() => cardShares(cards, selectedOf, pal, tones, view), [cards, selectedOf, pal, tones, view])
   const select = (a: Analysis, names: string[]) => patch(v => {
     const next = { ...v.selected, [a.id]: names }
     if (v.link) for (const b of shown) if (b !== a) next[b.id] = remap(a, b, names)
@@ -594,6 +612,7 @@ export function Decypher({ sources, files, onFiles, onClearFiles, jobs, jobsLoad
           </div>
           <span className="flex-1" />
           <Seg label="show" value={view.mode === 'each' ? 'each result' : 'one graph'} options={['each result', 'one graph'] as const} onChange={v => patch({ mode: v === 'each result' ? 'each' : 'one' })} />
+          {view.mode === 'each' && <Seg label="same scale" value={SCALE_WORD[view.scale]} options={SCALE_WORDS} onChange={w => patch({ scale: SCALE_OF[w] })} />}
           {view.mode === 'each' && <Chip on={view.link} onClick={() => patch({ link: !view.link })} title="a group picked in one result is picked in every result that has it">link groups</Chip>}
           <Button variant="outline" size="sm" onClick={() => { setExporting(n => n + 1); setExportOpen(true) }} disabled={!shown.length}><Download /> export</Button>
         </header>
@@ -624,7 +643,8 @@ export function Decypher({ sources, files, onFiles, onClearFiles, jobs, jobsLoad
               <div className="flex flex-col gap-4">
                 {cards.map(({ lead: a, members, on, candidates }) => <AnalysisCard key={a.id} members={members} on={on} candidates={candidates} tone={tones[a.id]} mol={a.struct ? mols.get(a.struct) ?? null : null} pal={pal} view={view} selected={selectedOf(a)} tones={tones}
                   onMorph={id => patch(v => ({ morphed: joinMorph(v.morphed, a.id, id) }))} onSplit={() => patch(v => ({ morphed: splitMorph(v.morphed, a.id) }))} onRefs={next => patch(v => ({ morphed: setMorphRefs(v.morphed, a.id, next) }))}
-                  onSelect={n => select(a, n)} handle={h => handles.current.set(a.id, h)} onActive={() => { active.current = a.id }} display={display} marks={marks} />)}
+                  onSelect={n => select(a, n)} handle={h => handles.current.set(a.id, h)} onActive={() => { active.current = a.id }} display={display} marks={marks}
+                  scale={view.scale === 'own' ? undefined : { share: shares[a.id], own: view.ownScale.includes(a.id), toggle: () => patch(v => ({ ownScale: v.ownScale.includes(a.id) ? v.ownScale.filter(x => x !== a.id) : [...v.ownScale, a.id] })) }} />)}
               </div>
             ) : focus && (
               <CompareView shown={shown} focus={focus} setFocus={setFocus} mols={mols} pal={pal} view={view} patch={patch} selected={selectedOf(focus)} onSelect={n => select(focus, n)} tones={tones}

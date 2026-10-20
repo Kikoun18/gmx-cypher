@@ -102,7 +102,7 @@ export function exportData(o: ExportInput): ExportData {
   // A morph keeps the RDFs that are in the export, the first of them leading; fewer than two is no morph.
   const morphs = cardsOf(o.analyses, o.morphs ?? []).filter(c => c.members.length > 1)
     .map(c => ({ ids: c.members.map(a => id.get(a.id)!), on: c.on.map(x => id.get(x)!), title: chosen(c.lead) || cardTitle(c.members) }))
-  return { header: (o.header ?? '').trim() || DEFAULT_HEADER, made: o.made ?? new Date().toISOString(), by: o.by, theme: o.theme, tokens: o.tokens, structs, analyses, compare, ...(morphs.length ? { morphs } : {}), view: o.view }
+  return { header: (o.header ?? '').trim() || DEFAULT_HEADER, made: o.made ?? new Date().toISOString(), by: o.by, theme: o.theme, tokens: o.tokens, structs, analyses, compare, ...(morphs.length ? { morphs } : {}), view: { ...o.view, ...(o.view.ownScale ? { ownScale: o.view.ownScale.filter(x => id.has(x)).map(x => id.get(x)!) } : {}) } }
 }
 
 const CSS = `*{box-sizing:border-box}

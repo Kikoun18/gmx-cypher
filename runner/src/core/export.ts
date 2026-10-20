@@ -8,7 +8,9 @@ import { kit, type Series } from './index'
 import type { Analysis, Curve, Marks, Plot } from './kit'
 
 /** A chart as a figure: its title and file name, axes, curves (in the export theme's palette) and how it is drawn. */
-export interface Figure { title: string; sub?: string; file: string; xlabel: string; ylabel: string; curves: Curve[]; y?: 'zero' | 'data'; rule?: number | null; marks?: Marks; xDigits?: number }
+export interface Figure { title: string; sub?: string; file: string; xlabel: string; ylabel: string; curves: Curve[]; y?: 'zero' | 'data'; rule?: number | null; marks?: Marks; xDigits?: number
+  /** The y range shared with other charts (R11a); the Matrix's figures take no x range, so a shared x stays on the page. */
+  share?: { x?: [number, number]; y?: [number, number] } }
 
 /**
  * A figure as the Matrix's graph: each curve a series in its colour (grey for print) and dash, an error band as
@@ -34,10 +36,11 @@ export function graphData(f: Figure, theme: ExportPrefs['theme']): GraphData {
   })
   let hi = -Infinity
   for (const c of f.curves) c.y.forEach((v, i) => { hi = Math.max(hi, v + (c.err?.[i] || 0)) })
-  const zero = (f.y ?? 'zero') === 'zero'
+  const zero = (f.y ?? 'zero') === 'zero', sy = f.share?.y, pad = sy ? (sy[1] - sy[0]) * 0.06 || Math.abs(sy[1]) * 0.06 || 1 : 0
+  if (sy) hi = sy[1]
   return {
     file: f.file, title: f.title, ...(f.sub ? { sub: f.sub } : {}), xLabel: f.xlabel, yLabel: f.ylabel, series,
-    ...(zero ? { domain: { lo: 0, hi: Math.max(Number.isFinite(hi) ? hi : 0, rule != null && rule > 0 ? rule : 0) * 1.12 || 1 } } : {}),
+    ...(zero ? { domain: { lo: 0, hi: Math.max(Number.isFinite(hi) ? hi : 0, rule != null && rule > 0 ? rule : 0) * 1.12 || 1 } } : sy ? { domain: { lo: sy[0] - pad, hi: sy[1] + pad } } : {}),
     pins: { marks: pins, lines: rule != null && rule !== 0 ? [{ axis: 'y' as const, v: rule, label: rule === 1 ? 'g = 1' : 'y = ' + rule }] : [] },
   }
 }
