@@ -212,6 +212,8 @@ export function Groups({ draft, setDraft }: { draft: Draft; setDraft: React.Disp
   const command = commandOf(draft.analysis ?? 'rdf') ?? rdfCommand, roles = rolesOf(command), others = draft.groups.length - 1
   const canAdd = roles.max === undefined || others < roles.max, title = (w: string) => w[0].toUpperCase() + w.slice(1)
   const addSelection = () => setDraft(d => ({ ...d, groups: [...d.groups, { role: 'selection', name: 'selection' + d.groups.length, tone: TONES[d.groups.length % TONES.length], steps: [] }] }))
+  // gmx order (R16b, question 27): one group per carbon, in tail order, as an index file has them; they replace the groups here.
+  const fromIndex = () => { setDraft(d => ({ ...d, groups: index.groups.map((g, i): Group => ({ role: i ? 'selection' : 'reference', name: g.label, tone: TONES[i % TONES.length], steps: [{ op: 'add', rule: { kind: 'atoms', atoms: toRanges(g.atoms) }, note: 'index group ' + g.label + ' (#' + i + ' in ' + index.file + ')' }] })) })); setCardKeys(initialKeys(index.groups.length)); setCurrent(0) }
   return (
     <div className="grid grid-cols-[minmax(0,1fr)_420px] gap-5">
       <div className="flex min-w-0 flex-col gap-3">
@@ -226,6 +228,12 @@ export function Groups({ draft, setDraft }: { draft: Draft; setDraft: React.Disp
       </div>
       <div className="flex flex-col gap-3">
         <Section label={title(roles.first)} />
+        {command.tool === 'order' && (
+          <p className="m-0 flex flex-wrap items-center gap-2 text-caption text-muted-foreground">
+            gmx order reads one group per carbon, in tail order: the groups here, in this order
+            {index.groups.length >= 3 ? <Button variant="outline" size="sm" onClick={fromIndex} title="replaces the groups here with the index file's, in its order">take the {index.groups.length} groups of {index.file}</Button> : <span>· an index file in inputs gives them all at once</span>}
+          </p>
+        )}
         <GroupCard group={ref} atoms={structure.atoms} index={index} nrs={sets[0]} others={names(0)} current={current === 0} onCurrent={() => setCurrent(0)} onChange={g => setGroup(0, g)} onCentre={() => centreOn(0)} />
         {roles.max === 0 ? others > 0 && <Section label={'Not used by gmx ' + command.tool + ' ' + String(others).padStart(2, '0')}><span className="text-caption text-muted-foreground">it takes one group</span></Section>
           : <Section label={title(roles.rest) + 's ' + String(others).padStart(2, '0')}>{canAdd ? <Button variant="dashed" size="sm" shape="pill" onClick={addSelection}><Plus /> group</Button>

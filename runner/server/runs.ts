@@ -7,7 +7,7 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, statSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import { atomTable, type Atom } from '../src/lib/atoms';
-import { allNames, COMMANDS, commandOf, roleProblems, type CommandDef, type InputSlot, type OutputNames, type RunIo } from '../src/lib/commands';
+import { allNames, COMMANDS, commandOf, roleProblems, rolesOf, type CommandDef, type InputSlot, type OutputNames, type RunIo } from '../src/lib/commands';
 import { awhFrames, awhNames, awhUnits, framesWritten, type AwhFrame } from '../src/lib/awh';
 import { commonFolder, listFile, whamOutputNames } from '../src/lib/wham';
 import { parseDistanceStats } from '../src/lib/distance';
@@ -268,7 +268,8 @@ export async function startRun(ctx: Ctx, req: RunRequest, roots: string[]): Prom
   }); };
   const json = (r: RunRecord) => JSON.stringify(r, null, 2) + '\n';
   const job = ctx.jobs.start({
-    kind: plan.tool, title: !cmd.groups ? plan.stem + ' · gmx ' + plan.tool : plan.stem + ' · ' + req.groups[0].name + (req.groups.length > 1 ? ' → ' + req.groups.slice(1).map(g => g.name).join(', ') : ''),
+    // Groups of one kind (density's groups, order's carbons, R16) are listed; a first that measures the others leads with →.
+    kind: plan.tool, title: !cmd.groups ? plan.stem + ' · gmx ' + plan.tool : plan.stem + ' · ' + req.groups[0].name + (req.groups.length > 1 ? (rolesOf(cmd).first === rolesOf(cmd).rest ? ', ' : ' → ') + req.groups.slice(1).map(g => g.name).join(', ') : ''),
     file: plan.file, args: plan.argv, cwd: plan.cwd, env: plan.env, meta: { stem: plan.stem, outDir: plan.outDir, record: recordPath, names: plan.names, estimate, ...(req.batch ? { batch: req.batch.id, batchName: req.batch.name } : {}) },
     ...(plan.stdin != null ? { stdin: plan.stdin } : {}),
   });

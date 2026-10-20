@@ -13,13 +13,14 @@ export function mainXvg<O extends { kind: string; path: string }>(outputs: O[], 
 /**
  * The group the i-th curve of a command's main file measures, in the file's column order; null for none (an energy
  * term, gyrate's parts about x, y and z). RDF, distance, mindist and hbond measure the selections against the reference;
- * gmx rms measures its fit group first, then each further group; rmsf and gyrate their one group.
+ * gmx rms measures its fit group first, then each further group; rmsf and gyrate their one group; density each group,
+ * in order (R16a); order's one curve is S_CD over its carbons, no one group's (R16b).
  */
 export function curveGroup<G extends { role?: string }>(command: string, groups: G[], i: number): G | null {
   const sels = groups.filter(g => g.role === 'selection')
   if (command === 'rdf' || command === 'distance' || command === 'mindist') return sels[i] ?? null
   if (command === 'hbond' || command === 'hbond-legacy') return i === 0 ? sels[0] ?? null : null
-  if (command === 'rms') return groups[i] ?? null
+  if (command === 'rms' || command === 'density') return groups[i] ?? null
   if (command === 'rmsf' || command === 'gyrate' || command === 'gyrate-legacy') return i === 0 ? groups[0] ?? null : null
   return null
 }

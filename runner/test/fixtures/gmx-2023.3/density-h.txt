@@ -1,0 +1,112 @@
+SYNOPSIS
+
+gmx density [-f [<.xtc/.trr/...>]] [-n [<.ndx>]] [-s [<.tpr>]]
+            [-ei [<.dat>]] [-o [<.xvg>]] [-b <time>] [-e <time>] [-dt <time>]
+            [-[no]w] [-xvg <enum>] [-d <string>] [-sl <int>] [-dens <enum>]
+            [-ng <int>] [-[no]center] [-[no]symm]
+
+DESCRIPTION
+
+gmx density computes partial densities across the box, using an index file.
+
+For the total density of NPT simulations, use gmx energy instead.
+
+Option -center performs the histogram binning relative to the center of an
+arbitrary group, in absolute box coordinates. If you are calculating profiles
+along the Z axis box dimension bZ, output would be from -bZ/2 to bZ/2 if you
+center based on the entire system. Note that this behaviour has changed in
+GROMACS 5.0; earlier versions merely performed a static binning in (0,bZ) and
+shifted the output. Now we compute the center for each frame and bin in
+(-bZ/2,bZ/2).
+
+Option -symm symmetrizes the output around the center. This will automatically
+turn on -center too. The binning is now always performed in relative
+coordinates to account for changing box dimensions with pressure coupling,
+with the output scaled to the average box dimension along the output axis.
+
+Densities are in kg/m^3, and number densities or electron densities can also
+be calculated. For electron densities, a file describing the number of
+electrons for each type of atom should be provided using -ei. It should look
+like:
+
+   2
+   atomname = nrelectrons
+   atomname = nrelectrons
+
+The first line contains the number of lines to read from the file. There
+should be one line for each unique atom name in your system. The number of
+electrons for each atom is modified by its atomic partial charge.
+
+IMPORTANT CONSIDERATIONS FOR BILAYERS
+
+One of the most common usage scenarios is to calculate the density of various
+groups across a lipid bilayer, typically with the z axis being the normal
+direction. For short simulations, small systems, and fixed box sizes this will
+work fine, but for the more general case lipid bilayers can be complicated.
+The first problem that while both proteins and lipids have low volume
+compressibility, lipids have quite high area compressiblity. This means the
+shape of the box (thickness and area/lipid) will fluctuate substantially even
+for a fully relaxed system. Since GROMACS places the box between the origin
+and positive coordinates, this in turn means that a bilayer centered in the
+box will move a bit up/down due to these fluctuations, and smear out your
+profile. The easiest way to fix this (if you want pressure coupling) is to use
+the -center option that calculates the density profile with respect to the
+center of the box. Note that you can still center on the bilayer part even if
+you have a complex non-symmetric system with a bilayer and, say, membrane
+proteins - then our output will simply have more values on one side of the
+(center) origin reference.
+
+Finally, large bilayers that are not subject to a surface tension will exhibit
+undulatory fluctuations, where there are 'waves' forming in the system. This
+is a fundamental property of the biological system, and if you are comparing
+against experiments you likely want to include the undulation smearing effect.
+
+OPTIONS
+
+Options to specify input files:
+
+ -f      [<.xtc/.trr/...>]  (traj.xtc)
+           Trajectory: xtc trr cpt gro g96 pdb tng
+ -n      [<.ndx>]           (index.ndx)      (Opt.)
+           Index file
+ -s      [<.tpr>]           (topol.tpr)
+           Portable xdr run input file
+ -ei     [<.dat>]           (electrons.dat)  (Opt.)
+           Generic data file
+
+Options to specify output files:
+
+ -o      [<.xvg>]           (density.xvg)
+           xvgr/xmgr file
+
+Other options:
+
+ -b      <time>             (0)
+           Time of first frame to read from trajectory (default unit ps)
+ -e      <time>             (0)
+           Time of last frame to read from trajectory (default unit ps)
+ -dt     <time>             (0)
+           Only use frame when t MOD dt = first time (default unit ps)
+ -[no]w                     (no)
+           View output .xvg, .xpm, .eps and .pdb files
+ -xvg    <enum>             (xmgrace)
+           xvg plot formatting: xmgrace, xmgr, none
+ -d      <string>           (Z)
+           Take the normal on the membrane in direction X, Y or Z.
+ -sl     <int>              (50)
+           Divide the box in this number of slices.
+ -dens   <enum>             (mass)
+           Density: mass, number, charge, electron
+ -ng     <int>              (1)
+           Number of groups of which to compute densities.
+ -[no]center                (no)
+           Perform the binning relative to the center of the (changing) box.
+           Useful for bilayers.
+ -[no]symm                  (no)
+           Symmetrize the density along the axis, with respect to the center.
+           Useful for bilayers.
+
+KNOWN ISSUES
+
+* When calculating electron densities, atomnames are used instead of types.
+  This is bad.

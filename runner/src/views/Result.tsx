@@ -20,6 +20,7 @@ import { curveStats } from '../lib/curves'
 import { peaks, resultSeries } from '../lib/rdf'
 import { parseTable } from '../../../matrix/src/lib/seq'
 import { csvMeta, curvesCsv, xvgCsv } from '../lib/csv'
+import { scdByCarbon } from '../lib/order'
 import type { RunRecord } from '../lib/record'
 import { groupText, toneText, type Tone } from '../lib/tones'
 import { cn } from '../lib/utils'
@@ -475,6 +476,62 @@ function MindistChart({ job, record }: { job: Job; record: RunRecord }) {
   )
 }
 
+/** A label as gmx writes it, its superscripts drawn ("kg m^{-3}" → "kg m⁻³"); the unit itself is gmx's. */
+const SUP: Record<string, string> = { '-': '⁻', '+': '⁺', 0: '⁰', 1: '¹', 2: '²', 3: '³', 4: '⁴', 5: '⁵', 6: '⁶', 7: '⁷', 8: '⁸', 9: '⁹' }
+const supLabel = (l: string) => l.replace(/\^\{([-+0-9]+)\}/g, (_, s: string) => [...s].map(c => SUP[c] ?? c).join(''))
+
+/**
+ * gmx density (R16a): each group's density along the axis, in its group's tone, units as gmx writes them; a tile each
+ * with its mean over the slices and its highest slice.
+ */
+function DensityChart({ job, record }: { job: Job; record: RunRecord }) {
+  const xvg = useOutput(job.id, 'xvg')
+  if (xvg == null) return <p className="m-0 text-caption text-muted-foreground" aria-live="polite">reading the densities…</p>
+  const curves = resultSeries(xvg), head = parseTable(xvg).head, at = (i: number) => record.groups[i] ?? { name: curves[i].label, tone: TONES[i % 8] }
+  const xLabel = head.xLabel || 'position (nm)', yLabel = supLabel(head.yLabel || 'density'), unit = /\(([^)]*)\)\s*$/.exec(yLabel)?.[1] ?? ''
+  const v = (f: string) => record.options.find(o => o.flag === f)?.value, centred = v('center') === true || v('symm') === true
+  return (
+    <div className="flex flex-col gap-3">
+      <SeriesChart series={curves.map((c, i) => ({ label: at(i).name, points: c.points, tone: at(i).tone }))} xlabel={xLabel} ylabel={yLabel} height={260} legend={curves.length > 1} y="zero" rule={null}
+        exp={chartExport(job, record, outName(job, record), columns(xvg, curves.map((_, i) => at(i).name)), xLabel, yLabel)} />
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3">
+        {curves.map((c, i) => {
+          const st = curveStats(c.points), top = c.points.reduce((a, p) => (p[1] > a[1] ? p : a), c.points[0])
+          return st && <Stat key={i} label={at(i).name + ' · mean'} value={fmt(st.mean) + ' ' + unit} hint={'highest ' + fmt(top[1]) + ' at ' + top[0] + ' nm · ' + st.frames + ' slices'} />
+        })}
+      </div>
+      <p className="m-0 text-caption text-muted-foreground">
+        along {String(v('d') ?? 'Z').toUpperCase()} · {v('dens') ?? 'mass'} density · {centred ? 'centred on ' + record.groups[0]?.name + (v('symm') === true ? ', symmetrised' : '') : 'in box coordinates'} · the Matrix reads every curve
+      </p>
+    </div>
+  )
+}
+
+/**
+ * gmx order (R16b): S_CD per carbon, named by its group (gmx gives the carbons between the first and the last), with
+ * gmx's own warning about the force fields its method suits.
+ */
+function OrderChart({ job, record }: { job: Job; record: RunRecord }) {
+  const xvg = useOutput(job.id, 'xvg')
+  if (xvg == null) return <p className="m-0 text-caption text-muted-foreground" aria-live="polite">reading S_CD…</p>
+  const rows = scdByCarbon(xvg, record.groups.map(g => g.name)), tone = record.groups[1]?.tone ?? 'coral'
+  return (
+    <div className="flex flex-col gap-3">
+      {/* One inner carbon gives one value: a table, no curve. */}
+      {rows.length > 1 && <SeriesChart series={[{ label: 'S_CD', points: rows.map(r => [r.n, r.scd] as [number, number]), tone }]} xlabel="carbon (gmx's number)" ylabel="S_CD" height={240} y="data" rule={0}
+        exp={chartExport(job, record, outName(job, record), [{ text: xvg, col: 1, name: 'S_CD' }], 'carbon', 'S_CD')} />}
+      <table className="text-control" aria-label="S_CD per carbon">
+        <thead><tr className="text-left text-label uppercase text-muted-foreground"><th className="py-1 pr-4 font-normal">carbon</th><th className="pr-4 font-normal">gmx's number</th><th className="font-normal">S_CD</th></tr></thead>
+        <tbody>{rows.map(r => <tr key={r.n} className="border-t border-border"><td className="py-0.5 pr-4">{r.carbon}</td><td className="pr-4 tabular-nums text-muted-foreground">{r.n}</td><td className="tabular-nums font-bold">{r.scd.toFixed(4)}</td></tr>)}</tbody>
+      </table>
+      <p className="m-0 text-caption text-muted-foreground">
+        {record.groups.length} carbon groups, in tail order: S_CD for each between the first and the last, from its neighbours · the Matrix draws these as points (Order parameters) · the order tensor is beside them, not sent
+      </p>
+      <Status level="info" className="text-control">gmx order's own known issues: "This tool only works for saturated carbons and united atom force fields. For anything else, it is highly recommended to use a different analysis method!"</Status>
+    </div>
+  )
+}
+
 /** The options a job changed, in gmx's own words (`-b 2 · -nofit`): the settings line of a result that has none in words. */
 const flagsLine = (r: RunRecord) => r.options.filter(o => !o.isDefault).map(o => (o.value === true ? '-' + o.flag : o.value === false ? '-no' + o.flag : '-' + o.flag + ' ' + o.value)).join(' · ') || 'gmx ' + (r.analysis ?? 'rdf') + ' defaults'
 
@@ -483,7 +540,8 @@ function Charts({ job, record }: { job: Job; record: RunRecord }) {
   const k = job.kind
   return k === 'energy' ? <EnergyChart job={job} record={record} /> : k === 'awh' ? <AwhChart job={job} record={record} /> : k === 'wham' ? <WhamChart job={job} record={record} />
     : k === 'distance' ? <DistanceChart job={job} record={record} /> : k === 'hbond' || k === 'hbond-legacy' ? <HbondChart job={job} record={record} /> : k === 'rms' ? <RmsChart job={job} record={record} />
-    : k === 'rmsf' ? <RmsfChart job={job} record={record} /> : k === 'gyrate' || k === 'gyrate-legacy' ? <GyrateChart job={job} record={record} /> : k === 'mindist' ? <MindistChart job={job} record={record} /> : <RdfChart job={job} record={record} />
+    : k === 'rmsf' ? <RmsfChart job={job} record={record} /> : k === 'gyrate' || k === 'gyrate-legacy' ? <GyrateChart job={job} record={record} /> : k === 'mindist' ? <MindistChart job={job} record={record} />
+    : k === 'density' ? <DensityChart job={job} record={record} /> : k === 'order' ? <OrderChart job={job} record={record} /> : <RdfChart job={job} record={record} />
 }
 
 /**
