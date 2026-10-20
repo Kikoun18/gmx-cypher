@@ -194,7 +194,7 @@ From [`batch-3.md`](batch-3.md) §5: one coherent app, (de)Cypher for every anal
 - [x] R9a Set-up and results; compare as `#compare`; old addresses still work; drops routed by type (T178)
 - [x] R9b One result page layout; (de)Cypher's controls regrouped (T179) (with the one style menu, so the display menu is built once)
 - [x] R8a One gesture scheme for structures, charts and legends (T180)
-- [ ] R8b Every key in one registry, rebindable, listed by `?`
+- [x] R8b Every key in one registry, rebindable, listed by `?` (T181)
 
 ### Phase 6: Compare every analysis (R10, R11)
 - [ ] R10a Results of any command in compare: cards, and one graph for like quantities
