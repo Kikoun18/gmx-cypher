@@ -2,17 +2,17 @@
 // compare (R9a), side by side with their structure, on one graph, exported as one HTML file that works on its own;
 // its key rebound in settings.
 import { execFileSync, spawn, type ChildProcess } from 'node:child_process'
-import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { expect, test, type Page } from '@playwright/test'
+import { tmp } from '../test/helpers'
 
 const RUNNER = new URL('..', import.meta.url).pathname, F = RUNNER + 'test/fixtures/decypher/'
 let runner: ChildProcess, url: string, sim: string
 
 test.beforeAll(async () => {
-  const home = mkdtempSync(join(tmpdir(), 'gmxc-e2e-home-'))
-  sim = mkdtempSync(join(tmpdir(), 'gmxc-e2e-sim-'))
+  const home = tmp('e2e-home')
+  sim = tmp('e2e-sim')
   const out = join(sim, 'rdf')
   mkdirSync(out)
   mkdirSync(join(home, 'jobs'))
@@ -29,7 +29,7 @@ test.beforeAll(async () => {
     writeFileSync(join(home, 'jobs', id + '.ndjson'), [{ t: 'created', at, spec }, { t: 'started', at, pid: 1 }, { t: 'ended', at, status: 'done', code: 0, signal: null }].map(e => JSON.stringify(e)).join('\n') + '\n')
   }
   // The Matrix's vault with two RDFs of one cell, whose runs this runner doesn't know (as for a vault from another machine).
-  const vault = mkdtempSync(join(tmpdir(), 'gmxc-e2e-vault-'))
+  const vault = tmp('e2e-vault')
   execFileSync(process.execPath, ['--import', './server/register.mjs', 'e2e/make-vault.ts', vault], { cwd: RUNNER })
   writeFileSync(join(home, 'config.json'), JSON.stringify({ vault }))
   runner = spawn(process.execPath, ['--import', './server/register.mjs', 'server/main.ts', '--port', '0', '--gmx', join(RUNNER, 'test/fake-gmx.mjs'), '--allow', sim],
@@ -93,11 +93,11 @@ test('tick two jobs, see them side by side and on one graph, export them as one 
   await dialog.getByRole('button', { name: 'export' }).click()
   const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: '+ Export html' }).click()])
   await expect(page.getByText(/^decypher_2-RDFs_/)).toBeVisible()
-  const file = join(mkdtempSync(join(tmpdir(), 'gmxc-e2e-export-')), download.suggestedFilename())
+  const file = join(tmp('e2e-export'), download.suggestedFilename())
   await download.saveAs(file)
   // The same RDFs as figures (R6b): by default one PDF, a page for each card and one for the one graph.
   const [figures] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: '+ Export figures' }).click()])
-  const pdfFile = join(mkdtempSync(join(tmpdir(), 'gmxc-e2e-export-')), figures.suggestedFilename())
+  const pdfFile = join(tmp('e2e-export'), figures.suggestedFilename())
   await figures.saveAs(pdfFile)
   const pdf = readFileSync(pdfFile, 'latin1')
   expect([pdf.slice(0, 8), /\/Type \/Pages [^>]*\/Count (\d+)/.exec(pdf)?.[1], pdfFile.endsWith('.pdf')]).toEqual(['%PDF-1.4', '3', true])
@@ -210,7 +210,7 @@ test('morph the two runs into one card, pick their references, sorted values, he
   await page.getByLabel('page heading').fill('Methionine, two references')
   await page.getByLabel('heading of 2 morphed RDFs').fill('Hydrogens against sulfurs')
   const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: '+ Export html' }).click()])
-  const file = join(mkdtempSync(join(tmpdir(), 'gmxc-e2e-export-')), download.suggestedFilename())
+  const file = join(tmp('e2e-export'), download.suggestedFilename())
   await download.saveAs(file)
   const html = readFileSync(file, 'utf8')
   const exported = await context.newPage(), exportErrors = watch(exported)

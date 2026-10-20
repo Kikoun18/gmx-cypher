@@ -2,18 +2,18 @@
 // on the nvt fixtures), side by side in compare: the RMSF painted on its structure, the H-bond pairs drawn in frame
 // positions; exported as one HTML file that draws both on its own, from file://, with nothing fetched.
 import { spawn, type ChildProcess } from 'node:child_process'
-import { cpSync, mkdirSync, mkdtempSync, readFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { cpSync, mkdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { expect, test, type Page } from '@playwright/test'
+import { tmp } from '../test/helpers'
 
 const RUNNER = new URL('..', import.meta.url).pathname, F = RUNNER + 'test/fixtures/'
 let runner: ChildProcess, url: string, sim: string
 const jobs: Record<string, string> = {}
 
 test.beforeAll(async () => {
-  const home = mkdtempSync(join(tmpdir(), 'gmxc-e2e-home-'))
-  sim = mkdtempSync(join(tmpdir(), 'gmxc-e2e-sim-'))
+  const home = tmp('e2e-home')
+  sim = tmp('e2e-sim')
   const md = join(sim, 'md')
   mkdirSync(md)
   for (const f of ['nvt.gro', 'nvt.tpr', 'nvt.xtc', 'index.ndx']) cpSync(F + 'nvt/' + f, join(md, f))
@@ -69,7 +69,7 @@ test('an RMSF and an H-bond result in compare, exported, then opened offline', a
 
   await view.getByRole('button', { name: 'export' }).click()
   const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: '+ Export html' }).click()])
-  const file = join(mkdtempSync(join(tmpdir(), 'gmxc-e2e-export-')), download.suggestedFilename())
+  const file = join(tmp('e2e-export'), download.suggestedFilename())
   await download.saveAs(file)
   const html = readFileSync(file, 'utf8')
   expect(html).not.toContain(sim)

@@ -1,16 +1,16 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { request, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { startServer } from '../server/http';
+import { tmp } from './helpers';
 
 const TOKEN = 'a'.repeat(43);
 let server: Server, port: number;
 
 beforeAll(async () => {
-  const parent = mkdtempSync(join(tmpdir(), 'gmxc-')), dist = join(parent, 'dist');
+  const parent = tmp('dist'), dist = join(parent, 'dist');
   mkdirSync(dist);
   writeFileSync(join(parent, 'secret.txt'), 'SECRET-OUTSIDE-DIST');
   writeFileSync(join(dist, 'index.html'), '<!doctype html><title>gmx-cypher</title>');

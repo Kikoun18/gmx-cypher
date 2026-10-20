@@ -1,16 +1,16 @@
 // Start, pick inputs, make two groups, run with the fake gmx, see the chart: the whole path once, in a browser.
 import { spawn, type ChildProcess } from 'node:child_process'
-import { copyFileSync, mkdtempSync, readFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { copyFileSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { expect, test } from '@playwright/test'
+import { tmp } from '../test/helpers'
 
 const RUNNER = new URL('..', import.meta.url).pathname
 let runner: ChildProcess, url: string, sim: string
 
 test.beforeAll(async () => {
-  const home = mkdtempSync(join(tmpdir(), 'gmxc-e2e-home-'))
-  sim = mkdtempSync(join(tmpdir(), 'gmxc-e2e-sim-'))
+  const home = tmp('e2e-home')
+  sim = tmp('e2e-sim')
   for (const f of ['nvt.tpr', 'nvt.gro', 'nvt.xtc', 'index.ndx']) copyFileSync(join(RUNNER, 'test/fixtures/nvt', f), join(sim, f))
   runner = spawn(process.execPath, ['--import', './server/register.mjs', 'server/main.ts', '--port', '0', '--gmx', join(RUNNER, 'test/fake-gmx.mjs'), '--allow', sim],
     { cwd: RUNNER, env: { ...process.env, GMX_CYPHER_HOME: home, FAKE_GMX_FRAMES: '11', FAKE_GMX_SLOW: '50' } })
@@ -89,7 +89,7 @@ test('pick inputs, make groups, run, see the chart', async ({ page }) => {
   const exportAs = async (what: RegExp) => {
     await chart.locator('xpath=ancestor::figure').getByRole('combobox', { name: /^export / }).click()
     const [d] = await Promise.all([page.waitForEvent('download'), page.getByRole('option', { name: what }).click()])
-    const f = join(mkdtempSync(join(tmpdir(), 'gmxc-e2e-export-')), d.suggestedFilename())
+    const f = join(tmp('e2e-export'), d.suggestedFilename())
     await d.saveAs(f)
     return f
   }
