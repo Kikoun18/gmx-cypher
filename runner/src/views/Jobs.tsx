@@ -15,6 +15,7 @@ import type { Route } from '../lib/route'
 import { modsOf, pickInList } from '../core/gestures'
 import { filterJobs, type JobFilter } from '../lib/jobFilter'
 import { JobFilters } from './JobFilters'
+import { JobsDiff } from './RunDiff'
 
 /** Destructive actions arm on the first click and act on the second, within 2.6 s. */
 function useArmed(): [boolean, () => boolean] {
@@ -30,7 +31,7 @@ function useNow(on: boolean) {
   return now
 }
 
-function JobDetail({ job, log, onAllLog, onRunAgain, vault, allow, onCompare }: { job: Job; log: Log | undefined; onAllLog: () => void; onRunAgain: (r: RunRecord) => void; vault: string | null; allow: string[]; onCompare: () => void }) {
+function JobDetail({ job, jobs, log, onAllLog, onRunAgain, vault, allow, onCompare }: { job: Job; jobs: Job[]; log: Log | undefined; onAllLog: () => void; onRunAgain: (r: RunRecord) => void; vault: string | null; allow: string[]; onCompare: () => void }) {
   const [armed, press] = useArmed()
   const cancel = () => { if (press()) postJson('/api/jobs/' + job.id + '/cancel', {}).catch(() => {}) }
   const s = statusOf(job), running = job.status === 'running', now = useNow(running), f = fraction(job)
@@ -53,7 +54,7 @@ function JobDetail({ job, log, onAllLog, onRunAgain, vault, allow, onCompare }: 
       {job.unfollowed && <p className="m-0 text-caption text-muted-foreground">gmx-cypher restarted while this job ran: it still runs (pid {job.pid}), but its output and its end are no longer read here, and its record is not completed</p>}
       {(running || job.progress.frame != null) && !job.unfollowed && <p className="m-0 text-control" aria-live="polite">{job.status === 'failed' || job.status === 'cancelled' ? 'stopped at ' : ''}{progressText(job)}{took && ' · ' + took}</p>}
       {job.status === 'interrupted' && <p className="m-0 text-caption text-muted-foreground">{job.error}</p>}
-      <RunResult job={job} log={log?.text} logCut={log && log.from > 0 ? { from: log.from, size: log.size } : undefined} onAllLog={onAllLog} allow={allow} vault={vault} onRunAgain={onRunAgain} onCompare={onCompare}
+      <RunResult job={job} jobs={jobs} log={log?.text} logCut={log && log.from > 0 ? { from: log.from, size: log.size } : undefined} onAllLog={onAllLog} allow={allow} vault={vault} onRunAgain={onRunAgain} onCompare={onCompare}
         actions={job.status === 'running' && !job.unfollowed && <Button variant="destructive" onClick={cancel}>{armed ? 'click again to cancel' : 'cancel'}</Button>} />
       <p className="m-0 text-caption text-muted-foreground">a job keeps running when this page is closed or reloaded · started {new Date(job.created).toLocaleString()}</p>
     </div>
@@ -80,11 +81,13 @@ export function JobsView({ jobs, logs, loadLog, route, go, onRunAgain, vault, al
   const selected = route.view === 'compare' ? route.jobs : job ? [job.id] : []
   const anchor = React.useRef<string | null>(selected[0] ?? null)
   React.useEffect(() => { if (job && !(job.id in logs)) loadLog(job.id) }, [job, logs, loadLog])
-  // In compare, a change of selection stays in compare; elsewhere, two or more open it.
+  // In compare, a change of selection stays in compare (in the diff while two are selected); elsewhere, two or more open it.
+  const diffing = route.view === 'compare' && !!route.diff
   const pick = (id: string, m: { shift?: boolean; add?: boolean }) => {
     const next = pickInList(listed.map(j => j.id), selected, anchor.current, id, m)
     if (!m.shift) anchor.current = id
-    go(route.view === 'compare' && (m.add || m.shift) ? { view: 'compare', jobs: next, filter } : next.length > 1 ? { view: 'compare', jobs: next, filter } : { view: 'results', job: next[0] ?? null, filter })
+    const diff = diffing && next.length === 2 ? { diff: true } : {}
+    go(route.view === 'compare' && (m.add || m.shift) ? { view: 'compare', jobs: next, filter, ...diff } : next.length > 1 ? { view: 'compare', jobs: next, filter } : { view: 'results', job: next[0] ?? null, filter })
   }
   // Archive (R12c) the selected jobs that have ended: their files move to the jobs folder's archive/.
   const toArchive = selected.filter(id => jobs.find(j => j.id === id)?.ended)
@@ -95,8 +98,8 @@ export function JobsView({ jobs, logs, loadLog, route, go, onRunAgain, vault, al
     go({ view: 'results', job: null, filter })
   }
   const unarchive = (id: string) => postJson('/api/jobs/' + id + '/unarchive', {}).then(() => { setSaid('unarchived: back in the list'); readShelf() }, e => setSaid((e as Error).message))
-  const onFilter = (f: JobFilter, typing?: boolean) => go(route.view === 'compare' ? { view: 'compare', jobs: route.jobs, filter: f } : { view: 'results', job: route.job, filter: f }, { replace: typing })
-  const openCompare = <Button variant="outline" size="sm" className="mb-1 justify-between" onClick={() => go({ view: 'compare', jobs: selected, filter })} aria-current={route.view === 'compare' ? 'page' : undefined}
+  const onFilter = (f: JobFilter, typing?: boolean) => go(route.view === 'compare' ? { view: 'compare', jobs: route.jobs, filter: f, ...(diffing ? { diff: true } : {}) } : { view: 'results', job: route.job, filter: f }, { replace: typing })
+  const openCompare = <Button variant="outline" size="sm" className="mb-1 justify-between" onClick={() => go({ view: 'compare', jobs: selected, filter })} aria-current={route.view === 'compare' && !diffing ? 'page' : undefined}
     title={(keyName ? keyName + ' opens it too (settings → keyboard) · ' : 'set a key in settings → keyboard · ') + '⌘/Ctrl-click or tick jobs to compare them'}>
     <span>compare{selected.length > 1 ? ' · ' + String(selected.length).padStart(2, '0') : ''}</span>{keyName && <Kbd>{keyName}</Kbd>}
   </Button>
@@ -106,6 +109,8 @@ export function JobsView({ jobs, logs, loadLog, route, go, onRunAgain, vault, al
         <Section label={'Jobs ' + String(jobs.length).padStart(2, '0')} />
         {(jobs.length > 0 || archive) && <JobFilters jobs={archive ? shelf ?? [] : jobs} filter={filter} onFilter={onFilter} shown={listed.length} allow={allow} />}
         {!archive && openCompare}
+        {!archive && selected.length === 2 && <Button variant="outline" size="sm" className="mb-1 justify-start" onClick={() => go({ view: 'compare', jobs: selected, filter, diff: true })} aria-current={diffing ? 'page' : undefined}
+          title="what differs between the two jobs' records: options, inputs, groups, gmx, environment, frames">diff</Button>}
         {!archive && toArchive.length > 0 && <Button variant="ghost" size="sm" className="mb-1 justify-start" onClick={() => void archiveSelected()} title="their files move to the jobs folder's archive/; nothing is deleted, and unarchive brings them back">archive{toArchive.length > 1 ? ' · ' + String(toArchive.length).padStart(2, '0') : ''}</Button>}
         {said && <p className="m-0 text-caption text-muted-foreground" aria-live="polite">{said}</p>}
         {!jobs.length && <p className="m-0 text-control text-muted-foreground">no jobs yet</p>}
@@ -131,7 +136,8 @@ export function JobsView({ jobs, logs, loadLog, route, go, onRunAgain, vault, al
         })}
       </nav>
       {archive ? <p className="m-0 text-control text-muted-foreground">archived jobs: their files are in the jobs folder's archive/, not read at start. Unarchive one to open its result again.</p>
-        : route.view === 'compare' ? compare : job && <JobDetail key={job.id} job={job} log={logs[job.id]} onAllLog={() => loadLog(job.id, true)} onRunAgain={onRunAgain} vault={vault} allow={allow} onCompare={() => go({ view: 'compare', jobs: [job.id], filter })} />}
+        : diffing ? <JobsDiff ids={route.jobs} jobs={jobs} onCompare={() => go({ view: 'compare', jobs: route.jobs, filter })} />
+        : route.view === 'compare' ? compare : job && <JobDetail key={job.id} job={job} jobs={jobs} log={logs[job.id]} onAllLog={() => loadLog(job.id, true)} onRunAgain={onRunAgain} vault={vault} allow={allow} onCompare={() => go({ view: 'compare', jobs: [job.id], filter })} />}
     </div>
   )
 }

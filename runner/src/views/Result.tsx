@@ -30,6 +30,7 @@ import { PathText, ResultPage } from '../ui/result-page'
 import { commandText } from '../lib/command'
 import { asTerminal } from '../lib/progress'
 import { Code } from './Code'
+import { CompareWith } from './RunDiff'
 
 const size = (n: number) => (n < 1024 ? n + ' B' : n < 1048576 ? (n / 1024).toFixed(1) + ' kB' : (n / 1048576).toFixed(1) + ' MB')
 
@@ -490,13 +491,15 @@ function Charts({ job, record }: { job: Job; record: RunRecord }) {
  * settings line and the groups as gmx counted them; and, collapsed, its files (within their allowed folder), its
  * command and its log. While it runs or when it failed, the log is open.
  */
-export function ResultView({ job, record: rec, recordError, log, logCut, onAllLog, allow, vault, onRunAgain, onCompare, actions }: {
+export function ResultView({ job, record: rec, recordError, log, logCut, onAllLog, allow, vault, onRunAgain, onCompare, actions, jobs }: {
   job: Job; record: RunRecord | null; recordError?: string; log: string | undefined; allow: string[]; vault: string | null
   /** Where the log shown starts, when it is its tail only (R12a), and reading all of it. */
   logCut?: { from: number; size: number }; onAllLog?: () => void
   onRunAgain: (r: RunRecord) => void; onCompare: () => void; actions?: React.ReactNode
+  /** The jobs to pick from in compare with… (R13). */
+  jobs?: Job[]
 }) {
-  const [sending, setSending] = React.useState(false), [figures] = React.useState(() => new Map<string, PageFigure>())
+  const [sending, setSending] = React.useState(false), [figures] = React.useState(() => new Map<string, PageFigure>()), [diffing, setDiffing] = React.useState(false)
   const sendButton = React.useRef<HTMLButtonElement>(null), logRef = React.useRef<HTMLDivElement>(null)
   React.useEffect(() => { const el = logRef.current?.querySelector('pre'); if (el) el.scrollTop = el.scrollHeight }, [log])
   const done = job.status === 'done' && !!rec, live = job.status === 'running' && !job.unfollowed
@@ -514,11 +517,13 @@ export function ResultView({ job, record: rec, recordError, log, logCut, onAllLo
         actions={<>
           {actions}
           {job.status === 'done' && <Button onClick={onCompare}>compare</Button>}
+          {rec && jobs && <Button variant="outline" aria-expanded={diffing} onClick={() => setDiffing(x => !x)} title="what differs between this job's record and another job's, or a record on disk: options, inputs, groups, gmx, environment, frames">compare with…</Button>}
           {done && vault && <Button ref={sendButton} variant="outline" onClick={() => setSending(true)}>send to vault…</Button>}
           {rec && <Button variant="outline" onClick={() => onRunAgain(rec)}>open in set-up</Button>}
           {done && <ExportAll figures={figures} file={stem} fields={{ ...job.fields, command: job.kind }} />}
           <span className="text-caption text-muted-foreground">{done && !vault ? 'set a Matrix vault in settings to send this result · ' : ''}{rec ? 'open in set-up fills the steps with this job\'s inputs, groups and options; a new job gets new names' : recordError ? 'no job record: ' + recordError : ''}</span>
         </>}
+        panel={diffing && rec && jobs ? <CompareWith job={job} jobs={jobs} onClose={() => setDiffing(false)} /> : undefined}
         charts={done ? <Charts job={job} record={rec} /> : undefined}
         settings={rec ? <>
           <p className="m-0 text-caption text-muted-foreground">{job.kind === 'rdf' ? optionsLine(rec) + ' · reference ' + rec.groups[0]?.name : flagsLine(rec)}</p>

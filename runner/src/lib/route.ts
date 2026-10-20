@@ -9,7 +9,8 @@ export type Route =
   | { view: 'setup'; step: Step; batch: boolean }
   /** The jobs list's filter (R12b) goes with results and compare. */
   | { view: 'results'; job: string | null; filter?: JobFilter }
-  | { view: 'compare'; jobs: string[]; filter?: JobFilter }
+  /** `diff`: two jobs' records side by side, what differs (R13), in place of compare. */
+  | { view: 'compare'; jobs: string[]; filter?: JobFilter; diff?: boolean }
   | { view: 'cluster' }
 
 export const STEPS: readonly Step[] = ['inputs', 'groups', 'command']
@@ -27,7 +28,7 @@ export function parseRoute(hash: string): { route: Route; redirect: boolean } {
   const f = parseFilter(q), filter = Object.keys(f).length ? { filter: f } : {}
   if (parts[0] === 'setup' && (STEPS as readonly string[]).includes(parts[1])) route = setup(parts[1] as Step, q.get('mode') === 'batch')
   else if (parts[0] === 'results') route = { view: 'results', job: parts.length === 2 && isJobId(parts[1]) ? parts[1] : null, ...filter }
-  else if (parts[0] === 'compare') route = { view: 'compare', jobs: [...new Set((q.get('jobs') ?? '').split(',').filter(isJobId))], ...filter }
+  else if (parts[0] === 'compare') route = { view: 'compare', jobs: [...new Set((q.get('jobs') ?? '').split(',').filter(isJobId))], ...filter, ...(q.get('diff') === '1' ? { diff: true } : {}) }
   else if (parts[0] === 'cluster') route = { view: 'cluster' }
   return { route, redirect: formatRoute(route) !== '#' + h }
 }
@@ -37,6 +38,6 @@ export function formatRoute(r: Route): string {
   if (r.view === 'setup') return '#setup/' + r.step + (r.batch ? '?mode=batch' : '')
   const f = r.view === 'results' || r.view === 'compare' ? filterQuery(r.filter ?? {}) : ''
   if (r.view === 'results') return '#results' + (r.job && isJobId(r.job) ? '/' + r.job : '') + (f ? '?' + f : '')
-  if (r.view === 'compare') { const ids = r.jobs.filter(isJobId), q = [...(ids.length ? ['jobs=' + ids.join(',')] : []), ...(f ? [f] : [])]; return '#compare' + (q.length ? '?' + q.join('&') : '') }
+  if (r.view === 'compare') { const ids = r.jobs.filter(isJobId), q = [...(ids.length ? ['jobs=' + ids.join(',')] : []), ...(r.diff ? ['diff=1'] : []), ...(f ? [f] : [])]; return '#compare' + (q.length ? '?' + q.join('&') : '') }
   return '#cluster'
 }

@@ -127,12 +127,16 @@ export function findRuns(root: string, roots: string[], limit = 400, budget = 50
 }
 
 /** A found record and its main file (R10a): the record in the allowed folders, its main .xvg too. */
-export function readRun(path: string, roots: string[]): { record: RunRecord; xvg: string; pairs?: string } {
+export function readRun(path: string, roots: string[]): { record: RunRecord; xvg: string; pairs?: string };
+/** `recordOnly`: the record alone (a run diff, R13), read even when its files have moved. */
+export function readRun(path: string, roots: string[], recordOnly: true): { record: RunRecord };
+export function readRun(path: string, roots: string[], recordOnly = false): { record: RunRecord; xvg?: string; pairs?: string } {
   const p = inside(path, roots);
   if (!p.endsWith('.run.json')) throw new HttpError(400, path + ' is not a gmx-cypher run record (.run.json)');
   const rec = recordAt(p, false);
   if (!isRecord(rec)) throw new HttpError(400, path + ' is not a gmx-cypher run record');
   if (!recordComplete(rec)) throw new HttpError(409, path + " is incomplete: its job didn't finish (the record was written when it started)");
+  if (recordOnly) return { record: rec };
   const main = mainXvg(rec.outputs, stemOf(p));
   if (!main) throw new HttpError(404, path + ' names no .xvg of its own');
   // The selection tool's H-bond pairs (R10c), when the record lists them and they are still there.

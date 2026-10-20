@@ -128,6 +128,8 @@ describe('(de)Cypher finds the jobs gmx-cypher ran before, by their records', ()
     expect(run.xvg).toBe(readFileSync(F + 'rdf_o111_Methionine_H.xvg', 'utf8'))
     // Any command's record is read since R10a; one that names no .xvg of its own has nothing to show, and is not listed.
     expect(() => readRun(join(out, 'energy_nvt.run.json'), [root])).toThrow('names no .xvg of its own')
+    // The record alone (a run diff, R13): read whatever its files.
+    expect(readRun(join(out, 'energy_nvt.run.json'), [root], true)).toEqual({ record: expect.objectContaining({ analysis: 'energy' }) })
     expect(() => readRun(join(out, 'rdf_o111_Methionine_H.xvg'), [root])).toThrow('is not a gmx-cypher run record')
     // gmx hbond's record brings its pairs file (R10c), while it is there.
     const H = new URL('./fixtures/hbond/new/', import.meta.url).pathname

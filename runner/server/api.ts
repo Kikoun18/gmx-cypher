@@ -188,7 +188,10 @@ export function makeApi(ctx: Ctx): Api {
       // (de)Cypher: RDF runs gmx-cypher wrote before, by their records, under a folder of the allowed ones.
       return { body: findRuns(String((await readJson<{ root: string }>(req)).root || ''), roots()) };
     }
-    if (is(req, 'GET', url, '/api/decypher/run')) return { body: readRun(url.searchParams.get('path') || '', roots()) };
+    if (is(req, 'GET', url, '/api/decypher/run')) {
+      const path = url.searchParams.get('path') || '';
+      return { body: url.searchParams.get('only') === 'record' ? readRun(path, roots(), true) : readRun(path, roots()) };
+    }
     if (is(req, 'POST', url, '/api/landing')) {
       const b = await readJson<{ job: string; project: string; fields?: Fields; name?: string }>(req);
       const j = ctx.jobs.get(b.job);

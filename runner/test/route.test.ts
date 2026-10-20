@@ -19,6 +19,10 @@ describe('addresses', () => {
     ['#compare', { view: 'compare', jobs: [] }, false],
     ['#compare?jobs=' + ID, { view: 'compare', jobs: [ID] }, false],
     ['#compare?jobs=' + ID + ',' + ID2, { view: 'compare', jobs: [ID, ID2] }, false],
+    // Two jobs' run diff (R13): the flag after the jobs; any other value of it is dropped.
+    ['#compare?jobs=' + ID + ',' + ID2 + '&diff=1', { view: 'compare', jobs: [ID, ID2], diff: true }, false],
+    ['#compare?diff=1&jobs=' + ID + ',' + ID2, { view: 'compare', jobs: [ID, ID2], diff: true }, true],
+    ['#compare?jobs=' + ID + '&diff=yes', { view: 'compare', jobs: [ID] }, true],
     ['#cluster', { view: 'cluster' }, false],
     // The tabs' old addresses open what they opened, and are written again in the new form.
     ['#inputs', { view: 'setup', step: 'inputs', batch: false }, true],

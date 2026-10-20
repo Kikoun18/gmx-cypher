@@ -8,14 +8,17 @@ import { shortPath } from "../lib/paths"
 import { cn } from "../lib/utils"
 import { Button } from "./button"
 
-function ResultPage({ actions, charts, settings, provenance, open, summary = "Provenance · files, command, log", className }: {
+function ResultPage({ actions, panel, charts, settings, provenance, open, summary = "Provenance · files, command, log", className }: {
   actions: React.ReactNode; charts?: React.ReactNode; settings?: React.ReactNode; provenance: React.ReactNode
+  /** What an action opened, under the actions (a run diff, R13). */
+  panel?: React.ReactNode
   /** Open from the start: while a job runs, its log is what there is to see. */
   open?: boolean; summary?: string; className?: string
 }) {
   return (
     <div className={cn("flex min-w-0 flex-col gap-4", className)}>
       {actions && <div role="toolbar" aria-label="actions" data-landmark="actions" className="flex flex-wrap items-center gap-2">{actions}</div>}
+      {panel}
       {charts && <div data-landmark="charts" className="flex min-w-0 flex-col gap-3">{charts}</div>}
       {settings && <div data-landmark="settings" className="flex min-w-0 flex-col gap-2">{settings}</div>}
       <details data-landmark="provenance" open={open} className="group/prov">
