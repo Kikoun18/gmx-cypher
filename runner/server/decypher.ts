@@ -127,7 +127,7 @@ export function findRuns(root: string, roots: string[], limit = 400, budget = 50
 }
 
 /** A found record and its main file (R10a): the record in the allowed folders, its main .xvg too. */
-export function readRun(path: string, roots: string[]): { record: RunRecord; xvg: string } {
+export function readRun(path: string, roots: string[]): { record: RunRecord; xvg: string; pairs?: string } {
   const p = inside(path, roots);
   if (!p.endsWith('.run.json')) throw new HttpError(400, path + ' is not a gmx-cypher run record (.run.json)');
   const rec = recordAt(p, false);
@@ -135,5 +135,9 @@ export function readRun(path: string, roots: string[]): { record: RunRecord; xvg
   if (!recordComplete(rec)) throw new HttpError(409, path + " is incomplete: its job didn't finish (the record was written when it started)");
   const main = mainXvg(rec.outputs, stemOf(p));
   if (!main) throw new HttpError(404, path + ' names no .xvg of its own');
-  return { record: rec, xvg: readFileSync(inside(main, roots), 'utf8') };
+  // The selection tool's H-bond pairs (R10c), when the record lists them and they are still there.
+  const ndx = rec.analysis === 'hbond' ? rec.outputs.find(o => /_hbonds\.ndx$/.test(o.path))?.path : undefined;
+  let pairs: string | undefined;
+  try { if (ndx) pairs = readFileSync(inside(ndx, roots), 'utf8'); } catch { /* gone: drawn without pairs, and said so */ }
+  return { record: rec, xvg: readFileSync(inside(main, roots), 'utf8'), ...(pairs != null ? { pairs } : {}) };
 }

@@ -56,6 +56,8 @@ export interface Analysis {
   command?: string
   /** Values to paint on its structure (R10b: RMSF), by atom or residue number, the group's atoms only. */
   paint?: { by: 'atom' | 'residue'; values: [number, number][]; label: string; unit: string }
+  /** H-bond pairs to draw (R10c): donor, hydrogen, acceptor, the nearest at the structure's positions, of `total` found. */
+  pairs?: { drawn: [number, number, number][]; total: number }
 }
 /** A structure's painted atoms (R10b): each atom's value by its GROMACS number, the range, and what the values are. */
 export interface Paint { values: Map<number, number>; min: number; max: number; label: string; unit: string }
@@ -74,6 +76,8 @@ export interface Mol {
   n: number; gnr: number[]; el: string[]; name: string[]; resn: string[]; resnr: number[]
   local: Float64Array; comp: Int32Array; comps: { minx: number; maxx: number; miny: number; maxy: number; D: number; ox: number; oy: number }[]
   bonds: Int32Array; g2l: Int32Array; ext: { w: number; h: number }; nmol: number; molOf: Int32Array; molLabels: string[]; truncated: boolean; hidden: number
+  /** The H-bond pairs it can draw (R10c), as "donor-hydrogen-acceptor" numbers: in frame positions, each atom drawn, the two not apart across the box. */
+  links: string[]; arrange: Arrange
 }
 
 /** What a structure view draws: the analysis's groups, which are plotted, its reference(s), and the style. */
@@ -95,6 +99,8 @@ export interface SceneState {
   /** Atoms painted by a value (R10b), and atoms ringed from elsewhere (a chart's point), by GROMACS number. */
   paint?: Paint | null
   ring?: number[]
+  /** H-bond pairs drawn dashed (R10c), those of them the Mol can draw. */
+  pairs?: [number, number, number][]
 }
 
 /** The atom under the pointer: its line, its group or reference (−1: none), and where its card goes. */
@@ -116,8 +122,8 @@ export type VNode = [string, Record<string, unknown>, ...(VNode | string)[]]
 export interface ChartGeom { m: { l: number; r: number; t: number; b: number }; iw: number; ih: number; x0: number; x1: number; y0: number; y1: number; grid: number[]; xDigits: number; yDigits: number }
 
 /** One job as an export carries it: atoms as ranges, y values rounded, its selection when exported. */
-export interface ExportAnalysis { id: string; title: string; label: string; sub: string; x: number[]; xlabel: string; ylabel: string; ref: { name: string; atoms: string; tone: Tone } | null; sels: { name: string; atoms: string; tone: Tone; y: number[]; peak: Peak | null; shell?: Peak | null; colors?: Colors }[]; struct: string | null; structNote: string; selected: string[]; tone: Tone; plot?: Plot; paint?: Analysis['paint'] }
-/** Everything an exported page needs: its tokens, structures without solvent, the analyses, the comparison and the style. */
+export interface ExportAnalysis { id: string; title: string; label: string; sub: string; x: number[]; xlabel: string; ylabel: string; ref: { name: string; atoms: string; tone: Tone } | null; sels: { name: string; atoms: string; tone: Tone; y: number[]; peak: Peak | null; shell?: Peak | null; colors?: Colors }[]; struct: string | null; structNote: string; selected: string[]; tone: Tone; plot?: Plot; paint?: Analysis['paint']; pairs?: Analysis['pairs']; command?: string }
+/** Everything an exported page needs: its tokens, structures without solvent (but for H-bond pairs' molecules), the analyses, the comparison and the style. */
 export interface ExportData {
   /** The page's heading, as chosen ('(de)Cypher' unless changed). */
   header: string
@@ -161,6 +167,17 @@ export function decypherKit(data: KitData) {
     const r = pal.ramp, x = Math.min(1, Math.max(0, Number.isFinite(t) ? t : 0)) * (r.length - 1), i = Math.min(r.length - 2, Math.floor(x))
     return mix(r[i], r[i + 1], x - i)
   }
+  /** What a result's H-bond pairs come to on its structure (R10c), in words: how many were found and drawn, or why none is. */
+  function pairsNote(a: Pick<Analysis, 'pairs' | 'command'>, mol: Mol | null): string | null {
+    if (a.command === 'hbond-legacy') return 'gmx hbond-legacy writes no pairs to draw: the selection tool, gmx hbond, does'
+    if (!a.pairs) return a.command === 'hbond' ? 'no pairs drawn: this result came without its _hbonds.ndx' : null
+    const { drawn, total } = a.pairs, found = total + (total === 1 ? ' pair' : ' pairs') + ' found over the trajectory'
+    if (!mol) return found
+    if (mol.arrange !== 'frame positions') return found + ': arrange the molecules in frame positions to draw them'
+    const can = new Set(mol.links), k = drawn.filter(p => can.has(p.join('-'))).length
+    return found + ', drawn dashed at the structure\'s positions: ' + (k < drawn.length ? k + ' of the ' + drawn.length + ' nearest (the rest across the box edge)' : 'the ' + k + ' nearest') + (total > k ? ' · ' + (total - k) + ' not drawn' : '')
+  }
+
   /** An analysis's values on a structure (R10b): each atom of its first group gets its own value, or its residue's. */
   function paintOf(a: Pick<Analysis, 'paint' | 'sels'>, mol: Mol | null): Paint | null {
     if (!a.paint || !mol) return null
@@ -275,16 +292,31 @@ export function decypherKit(data: KitData) {
   /**
    * The drawable structure: solvent and ions left out, bonds guessed from distances (across the box edges),
    * each molecule made whole and, side by side, laid flat on its own and packed in rows, the molecules with
-   * plotted atoms first. Over 4000 atoms, the groups' atoms are kept and the rest cut in file order.
+   * plotted atoms first. Over 4000 atoms, the groups' atoms are kept and the rest cut in file order. In frame positions,
+   * the molecules of H-bond pairs (R10c: donor, hydrogen, acceptor) are kept though solvent, each moved across the box
+   * edges to its partner.
    */
-  function buildMol(s: Struct, selNrs: Set<number>, refNrs: Set<number>, arrange: Arrange): Mol | null {
+  function buildMol(s: Struct, selNrs: Set<number>, refNrs: Set<number>, arrange: Arrange, pairs: [number, number, number][] = []): Mol | null {
+    if (arrange !== 'frame positions') pairs = []
+    const at = new Map<number, number>(), kept = new Uint8Array(s.n), solv = (i: number) => SOLV.has(String(s.resn[i]).toUpperCase())
+    if (pairs.length) for (let i = 0; i < s.n; i++) at.set(s.nr[i], i)
+    // A paired solvent atom keeps its whole residue: the run of atoms with its residue number and name.
+    for (const nr of new Set(pairs.flat())) {
+      const i = at.get(nr)
+      if (i == null || !solv(i) || kept[i]) continue
+      const same = (j: number) => s.resnr[j] === s.resnr[i] && s.resn[j] === s.resn[i]
+      let a = i, b = i
+      while (a > 0 && same(a - 1)) a--
+      while (b < s.n - 1 && same(b + 1)) b++
+      for (let j = a; j <= b; j++) kept[j] = 1
+    }
     let idx: number[] = [], hidden = 0
-    for (let i = 0; i < s.n; i++) { if (SOLV.has(String(s.resn[i]).toUpperCase()) || s.el[i] === 'virtual') hidden++; else idx.push(i) }
+    for (let i = 0; i < s.n; i++) { if ((solv(i) && !kept[i]) || s.el[i] === 'virtual') hidden++; else idx.push(i) }
     let truncated = false
     if (idx.length > MAX_ATOMS) {
       truncated = true
-      const keep = idx.filter(i => selNrs.has(s.nr[i]) || refNrs.has(s.nr[i])).slice(0, MAX_ATOMS), kept = new Set(keep)
-      for (const i of idx) { if (keep.length >= MAX_ATOMS) break; if (!kept.has(i)) keep.push(i) }
+      const keep = idx.filter(i => selNrs.has(s.nr[i]) || refNrs.has(s.nr[i]) || kept[i]).slice(0, MAX_ATOMS), kept2 = new Set(keep)
+      for (const i of idx) { if (keep.length >= MAX_ATOMS) break; if (!kept2.has(i)) keep.push(i) }
       idx = keep.sort((p, q) => p - q)
     }
     const n = idx.length
@@ -331,8 +363,26 @@ export function decypherKit(data: KitData) {
       }
       mols.push({ members })
     }
+    // Each paired solvent molecule moves by whole boxes to sit by its partner (the first pair naming it), so the pair is drawn short.
+    const L = [bx, by, bz], moved = new Uint8Array(mols.length), links: string[] = []
+    for (const p of pairs) {
+      const [d, h, a] = p.map(nr => (nr < g2l.length ? g2l[nr] : -1))
+      if (d < 0 || h < 0 || a < 0) continue
+      const mh = molOf[h], ma = molOf[a]
+      if (mh !== ma) {
+        const [k, from, to] = !moved[ma] && kept[idx[a]] ? [ma, a, h] : !moved[mh] && kept[idx[h]] ? [mh, h, a] : [-1, 0, 0]
+        if (k >= 0) {
+          const shift = [0, 1, 2].map(c => (L[c] > 0 ? L[c] * Math.round((un[3 * from + c] - un[3 * to + c]) / L[c]) : 0))
+          for (const j of mols[k].members) for (let c = 0; c < 3; c++) un[3 * j + c] -= shift[c]
+        }
+        moved[mh] = moved[ma] = 1
+      }
+      // Drawn only where the drawn hydrogen…acceptor is the shortest across the box: under half a box on each axis.
+      if ([0, 1, 2].every(c => !(L[c] > 0) || Math.abs(un[3 * a + c] - un[3 * h + c]) < L[c] / 2)) links.push(p.join('-'))
+    }
+    // A paired water (R10c) is named by nothing: there are many, and the group already says what they are.
     const molLabels = mols.map(g => {
-      if (g.members.length < 3) return ''
+      if (g.members.length < 3 || g.members.every(k => kept[idx[k]])) return ''
       const seq: string[] = []; let last: string | null = null
       g.members.slice().sort((p, q) => idx[p] - idx[q]).forEach(k => { const i = idx[k], key = s.resnr[i] + s.resn[i]; if (key !== last) { seq.push(s.resn[i]); last = key } })
       const u = [...new Set(seq)]
@@ -383,7 +433,7 @@ export function decypherKit(data: KitData) {
     comps.forEach(c => { c.ox -= totalW / 2; c.oy += totalH / 2 })
     return {
       n, gnr: idx.map(i => s.nr[i]), el, name: idx.map(i => s.name[i]), resn: idx.map(i => s.resn[i]), resnr: idx.map(i => s.resnr[i]),
-      local, comp, comps, bonds: Int32Array.from(bonds), g2l, ext: { w: totalW, h: totalH }, nmol: mols.length, molOf, molLabels, truncated, hidden,
+      local, comp, comps, bonds: Int32Array.from(bonds), g2l, ext: { w: totalW, h: totalH }, nmol: mols.length, molOf, molLabels, truncated, hidden, links, arrange,
     }
   }
 
@@ -499,11 +549,24 @@ export function decypherKit(data: KitData) {
       const items: [number, number][] = []
       for (let k = 0; k < n; k++) if (vis[k]) items.push([P[4 * k + 2], k])
       if (BW > 0) for (let b = 0; b < mol.bonds.length / 2; b++) { const i = mol.bonds[2 * b], j = mol.bonds[2 * b + 1]; if (vis[i] && vis[j]) items.push([(P[4 * i + 2] + P[4 * j + 2]) / 2 - 0.02, -1 - b]) }
+      // H-bond pairs (R10c), from the hydrogen (the donor while hydrogens are hidden) to the acceptor, sorted in with the atoms.
+      const drawable = new Set(mol.links), links: [number, number][] = []
+      for (const p of st.pairs ?? []) {
+        if (!drawable.has(p.join('-'))) continue
+        const [d, hh, a] = p.map(nr => mol.g2l[nr]), from = vis[hh] ? hh : d
+        if (vis[from] && vis[a]) { items.push([(P[4 * from + 2] + P[4 * a + 2]) / 2 - 0.02, n + links.length]); links.push([from, a]) }
+      }
       items.sort((p, q) => p[0] - q[0])
       const zr = zmax - zmin || 1
       ctx.lineCap = 'round'
       for (let t = 0; t < items.length; t++) {
         const z = items[t][0], id = items[t][1], fog = Math.min(0.5, ((zmax - z) / zr) * 0.5)
+        if (id >= n) {
+          const [i, j] = links[id - n]
+          ctx.setLineDash([3, 3]); ctx.lineWidth = 1.5; ctx.strokeStyle = mix(th.fg, BG, 0.25 + fog)
+          ctx.beginPath(); ctx.moveTo(P[4 * i], P[4 * i + 1]); ctx.lineTo(P[4 * j], P[4 * j + 1]); ctx.stroke(); ctx.setLineDash([])
+          continue
+        }
         if (id < 0) {
           const b = -1 - id, i = mol.bonds[2 * b], j = mol.bonds[2 * b + 1]
           const mx = (P[4 * i] + P[4 * j]) / 2, my = (P[4 * i + 1] + P[4 * j + 1]) / 2, f = (P[4 * i + 3] + P[4 * j + 3]) / 2
@@ -991,7 +1054,7 @@ export function decypherKit(data: KitData) {
     const analyses: Analysis[] = data.analyses.map(a => ({
       id: a.id, kind: 'job', title: a.title, label: a.label, sub: a.sub, x: a.x, xlabel: a.xlabel, ylabel: a.ylabel,
       ref: a.ref ? { name: a.ref.name, atoms: fromRanges(a.ref.atoms), tone: a.ref.tone } : null,
-      sels: a.sels.map(s => ({ name: s.name, atoms: fromRanges(s.atoms), tone: s.tone, y: s.y, peak: s.peak, shell: s.shell ?? null, ...(s.colors ? { colors: s.colors } : {}) })), struct: a.struct, structNote: a.structNote, ...(a.plot ? { plot: a.plot } : {}), ...(a.paint ? { paint: a.paint } : {}),
+      sels: a.sels.map(s => ({ name: s.name, atoms: fromRanges(s.atoms), tone: s.tone, y: s.y, peak: s.peak, shell: s.shell ?? null, ...(s.colors ? { colors: s.colors } : {}) })), struct: a.struct, structNote: a.structNote, ...(a.plot ? { plot: a.plot } : {}), ...(a.paint ? { paint: a.paint } : {}), ...(a.pairs ? { pairs: a.pairs } : {}), ...(a.command ? { command: a.command } : {}),
     }))
     const tones: Record<string, Tone> = {}
     data.analyses.forEach(a => { tones[a.id] = a.tone })
@@ -1001,7 +1064,7 @@ export function decypherKit(data: KitData) {
       if (!(key in mols)) {
         const sel = new Set<number>(), ref = new Set<number>()
         analyses.forEach(a => { if (a.struct !== key) return; a.sels.forEach(g => g.atoms.forEach(v => sel.add(v))); if (a.ref) a.ref.atoms.forEach(v => ref.add(v)) })
-        mols[key] = buildMol(data.structs[key], sel, ref, data.view.arrange)
+        mols[key] = buildMol(data.structs[key], sel, ref, data.view.arrange, analyses.flatMap(a => (a.struct === key && a.pairs?.drawn) || []))
       }
       return mols[key]
     }
@@ -1125,11 +1188,12 @@ export function decypherKit(data: KitData) {
       })
       const update = () => {
         const s = sel()
-        view.set({ mol, pal: pal(), rep: data.view.rep, rest: data.view.rest, labels: data.view.labels, hydrogens: data.view.hydrogens, sels: a.sels, selected: a.sels.flatMap((g, i) => (s.includes(g.name) ? [i] : [])), refs: refs(), hoverSel, hoverRef: -1, paint })
+        view.set({ mol, pal: pal(), rep: data.view.rep, rest: data.view.rest, labels: data.view.labels, hydrogens: data.view.hydrogens, sels: a.sels, selected: a.sels.flatMap((g, i) => (s.includes(g.name) ? [i] : [])), refs: refs(), hoverSel, hoverRef: -1, paint, pairs: a.pairs?.drawn })
       }
       redraws.push(update)
       update()
-      return { el: wrap, set: (i: number) => { hoverSel = i; update() } }
+      const note = pairsNote(a, mol)
+      return { el: note ? h('div', null, wrap, h('p', { class: 'dc-cap dc-note' }, note)) : wrap, set: (i: number) => { hoverSel = i; update() } }
     }
 
     function header() {
@@ -1215,7 +1279,7 @@ export function decypherKit(data: KitData) {
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => redraws.forEach(f => f()))
   }
 
-  return { rampAt, paintOf, legendPick, pickGroups, clickScope, pans, scopeAtoms, TONES, DASH, DASH_NAMES, REPS, RESTS, SOLV, palette, toRanges, fromRanges, parseStructure, mix, buildMol, structureView, matchGroup, rdfLooks, buildCurves, looseName, sameButReference, morphWhy, pickRefs, refLabels, niceTicks, xDigitsOf, valAt, hoverRows, hoverX, readoutTitle, chart, mount }
+  return { rampAt, paintOf, pairsNote, legendPick, pickGroups, clickScope, pans, scopeAtoms, TONES, DASH, DASH_NAMES, REPS, RESTS, SOLV, palette, toRanges, fromRanges, parseStructure, mix, buildMol, structureView, matchGroup, rdfLooks, buildCurves, looseName, sameButReference, morphWhy, pickRefs, refLabels, niceTicks, xDigitsOf, valAt, hoverRows, hoverX, readoutTitle, chart, mount }
 }
 
 export type Kit = ReturnType<typeof decypherKit>

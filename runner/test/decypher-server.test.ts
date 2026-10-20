@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { copyFileSync, mkdirSync, readdirSync, readFileSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
+import { copyFileSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { NodeBackend } from '../../matrix/scripts/node-backend'
@@ -129,6 +129,13 @@ describe('(de)Cypher finds the jobs gmx-cypher ran before, by their records', ()
     // Any command's record is read since R10a; one that names no .xvg of its own has nothing to show, and is not listed.
     expect(() => readRun(join(out, 'energy_nvt.run.json'), [root])).toThrow('names no .xvg of its own')
     expect(() => readRun(join(out, 'rdf_o111_Methionine_H.xvg'), [root])).toThrow('is not a gmx-cypher run record')
+    // gmx hbond's record brings its pairs file (R10c), while it is there.
+    const H = new URL('./fixtures/hbond/new/', import.meta.url).pathname
+    for (const f of ['hbond_nvt.xvg', 'hbond_nvt_hbonds.ndx']) copyFileSync(H + f, join(out, f))
+    writeFileSync(join(out, 'hbond_nvt.run.json'), JSON.stringify({ format: 'gmx-cypher run', version: 3, analysis: 'hbond', groups: [], outputs: [{ kind: 'xvg', path: join(out, 'hbond_nvt.xvg') }, { kind: 'ndx', path: join(out, 'hbond_nvt_hbonds.ndx') }] }))
+    expect(readRun(join(out, 'hbond_nvt.run.json'), [root]).pairs).toBe(readFileSync(H + 'hbond_nvt_hbonds.ndx', 'utf8'))
+    rmSync(join(out, 'hbond_nvt_hbonds.ndx'))
+    expect(readRun(join(out, 'hbond_nvt.run.json'), [root]).pairs).toBeUndefined()
   })
 
   it('skips and refuses a record whose job did not finish: the one written at its start (R2b)', () => {

@@ -8,6 +8,7 @@ import type { Job } from '../jobs'
 import type { Analysis, Struct } from '../core/kit'
 import { readStructure } from '../core/index'
 import { mainXvg } from '../core/cards'
+import { hbondTriplets, nearestPairs } from '../lib/hbond'
 import { basename, fromFiles, fromRecord, fromVault, maxAtom, recordGroups, shortLabels, type FileRow, type LoadedFile, type RecordLike } from './parse'
 import { refKey, type SourceRef } from './state'
 import type { VaultRdfs } from './vaultTypes'
@@ -50,19 +51,28 @@ async function runStructure(rec: RecordLike): Promise<{ key: string | null; note
   return { key, note, structs: out }
 }
 
+/** The selection tool's pairs file among a record's outputs (R10c). */
+const pairsFile = (rec: RecordLike) => (rec.analysis === 'hbond' ? rec.outputs?.find(o => /_hbonds\.ndx$/.test(o.path))?.path ?? null : null)
+/** H-bond pairs (R10c): those found over the trajectory, the nearest drawn at the run's structure; none without one. */
+function withPairs(r: Result, ndx: string | null | undefined): Result {
+  const s = r.analysis.struct ? r.structs[r.analysis.struct] : undefined
+  return ndx == null || !s ? r : { ...r, analysis: { ...r.analysis, pairs: nearestPairs(hbondTriplets(ndx), s) } }
+}
+
 async function loadJob(job: Job): Promise<Result> {
   // Any command's result (R10a): its main file by the record's outputs; a command without atom groups has no structure.
   const rec = await getJson<RecordLike>('/api/jobs/' + job.id + '/record'), main = mainXvg(rec.outputs ?? [], basename(String(job.meta?.record ?? '')).replace(/\.run\.json$/, ''))
   const xvg = await text('/api/jobs/' + job.id + '/output?' + (main ? 'name=' + enc(basename(main)) : 'kind=xvg'))
   const s = rec.groups.length ? await runStructure(rec) : { key: null, note: 'gmx ' + rec.analysis + ' has no atom groups, so no structure', structs: {} }, stem = String(job.meta?.stem ?? job.title)
-  return { analysis: fromRecord({ id: 'job:' + job.id, kind: 'job', title: job.name ?? job.title, label: stem, source: 'job', record: rec, xvg, struct: s.key, structNote: s.note }), structs: s.structs }
+  const pf = pairsFile(rec), ndx = pf ? await text('/api/jobs/' + job.id + '/output?name=' + enc(basename(pf))).catch(() => null) : null
+  return withPairs({ analysis: fromRecord({ id: 'job:' + job.id, kind: 'job', title: job.name ?? job.title, label: stem, source: 'job', record: rec, xvg, struct: s.key, structNote: s.note }), structs: s.structs }, ndx)
 }
 
 async function loadRecord(path: string): Promise<Result> {
-  const { record, xvg } = await getJson<{ record: RecordLike; xvg: string }>('/api/decypher/run?path=' + enc(path))
+  const { record, xvg, pairs } = await getJson<{ record: RecordLike; xvg: string; pairs?: string }>('/api/decypher/run?path=' + enc(path))
   const s = await runStructure(record), stem = basename(path).replace(/\.run\.json$/, ''), g = recordGroups(record)
   const title = stem + (g.ref ? ' · ' + g.ref.name + ' → ' + (g.sels.length === 1 ? g.sels[0].name : g.sels.length + ' groups') : '')
-  return { analysis: fromRecord({ id: 'record:' + path, kind: 'record', title, label: stem, source: 'run on disk', record, xvg, struct: s.key, structNote: s.note }), structs: s.structs }
+  return withPairs({ analysis: fromRecord({ id: 'record:' + path, kind: 'record', title, label: stem, source: 'run on disk', record, xvg, struct: s.key, structNote: s.note }), structs: s.structs }, pairs)
 }
 
 async function loadVault(ref: Extract<SourceRef, { kind: 'vault' }>, list: VaultRdfs): Promise<Result> {

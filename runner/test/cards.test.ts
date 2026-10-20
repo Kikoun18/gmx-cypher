@@ -6,6 +6,8 @@ import { curveGroup, mainXvg, quantityOf, unlike } from '../src/core/cards';
 import { fromRecord, type RecordLike } from '../src/decypher/parse';
 import { kit, parseStructure } from '../src/core/index';
 import { themeTokens } from '../src/core/tokens';
+import { hbondTriplets, nearestPairs } from '../src/lib/hbond';
+import { compactStruct } from '../src/decypher/export';
 
 const F = (p: string) => readFileSync(new URL('./fixtures/' + p, import.meta.url), 'utf8');
 const out = (...names: string[]) => names.map(n => ({ kind: n.endsWith('.ndx') ? 'ndx' : 'xvg', path: '/sim/out/' + n }));
@@ -110,5 +112,50 @@ describe('RMSF on the structure (R10b)', () => {
   });
   it('no other command paints its structure', () => {
     expect(fromRecord({ id: 'x', kind: 'job', title: 't', label: 'l', source: 'job', xvg: F('r9/rms/rmsd_nvt.xvg'), struct: null, structNote: '', record: { analysis: 'rms', groups: [] } }).paint).toBeUndefined();
+  });
+});
+
+describe('H-bond pairs on the structure (R10c)', () => {
+  const ndx = F('hbond/new/hbond_nvt_hbonds.ndx'), struct = parseStructure(F('nvt/nvt.gro'), 'gro');
+  it('reads the donor, hydrogen, acceptor triplets gmx hbond found, from its own index file', () => {
+    const t = hbondTriplets(ndx), numbers = ndx.split('[ hbonds_sulfate-water ]')[1].trim().split(/\s+/).map(Number);
+    expect(t.length).toBe(numbers.length / 3);
+    expect(t.slice(0, 2)).toEqual([[67, 68, 11], [67, 69, 11]]);
+    expect(hbondTriplets('[ sulfate ]\n1 2 3\n')).toEqual([]);
+  });
+  it('draws the shortest hydrogen…acceptor pairs at the structure\'s positions, 200 by default, and counts the rest', () => {
+    const t = hbondTriplets(ndx), p = nearestPairs(t, struct);
+    expect([p.total, p.drawn.length]).toEqual([t.length, Math.min(200, t.length)]);
+    const at = (nr: number) => { const i = struct.nr.indexOf(nr); return struct.xyz.slice(3 * i, 3 * i + 3) };
+    // Across the box edges, as gmx measures: 97 of the 569 pairs are split by them in nvt.gro.
+    const d = ([, h, a]: [number, number, number]) => Math.hypot(...at(h).map((v, k) => { const x = v - at(a)[k]; return x - 3.5 * Math.round(x / 3.5) }));
+    expect(p.drawn.map(d)).toEqual(p.drawn.map(d).slice().sort((x, y) => x - y));
+    expect(d(p.drawn[p.drawn.length - 1])).toBeLessThanOrEqual(Math.min(...t.filter(x => !p.drawn.includes(x)).map(d)));
+    expect(nearestPairs(t, struct, 5).drawn.length).toBe(5);
+  });
+  it('keeps the molecules of the pairs drawn, though solvent is hidden, each by its partner across the box edge', () => {
+    const pairs: [number, number, number][] = [[67, 68, 11], [2707, 2709, 28]];
+    const mol = kit.buildMol(struct, new Set([1, 2, 3, 4, 5]), new Set(), 'frame positions', pairs)!;
+    const nrs = new Set(mol.gnr), local = (nr: number) => { const k = mol.g2l[nr]; return [0, 1, 2].map(i => mol.local[3 * k + i]) };
+    expect([nrs.has(67), nrs.has(68), nrs.has(69), nrs.has(71), nrs.has(2707)]).toEqual([true, true, true, false, true]);
+    // 2709 and 28 are 3.33 nm apart in the file, 0.19 nm across the edge: the water is drawn by its sulfate.
+    expect(Math.hypot(...local(2709).map((v, i) => v - local(28)[i]))).toBeCloseTo(0.187, 2);
+    expect(mol.links).toEqual(['67-68-11', '2707-2709-28']);
+    // Side by side, solvent stays hidden and no pair is drawn.
+    const flat = kit.buildMol(struct, new Set([1, 2, 3, 4, 5]), new Set(), 'side by side', pairs)!;
+    expect([flat.gnr.includes(67), flat.links]).toEqual([false, []]);
+  });
+  it('says how many were found and drawn, or why none is', () => {
+    const p = nearestPairs(hbondTriplets(ndx), struct), mol = (arrange: 'frame positions' | 'side by side') => kit.buildMol(struct, new Set([1]), new Set(), arrange, p.drawn);
+    expect(kit.pairsNote({ command: 'hbond', pairs: p }, mol('frame positions'))).toBe("569 pairs found over the trajectory, drawn dashed at the structure's positions: the 200 nearest · 369 not drawn");
+    expect(kit.pairsNote({ command: 'hbond', pairs: p }, mol('side by side'))).toBe('569 pairs found over the trajectory: arrange the molecules in frame positions to draw them');
+    expect(kit.pairsNote({ command: 'hbond' }, null)).toBe('no pairs drawn: this result came without its _hbonds.ndx');
+    expect(kit.pairsNote({ command: 'hbond-legacy' }, null)).toMatch(/^gmx hbond-legacy writes no pairs/);
+    expect(kit.pairsNote({ command: 'rmsf' }, null)).toBeNull();
+  });
+  it('keeps the paired molecules in an export, solvent being left out', () => {
+    const kept = compactStruct(struct, new Set([1]), 4000, new Set([67, 68, 11]));
+    expect([kept.nr.includes(67), kept.nr.includes(70), kept.nr.includes(71)]).toEqual([true, true, false]);
+    expect(compactStruct(struct, new Set([1])).nr.includes(67)).toBe(false);
   });
 });

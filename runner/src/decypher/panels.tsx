@@ -19,7 +19,9 @@ export const StructurePanel = React.forwardRef<StructureHandle, {
   hoverSel: number; hoverRef?: number; onPick: (sels: number[], add: boolean) => void; onPickRef?: (ref: number, add: boolean) => void; onActive?: () => void; className?: string; empty: React.ReactNode
   /** Values painted on the atoms (R10b), atoms ringed from the chart, and the atom under the pointer for the chart. */
   paint?: Paint | null; ring?: number[]; onAtom?: (nr: number | null) => void
-}>(function StructurePanel({ mol, pal, view, sels, selected, refs, hoverSel, hoverRef = -1, onPick, onPickRef, onActive, className, empty, paint = null, ring, onAtom }, ref) {
+  /** H-bond pairs drawn dashed (R10c): donor, hydrogen, acceptor. */
+  pairs?: [number, number, number][]
+}>(function StructurePanel({ mol, pal, view, sels, selected, refs, hoverSel, hoverRef = -1, onPick, onPickRef, onActive, className, empty, paint = null, ring, onAtom, pairs }, ref) {
   const wrap = React.useRef<HTMLDivElement>(null), canvas = React.useRef<HTMLCanvasElement>(null)
   const ctl = React.useRef<ReturnType<typeof kit.structureView> | null>(null)
   const [tip, setTip] = React.useState<AtomHover | null>(null)
@@ -40,9 +42,9 @@ export const StructurePanel = React.forwardRef<StructureHandle, {
     return () => { c.destroy(); ctl.current = null }
   }, [!!mol]) // eslint-disable-line react-hooks/exhaustive-deps -- made once while there is a structure; set() brings each change
   React.useEffect(() => {
-    const st: SceneState = { mol, pal, rep: view.rep, rest: view.rest, labels: view.labels, hydrogens: view.hydrogens, sels, selected, refs, hoverSel, hoverRef, paint, ring }
+    const st: SceneState = { mol, pal, rep: view.rep, rest: view.rest, labels: view.labels, hydrogens: view.hydrogens, sels, selected, refs, hoverSel, hoverRef, paint, ring, pairs }
     ctl.current?.set(st)
-  }, [mol, pal, view.rep, view.rest, view.labels, view.hydrogens, sels, selected, refs, hoverSel, hoverRef, paint, ring])
+  }, [mol, pal, view.rep, view.rest, view.labels, view.hydrogens, sels, selected, refs, hoverSel, hoverRef, paint, ring, pairs])
   if (!mol) return <div className={cn('flex flex-col items-center justify-center gap-1.5 p-6 text-center', className)}>{empty}</div>
   const mod = modName(), g = tip && tip.sel >= 0 ? sels[tip.sel] : null, r = tip && tip.ref >= 0 ? refs[tip.ref] : null, on = g ? selected.includes(sels.indexOf(g)) : false
   return (
@@ -56,7 +58,7 @@ export const StructurePanel = React.forwardRef<StructureHandle, {
           <span className="inline-flex items-center gap-[7px]"><span className="size-2.5 rounded-full" style={{ background: pal.neutral.O }} />not plotted</span>
           <span className="inline-flex items-center gap-[7px]"><span className="size-2 rounded-full bg-foreground shadow-[0_0_0_1.5px_var(--card),0_0_0_2.7px_var(--foreground)]" />reference</span>
         </div>}
-        <span>{mol.n} atoms · solvent hidden{mol.truncated ? ' · first 4000' : ''} · drag rotate · right- or Space-drag pan · scroll zoom · F fit</span>
+        <span>{mol.n} atoms · solvent hidden{mol.links.length ? ' but for the pairs\' molecules' : ''}{mol.truncated ? ' · first 4000' : ''} · drag rotate · right- or Space-drag pan · scroll zoom · F fit</span>
       </div>
       {tip && (
         <div className="pointer-events-none absolute z-[2] flex w-60 flex-col gap-0.5 rounded-lg border border-border bg-popover px-2.5 py-2 shadow-menu" style={{ left: tip.left, top: tip.top }}>

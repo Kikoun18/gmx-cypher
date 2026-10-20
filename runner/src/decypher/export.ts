@@ -9,12 +9,18 @@ import type { ThemeTokens } from '../core/tokens'
 
 
 /** A structure's atoms without water and ions, at the 3 decimals of a .gro; over 4000, the groups' atoms first. */
-export function compactStruct(s: Struct, keep: Set<number>, max = 4000): Struct {
+export function compactStruct(s: Struct, keep: Set<number>, max = 4000, paired = new Set<number>()): Struct {
   let idx: number[] = []
-  for (let i = 0; i < s.n; i++) if (!kit.SOLV.has(String(s.resn[i]).toUpperCase())) idx.push(i)
+  // Solvent is left out, but for the molecules of H-bond pairs (R10c): the run of atoms with a paired atom's residue.
+  const solv = (i: number) => kit.SOLV.has(String(s.resn[i]).toUpperCase()), kept = new Uint8Array(s.n)
+  for (let i = 0; i < s.n; i++) if (paired.has(s.nr[i]) && solv(i)) {
+    for (let j = i; j >= 0 && s.resnr[j] === s.resnr[i] && s.resn[j] === s.resn[i]; j--) kept[j] = 1
+    for (let j = i; j < s.n && s.resnr[j] === s.resnr[i] && s.resn[j] === s.resn[i]; j++) kept[j] = 1
+  }
+  for (let i = 0; i < s.n; i++) if (!solv(i) || kept[i]) idx.push(i)
   if (idx.length > max) {
-    const first = idx.filter(i => keep.has(s.nr[i])).slice(0, max), kept = new Set(first)
-    for (const i of idx) { if (first.length >= max) break; if (!kept.has(i)) first.push(i) }
+    const first = idx.filter(i => keep.has(s.nr[i]) || kept[i]).slice(0, max), taken = new Set(first)
+    for (const i of idx) { if (first.length >= max) break; if (!taken.has(i)) first.push(i) }
     idx = first.sort((a, b) => a - b)
   }
   const r3 = (v: number) => Math.round(v * 1000) / 1000
@@ -75,10 +81,10 @@ export function exportData(o: ExportInput): ExportData {
   const id = new Map(o.analyses.map((a, i) => [a.id, 'a' + (i + 1)])), sid = new Map<string, string>(), structs: Record<string, Struct> = {}
   if (o.structures) for (const a of o.analyses) {
     if (!a.struct || !o.structs[a.struct] || sid.has(a.struct)) continue
-    const key = 's' + (sid.size + 1), keep = new Set<number>()
-    o.analyses.filter(b => b.struct === a.struct).forEach(b => [b.ref, ...b.sels].forEach(g => g?.atoms.forEach(v => keep.add(v))))
+    const key = 's' + (sid.size + 1), keep = new Set<number>(), on = o.analyses.filter(b => b.struct === a.struct)
+    on.forEach(b => [b.ref, ...b.sels].forEach(g => g?.atoms.forEach(v => keep.add(v))))
     sid.set(a.struct, key)
-    structs[key] = compactStruct(o.structs[a.struct], keep)
+    structs[key] = compactStruct(o.structs[a.struct], keep, 4000, new Set(on.flatMap(b => b.pairs?.drawn.flat() ?? [])))
   }
   const chosen = (a: Analysis | undefined) => ((a && o.titles?.[a.id]) ?? '').trim()
   const analyses: ExportAnalysis[] = o.analyses.map(a => ({
@@ -86,6 +92,7 @@ export function exportData(o: ExportInput): ExportData {
     ref: a.ref ? { name: a.ref.name, atoms: toRanges(a.ref.atoms), tone: a.ref.tone } : null,
     sels: a.sels.map(g => ({ name: g.name, atoms: toRanges(g.atoms), tone: g.tone, y: g.y.map(v => round(v, 4)), peak: g.peak && { r: round(g.peak.r, 5), g: round(g.peak.g, 4) }, shell: g.shell ? { r: round(g.shell.r, 5), g: round(g.shell.g, 4) } : null, ...(g.colors ? { colors: g.colors } : {}) })),
     struct: a.struct ? sid.get(a.struct) ?? null : null, structNote: scrub(a.structNote), selected: o.selected(a), tone: o.tones[a.id] ?? 'coral', ...(a.plot ? { plot: a.plot } : {}), ...(a.paint ? { paint: a.paint } : {}),
+    ...(a.pairs ? { pairs: a.pairs } : {}), ...(a.command ? { command: a.command } : {}),
   }))
   const compare = o.compare && o.compare.ids.filter(x => id.has(x)).length > 1
     ? { ids: o.compare.ids.filter(x => id.has(x)).map(x => id.get(x)!), focus: id.get(o.compare.focus) ?? id.get(o.compare.ids[0])!, selected: o.compare.selected, colorBy: o.compare.colorBy }
@@ -106,6 +113,7 @@ button:focus-visible{outline:2px solid var(--ring);outline-offset:2px}
 .dc-header h1{margin:0;font-family:Archivo,ui-sans-serif,system-ui,sans-serif;font-size:22px;line-height:28px;font-weight:800;letter-spacing:-0.01em}
 .dc-grow{flex:1;min-width:0}
 .dc-cap{font-size:11px;line-height:16px;color:var(--muted-foreground)}
+.dc-note{margin:0;padding:8px 12px;border-top:1px solid var(--border)}
 .dc-label{font-size:10px;line-height:14px;letter-spacing:.12em;color:var(--muted-foreground);text-transform:uppercase}
 .dc-seg{display:inline-flex;gap:2px;padding:3px;border-radius:10px;border:1px solid var(--border);background:var(--muted)}
 .dc-seg button{height:24px;padding:0 10px;border:0;border-radius:7px;background:transparent;font-size:11px;cursor:pointer;transition:background-color 120ms ease}
