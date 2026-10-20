@@ -210,7 +210,7 @@ From [`batch-3.md`](batch-3.md) §5: one coherent app, (de)Cypher for every anal
 - [x] R12a Logs on demand; startup without logs in memory (T190)
 - [x] R12b Search, filters, multi-select (T191)
 - [x] R12c Archive (T192)
-- [ ] R13 Run diff
+- [x] R13 Run diff (T193)
 
 ### Phase 8: Vault, cluster and commands (R14, R15, R16)
 - [ ] R14b Connect to a project: sends and saved compare views in the space (the setting itself: Phase 2, if agreed)
