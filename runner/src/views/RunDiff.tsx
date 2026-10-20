@@ -60,10 +60,12 @@ export function RunDiff({ a, b, aName, bName }: { a: DiffRecord; b: DiffRecord; 
   )
 }
 
-/** A record to diff: one of this runner's jobs, or a .run.json on disk. */
-export type DiffSource = { kind: 'job'; id: string; name: string } | { kind: 'path'; path: string; name: string }
-const sourceKey = (s: DiffSource) => (s.kind === 'job' ? 'job:' + s.id : 'path:' + s.path)
-const readSource = (s: DiffSource) => (s.kind === 'job' ? getJson<DiffRecord>('/api/jobs/' + s.id + '/record') : getJson<{ record: DiffRecord }>('/api/decypher/run?only=record&path=' + encodeURIComponent(s.path)).then(r => r.record))
+/** A record to diff: one of this runner's jobs, a .run.json on disk, or a record copy in the vault (R14c). */
+export type DiffSource = { kind: 'job'; id: string; name: string } | { kind: 'path'; path: string; name: string } | { kind: 'space'; sha256: string; name: string }
+const sourceKey = (s: DiffSource) => (s.kind === 'job' ? 'job:' + s.id : s.kind === 'path' ? 'path:' + s.path : 'space:' + s.sha256)
+const readSource = (s: DiffSource) => (s.kind === 'job' ? getJson<DiffRecord>('/api/jobs/' + s.id + '/record')
+  : s.kind === 'path' ? getJson<{ record: DiffRecord }>('/api/decypher/run?only=record&path=' + encodeURIComponent(s.path)).then(r => r.record)
+    : getJson<DiffRecord>('/api/space/record?sha=' + s.sha256))
 
 /** Two records read, then their differences; the reason in words when one can't be read. */
 export function DiffPane({ a, b }: { a: DiffSource; b: DiffSource }) {
@@ -100,6 +102,9 @@ export function JobsDiff({ ids, jobs, onCompare }: { ids: string[]; jobs: Job[];
 export function CompareWith({ job, jobs, onClose }: { job: Job; jobs: Job[]; onClose: () => void }) {
   const others = jobs.filter(j => j.id !== job.id && j.ended && j.status !== 'interrupted' && j.meta?.record)
   const [other, setOther] = React.useState<DiffSource | null>(null), [path, setPath] = React.useState('')
+  // The vault's record copies (R14c): each sent result's run, whichever gmx-cypher sent it; none without a vault.
+  const [copies, setCopies] = React.useState<{ sha256: string; name: string; ended: string | null }[]>([])
+  React.useEffect(() => { getJson<{ sha256: string; name: string; ended: string | null }[]>('/api/space/records').then(setCopies, () => setCopies([])) }, [])
   const name = job.name ?? job.title
   const readPath = () => { const p = path.trim(); if (p) setOther({ kind: 'path', path: p, name: p.split('/').pop()!.replace(/\.run\.json$/, '') }) }
   return (
@@ -109,6 +114,10 @@ export function CompareWith({ job, jobs, onClose }: { job: Job; jobs: Job[]; onC
           <SelectTrigger size="sm" className="w-64" aria-label="another job"><SelectValue placeholder={others.length ? 'another job' : 'no other job has ended'} /></SelectTrigger>
           <SelectContent>{others.map(j => <SelectItem key={j.id} value={j.id}>{j.name ?? j.title}</SelectItem>)}</SelectContent>
         </Select>
+        {copies.length > 0 && <Select value={other?.kind === 'space' ? other.sha256 : ''} onValueChange={sha => { const c = copies.find(x => x.sha256 === sha); if (c) setOther({ kind: 'space', sha256: sha, name: c.name + ' (vault)' }) }}>
+          <SelectTrigger size="sm" className="w-64" aria-label="a record in the vault"><SelectValue placeholder="a record in the vault" /></SelectTrigger>
+          <SelectContent>{copies.map(c => <SelectItem key={c.sha256} value={c.sha256}>{c.name}{c.ended ? ' · ' + new Date(c.ended).toLocaleDateString() : ''}</SelectItem>)}</SelectContent>
+        </Select>}
         <span className="text-caption text-muted-foreground">or a record on disk</span>
         <form className="flex items-center gap-2" onSubmit={e => { e.preventDefault(); readPath() }}>
           <Input className="h-8 w-80" value={path} placeholder="/path/to/run.run.json" aria-label="a record on disk" onChange={e => setPath(e.target.value)} />

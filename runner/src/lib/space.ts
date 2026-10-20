@@ -26,6 +26,51 @@ export const spacePaths = {
 
 export interface PortableRecord extends RunRecord { envNames: string[]; copy: { paths: string; env: string } }
 
+/** What compare shows (R14b): jobs by id, records on disk by path, vault RDFs by their Matrix IDs. */
+export type ViewSource = { kind: 'job'; id: string } | { kind: 'record'; path: string } | { kind: 'vault'; project: string; row: string; rdf: string }
+
+/**
+ * A compare view saved in the space (R14b, question 24): its sources, how compare showed them (its view state, by
+ * each source's id) and their groups' labels. In the space a record's path is relative to its allowed folder.
+ */
+export interface SavedView {
+  format: 'gmx-cypher view'; version: 1; name: string; saved: string; by: string
+  sources: ViewSource[]; view: Record<string, unknown>; labels: Record<string, Record<string, string>>
+}
+
+/** Each record's path, as `to` gives it, wherever the view names it: its source, and its id (`record:<path>`) in the view and the labels. */
+function mapRecords(v: SavedView, to: (path: string) => string): SavedView {
+  const pairs = v.sources.flatMap(s => (s.kind === 'record' && to(s.path) !== s.path ? [[s.path, to(s.path)]] : [])).sort((a, b) => b[0].length - a[0].length);
+  const id = (p: string) => JSON.stringify('record:' + p).slice(1, -1);
+  let text = JSON.stringify({ view: v.view, labels: v.labels });
+  for (const [from, into] of pairs) text = text.split(id(from)).join(id(into));
+  const { view, labels } = JSON.parse(text) as Pick<SavedView, 'view' | 'labels'>;
+  return { ...v, sources: v.sources.map(s => (s.kind === 'record' ? { ...s, path: to(s.path) } : s)), view, labels };
+}
+
+/** A view as the space keeps it (T158): each record's path relative to the longest allowed folder holding it. */
+export function portableView(v: SavedView, roots: string[]): SavedView {
+  const rs = [...roots].sort((a, b) => b.length - a.length);
+  return mapRecords(v, p => {
+    if (!p.startsWith('/')) return p;
+    const root = rs.find(x => p.startsWith(x + '/'));
+    if (!root) throw new Error(p + ' is outside the allowed folders: a saved view names records by their place in them');
+    return p.slice(root.length + 1);
+  });
+}
+
+/** A view opened again: each record under the first allowed folder that has it; `missing`, those found under none. */
+export function resolvedView(v: SavedView, roots: string[], exists: (path: string) => boolean): { view: SavedView; missing: string[] } {
+  const missing: string[] = [];
+  const view = mapRecords(v, p => {
+    if (p.startsWith('/')) return p;
+    const found = roots.map(r => r + '/' + p).find(exists);
+    if (!found) missing.push(p);
+    return found ?? p;
+  });
+  return { view, missing: [...new Set(missing)] };
+}
+
 /**
  * A record as the space keeps it (T158): a vault may be shared or put in Git, so every path inside an allowed folder
  * becomes relative to it, any other keeps only its name, the log's folders likewise (home as ~), and the environment

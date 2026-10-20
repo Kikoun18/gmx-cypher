@@ -13,6 +13,8 @@ export interface DiffRecord {
   inputs?: Record<string, { path: string; size?: number; mtime?: string; sha256?: string } | undefined>
   groups: { role: string; name: string; atoms: string }[]
   options?: { flag: string; value: unknown; default?: unknown }[]
+  /** A record copied to the vault's space (R14c, T158): its paths relative, its environment's names only. */
+  copy?: unknown
 }
 export type DiffSection = 'command' | 'options' | 'frames' | 'inputs' | 'groups' | 'gmx' | 'environment'
 export interface DiffRow { section: DiffSection; field: string; a: string; b: string; note?: string }
@@ -76,10 +78,13 @@ export function diffRecords(a: DiffRecord, b: DiffRecord): { rows: DiffRow[]; eq
   const refDiffers = A.ref?.name !== B.ref?.name || A.ref?.atoms !== B.ref?.atoms
   if (refDiffers && A.sels.length && kit.sameButReference(A, B)) push(rows, { section: 'groups', field: 'in short', a: '', b: '', note: 'the same groups: only the reference differs' })
 
-  field('gmx', 'gmx', held(a.gmx, g => shown(g.path)), held(b.gmx, g => shown(g.path)))
+  // A copy in the vault keeps the gmx by its name and the environment's names only: compared as far as both hold them.
+  const copied = !!(a.copy || b.copy), gmxPath = (g: NonNullable<DiffRecord['gmx']>) => shown(copied ? g.path?.split('/').pop() : g.path)
+  field('gmx', 'gmx', held(a.gmx, gmxPath), held(b.gmx, gmxPath), copied ? 'by name: a record copied to the vault keeps its paths relative' : undefined)
   field('gmx', 'gmx version', held(a.gmx, g => shown(g.version)), held(b.gmx, g => shown(g.version)))
   field('gmx', 'gmx-cypher', held(a.runner, r => shown(r.version)), held(b.runner, r => shown(r.version)))
   // Both environments recorded: a variable set in one only differs. One not recorded: nothing to say.
-  for (const k of [...new Set([...Object.keys(a.env ?? {}), ...Object.keys(b.env ?? {})])].sort()) field('environment', k, held(a.env, e => shown(e[k])), held(b.env, e => shown(e[k])))
+  const env = (r: DiffRecord) => (r.copy ? undefined : r.env)
+  for (const k of [...new Set([...Object.keys(a.env ?? {}), ...Object.keys(b.env ?? {})])].sort()) field('environment', k, held(env(a), e => shown(e[k])), held(env(b), e => shown(e[k])))
   return { rows, equal: same.length, same, unrecorded, all }
 }

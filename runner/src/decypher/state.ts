@@ -19,7 +19,7 @@ function load<T>(key: string, check: (v: unknown) => T | null): T | null {
 }
 function save(key: string, v: unknown) { try { localStorage.setItem(key, JSON.stringify(v)) } catch { /* a convenience only */ } }
 
-const isRef = (r: unknown): r is SourceRef => {
+export const isRef = (r: unknown): r is SourceRef => {
   const x = r as Record<string, unknown> | null
   return !!x && ((x.kind === 'job' && typeof x.id === 'string') || (x.kind === 'record' && typeof x.path === 'string') || (x.kind === 'vault' && ['project', 'row', 'rdf'].every(k => typeof x[k] === 'string')))
 }
@@ -40,6 +40,8 @@ export function useDecypherSources(jobs: string[], setJobs: (ids: string[]) => v
     toggle: (r: SourceRef) => set(keys.has(refKey(r)) ? refs.filter(x => refKey(x) !== refKey(r)) : [...refs, r]),
     add: (rs: SourceRef[]) => set([...refs, ...rs.filter(r => !keys.has(refKey(r)))]),
     remove: (key: string) => set(refs.filter(x => refKey(x) !== key)),
+    /** What a saved view shows (R14b), in place of what compare shows now. */
+    replace: (next: SourceRef[]) => set(next),
   }
 }
 export type DecypherSources = ReturnType<typeof useDecypherSources>
@@ -80,7 +82,7 @@ export interface View {
 
 export const DEFAULT_VIEW: View = { mode: 'each', colorBy: 'group', rep: 'ball & stick', rest: 'grey', arrange: 'side by side', labels: true, hydrogens: true, marks: 'both', link: false, hidden: [], selected: {}, focus: null, morphed: [], scale: 'own', ownScale: [], styles: {}, pins: {} }
 
-function checkView(v: unknown): View | null {
+export function checkView(v: unknown): View | null {
   if (!v || typeof v !== 'object') return null
   const o = v as Partial<View>, d = DEFAULT_VIEW, one = <T>(x: unknown, ok: readonly T[], def: T) => (ok.includes(x as T) ? (x as T) : def)
   const bool = (x: unknown, def: boolean) => (typeof x === 'boolean' ? x : def)

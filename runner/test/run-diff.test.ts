@@ -2,6 +2,8 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { diffRecords, type DiffRecord } from '../src/lib/runDiff'
+import { portableRecord } from '../src/lib/space'
+import type { RunRecord } from '../src/lib/record'
 import { RUNNER } from './helpers'
 
 const read = (f: string) => JSON.parse(readFileSync(RUNNER + 'test/fixtures/' + f, 'utf8')) as DiffRecord
@@ -66,6 +68,14 @@ describe('run diff (R13)', () => {
     const d = diffRecords(H, b)
     expect(d.rows).toEqual([])
     expect(d.unrecorded.map(r => [r.field, r.b])).toEqual(expect.arrayContaining([['-bin', 'not recorded'], ['gmx-cypher', 'not recorded'], ['GMX_MAXBACKUP', 'not recorded']]))
+  })
+  it('a record against its copy in the vault (R14c): paths relative, the environment\'s names only; no difference', () => {
+    const roots = [H.inputs!.structure!.path.split('/').slice(0, -2).join('/')]
+    const copied = portableRecord(H as unknown as RunRecord, roots, '/home/me') as unknown as DiffRecord
+    const d = diffRecords(H, copied)
+    expect(d.rows).toEqual([])
+    expect(d.same.find(r => r.field === 'gmx')).toMatchObject({ a: 'gmx_mpi', b: 'gmx_mpi', note: 'by name: a record copied to the vault keeps its paths relative' })
+    expect(d.unrecorded.map(r => r.field)).toEqual(Object.keys(H.env!).sort())
   })
   it('a group in one run only, and the gmx, runner and environment', () => {
     const b = copy(H)

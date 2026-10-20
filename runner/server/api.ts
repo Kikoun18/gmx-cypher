@@ -12,7 +12,7 @@ import { checkInputs, checkSizes } from './check';
 import { awhScan, runConvergence } from './awh';
 import { energyMenu } from './energy';
 import { findWindows } from './wham';
-import { inside, listFolder, namesIn, saveUpload } from './files';
+import { inside, listFolder, namesIn, real, saveUpload } from './files';
 import { detectGmx, executable, findTool, type GmxState } from './gmx';
 import { HttpError, readJson, sendFile, type Api } from './http';
 import type { Job, Jobs } from './jobs';
@@ -23,6 +23,7 @@ import { recipeFileProblems, type Recipe } from '../src/lib/recipe';
 import { cpus } from 'node:os';
 import { planRun, recordWritten, startRun } from './runs';
 import { keepRecord, sendToInbox } from './send';
+import { listRecords, listViews, readRecordCopy, readView, saveView } from './space';
 import { landingFor, listProjects, openVault, projectSummary, readProject } from './vault';
 import { findRuns, listVault, readRun, vaultFile } from './decypher';
 import type { Fields } from '../src/lib/landing';
@@ -175,11 +176,11 @@ export function makeApi(ctx: Ctx): Api {
     if (is(req, 'GET', url, '/api/decypher/vault')) {
       // (de)Cypher: the vault's RDFs with their rows' structures, and the run that wrote each, read only.
       if (!ctx.config.vault) throw new HttpError(409, 'no vault set: choose the Matrix vault in settings');
-      return { body: await listVault(await openVault(ctx.config.vault), ctx.jobs) };
+      return { body: await listVault(await openVault(ctx.config.vault), ctx.jobs, roots()) };
     }
     if (is(req, 'GET', url, '/api/decypher/vault/file')) {
       if (!ctx.config.vault) throw new HttpError(409, 'no vault set: choose the Matrix vault in settings');
-      const text = await vaultFile(await openVault(ctx.config.vault), ctx.jobs, url.searchParams.get('path') || '');
+      const text = await vaultFile(await openVault(ctx.config.vault), ctx.jobs, url.searchParams.get('path') || '', roots());
       res.writeHead(200, { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' });
       res.end(text);
       return 'handled';
@@ -251,6 +252,23 @@ export function makeApi(ctx: Ctx): Api {
       const name = url.searchParams.get('name') || 'upload', role = inputRole(name);
       if (!role || role === 'output') throw new HttpError(400, name + ' is not a GROMACS input (.xtc .trr .tng .tpr .gro .pdb .ndx .edr); not uploaded');
       return { body: await saveUpload(req, ctx.home, name) };
+    }
+    // The record copies in the vault's space (R14c), for a run diff (R13): listed, and one by its file's SHA-256.
+    if (is(req, 'GET', url, '/api/space/records') || is(req, 'GET', url, '/api/space/record')) {
+      if (!ctx.config.vault) throw new HttpError(409, 'no vault set: choose the Matrix vault in settings');
+      const v = await openVault(ctx.config.vault);
+      return { body: url.pathname.endsWith('/records') ? listRecords(v.path) : readRecordCopy(v.path, url.searchParams.get('sha') || '') };
+    }
+    // Saved compare views (R14b): the connected project's, in the vault's gmx-cypher space; each written once.
+    if (url.pathname === '/api/space/views' || url.pathname.startsWith('/api/space/views/')) {
+      if (!ctx.config.vault || !ctx.config.project) throw new HttpError(409, 'connect a project in settings to save compare views in the vault');
+      const v = await openVault(ctx.config.vault), project = ctx.config.project;
+      if (!(await listProjects(v)).some(p => p.id === project)) throw new HttpError(404, 'the connected project is no longer in the vault: choose it again in settings');
+      // Records on disk are named by their real paths (findRuns): both forms of each allowed folder.
+      const rs = [...new Set(roots().flatMap(r => [r, real(r) ?? r]))], name = decodeURIComponent(url.pathname.slice('/api/space/views/'.length));
+      if (is(req, 'GET', url, '/api/space/views')) return { body: { project, views: listViews(v.path, project) } };
+      if (is(req, 'POST', url, '/api/space/views')) return { body: { view: saveView(v.path, project, await readJson(req), rs, 'gmx-cypher ' + ctx.version) } };
+      if (req.method === 'GET' && name) return { body: readView(v.path, project, name, rs) };
     }
     // Archive and unarchive (R12c): the job's file moved, never over another; refusals in words.
     const shelf = /^\/api\/jobs\/([\w-]+)\/(archive|unarchive)$/.exec(url.pathname);

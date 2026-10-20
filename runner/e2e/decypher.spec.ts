@@ -5,10 +5,12 @@ import { execFileSync, spawn, type ChildProcess } from 'node:child_process'
 import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { expect, test, type Page } from '@playwright/test'
+import { createHash } from 'node:crypto'
 import { tmp } from '../test/helpers'
+import { copyRecord } from '../server/space'
 
 const RUNNER = new URL('..', import.meta.url).pathname, F = RUNNER + 'test/fixtures/decypher/'
-let runner: ChildProcess, url: string, sim: string
+let runner: ChildProcess, url: string, sim: string, vault: string
 
 test.beforeAll(async () => {
   const home = tmp('e2e-home')
@@ -29,7 +31,7 @@ test.beforeAll(async () => {
     writeFileSync(join(home, 'jobs', id + '.ndjson'), [{ t: 'created', at, spec }, { t: 'started', at, pid: 1 }, { t: 'ended', at, status: 'done', code: 0, signal: null }].map(e => JSON.stringify(e)).join('\n') + '\n')
   }
   // The Matrix's vault with two RDFs of one cell, whose runs this runner doesn't know (as for a vault from another machine).
-  const vault = tmp('e2e-vault')
+  vault = tmp('e2e-vault')
   execFileSync(process.execPath, ['--import', './server/register.mjs', 'e2e/make-vault.ts', vault], { cwd: RUNNER })
   writeFileSync(join(home, 'config.json'), JSON.stringify({ vault }))
   runner = spawn(process.execPath, ['--import', './server/register.mjs', 'server/main.ts', '--port', '0', '--gmx', join(RUNNER, 'test/fake-gmx.mjs'), '--allow', sim],
@@ -280,7 +282,63 @@ test('two RDFs of the vault, whose runs are unknown: the morph menu is there, an
   await expect(card.getByRole('button', { name: 'take NH_N...S off the plot' })).toHaveCount(2)
   await card.getByRole('button', { name: 'split' }).click()
   await expect(cards).toHaveCount(2)
+
+  // R14c: the gmx-cypher that sent run a kept its record in the vault's space; with it, run a has its groups' atoms and
+  // its reference, drawn on the row's structure (T156's case).
+  const S = 'rdf_o111_Methionine_S', sha = createHash('sha256').update(readFileSync(F + S + '.xvg')).digest('hex')
+  copyRecord(vault, sha, JSON.parse(readFileSync(F + S + '.run.json', 'utf8')), [sim], '/home/them', 'gmx-cypher 0.1.0')
+  await page.reload()
+  const again = page.getByRole('region', { name: 'compare', exact: true })
+  await again.getByRole('radio', { name: 'vault' }).click()
+  await expect(again.getByText('groups from ' + S + ' (its record in the vault)')).toBeVisible()
+  const sources = again.getByRole('complementary', { name: 'sources' })
+  await expect(sources.getByText(/ref H_Met/)).toHaveCount(1)
+  await expect(again.getByRole('button', { name: 'style of NH_N...S · ref H_Met' })).toBeVisible()
   expect(errors).toEqual([])
+})
+
+test('a compare view saved in the vault with the connected project, and opened again (R14b)', async ({ page }) => {
+  const errors = watch(page)
+  await page.goto(url)
+  await expect(page.getByRole('button', { name: 'settings' })).toBeVisible()
+  const api = (path: string, body?: unknown) => page.evaluate(async ([p, b]) => { const r = await fetch(p as string, b === undefined ? {} : { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(b) }); return r.json() }, [path, body] as const)
+  const project = (await api('/api/vault') as { projects: { id: string }[] }).projects[0].id
+  await page.keyboard.press('d')
+  const dialog = page.getByRole('region', { name: 'compare', exact: true })
+  // Without a connected project, the panel says what to do.
+  await dialog.getByRole('button', { name: 'views', exact: true }).click()
+  await expect(dialog.getByText('connect a project in settings to save compare views in the vault')).toBeVisible()
+  await dialog.getByRole('button', { name: 'views', exact: true }).click()
+  await api('/api/config', { project })
+  try {
+    await dialog.getByRole('radio', { name: 'vault' }).click()
+    await dialog.getByText('Methionine × PG · run a', { exact: true }).click()
+    await dialog.getByText('Methionine × PG · run b', { exact: true }).click()
+    await expect(dialog.getByRole('region', { name: 'Methionine × PG', exact: true })).toHaveCount(2)
+    await dialog.getByRole('radio', { name: 'one graph' }).click()
+    const panel = dialog.getByLabel('saved views')
+    await dialog.getByRole('button', { name: 'views', exact: true }).click()
+    await panel.getByLabel('view name').fill('two runs')
+    await panel.getByRole('button', { name: 'save view' }).click()
+    await expect(panel.getByText('saved: two runs')).toBeVisible()
+    await expect(panel.getByRole('listitem')).toHaveCount(1)
+    // A name is used once: nothing is replaced.
+    await panel.getByLabel('view name').fill('two runs')
+    await panel.getByRole('button', { name: 'save view' }).click()
+    await expect(panel.getByText('a view named "two runs" exists: nothing was replaced; choose another name')).toBeVisible()
+    // An empty compare (this browser forgets its working state), then the saved view: both runs, on one graph.
+    await page.evaluate(() => localStorage.clear())
+    await page.reload()
+    const again = page.getByRole('region', { name: 'compare', exact: true })
+    await expect(again.getByText('nothing picked yet · tick jobs in the jobs list, or add below')).toBeVisible()
+    await again.getByRole('button', { name: 'views', exact: true }).click()
+    await again.getByLabel('saved views').getByRole('button', { name: 'open' }).click()
+    await expect(again.getByText('opened: two runs')).toBeVisible()
+    await expect(again.getByRole('radio', { name: 'one graph' })).toBeChecked()
+    await expect(again.getByRole('complementary', { name: 'sources' }).getByRole('button', { name: /^remove Methionine × PG/ })).toHaveCount(2)
+  } finally { await api('/api/config', { project: null }) }
+  // The two refusals above (no project yet, a name taken) are answers in words, logged by the browser as 409s.
+  expect(errors.filter(e => !/status of 409/.test(e))).toEqual([])
 })
 
 test('one gesture scheme (R8a): a legend acts alike on a result chart and in compare; Shift-click on a structure takes the residue', async ({ page }) => {

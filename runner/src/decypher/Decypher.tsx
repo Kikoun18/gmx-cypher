@@ -15,7 +15,8 @@ import { Section } from '../ui/separator'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
 import { ToggleGroup, ToggleGroupItem } from '../ui/toggle-group'
 import { getJson, postJson } from '../api'
-import { useLabels } from '../lib/labels'
+import { cleanLabels, setLabel, useLabels } from '../lib/labels'
+import type { SavedView } from '../lib/space'
 import type { Job } from '../jobs'
 import { Status } from '../ui/status'
 import { cn } from '../lib/utils'
@@ -36,9 +37,10 @@ import { CurveTable, GroupChips, Renames, StructurePanel, type StructureHandle }
 import type { LoadedFile } from './parse'
 import { useAnalyses, type Item } from './sources'
 import { pickGroups } from '../core/gestures'
-import { activeMorphs, joinMorph, refKey, setMorphRefs, splitMorph, useView, type ActiveMorph, type DecypherSources, type SourceRef, type View } from './state'
+import { activeMorphs, checkView, DEFAULT_VIEW, isRef, joinMorph, refKey, setMorphRefs, splitMorph, useView, type ActiveMorph, type DecypherSources, type SourceRef, type View } from './state'
 import { kit, PALETTES, TOKENS_BY_THEME, usePageTheme } from '../core/theme'
 import type { VaultRdfs } from './vaultTypes'
+import { SavedViews } from './SavedViews'
 import { cardsOf, cardTitle, DEFAULT_HEADER, download, exportData, exportHtml, exportName, fontData } from './export'
 
 const pad = (n: number) => String(n).padStart(2, '0')
@@ -374,7 +376,7 @@ function AddPanel({ sources, allow, vaultPath, vault, loadVault, fileRows, onFil
               <div key={p.id} className="flex flex-col gap-0.5">
                 <span className="text-label uppercase text-muted-foreground">{p.name}</span>
                 {p.rows.map(r => r.rdfs.map(a => row({ kind: 'vault', project: p.id, row: r.id, rdf: a.id }, r.name + ' × ' + a.column + ' · run ' + a.slot,
-                  <>{plural(a.curves.length, 'curve')} · {a.run ? 'groups from ' + a.run.title.split(' · ')[0] : <Status inline level="warning" word="no atom groups" why="No record of the job that wrote this file: its curves come with their names, but not with their atoms." />} · {r.structures.map(s => s.name).join(', ') || 'no structure in the row'}</>)))}
+                  <>{plural(a.curves.length, 'curve')} · {a.run ? 'groups from ' + a.run.title.split(' · ')[0] + (a.run.from === 'space' ? ' (its record in the vault)' : '') : <Status inline level="warning" word="no atom groups" why="No record of the job that wrote this file, neither among this gmx-cypher's jobs nor in the vault's gmx-cypher folder: its curves come with their names, but not with their atoms." />} · {r.structures.map(s => s.name).join(', ') || 'no structure in the row'}</>)))}
               </div>
             ))}
           </div>
@@ -523,7 +525,7 @@ export function Decypher({ sources, files, onFiles, onClearFiles, jobs, jobsLoad
   // The vault's list, for the vault set now: one read at a time, kept until asked again.
   const [vaultRead, setVaultRead] = React.useState<{ path: string; list?: VaultRdfs; error?: string } | null>(null)
   const vault = vaultRead && vaultRead.path === vaultPath ? vaultRead : null
-  const [exporting, setExporting] = React.useState(0), [exportOpen, setExportOpen] = React.useState(false)
+  const [exporting, setExporting] = React.useState(0), [exportOpen, setExportOpen] = React.useState(false), [viewsOpen, setViewsOpen] = React.useState(false)
   const handles = React.useRef(new Map<string, StructureHandle | null>()), active = React.useRef<string | null>(null), reading = React.useRef(false)
   const loadVault = React.useCallback(() => {
     if (!vaultPath || reading.current) return
@@ -611,6 +613,12 @@ export function Decypher({ sources, files, onFiles, onClearFiles, jobs, jobsLoad
     </DisplayMenu>
   )
   const marks = <MarksSelect value={view.marks} onChange={m => patch({ marks: m })} />
+  // A saved view (R14b) in place of what compare shows: its sources, how it showed them, and their labels.
+  const openView = (v: SavedView) => {
+    sources.replace((v.sources as unknown[]).filter(isRef))
+    patch(checkView(v.view) ?? DEFAULT_VIEW)
+    for (const [source, m] of Object.entries(cleanLabels(v.labels))) for (const [name, label] of Object.entries(m)) setLabel(source, name, label)
+  }
   const loading = items.filter(i => i.status === 'loading').length
   const subtitle = !items.length ? 'results of several jobs at once, with their structures' : [plural(ready.length, 'result'), plural(new Set(ready.map(a => a.struct).filter(Boolean)).size, 'structure'), loading ? 'reading ' + loading + '…' : null, shown.length < ready.length ? (ready.length - shown.length) + ' hidden' : null].filter(Boolean).join(' · ')
 
@@ -625,8 +633,10 @@ export function Decypher({ sources, files, onFiles, onClearFiles, jobs, jobsLoad
           <Seg label="show" value={view.mode === 'each' ? 'each result' : 'one graph'} options={['each result', 'one graph'] as const} onChange={v => patch({ mode: v === 'each result' ? 'each' : 'one' })} />
           {view.mode === 'each' && <Seg label="same scale" value={SCALE_WORD[view.scale]} options={SCALE_WORDS} onChange={w => patch({ scale: SCALE_OF[w] })} />}
           {view.mode === 'each' && <Chip on={view.link} onClick={() => patch({ link: !view.link })} title="a group picked in one result is picked in every result that has it">link groups</Chip>}
+          <Button variant="outline" size="sm" aria-expanded={viewsOpen} onClick={() => setViewsOpen(o => !o)} title="save what compare shows in the vault, with the connected project, or open a view saved before">views</Button>
           <Button variant="outline" size="sm" onClick={() => { setExporting(n => n + 1); setExportOpen(true) }} disabled={!shown.length}><Download /> export</Button>
         </header>
+        {viewsOpen && <SavedViews refs={sources.refs} view={view} labels={labels} onOpen={openView} onClose={() => setViewsOpen(false)} />}
         <div className="grid min-h-0 flex-1 grid-cols-[280px_minmax(0,1fr)]">
           <aside className="flex min-h-0 flex-col gap-4 border-r border-border p-4" aria-label="sources">
             <div className="flex flex-col gap-1">
