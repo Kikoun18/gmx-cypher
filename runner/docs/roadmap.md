@@ -204,7 +204,7 @@ From [`batch-3.md`](batch-3.md) §5: one coherent app, (de)Cypher for every anal
 - [x] R11a Same scale (T186)
 - [x] R11b Line styles (T187)
 - [x] R11c Marks and lines, carried into exports (T188)
-- [ ] R11d Renamed groups and reference
+- [x] R11d Renamed groups and reference (T189)
 
 ### Phase 7: The runner at scale (R12, R13)
 - [ ] R12a Logs on demand; startup without logs in memory
