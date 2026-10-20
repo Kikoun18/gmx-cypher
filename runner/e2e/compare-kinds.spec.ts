@@ -5,6 +5,7 @@ import { spawn, type ChildProcess } from 'node:child_process'
 import { cpSync, mkdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { expect, test, type Page } from '@playwright/test'
+import AxeBuilder from '@axe-core/playwright'
 import { tmp } from '../test/helpers'
 
 const RUNNER = new URL('..', import.meta.url).pathname, F = RUNNER + 'test/fixtures/'
@@ -35,6 +36,7 @@ test.beforeAll(async () => {
   const res = (role: string, name: string, tone: string, value: string) => ({ role, name, tone, steps: [{ op: 'add', rule: { kind: 'resname', value } }] })
   jobs.rmsf = (await call<{ id: string }>('/api/runs', { tool: 'rmsf', inputs, groups: [res('selection', 'sulfate', 'coral', 'SO4')], options: {} })).id
   jobs.hbond = (await call<{ id: string }>('/api/runs', { tool: 'hbond', inputs, groups: [res('reference', 'sulfate', 'coral', 'SO4'), res('selection', 'water', 'sky', 'SOL')], options: {} })).id
+  jobs.rdf = (await call<{ id: string }>('/api/runs', { inputs, groups: [res('reference', 'sulfate', 'coral', 'SO4'), res('selection', 'water', 'sky', 'SOL'), res('selection', 'sodium', 'mint', 'Na')], options: {} })).id
   for (let i = 0; i < 100; i++) {
     const list = await call<{ id: string; status: string }[]>('/api/jobs')
     if (Object.values(jobs).every(id => list.find(j => j.id === id)?.status === 'done')) return
@@ -87,3 +89,36 @@ test('an RMSF and an H-bond result in compare, exported, then opened offline', a
   expect(exportErrors).toEqual([])
   expect(errors).toEqual([])
 })
+
+// WCAG 2 AA (colour contrast included) on the result pages and in compare, in both themes: no serious or critical
+// violation (Phase 9 QA, kept as a test; `region` is left out, the page's landmarks are named by their parts).
+for (const theme of ['light', 'dark'] as const) {
+  test('axe finds nothing serious on results and compare, ' + theme, async ({ page }) => {
+    const errors = watch(page)
+    await page.addInitScript(t => { try { localStorage.setItem('gmx-cypher-theme', t) } catch { /* the default theme */ } }, theme)
+    const check = async (where: string) => {
+      const r = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).disableRules(['region']).analyze()
+      expect([where, r.violations.filter(v => v.impact === 'serious' || v.impact === 'critical').map(v => v.id + ' ' + v.nodes[0].target.join(' '))]).toEqual([where, []])
+    }
+    await page.goto(url)
+    await expect(page.locator('html')).toHaveAttribute('data-theme', theme)
+    for (const k of ['rmsf', 'hbond', 'rdf']) {
+      await page.goto(url + '#results/' + jobs[k])
+      await expect(page.locator('[data-landmark="charts"]')).toBeVisible()
+      await check('result ' + k)
+    }
+    // An RDF of two groups, one of them not plotted: its chip greyed, as the rest is in the structure.
+    await page.goto(url + '#compare?jobs=' + jobs.rmsf + ',' + jobs.hbond + ',' + jobs.rdf)
+    const view = page.getByRole('region', { name: 'compare', exact: true })
+    await expect(view.getByRole('region', { name: /^hbond_nvt/ })).toBeVisible()
+    const rdf = view.getByRole('region', { name: /^rdf_nvt/ })
+    await expect(rdf.getByRole('button', { name: /^sodium/ })).toBeVisible()
+    if (await rdf.getByRole('button', { name: /^sodium/ }).getAttribute('aria-pressed') === 'true') await rdf.getByRole('button', { name: /^sodium/ }).click()
+    await expect(rdf.getByRole('button', { name: /^sodium/ })).toHaveAttribute('aria-pressed', 'false')
+    await check('compare, each result')
+    await view.getByRole('radio', { name: 'one graph' }).click()
+    await expect(view.getByRole('region', { name: 'one graph' })).toBeVisible()
+    await check('compare, one graph')
+    expect(errors).toEqual([])
+  })
+}

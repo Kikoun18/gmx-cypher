@@ -177,7 +177,7 @@ export function GroupChips({ refs, sels, selected, pal, dim, hover, onShown, onP
   return (
     <div className="flex flex-wrap gap-1.5">
       {refs.map((r, i) => {
-        const cls = cn('inline-flex h-[26px] items-center gap-1.5 whitespace-nowrap rounded-full border-[1.5px] border-foreground px-2.5 text-caption', r.dashed || r.on === false ? 'border-dashed text-foreground' : 'text-foreground', r.on === false && 'opacity-45')
+        const cls = cn('inline-flex h-[26px] items-center gap-1.5 whitespace-nowrap rounded-full border-[1.5px] border-foreground px-2.5 text-caption', r.on === false ? 'border-dashed border-input text-muted-foreground' : r.dashed ? 'border-dashed text-foreground' : 'text-foreground')
         const body = <>{r.plain ? '' : 'ref '}{r.label}{!r.plain && <span className="font-normal tabular-nums">{r.count || '—'}</span>}</>
         return onPickRef
           ? <button key={r.label} type="button" aria-pressed={r.on !== false} title={'click: plot only this reference · ' + modName() + '-click: add or remove'} className={cn(cls, 'cursor-pointer')} onClick={e => onPickRef(i, e.metaKey || e.ctrlKey)}>{body}</button>
@@ -185,7 +185,7 @@ export function GroupChips({ refs, sels, selected, pal, dim, hover, onShown, onP
       })}
       <Legend label="groups" className="contents" items={sels.map(g => ({ key: g.name, label: kit.shownName(g), g }))} shown={selected} onShown={onShown} onHover={onHover}
         itemClass={(_, on) => cn('inline-flex h-[26px] items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 text-caption transition-[background-color,box-shadow] duration-[120ms]', on && 'font-bold')}
-        itemStyle={({ g }, on) => { const t = pal.hues[g.tone]; return { background: on ? t.base : dim ? pal.secondary : t.soft, color: on ? t.fg : dim ? pal.muted : pal.fg, boxShadow: hover === g.name ? '0 0 0 2px ' + pal.fg : 'none' } }}
+        itemStyle={({ g }, on) => { const t = pal.hues[g.tone], grey = !on && dim; return { background: on ? t.base : grey ? pal.card : t.soft, color: on ? t.fg : grey ? pal.muted : pal.fg, boxShadow: hover === g.name ? '0 0 0 2px ' + pal.fg : grey ? 'inset 0 0 0 1px ' + pal.border : 'none' } }}
         item={({ g }, on) => <><span className="size-[7px] shrink-0 rounded-full" style={{ background: on ? pal.hues[g.tone].fg : pal.hues[g.tone].strong }} /><span title={g.label ? 'gmx name: ' + g.name : undefined}>{kit.shownName(g)}</span>{counts && <span className="font-normal tabular-nums">{g.atoms.length || '—'}</span>}</>} />
     </div>
   )
