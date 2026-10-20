@@ -22,7 +22,9 @@ export type ElementOf = (name: string, resn: string, column?: string) => string 
 export interface Peak { r: number; g: number }
 export interface Group { name: string; atoms: number[]; tone: Tone }
 /** A group's curve, with both peak rules (R3d): `peak` is the maximum, `shell` the first shell (none if g(r) never rises above 1). */
-export interface Sel extends Group { y: number[]; peak: Peak | null; shell?: Peak | null }
+/** Ramp colours of an ordered curve (R7a), per theme, in place of its tone's. */
+export interface Colors { light: string; dark: string; print?: string }
+export interface Sel extends Group { y: number[]; peak: Peak | null; shell?: Peak | null; colors?: Colors }
 /** Which peak marks a chart draws (R3d): the maximum filled, the first shell hollow. */
 export type Marks = 'both' | 'maximum' | 'first shell' | 'none'
 
@@ -88,6 +90,8 @@ export interface Curve {
   hot?: boolean; dim?: boolean
   /** ± per point, drawn as a band in the curve's colour (WHAM's bootstrap error). */
   err?: number[]
+  /** Its grey in print (an ordered curve's even grey, R7a); else the Matrix greys its colour. */
+  print?: string
 }
 
 /** A chart as data: [tag, attributes, ...children]. The page renders it with React, the export with the DOM. */
@@ -96,7 +100,7 @@ export type VNode = [string, Record<string, unknown>, ...(VNode | string)[]]
 export interface ChartGeom { m: { l: number; r: number; t: number; b: number }; iw: number; ih: number; x0: number; x1: number; y0: number; y1: number; grid: number[]; xDigits: number; yDigits: number }
 
 /** One job as an export carries it: atoms as ranges, y values rounded, its selection when exported. */
-export interface ExportAnalysis { id: string; title: string; label: string; sub: string; x: number[]; xlabel: string; ylabel: string; ref: { name: string; atoms: string; tone: Tone } | null; sels: { name: string; atoms: string; tone: Tone; y: number[]; peak: Peak | null; shell?: Peak | null }[]; struct: string | null; structNote: string; selected: string[]; tone: Tone; plot?: Plot }
+export interface ExportAnalysis { id: string; title: string; label: string; sub: string; x: number[]; xlabel: string; ylabel: string; ref: { name: string; atoms: string; tone: Tone } | null; sels: { name: string; atoms: string; tone: Tone; y: number[]; peak: Peak | null; shell?: Peak | null; colors?: Colors }[]; struct: string | null; structNote: string; selected: string[]; tone: Tone; plot?: Plot }
 /** Everything an exported page needs: its tokens, structures without solvent, the analyses, the comparison and the style. */
 export interface ExportData {
   /** The page's heading, as chosen ('(de)Cypher' unless changed). */
@@ -755,7 +759,8 @@ export function decypherKit(data: KitData) {
           dash = DASH[(look.jobDash + gi) % DASH.length]
         } else {
           const ink = dark ? tn.base : tn.fg
-          color = kk === 0 ? tn.strong : mix(tn.strong, ink, Math.min(0.75, 0.45 * kk))
+          // An ordered curve's ramp colour (R7a), else its tone's, lighter for a repeated tone.
+          color = g0.colors ? g0.colors[dark ? 'dark' : 'light'] : kk === 0 ? tn.strong : mix(tn.strong, ink, Math.min(0.75, 0.45 * kk))
           if (mi > 0) color = mix(color, ink, look.shade)
           dash = DASH[look.groupDash]
         }
@@ -901,7 +906,7 @@ export function decypherKit(data: KitData) {
     const analyses: Analysis[] = data.analyses.map(a => ({
       id: a.id, kind: 'job', title: a.title, label: a.label, sub: a.sub, x: a.x, xlabel: a.xlabel, ylabel: a.ylabel,
       ref: a.ref ? { name: a.ref.name, atoms: fromRanges(a.ref.atoms), tone: a.ref.tone } : null,
-      sels: a.sels.map(s => ({ name: s.name, atoms: fromRanges(s.atoms), tone: s.tone, y: s.y, peak: s.peak, shell: s.shell ?? null })), struct: a.struct, structNote: a.structNote, ...(a.plot ? { plot: a.plot } : {}),
+      sels: a.sels.map(s => ({ name: s.name, atoms: fromRanges(s.atoms), tone: s.tone, y: s.y, peak: s.peak, shell: s.shell ?? null, ...(s.colors ? { colors: s.colors } : {}) })), struct: a.struct, structNote: a.structNote, ...(a.plot ? { plot: a.plot } : {}),
     }))
     const tones: Record<string, Tone> = {}
     data.analyses.forEach(a => { tones[a.id] = a.tone })

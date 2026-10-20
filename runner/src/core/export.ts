@@ -15,10 +15,11 @@ export interface Figure { title: string; sub?: string; file: string; xlabel: str
  * ± σ beside it; the peaks pinned as marks; g = 1 a reference line (the Matrix draws 0 itself); from 0 when asked.
  */
 export function graphData(f: Figure, theme: ExportPrefs['theme']): GraphData {
-  const ink = (c: string) => (theme === 'print' ? grey(c) : c), rule = f.rule === undefined ? 1 : f.rule, marks = f.marks ?? 'none'
+  // Print: a curve's own grey (an ordered curve's, R7a), else the Matrix's grey of its colour.
+  const ink = (c: Curve) => (theme === 'print' ? c.print ?? grey(c.color) : c.color), rule = f.rule === undefined ? 1 : f.rule, marks = f.marks ?? 'none'
   const name = (c: Curve) => c.name + (c.source ? ' · ' + c.source : ''), digits = f.xDigits ?? kit.xDigitsOf(f.curves[0]?.x ?? [])
   const series = f.curves.flatMap(c => {
-    const s = { x: c.x, y: c.y, label: name(c), color: ink(c.color), width: 2, dash: c.dash === 'none' ? undefined : c.dash }
+    const s = { x: c.x, y: c.y, label: name(c), color: ink(c), width: 2, dash: c.dash === 'none' ? undefined : c.dash }
     if (!c.err) return [s]
     const band = (sign: 1 | -1) => ({ x: c.x, y: c.y.map((v, i) => v + sign * (c.err![i] || 0)), label: name(c) + (sign > 0 ? ' + σ' : ' − σ'), color: s.color, width: 1, dash: '2 3' })
     return [s, band(1), band(-1)]
@@ -27,7 +28,7 @@ export function graphData(f: Figure, theme: ExportPrefs['theme']): GraphData {
   // one pin when both rules fall on the same point.
   const pins = f.curves.flatMap(c => {
     const max = (marks === 'both' || marks === 'maximum') && c.peak ? c.peak : null, shell = (marks === 'both' || marks === 'first shell') && c.shell ? c.shell : null
-    const pin = (p: { r: number; g: number }, rule: string) => ({ x: p.r, y: p.g, color: ink(c.color), label: fmtValue(p.g), curve: name(c) + ' · ' + rule })
+    const pin = (p: { r: number; g: number }, rule: string) => ({ x: p.r, y: p.g, color: ink(c), label: fmtValue(p.g), curve: name(c) + ' · ' + rule })
     if (max && shell && max.r.toFixed(digits) === shell.r.toFixed(digits)) return [pin(max, 'maximum = first shell')]
     return [...(max ? [pin(max, 'maximum')] : []), ...(shell ? [pin(shell, 'first shell')] : [])]
   })
@@ -54,7 +55,7 @@ export function resultAnalysis(o: { id: string; title: string; sub: string; xlab
   const plot: Plot | undefined = o.y || o.rule !== undefined ? { y: o.y ?? 'zero', rule: o.rule === undefined ? 1 : o.rule, ...(o.xDigits != null ? { xDigits: o.xDigits } : {}) } : undefined
   return {
     id: o.id, kind: 'job', title: o.title, label: o.title, sub: o.sub, x, xlabel: o.xlabel, ylabel: o.ylabel, ref: null,
-    sels: o.series.map(s => ({ name: s.label, atoms: [], tone: s.tone, y: s.points.map(p => p[1]), peak: s.peak ?? null, shell: s.shell ?? null })),
+    sels: o.series.map(s => ({ name: s.label, atoms: [], tone: s.tone, y: s.points.map(p => p[1]), peak: s.peak ?? null, shell: s.shell ?? null, ...(s.colors ? { colors: s.colors } : {}) })),
     struct: null, structNote: 'a result without a structure', ...(plot ? { plot } : {}),
   }
 }

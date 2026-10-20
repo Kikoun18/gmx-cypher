@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { graphScene, toPDF, toSVG } from '../../matrix/src/lib/export'
 import { fmtValue, parseTable } from '../../matrix/src/lib/seq'
 import { graphData, resultAnalysis } from '../src/core/export'
+import { rampColors } from '../src/core/ramp'
 import { curvesOf, kit, TONES, type Series } from '../src/core/index'
 import { themeTokens } from '../src/core/tokens'
 import { exportData, exportHtml } from '../src/decypher/export'
@@ -54,6 +55,18 @@ describe('SVG, PDF and PNG through the Matrix (graphScene, by import)', () => {
   it('the dark and print themes: curves in the dark palette, or grey for print', () => {
     expect(graphData({ ...fig, curves: curvesOf(series, dark) }, 'dark').series[1].color).toBe(dark.hues.sky.strong)
     expect(graphData(fig, 'print').series[1].color).toMatch(/^#([0-9a-f]{2})\1\1$/)
+  })
+
+  it("ordered curves (R7a) keep their ramp: the theme's colour, print's even grey, and on the HTML page", () => {
+    const colors = rampColors(3, TOKENS), ramped: Series[] = [0, 1, 2].map(i => ({ label: 't = ' + i, points: [[0, i], [1, i + 1]], tone: 'coral', colors: colors[i] }))
+    expect(graphData({ ...fig, curves: curvesOf(ramped, light) }, 'light').series.map(s => s.color)).toEqual(colors.map(c => c.light))
+    expect(graphData({ ...fig, curves: curvesOf(ramped, dark) }, 'dark').series.map(s => s.color)).toEqual(colors.map(c => c.dark))
+    expect(graphData({ ...fig, curves: curvesOf(ramped, light) }, 'print').series.map(s => s.color)).toEqual(colors.map(c => c.print))
+    const a = resultAnalysis({ id: 'awh', title: 'awh', sub: '', xlabel: 'x', ylabel: 'PMF (kJ/mol)', series: ramped, y: 'data', rule: 0 })!
+    const d = exportData({ analyses: [a], structs: {}, selected: () => a.sels.map(g => g.name), tones: {}, compare: null, view: { rep: 'ball & stick', rest: 'grey', labels: true, hydrogens: true, arrange: 'side by side' }, theme: 'dark', tokens: TOKENS, structures: false, by: 'x' })
+    expect(d.analyses[0].sels.map(g => g.colors)).toEqual(colors)
+    const curves = kit.buildCurves({ focus: a, plotted: [a], selected: a.sels.map(g => g.name), colorBy: 'group', pal: dark, tones: {} })
+    expect(curves.map(c => c.color)).toEqual(colors.map(c => c.dark))
   })
 
   it('the PDF parses: its header, one page, its trailer', async () => {

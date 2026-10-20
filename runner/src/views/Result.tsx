@@ -5,11 +5,13 @@ import { Button } from '../ui/button'
 import { Stat } from '../ui/card'
 import { TONES, type Series } from '../core/index'
 import { SeriesChart, Swatch, type ChartExport } from '../core/Chart'
+import { rampColors } from '../core/ramp'
+import { TOKENS_BY_THEME } from '../core/theme'
 import { Section } from '../ui/separator'
 import { getJson } from '../api'
 import { estimateOf, type Job } from '../jobs'
 import { awhTargetError } from '../lib/awh'
-import { neighbourOverlaps, overlapNotes, parseBootstrap, parseHistograms } from '../lib/wham'
+import { neighbourOverlaps, overlapNotes, parseBootstrap, parseHistograms, windowsInOrder } from '../lib/wham'
 import { COMMANDS } from '../lib/commands'
 import { driftLarger, type EnergyRow } from '../lib/energy'
 import { curveStats } from '../lib/curves'
@@ -183,6 +185,9 @@ function EnergyChart({ job, record }: { job: Job; record: RunRecord }) {
   )
 }
 
+/** The time of an AWH frame's file, from its name (`…_t12.5.xvg`). */
+const frameTime = (n: string) => Number(/_t(-?\d+(?:\.\d+)?)\.xvg$/.exec(n)?.[1] ?? NaN)
+
 /** At most `n` of a run's frames for one chart, evenly spaced, the last always among them. */
 function spread<T>(items: T[], n: number): T[] {
   if (items.length <= n) return items
@@ -190,11 +195,12 @@ function spread<T>(items: T[], n: number): T[] {
 }
 
 /**
- * gmx awh's result (R5): the PMF of each frame written, on one chart, oldest to newest. Eight tones, then the same
- * tones dashed; at most 12 curves (evenly spaced, the last always in), so a long run stays readable.
+ * gmx awh's result (R5): the PMF of each frame written, on one chart, oldest to newest along a ramp (R7a); at most 12
+ * curves (evenly spaced, the last always in), so a long run stays readable.
  */
 function AwhChart({ job, record }: { job: Job; record: RunRecord }) {
-  const names = React.useMemo(() => record.outputs.filter(o => o.kind === 'xvg').map(o => o.path.split('/').pop()!), [record])
+  // Every frame's file, in time order (t = 2 before t = 10), whatever order the record lists them in.
+  const names = React.useMemo(() => record.outputs.filter(o => o.kind === 'xvg').map(o => o.path.split('/').pop()!).sort((a, b) => frameTime(a) - frameTime(b)), [record])
   const shown = React.useMemo(() => spread(names, 12), [names])
   const [texts, setTexts] = React.useState<Record<string, string>>({})
   React.useEffect(() => {
@@ -203,12 +209,13 @@ function AwhChart({ job, record }: { job: Job; record: RunRecord }) {
     return () => { alive = false }
   }, [job.id, shown])
   if (shown.some(n => texts[n] == null)) return <p className="m-0 text-caption text-muted-foreground" aria-live="polite">reading {shown.length} PMF file{shown.length > 1 ? 's' : ''}…</p>
-  const time = (n: string) => /_t(-?\d+(?:\.\d+)?)\.xvg$/.exec(n)?.[1] ?? '?'
-  const series: Series[] = shown.map((n, i) => ({ label: 't = ' + time(n) + ' ps', points: resultSeries(texts[n])[0]?.points ?? [], tone: TONES[i % 8], dash: Math.floor(i / 8) }))
+  const time = (n: string) => /_t(-?\d+(?:\.\d+)?)\.xvg$/.exec(n)?.[1] ?? '?', colors = rampColors(shown.length, TOKENS_BY_THEME)
+  // The frames along the ramp, oldest to newest (R7a).
+  const series: Series[] = shown.map((n, i) => ({ label: 't = ' + time(n) + ' ps', points: resultSeries(texts[n])[0]?.points ?? [], tone: 'coral', colors: colors[i] }))
   const last = texts[shown[shown.length - 1]], target = awhTargetError(last), xLabel = parseTable(last).head.xLabel || 'coordinate'
   return (
     <div className="flex flex-col gap-3">
-      <SeriesChart series={series} xlabel={xLabel} ylabel="PMF (kJ/mol)" height={300} legend={series.length > 1} y="data" rule={0}
+      <SeriesChart series={series} xlabel={xLabel} ylabel="PMF (kJ/mol)" height={300} ramp={{ first: series[0].label, last: series[series.length - 1].label }} y="data" rule={0}
         exp={chartExport(job, record, shown[shown.length - 1], shown.map((n, i) => ({ text: texts[n], col: 1, name: series[i].label })), xLabel, 'PMF (kJ/mol)')} />
       {names.length > shown.length && <p className="m-0 text-caption text-muted-foreground">{shown.length} of {names.length} frames drawn, evenly spaced; every file is in the folder</p>}
       <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3">
@@ -247,15 +254,17 @@ function WhamChart({ job, record }: { job: Job; record: RunRecord }) {
   const prof = resultSeries(profile)[0]?.points ?? [], bs = parseBootstrap(bsres)
   // The band is the bootstrap's standard deviation at each point of the profile (the same bins).
   const errors = bs.length === prof.length ? bs.map(b => b[2]) : undefined
-  const hist: Series[] = h!.windows.map((c, j) => ({ label: 'window ' + label(j + 1), points: h!.x.map((x, i) => [x, c[i]] as [number, number]), tone: TONES[j % 8], dash: Math.floor(j / 8) }))
+  // The windows along the ramp in their order along ξ (R7a), as the overlap table sorts them, not in column order.
+  const ordered = windowsInOrder(h!), colors = rampColors(ordered.length, TOKENS_BY_THEME)
+  const hist: Series[] = ordered.map((w, k) => ({ label: 'window ' + label(w.window), points: w.x.map((x, i) => [x, w.y[i]] as [number, number]), tone: 'coral', colors: colors[k] }))
   return (
     <div className="flex flex-col gap-3">
       <SeriesChart series={[{ label: 'profile', points: prof, tone: 'coral', ...(errors ? { err: errors } : {}) }]} xlabel="ξ (nm)" ylabel="E (kJ/mol)" height={260} y="data" rule={0}
         exp={chartExport(job, record, outName(job, record, '_profile.xvg'), [{ text: profile, col: 1, name: 'profile' }, ...(errors ? [{ text: bsres, col: 2, name: 'σ (bootstrap)' }] : [])], 'ξ (nm)', 'E (kJ/mol)')} />
       <p className="m-0 text-caption text-muted-foreground">{errors ? 'the band: ± one standard deviation over ' + (record.options.find(o => o.flag === 'nBootstrap')?.value ?? '') + ' bootstraps' : 'no error estimate: run with bootstraps for one'} · the profile is not sent to the vault: the Matrix would read it as a histogram</p>
       <Section label={'Histograms · ' + h!.windows.length + ' windows'} />
-      <SeriesChart series={hist} xlabel="ξ (nm)" ylabel="count" height={220} y="zero" rule={null}
-        exp={chartExport(job, record, outName(job, record), columns(histo, hist.map(x => x.label)), 'ξ (nm)', 'count')} />
+      <SeriesChart series={hist} xlabel="ξ (nm)" ylabel="count" height={220} y="zero" rule={null} ramp={{ first: hist[0].label, last: hist[hist.length - 1].label }}
+        exp={chartExport(job, record, outName(job, record), ordered.map((w, k) => ({ text: histo, col: w.window, name: hist[k].label })), 'ξ (nm)', 'count')} />
       <Section label="Overlap of neighbouring windows" />
       <table className="text-control" aria-label="overlap of neighbouring windows">
         <thead><tr className="text-left text-label uppercase text-muted-foreground"><th className="py-1 pr-4 font-normal">windows</th><th className="pr-4 font-normal">peaks at</th><th className="font-normal">overlap</th></tr></thead>
