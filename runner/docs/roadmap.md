@@ -192,7 +192,7 @@ From [`batch-3.md`](batch-3.md) §5: one coherent app, (de)Cypher for every anal
 
 ### Phase 5: Layout and interaction (R8, R9)
 - [x] R9a Set-up and results; compare as `#compare`; old addresses still work; drops routed by type (T178)
-- [ ] R9b One result page layout; (de)Cypher's controls regrouped (with the one style menu, so the display menu is built once)
+- [x] R9b One result page layout; (de)Cypher's controls regrouped (T179) (with the one style menu, so the display menu is built once)
 - [ ] R8a One gesture scheme for structures, charts and legends
 - [ ] R8b Every key in one registry, rebindable, listed by `?`
 
