@@ -25,6 +25,8 @@ export interface QqJob {
   /** A running job's node; a queued one's plan as qq prints it ("node9 in 03:55"), not interpreted. */
   node: string | null; planned: string | null;
   cpu: number | null; mem: number | null;
+  /** What `qq jobs -e` prints under the row (R15): where the job was submitted from, its input folder, qq's comment. */
+  inputMachine: string | null; inputDir: string | null; comment: string | null;
   /** The row as printed, without the table's borders. */
   raw: string;
 }
@@ -35,11 +37,19 @@ const ANSI = new RegExp(String.fromCharCode(27) + '\\[[0-9;]*[A-Za-z]', 'g');
 /** Strip colour codes and the box-drawing borders (│ ╭ ╰ …) of qq's table. */
 const plain = (line: string) => line.replace(ANSI, '').replace(/^\s*[│┃|]/, '').replace(/[│┃|]\s*$/, '').trimEnd();
 
-/** "00:48:36" (hours may run past 24) in seconds; null if it isn't one. */
+/** "00:48:36" (hours may run past 24), or with days as qq prints a day of walltime ("1d 00:00:00"), in seconds; null if it isn't one. */
 export function clock(t: string): number | null {
-  const m = /^(\d+):(\d{2}):(\d{2})$/.exec(t);
-  return m ? +m[1] * 3600 + +m[2] * 60 + +m[3] : null;
+  const m = /^(?:(\d+)d\s+)?(\d+):(\d{2}):(\d{2})$/.exec(t);
+  return m ? +(m[1] ?? 0) * 86400 + +m[2] * 3600 + +m[3] * 60 + +m[4] : null;
 }
+/** A time among a row's words at `i`, one word or two ("1d" "00:00:00"): its seconds and how many words it took. */
+const timeAt = (w: string[], i: number): [number, number] | null => {
+  if (/^\d+d$/.test(w[i] ?? '') && clock(w[i] + ' ' + (w[i + 1] ?? '')) !== null) return [clock(w[i] + ' ' + w[i + 1])!, 2];
+  const c = clock(w[i] ?? '');
+  return c === null ? null : [c, 1];
+};
+/** What -e prints under a row, by its label. */
+const DETAILS: Record<string, 'inputMachine' | 'inputDir' | 'comment'> = { 'Input machine': 'inputMachine', 'Input directory': 'inputDir', Comment: 'comment' };
 const num = (t: string | undefined) => (t !== undefined && /^\d+(\.\d+)?$/.test(t) ? Number(t) : null);
 
 /**
@@ -54,6 +64,9 @@ export function parseQqJobs(text: string): QqTable {
     const l = plain(line), t = l.trim().split(/\s+/);
     if (!l.trim()) continue;
     if (/\bJob ID\b/.test(l)) continue;
+    // `qq jobs -e`: "> Input directory: /path" under a row belongs to that job (R15).
+    const detail = /^>\s+([^:]+):\s*(.*)$/.exec(l.trim()), last = jobs[jobs.length - 1];
+    if (detail && last && DETAILS[detail[1].trim()]) { last[DETAILS[detail[1].trim()]] = detail[2].trim() || null; continue; }
     const row = /^[A-Z]$/.test(t[0]) && /^\d+(\.\S+)?$/.test(t[1] ?? '') ? t : null;
     if (!row || row.length < 9) {
       const total = /\bJobs\s+((?:[A-ZΣ]\s+\d+\s+)*[A-ZΣ]\s+\d+)/.exec(l);
@@ -63,8 +76,9 @@ export function parseQqJobs(text: string): QqTable {
     }
     const [letter, id, user, name, queue, cpus, gpus, nodes, ...rest] = row;
     let runtime: number | null = null, walltime: number | null = null, waiting: number | null = null, i = 0;
-    if (rest[1] === '/' && clock(rest[0]) !== null && clock(rest[2] ?? '') !== null) { runtime = clock(rest[0]); walltime = clock(rest[2]); i = 3; }
-    else if (clock(rest[0]) !== null) { waiting = clock(rest[0]); i = 1; }
+    const first = timeAt(rest, 0), second = first && rest[first[1]] === '/' ? timeAt(rest, first[1] + 1) : null;
+    if (first && second) { runtime = first[0]; walltime = second[0]; i = first[1] + 1 + second[1]; }
+    else if (first) { waiting = first[0]; i = first[1]; }
     const tail = rest.slice(i);
     // A running job ends with its node, then %CPU and %Mem when the batch system gives them (Slurm doesn't); a
     // queued one with a plan, kept as printed (review: a running row with its node alone is not a plan).
@@ -73,10 +87,27 @@ export function parseQqJobs(text: string): QqTable {
       id, key: id.replace(/\..*$/, ''), state: stateOf(letter), user, name: name.replace(/…$/, ''), truncated: name.endsWith('…'), queue,
       cpus: num(cpus), gpus: num(gpus), nodes: num(nodes), runtime, walltime, waiting,
       node: usage ? tail[0] : null, planned: usage || !tail.length ? null : tail.join(' '), cpu: usage ? num(tail[1]) : null, mem: usage ? num(tail[2]) : null,
+      inputMachine: null, inputDir: null, comment: null,
       raw: l.trim(),
     });
   }
   return { jobs, counts, other };
+}
+
+/** A job that was running and has ended between two reads (R15, T169). */
+export interface Ended { key: string; name: string; word: 'finished' | 'no longer running'; inputDir: string | null }
+
+/**
+ * The jobs running in `before` that have ended in `after`: "finished" only when the list says so (`qq jobs -a` keeps
+ * finished jobs), "no longer running" when it no longer lists them. Their input folder is what `qq jobs -e` printed (in
+ * either read, or an earlier one, `dirs`), never guessed.
+ */
+export function endedBetween(before: QqJob[], after: QqJob[], dirs: Map<string, string> = new Map()): Ended[] {
+  const now = new Map(after.map(j => [j.key, j]));
+  return before.filter(j => ['R', 'E'].includes(j.state.letter)).flatMap(j => {
+    const a = now.get(j.key), word = !a ? 'no longer running' : a.state.letter === 'F' ? 'finished' : null;
+    return word ? [{ key: j.key, name: j.name, word, inputDir: j.inputDir ?? a?.inputDir ?? dirs.get(j.key) ?? null } satisfies Ended] : [];
+  });
 }
 
 /** One job in `gmx-eta -a`: its time left, or gmx-eta's reason for none, and its whole message. */

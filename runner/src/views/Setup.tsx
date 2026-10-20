@@ -8,7 +8,7 @@ import { cn } from '../lib/utils'
 import { Status } from '../ui/status'
 import { ToggleGroup, ToggleGroupItem } from '../ui/toggle-group'
 import { Analysis } from './Analysis'
-import { BatchView } from './Batch'
+import { BatchView, type BatchPreset } from './Batch'
 import { Groups } from './Groups'
 import { Inputs, useInputsCheck } from './Inputs'
 
@@ -18,9 +18,11 @@ const plural = (n: number, one: string) => n + ' ' + one + (n === 1 ? '' : 's')
  * Set-up (R9a): inputs → groups → command as steps, each saying where it stands. Batch is the same steps over many
  * trajectories: its first step finds them by a path template, and the groups and command are the recipe.
  */
-export function Setup({ route, go, state, draft, setDraft, jobs, uploads, onUploaded, onSettings, onOpenJob }: {
+export function Setup({ route, go, state, draft, setDraft, jobs, uploads, onUploaded, onSettings, onOpenJob, batchPreset }: {
   route: Extract<Route, { view: 'setup' }>; go: (r: Route) => void; state: AppState; draft: Draft; setDraft: React.Dispatch<React.SetStateAction<Draft>>; jobs: Job[]
   uploads: File[]; onUploaded: () => void; onSettings: () => void; onOpenJob: (id: string) => void
+  /** A cluster job's folder and a recipe, handed over by the cluster tab (R15); a new one fills batch again. */
+  batchPreset?: BatchPreset | null
 }) {
   const check = useInputsCheck(draft), command = check.command
   const [matches, setMatches] = React.useState<number | null>(null)
@@ -61,7 +63,7 @@ export function Setup({ route, go, state, draft, setDraft, jobs, uploads, onUplo
         <Status level="info">in batch, the groups and the command are the recipe: preview and run it over the trajectories of step 1 · run here runs the one trajectory of one-trajectory mode</Status>
       )}
       {step === 'inputs' && (route.batch
-        ? <BatchView state={state} draft={draft} jobs={jobs} onOpenJob={onOpenJob} onMatches={setMatches} />
+        ? <BatchView key={batchPreset?.id ?? 0} state={state} draft={draft} jobs={jobs} onOpenJob={onOpenJob} onMatches={setMatches} preset={batchPreset} />
         : <Inputs state={state} draft={draft} setDraft={setDraft} check={check} uploads={uploads} onUploaded={onUploaded} onSettings={onSettings} onNext={() => to(steps[1])} />)}
       {step === 'groups' && <Groups draft={draft} setDraft={setDraft} />}
       {step === 'command' && <Analysis gmx={state.gmx} draft={draft} setDraft={setDraft} onStarted={onOpenJob} />}

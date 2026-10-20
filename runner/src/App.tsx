@@ -13,6 +13,7 @@ import { Status } from './ui/status'
 import { useDraft } from './draft'
 import { recipeFromRecord } from './lib/record'
 import { ClusterView } from './views/Cluster'
+import type { BatchPreset } from './views/Batch'
 import { withCommand } from './lib/commands'
 import { JobsView } from './views/Jobs'
 import { Settings } from './views/Settings'
@@ -134,6 +135,9 @@ export function App() {
     return () => { window.removeEventListener('dragover', over); window.removeEventListener('dragleave', leave); window.removeEventListener('drop', drop) }
   })
   const openJob = (id: string) => go({ view: 'results', job: id })
+  // A cluster job's folder and a recipe (R15): batch set-up opens filled with them; nothing runs until run.
+  const [batchPreset, setBatchPreset] = React.useState<BatchPreset | null>(null)
+  const offerBatch = (root: string, recipe: string) => { setBatchPreset({ id: Date.now(), root, recipe }); go({ view: 'setup', step: 'inputs', batch: true }) }
 
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground">
@@ -166,7 +170,7 @@ export function App() {
             <AlertActions><Button variant="outline" size="sm" onClick={() => setSettings(true)}>set gmx</Button></AlertActions>
           </Alert>
         )}
-        <TabsContent value="setup">{state && route.view === 'setup' && <Setup route={route} go={go} state={state} draft={draft} setDraft={setDraft} jobs={jobs.jobs} uploads={uploads} onUploaded={() => setUploads([])} onSettings={() => setSettings(true)} onOpenJob={openJob} />}</TabsContent>
+        <TabsContent value="setup">{state && route.view === 'setup' && <Setup route={route} go={go} state={state} draft={draft} setDraft={setDraft} jobs={jobs.jobs} uploads={uploads} onUploaded={() => setUploads([])} onSettings={() => setSettings(true)} onOpenJob={openJob} batchPreset={batchPreset} />}</TabsContent>
         <TabsContent value="results">{(route.view === 'results' || route.view === 'compare') && (
           <JobsView {...jobs} route={route} go={go} vault={state?.config.vault ?? null} allow={state?.config.allow ?? []} keyName={bindings.compare ? keyLabel(bindings.compare) : null}
             onRunAgain={r => { setDraft(d => ({ ...withCommand(d, r.analysis ?? 'rdf'), ...recipeFromRecord(r) })); go({ view: 'setup', step: 'command', batch: false }) }}
@@ -175,7 +179,7 @@ export function App() {
                 keyName={bindings.compare ? keyLabel(bindings.compare) : null} />
             </React.Suspense>} />
         )}</TabsContent>
-        <TabsContent value="cluster"><ClusterView /></TabsContent>
+        <TabsContent value="cluster"><ClusterView onOffer={offerBatch} /></TabsContent>
       </main>
       </Tabs>
       <Toaster />

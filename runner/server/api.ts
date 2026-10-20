@@ -120,7 +120,13 @@ export function makeApi(ctx: Ctx): Api {
     if (is(req, 'POST', url, '/api/cluster')) {
       // Your cluster jobs (R10): the last read if recent, else qq jobs and gmx-eta -a now; `refresh` asks for a new one.
       const b = await readJson<{ finished?: boolean; refresh?: boolean }>(req);
-      return { body: await cluster.read(b.finished === true, b.refresh === true ? 0 : 50_000) };
+      const r = await cluster.read(b.finished === true, b.refresh === true ? 0 : 50_000);
+      // A job that ended (R15): a batch is offered on its input folder only when that folder is inside the allowed ones.
+      const offer = (dir: string | null) => {
+        if (!dir) return { offer: null, refused: 'not offered: qq jobs -e printed no input folder for it' };
+        try { return { offer: { root: inside(dir, roots()) }, refused: null }; } catch (e) { return { offer: null, refused: 'not offered: ' + (e as Error).message }; }
+      };
+      return { body: { ...r, ended: r.ended.map(e => ({ ...e, ...offer(e.inputDir) })) } };
     }
     if (is(req, 'GET', url, '/api/ls')) {
       const path = url.searchParams.get('path');

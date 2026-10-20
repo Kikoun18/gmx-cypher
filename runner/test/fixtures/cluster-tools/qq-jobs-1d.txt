@@ -1,0 +1,21 @@
+╭───────────────────────────────────────────────── COLLECTED JOBS ─────────────────────────────────────────────────╮
+│                                                                                                                  │
+│  S   Job ID   User      Job Name      Queue   NCPUs   NGPUs   NNodes          Times           Node   %CPU   %Mem │
+│  R  1523408  user2  qq_flex_md+0046    gpu      8       1       1     21:29:20 / 1d 00:00:00 node11   99     27  │
+│  R  1523410  user2  qq_flex_md+0046    gpu      8       1       1     21:23:59 / 1d 00:00:00 node13   99     29  │
+│  R  1523411  user2  qq_flex_md+0045    gpu      8       1       1     21:23:17 / 1d 00:00:00 node28   99     27  │
+│  R  1523413  user2  qq_flex_md+0046    gpu      8       1       1     21:21:56 / 1d 00:00:00 node19   99     26  │
+│  R  1523414  user2  qq_flex_md+0047    gpu      8       1       1     21:20:27 / 1d 00:00:00 node9    98     26  │
+│  R  1523416  user2  qq_flex_md+0046    gpu      8       1       1     21:19:56 / 1d 00:00:00 node12   99     28  │
+│  R  1523727  user2  qq_loop_md+0001    cpu      8       0       1     11:41:58 / 1d 00:00:00 nodec2   99     10  │
+│  R  1523728  user2  qq_loop_md+0001    cpu      8       0       1     11:41:43 / 1d 00:00:00 nodec2   99     10  │
+│  R  1523729  user2  qq_loop_md+0001    cpu      8       0       1     11:41:29 / 1d 00:00:00 nodec2   99     10  │
+│  R  1523906  user2  martini_compress   cpu      8       0       1     06:29:21 / 1d 00:00:00 nodec7   99     9   │
+│  R  1523907  user2  martini_compress   cpu      8       0       1     06:29:21 / 1d 00:00:00 nodec7   99     9   │
+│  R  1523908  user2  martini_compress   cpu      8       0       1     06:29:21 / 1d 00:00:00 nodec1   99     10  │
+│                                                                                                                  │
+│                                           CPUs  GPUs  Nodes                                                      │
+│                                Requested   0     0      0                                                        │
+│  Jobs    R 12    Σ 12          Allocated   96    6     12                                                        │
+│                                                                                                                  │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
