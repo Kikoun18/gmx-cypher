@@ -44,6 +44,8 @@ export interface ChartOptions {
   pins?: Pins
 }
 export const NO_PINS: Pins = { points: [], lines: [] }
+/** A result page's labels (R11d), by gmx name: a curve named for a renamed group shows its label. */
+export const LabelsContext = React.createContext<Record<string, string>>({})
 
 /**
  * A chart's marks and lines under it (R11c): each with what it marks, a label of its own (empty: its value), and ×;
@@ -59,7 +61,7 @@ function PinList({ pins, curves, geom, onPins }: { pins: Pins; curves: Curve[]; 
       {points.map(({ p, n, c }) => (
         <div key={'p' + n} className={row}>
           <span className="size-2.5 justify-self-center rounded-full" style={{ background: c.color }} aria-hidden />
-          <span className="truncate" title={c.name + (c.source ? ' · ' + c.source : '')}>{c.x[p.i].toFixed(geom.xDigits)}, {c.y[p.i].toFixed(geom.yDigits)} · {c.name + (c.source ? ' · ' + c.source : '')}</span>
+          <span className="truncate" title={(c.label ?? c.name) + (c.source ? ' · ' + c.source : '')}>{c.x[p.i].toFixed(geom.xDigits)}, {c.y[p.i].toFixed(geom.yDigits)} · {(c.label ?? c.name) + (c.source ? ' · ' + c.source : '')}</span>
           <Input className="h-6 text-caption" value={p.label ?? ''} placeholder="label" aria-label={'label of the mark on ' + c.name} onChange={e => onPins({ ...pins, points: relabel(pins.points, n, e.target.value) })} />
           <button type="button" aria-label={'remove the mark on ' + c.name} className="grid size-[22px] place-items-center rounded-full text-muted-foreground hover:bg-accent hover:text-foreground" onClick={() => onPins({ ...pins, points: pins.points.filter((_, j) => j !== n) })}>×</button>
         </div>
@@ -188,7 +190,7 @@ export function ChartPanel({ curves, grid, xlabel, ylabel, pal, marks, y, rule, 
           {kit.hoverRows(curves, hover).slice(0, 14).map(({ curve: c, v }) => (
             <div key={c.key} className="grid grid-cols-[22px_minmax(0,1fr)_auto_auto] items-center gap-[7px] text-caption">
               <Swatch color={c.color} dash={c.dash} />
-              <span className="truncate font-bold" style={{ color: c.color }}>{c.name}</span>
+              <span className="truncate font-bold" style={{ color: c.color }}>{c.label ?? c.name}</span>
               <span className="truncate text-muted-foreground">{c.source}</span>
               <span>{v.toFixed(geom.yDigits)}</span>
             </div>
@@ -295,22 +297,23 @@ export function SeriesChart({ series, xlabel, ylabel, marks = 'none', height = 2
   /** Ordered curves (R7a): the legend is a bar of their ramp, from the first curve's name to the last's. */
   ramp?: { first: string; last: string }
 }) {
-  const pal = PALETTES[usePageTheme()]
-  const all = React.useMemo(() => curvesOf(series, pal), [series, pal])
+  const pal = PALETTES[usePageTheme()], named = React.useContext(LabelsContext)
+  const labelled = React.useCallback((p: Palette) => curvesOf(series, p).map(c => (named[c.name] ? { ...c, label: named[c.name] } : c)), [series, named])
+  const all = React.useMemo(() => labelled(pal), [labelled, pal])
   const [hidden, setHidden] = React.useState<string[]>([]), [dimmed, setDimmed] = React.useState<string[]>([]), [lit, setLit] = React.useState<string | null>(null), [pins, setPins] = React.useState<Pins>(NO_PINS)
   const curves = React.useMemo(() => all.filter(c => !hidden.includes(c.key)).map(c => (lit ? { ...c, dim: c.key !== lit } : dimmed.includes(c.key) ? { ...c, dim: true } : c)), [all, hidden, dimmed, lit])
   // On a result page, the chart is one of its figures (R9b) while it is drawn.
   const figures = React.useContext(FiguresContext), fid = React.useId()
   React.useEffect(() => {
     if (!figures || !exp) return
-    figures.set(fid, { exp, figure: p => ({ title: exp.title, sub: exp.sub, file: exp.file, xlabel, ylabel, curves: curvesOf(series, p), marks, ...o, pins }) })
+    figures.set(fid, { exp, figure: p => ({ title: exp.title, sub: exp.sub, file: exp.file, xlabel, ylabel, curves: labelled(p), marks, ...o, pins }) })
     return () => { figures.delete(fid) }
   })
   const full = React.useMemo(() => exp && { ...exp, ...(resultAnalysis({ id: 'r', title: '', sub: '', xlabel, ylabel, series }) ? { html: () => resultHtml(exp, series, xlabel, ylabel, o) } : { html: null, why: 'its curves are on different x grids' }) },
     [exp, series, xlabel, ylabel, o.y, o.rule, o.xDigits])
   return (
     <figure className="relative m-0 flex flex-col gap-2">
-      {full && <ExportMenu className="absolute right-0 top-0 z-[1]" exp={full} curves={p => curvesOf(series, p)} xlabel={xlabel} ylabel={ylabel} marks={marks} {...o} pins={pins} />}
+      {full && <ExportMenu className="absolute right-0 top-0 z-[1]" exp={full} curves={labelled} xlabel={xlabel} ylabel={ylabel} marks={marks} {...o} pins={pins} />}
       <ChartPanel curves={curves} grid={curves[0]?.x ?? []} xlabel={xlabel} ylabel={ylabel} pal={pal} marks={marks} height={height} {...o} pins={pins} onPins={setPins} />
       {ramp && curves.length > 1 && (
         <figcaption className="flex flex-wrap items-center gap-x-3 text-caption text-muted-foreground">
@@ -323,10 +326,10 @@ export function SeriesChart({ series, xlabel, ylabel, marks = 'none', height = 2
       {!curves.length && <p className="m-0 text-caption text-muted-foreground">every curve is hidden · click a name below to show it</p>}
       {legend && !ramp && (
         <figcaption>
-          <Legend label={'curves of ' + ylabel} items={all.map(c => ({ ...c, label: c.name }))} shown={all.filter(c => !hidden.includes(c.key)).map(c => c.key)} onShown={k => setHidden(all.filter(c => !k.includes(c.key)).map(c => c.key))}
+          <Legend label={'curves of ' + ylabel} items={all.map(c => ({ ...c, label: c.label ?? c.name }))} shown={all.filter(c => !hidden.includes(c.key)).map(c => c.key)} onShown={k => setHidden(all.filter(c => !k.includes(c.key)).map(c => c.key))}
             onHover={setLit} dimmed={dimmed} onDimmed={setDimmed} className="gap-x-3 gap-y-1"
             itemClass={(_, on) => cn('inline-flex items-center gap-2 rounded-md px-1 text-caption hover:text-foreground', on ? 'text-muted-foreground' : 'text-muted-foreground/60 line-through')}
-            itemStyle={c => ({ opacity: dimmed.includes(c.key) ? 0.4 : 1 })} item={c => <><Swatch color={c.color} dash={c.dash} />{c.name}</>} />
+            itemStyle={c => ({ opacity: dimmed.includes(c.key) ? 0.4 : 1 })} item={c => <><Swatch color={c.color} dash={c.dash} />{c.label ?? c.name}</>} />
         </figcaption>
       )}
     </figure>

@@ -11,6 +11,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Status } from '../ui/status'
 import { ToggleGroup, ToggleGroupItem } from '../ui/toggle-group'
 import { modName } from '../lib/platform'
+import { setLabel } from '../lib/labels'
+import { Input } from '../ui/input'
 import type { View } from './state'
 import { kit } from '../core/theme'
 
@@ -69,7 +71,7 @@ export const StructurePanel = React.forwardRef<StructureHandle, {
           <span className="text-caption text-muted-foreground">{tip.atom}</span>
           {tip.value != null && paint && <span className="text-control font-bold">{paint.label} {fmtStat(tip.value)} {paint.unit}</span>}
           <span className="text-control font-bold" style={{ color: g ? pal.hues[g.tone].strong : r ? 'var(--foreground)' : 'var(--muted-foreground)' }}>
-            {g ? g.name + ' · ' + g.atoms.length + ' atoms' : r ? 'reference · ' + r.label : 'not in any group'}
+            {g ? kit.shownName(g) + ' · ' + g.atoms.length + ' atoms' : r ? 'reference · ' + r.label : 'not in any group'}
           </span>
           {(g || r) && <span className="text-caption text-muted-foreground">{g ? (on ? (selected.length > 1 ? 'click: plot alone · ' + mod + '-click: remove' : 'click: remove') : 'click: plot alone · ' + mod + '-click: add') + ' · Shift: its residue' : onPickRef ? 'click: plot only this one · ' + mod + '-click: add or remove' : 'g(r) is measured from these atoms'}</span>}
         </div>
@@ -145,7 +147,7 @@ export function CurveTable({ curves, onRemove, onHover, source = true, stats = '
       {curves.map(c => (
         <div key={c.key} className={cn('grid min-h-[26px] items-center gap-2 text-control', cols)} onMouseEnter={() => onHover(c)} onMouseLeave={() => onHover(null)}>
           {onStyle ? <StyleMenu curve={c} style={styles?.[c.key]} onStyle={s => onStyle(c.key, s)} /> : <Swatch color={c.color} dash={c.dash} />}
-          <span className="truncate font-bold" style={{ color: c.color }}>{c.name}</span>
+          <span className="truncate font-bold" style={{ color: c.color }} title={c.label ? 'gmx name: ' + c.name : undefined}>{c.label ?? c.name}</span>
           {source && <span className="truncate text-muted-foreground">{c.source}</span>}
           <span className="text-right">{c.atoms || '—'}</span>
           {stats === 'peaks' ? <>
@@ -182,10 +184,35 @@ export function GroupChips({ refs, sels, selected, pal, dim, hover, onShown, onP
           ? <button key={r.label} type="button" aria-pressed={r.on !== false} title={'click: plot only this reference · ' + modName() + '-click: add or remove'} className={cn(cls, 'cursor-pointer')} onClick={e => onPickRef(i, e.metaKey || e.ctrlKey)}>{body}</button>
           : <span key={r.label} className={cls}>{body}</span>
       })}
-      <Legend label="groups" className="contents" items={sels.map(g => ({ key: g.name, label: g.name, g }))} shown={selected} onShown={onShown} onHover={onHover}
+      <Legend label="groups" className="contents" items={sels.map(g => ({ key: g.name, label: kit.shownName(g), g }))} shown={selected} onShown={onShown} onHover={onHover}
         itemClass={(_, on) => cn('inline-flex h-[26px] items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 text-caption transition-[background-color,box-shadow] duration-[120ms]', on && 'font-bold')}
         itemStyle={({ g }, on) => { const t = pal.hues[g.tone]; return { background: on ? t.base : dim ? pal.secondary : t.soft, color: on ? t.fg : dim ? pal.muted : t.strong, boxShadow: hover === g.name ? '0 0 0 2px ' + pal.fg : 'none' } }}
-        item={({ g }, on) => <><span className="size-[7px] shrink-0 rounded-full" style={{ background: on ? pal.hues[g.tone].fg : pal.hues[g.tone].strong }} />{g.name}{counts && <span className="opacity-70">{g.atoms.length || '—'}</span>}</>} />
+        item={({ g }, on) => <><span className="size-[7px] shrink-0 rounded-full" style={{ background: on ? pal.hues[g.tone].fg : pal.hues[g.tone].strong }} /><span title={g.label ? 'gmx name: ' + g.name : undefined}>{kit.shownName(g)}</span>{counts && <span className="opacity-70">{g.atoms.length || '—'}</span>}</>} />
+    </div>
+  )
+}
+
+/**
+ * Labels for an analysis's reference and groups (R11d), shown in their place here, in results and in exports: each gmx
+ * name with a label (empty: the name). A label is not the data: the record, the .ndx and the .xvg keep gmx's names.
+ */
+export function Renames({ a }: { a: { id: string; ref: Group | null; sels: Group[] } }) {
+  const [open, setOpen] = React.useState(false)
+  const groups = [...(a.ref ? [{ g: a.ref, ref: true }] : []), ...a.sels.map(g => ({ g, ref: false }))]
+  return (
+    <div className="flex flex-col gap-1.5">
+      <button type="button" aria-expanded={open} className="self-start text-caption text-muted-foreground underline underline-offset-2 hover:text-foreground" onClick={() => setOpen(o => !o)}>{open ? 'done renaming' : 'rename groups'}</button>
+      {open && (
+        <div className="grid max-w-[520px] grid-cols-[minmax(0,1fr)_minmax(0,220px)] items-center gap-x-3 gap-y-1 text-caption">
+          {groups.map(({ g, ref }) => (
+            <React.Fragment key={g.name}>
+              <span className="truncate text-muted-foreground">{(ref ? 'ref ' : '') + g.name}</span>
+              <Input className="h-6 text-caption" defaultValue={g.label ?? ''} placeholder={g.name} aria-label={'label for ' + g.name} onChange={e => setLabel(a.id, g.name, e.target.value)} />
+            </React.Fragment>
+          ))}
+          <span className="col-span-2 text-muted-foreground">a label shows here, in results and in exports; the record, the .ndx and the .xvg keep gmx's names</span>
+        </div>
+      )}
     </div>
   )
 }

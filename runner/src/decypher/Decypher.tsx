@@ -15,6 +15,7 @@ import { Section } from '../ui/separator'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
 import { ToggleGroup, ToggleGroupItem } from '../ui/toggle-group'
 import { getJson, postJson } from '../api'
+import { useLabels } from '../lib/labels'
 import type { Job } from '../jobs'
 import { Status } from '../ui/status'
 import { cn } from '../lib/utils'
@@ -25,13 +26,13 @@ import { modName } from '../lib/platform'
 import { DisplayMenu, DisplayRow, StyleRow } from '../ui/display-menu'
 import { ResultPage } from '../ui/result-page'
 import { ChartPanel, ExportMenu, Swatch, type ChartExport } from '../core/Chart'
-import { curvesCsv } from '../lib/csv'
+import { curvesCsv, groupNotes } from '../lib/csv'
 import { unlike } from '../core/cards'
 import { download as downloadBlob, renderBatch } from '../../../matrix/src/lib/export'
 import { graphData } from '../core/export'
 import { fileName, useExportPrefs } from '../core/exportPrefs'
 import { fileBase } from '../../../matrix/src/lib/exportPrefs'
-import { CurveTable, GroupChips, StructurePanel, type StructureHandle } from './panels'
+import { CurveTable, GroupChips, Renames, StructurePanel, type StructureHandle } from './panels'
 import type { LoadedFile } from './parse'
 import { useAnalyses, type Item } from './sources'
 import { pickGroups } from '../core/gestures'
@@ -163,7 +164,7 @@ export function AnalysisCard({ members, on, tone, mol, pal, view, selected, tone
   const note = kit.structureNote(a, mol)
   const lines = React.useMemo(() => a.lines?.filter(l => selected.includes(l.group)).map(l => ({ line: l, tone: a.sels.find(g => g.name === l.group)?.tone ?? tone })), [a, selected, tone])
   const fit = React.useMemo(() => (a.fit ? { label: a.fit.name, atoms: a.fit.atoms } : undefined), [a])
-  const exp: ChartExport = { file: a.label, fields: { command: a.command ?? 'rdf' }, title, csv: () => curvesCsv(curvesIn(pal).map(c => ({ ...c, name: c.source ? c.name + ' · ' + c.source : c.name })), a.xlabel, a.ylabel) }
+  const exp: ChartExport = { file: a.label, fields: { command: a.command ?? 'rdf' }, title, csv: () => curvesCsv(curvesIn(pal).map(c => ({ ...c, name: (c.label ?? c.name) + (c.source ? ' · ' + c.source : '') })), a.xlabel, a.ylabel, { notes: groupNotes(a) }) }
   // One result page's order (R9b): its actions, its structure beside its chart, its settings and groups, where it came from.
   return (
     <section aria-label={title} className="flex flex-col rounded-xl border border-border bg-card" onMouseEnter={onActive}>
@@ -218,8 +219,10 @@ export function AnalysisCard({ members, on, tone, mol, pal, view, selected, tone
           </Section>
           <GroupChips refs={chipRefs} sels={a.sels} selected={selected} pal={pal} dim={selected.length > 0 && view.rest !== 'tinted'} hover={hover}
             onShown={onSelect} onPickRef={pickChip} onHover={setHover} />
+          {!chartOnly && <Renames a={a} />}
         </>}
-        provenance={members.map(m => <p key={m.id} className="m-0 text-caption text-muted-foreground">{many ? m.label + ' · ' : ''}{m.structNote}</p>)} />
+        provenance={<>{members.map(m => <p key={m.id} className="m-0 text-caption text-muted-foreground">{many ? m.label + ' · ' : ''}{m.structNote}</p>)}
+          {kit.renames(a) && <p className="m-0 text-caption text-muted-foreground">{kit.renames(a)}</p>}</>} />
     </section>
   )
 }
@@ -246,7 +249,7 @@ function CompareView({ shown, focus, setFocus, mols, pal, view, patch, selected,
   const i = shown.indexOf(focus), step = (d: number) => setFocus(shown[(i + d + shown.length) % shown.length].id)
   // One graph's export (R6a): every curve, named with its RDF, in the export theme's palette.
   const curvesIn = (p: Palette) => kit.styleCurves(kit.buildCurves({ focus, plotted, selected, colorBy: view.colorBy, pal: p, tones }), view.styles, p)
-  const exp: ChartExport = { file: 'one-graph_' + plotted.length + '-results', fields: { command: focus.command ?? 'rdf' }, title: 'One graph · ' + plural(plotted.length, 'result'), csv: () => curvesCsv(curvesIn(pal).map(c => ({ ...c, name: c.name + ' · ' + c.source })), focus.xlabel, focus.ylabel) }
+  const exp: ChartExport = { file: 'one-graph_' + plotted.length + '-results', fields: { command: focus.command ?? 'rdf' }, title: 'One graph · ' + plural(plotted.length, 'result'), csv: () => curvesCsv(curvesIn(pal).map(c => ({ ...c, name: (c.label ?? c.name) + ' · ' + c.source })), focus.xlabel, focus.ylabel, { notes: groupNotes(focus) }) }
   return (
     <div className="grid min-h-[660px] grid-cols-[repeat(auto-fit,minmax(min(100%,460px),1fr))] gap-4">
       <section aria-label="structure" className="flex min-w-0 flex-col rounded-xl border border-border bg-card" onMouseEnter={onActive}>
@@ -531,7 +534,9 @@ export function Decypher({ sources, files, onFiles, onClearFiles, jobs, jobsLoad
   React.useEffect(() => { if (needVault && !vault) loadVault() }, [needVault, vault, loadVault])
 
   const { items, structs, fileRows } = useAnalyses(sources.refs, jobs, jobsLoaded, vault?.list ?? null, files)
-  const ready = React.useMemo(() => items.filter(i => i.analysis).map(i => i.analysis!), [items])
+  // Each analysis with its groups' labels (R11d): shown in place of their names; the names stay its keys.
+  const labels = useLabels()
+  const ready = React.useMemo(() => items.filter(i => i.analysis).map(i => kit.withLabels(i.analysis!, labels[i.analysis!.id])), [items, labels])
   const tones = React.useMemo(() => Object.fromEntries(items.map((it, i) => [it.analysis?.id ?? it.key, kit.TONES[i % kit.TONES.length]])) as Record<string, Tone>, [items])
   const shown = React.useMemo(() => ready.filter(a => !view.hidden.includes(a.id)), [ready, view.hidden])
   // RDFs morphed into one card, as each job is shown: the card stands where its first RDF would, the others have none.

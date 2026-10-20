@@ -4,7 +4,9 @@ import { Alert, AlertDescription, AlertTitle } from '../ui/alert'
 import { Button } from '../ui/button'
 import { Stat } from '../ui/card'
 import { TONES, type Series } from '../core/index'
-import { ExportAll, FiguresContext, SeriesChart, type ChartExport, type PageFigure } from '../core/Chart'
+import { ExportAll, FiguresContext, LabelsContext, SeriesChart, type ChartExport, type PageFigure } from '../core/Chart'
+import { labelsOf, setLabel, useLabels } from '../lib/labels'
+import { Input } from '../ui/input'
 import { rampColors } from '../core/ramp'
 import { TOKENS_BY_THEME } from '../core/theme'
 import { Section } from '../ui/separator'
@@ -69,7 +71,8 @@ function chartExport(job: Job, record: RunRecord, source: string, parts: { text:
   return {
     file: source.replace(/\.xvg$/i, '') + (part ? '_' + part : ''), title: (job.name ?? job.title) + (part ? ' · ' + part : ''),
     fields: { ...job.fields, command: job.kind, group: record.groups[0]?.name ?? '' },
-    csv: () => xvgCsv(parts, xlabel, ylabel, csvMeta(record, String(job.meta?.record ?? ''), source, g => g.name)),
+    // A renamed group's column and its line take its label (R11d), the line keeping gmx's name; read when the CSV is made.
+    csv: () => { const l = labelsOf('job:' + job.id); return xvgCsv(parts.map(p => ({ ...p, name: l[p.name] ?? p.name })), xlabel, ylabel, csvMeta(record, String(job.meta?.record ?? ''), source, g => l[g.name] ?? g.name)) },
   }
 }
 /** Every y column of an xvg, named. */
@@ -99,7 +102,7 @@ function optionsLine(r: RunRecord): string {
 function RdfChart({ job, record }: { job: Job; record: RunRecord }) {
   const xvg = useOutput(job.id, 'xvg'), cn = useOutput(job.id, record.outputs.some(o => o.kind === 'cn') ? 'cn' : null)
   const tones = React.useMemo(() => record.groups.slice(1).map(g => g.tone), [record])
-  const curves = React.useMemo(() => (xvg ? resultSeries(xvg) : []), [xvg])
+  const curves = React.useMemo(() => (xvg ? resultSeries(xvg) : []), [xvg]), named = React.useContext(LabelsContext)
   if (!xvg) return <p className="m-0 text-caption text-muted-foreground" aria-live="polite">reading {String((job.meta?.names as { xvg: string })?.xvg)}…</p>
   const dt = Number(record.options.find(o => o.flag === 'dt')?.value) || 0, start = estimateOf(job)?.start ?? 0
   return (
@@ -110,8 +113,8 @@ function RdfChart({ job, record }: { job: Job; record: RunRecord }) {
         {curves.flatMap((c, i) => {
           const { firstShell, maximum } = peaks(c.points)
           return [
-            <Stat key={'s' + i} label={'first shell · ' + c.label} value={firstShell ? firstShell.r.toFixed(3) + ' nm' : '—'} hint={firstShell ? 'g = ' + firstShell.g.toPrecision(3) : maximum ? 'never above 1: see the maximum' : 'g(r) is zero everywhere'} />,
-            <Stat key={'m' + i} label={'maximum · ' + c.label} value={maximum ? maximum.r.toFixed(3) + ' nm' : '—'} hint={maximum ? 'g = ' + maximum.g.toPrecision(3) : 'g(r) is zero everywhere'} />,
+            <Stat key={'s' + i} label={'first shell · ' + (named[c.label] ?? c.label)} value={firstShell ? firstShell.r.toFixed(3) + ' nm' : '—'} hint={firstShell ? 'g = ' + firstShell.g.toPrecision(3) : maximum ? 'never above 1: see the maximum' : 'g(r) is zero everywhere'} />,
+            <Stat key={'m' + i} label={'maximum · ' + (named[c.label] ?? c.label)} value={maximum ? maximum.r.toFixed(3) + ' nm' : '—'} hint={maximum ? 'g = ' + maximum.g.toPrecision(3) : 'g(r) is zero everywhere'} />,
           ]
         })}
         {record.frames && <Stat label="frames" value={String(record.frames.analysed)} hint={start + '–' + record.frames.lastTime + ' ps · ' + (dt ? 'every ' + dt + ' ps' : 'every frame')} />}
@@ -497,7 +500,10 @@ export function ResultView({ job, record: rec, recordError, log, allow, vault, o
   const done = job.status === 'done' && !!rec, live = job.status === 'running' && !job.unfollowed
   const recordPath = String(job.meta?.record ?? ''), stem = recordPath.split('/').pop()!.replace(/\.run\.json$/, '')
   const files = rec ? [...rec.outputs.map(o => ({ path: o.path, size: size(o.size), hash: 'sha256 ' + o.sha256.slice(0, 12) + '…' })), ...(recordPath ? [{ path: recordPath, size: '', hash: 'this record' }] : [])] : []
+  // Its groups' labels (R11d), shared with compare by the job's id: shown in its charts and CSV; the record keeps gmx's names.
+  const labels = useLabels()['job:' + job.id] ?? NO_LABELS
   return (
+    <LabelsContext.Provider value={labels}>
     <FiguresContext.Provider value={figures}>
       {rec && rec.problems.length > 0 && (
         <Alert variant="warning"><TriangleAlert /><AlertTitle>gmx-cypher's promise was broken</AlertTitle><AlertDescription>{rec.problems.map(p => <p key={p}>{p}</p>)}</AlertDescription></Alert>
@@ -519,6 +525,7 @@ export function ResultView({ job, record: rec, recordError, log, allow, vault, o
               <tr key={g.index}>
                 <td className="py-0.5 pr-4 text-muted-foreground">group {g.index}</td>
                 <td className={cn('pr-4 font-bold', groupText(g))}>{g.name}</td>
+                <td className="pr-4"><Input className="h-6 w-40 text-caption" defaultValue={labels[g.name] ?? ''} placeholder="label" aria-label={'label for ' + g.name} title="shown in place of the name, here, in compare and in exports; the record keeps gmx's name" onChange={e => setLabel('job:' + job.id, g.name, e.target.value)} /></td>
                 <td className="pr-4 text-right">{g.count} atoms</td>
                 <td className="text-caption text-muted-foreground"> {g.gmxCount === g.count ? <Status inline level="ok" word="gmx agrees" /> : <Status inline level="warning" word={'gmx: ' + g.gmxCount} />} · {g.atoms.length > 40 ? g.atoms.slice(0, 40) + '…' : g.atoms}</td>
               </tr>
@@ -538,8 +545,11 @@ export function ResultView({ job, record: rec, recordError, log, allow, vault, o
         </>} />
       {vault && <SendDialog job={job} open={sending} onOpenChange={setSending} returnFocus={sendButton} />}
     </FiguresContext.Provider>
+    </LabelsContext.Provider>
   )
 }
+
+const NO_LABELS: Record<string, string> = {}
 
 /** A job's result page, its record read from the server once the job has ended (T31). */
 export function RunResult(props: Omit<React.ComponentProps<typeof ResultView>, 'record' | 'recordError'>) {

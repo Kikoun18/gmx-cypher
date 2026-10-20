@@ -71,3 +71,9 @@ export function pinNotes(pins: { points: { key: string; i: number; label?: strin
 }
 /** A CSV with comment lines above its own. */
 export const withNotes = (csv: string, notes: string[]) => notes.map(l => '# ' + l.replace(/[\r\n]+/g, ' ') + '\n').join('') + csv;
+
+/** The renamed groups (R11d) as the CSV's comment lines: each label with gmx's name for it. */
+export const groupNotes = (a: { ref: { name: string; label?: string } | null; sels: { name: string; label?: string }[] }) => [
+  ...(a.ref?.label ? ['group ' + a.ref.label + ': gmx name ' + a.ref.name + ' (the reference)'] : []),
+  ...a.sels.filter(g => g.label).map(g => 'group ' + g.label + ': gmx name ' + g.name),
+];

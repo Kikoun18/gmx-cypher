@@ -21,7 +21,7 @@ export interface Figure { title: string; sub?: string; file: string; xlabel: str
 export function graphData(f: Figure, theme: ExportPrefs['theme']): GraphData {
   // Print: a curve's own grey (an ordered curve's, R7a), else the Matrix's grey of its colour.
   const ink = (c: Curve) => (theme === 'print' ? c.print ?? grey(c.color) : c.color), rule = f.rule === undefined ? 1 : f.rule, marks = f.marks ?? 'none'
-  const name = (c: Curve) => c.name + (c.source ? ' · ' + c.source : ''), digits = f.xDigits ?? kit.xDigitsOf(f.curves[0]?.x ?? [])
+  const name = (c: Curve) => (c.label ?? c.name) + (c.source ? ' · ' + c.source : ''), digits = f.xDigits ?? kit.xDigitsOf(f.curves[0]?.x ?? [])
   const series = f.curves.flatMap(c => {
     // Its own width (R11b); in print, half a pixel heavier.
     const s = { x: c.x, y: c.y, label: name(c), color: ink(c), width: (c.width ?? 2) + (theme === 'print' ? 0.5 : 0), dash: c.dash === 'none' ? undefined : c.dash }
