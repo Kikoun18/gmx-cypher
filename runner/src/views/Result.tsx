@@ -10,7 +10,7 @@ import { TOKENS_BY_THEME } from '../core/theme'
 import { Section } from '../ui/separator'
 import { getJson } from '../api'
 import { estimateOf, type Job } from '../jobs'
-import { awhTargetError, type AwhConvergence } from '../lib/awh'
+import { awhAxis, awhTargetError, type AwhConvergence } from '../lib/awh'
 import { neighbourOverlaps, overlapNotes, parseBootstrap, parseHistograms, windowsInOrder } from '../lib/wham'
 import { COMMANDS } from '../lib/commands'
 import { driftLarger, type EnergyRow } from '../lib/energy'
@@ -212,12 +212,15 @@ function AwhChart({ job, record }: { job: Job; record: RunRecord }) {
   const time = (n: string) => /_t(-?\d+(?:\.\d+)?)\.xvg$/.exec(n)?.[1] ?? '?', colors = rampColors(shown.length, TOKENS_BY_THEME)
   // The frames along the ramp, oldest to newest (R7a).
   const series: Series[] = shown.map((n, i) => ({ label: 't = ' + time(n) + ' ps', points: resultSeries(texts[n])[0]?.points ?? [], tone: 'coral', colors: colors[i] }))
-  const last = texts[shown[shown.length - 1]], target = awhTargetError(last), xLabel = parseTable(last).head.xLabel || 'coordinate'
+  // What ξ is (R7c): the unit the record read from the run input, else gmx awh's own "(nm, deg or lambda state)" and why.
+  const last = texts[shown[shown.length - 1]], target = awhTargetError(last), bias = Number(/(\d+)_t-?[\d.]+\.xvg$/.exec(shown[shown.length - 1])?.[1] ?? 1)
+  const axis = awhAxis(record.awhUnits, bias, parseTable(last).head.xLabel || 'coordinate'), xLabel = axis.label
   return (
     <div className="flex flex-col gap-3">
       <SeriesChart series={series} xlabel={xLabel} ylabel="PMF (kJ/mol)" height={300} ramp={{ first: series[0].label, last: series[series.length - 1].label }} y="data" rule={0}
         exp={chartExport(job, record, shown[shown.length - 1], shown.map((n, i) => ({ text: texts[n], col: 1, name: series[i].label })), xLabel, 'PMF (kJ/mol)')} />
       {names.length > shown.length && <p className="m-0 text-caption text-muted-foreground">{shown.length} of {names.length} frames drawn, evenly spaced; every file is in the folder</p>}
+      {axis.why ? <Status level="info" className="text-control">the axis keeps gmx awh's own label: {axis.why}</Status> : <p className="m-0 text-caption text-muted-foreground">ξ read from the run input when the job started · the files keep gmx's own label</p>}
       <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3">
         <Stat label="frames written" value={String(names.length)} hint={'t = ' + time(names[0]) + (names.length > 1 ? ' … ' + time(names[names.length - 1]) : '') + ' ps · one PMF file each'} />
         {target && <Stat label="target error · last frame" value={target.kJ + ' kJ/mol'} hint={target.kT + ' kT · from the AWH metadata of ' + names[names.length - 1]} />}

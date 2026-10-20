@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { parseHelp } from '../src/lib/gmxText';
-import { awhArgv, awhConvergence, awhFrames, awhNames, awhOptionProblems, awhTargetError, framesWritten, frameOptions, type AwhFrame } from '../src/lib/awh';
+import { awhArgv, awhAxis, awhConvergence, awhFrames, awhUnits, awhNames, awhOptionProblems, awhTargetError, framesWritten, frameOptions, type AwhFrame } from '../src/lib/awh';
 import { DEFAULT_PATTERN, detectAna, getAnalyses, parseName, parseTable } from '../../matrix/src/lib/seq';
 import { parseGmxHeader } from '../../matrix/src/lib/gmxHeader';
 
@@ -158,5 +158,36 @@ describe('AWH convergence (R7b): every frame against the one before and the fina
     expect(c.steps[10].prev!.max).toBeCloseTo(Math.max(...d.map(Math.abs)), 12);
     expect(c.steps[10].prev!.rms).toBeCloseTo(Math.sqrt(d.reduce((s, v) => s + v * v, 0) / d.length), 12);
     expect(c.steps[0].final!.rms).toBeGreaterThan(c.steps[9].final!.rms);
+  });
+});
+
+describe("the AWH axis unit (R7c): from the run input's dump, where gmx awh's own label says \"nm, deg or lambda state\"", () => {
+  // Real `gmx dump -s` output: tiny AWH run inputs made with GROMACS 2023.3 and 2025.4 (test/fixtures/awh/dumps, their
+  // .mdp beside them), and the test run's own topol.tpr (2025.4).
+  const dump = (n: string) => readFileSync(new URL('awh/dumps/' + n, FIX), 'utf8');
+  it.each([
+    ['dump-topol-2025.txt', { unit: 'nm', what: 'pull coordinate 1, distance' }],
+    ...(['2023', '2025'] as const).flatMap(v => [
+      ['dump-distance-' + v + '.txt', { unit: 'nm', what: 'pull coordinate 1, distance' }],
+      ['dump-angle-' + v + '.txt', { unit: 'deg', what: 'pull coordinate 1, angle' }],
+      ['dump-dihedral-' + v + '.txt', { unit: 'deg', what: 'pull coordinate 1, dihedral' }],
+      ['dump-lambda-' + v + '.txt', { unit: 'lambda state', what: 'the free-energy lambda state' }],
+    ]),
+  ] as [string, { unit: string; what: string }][])('%s', (file, want) => {
+    expect(awhUnits(dump(file))).toEqual([{ bias: 1, ...want }]);
+  });
+
+  it('the label shown: ξ with its unit and what it is; gmx\'s own when the unit is unknown, with the reason', () => {
+    expect(awhAxis([{ bias: 1, unit: 'nm', what: 'pull coordinate 1, distance' }], 1, '(nm, deg or lambda state)')).toEqual({ label: 'ξ (nm) · pull coordinate 1, distance' });
+    const unknown = awhUnits(dump('dump-distance-2025.txt').replace(/(geometry\s*=\s*)distance/, '$1transformation'));
+    expect(unknown).toEqual([{ bias: 1, unit: null, what: 'pull coordinate 1, transformation', why: "pull coordinate 1's geometry is transformation, whose unit gmx-cypher doesn't know" }]);
+    expect(awhAxis(unknown, 1, '(nm, deg or lambda state)')).toEqual({ label: '(nm, deg or lambda state)', why: "pull coordinate 1's geometry is transformation, whose unit gmx-cypher doesn't know" });
+    expect(awhAxis(undefined, 1, '(nm, deg or lambda state)')).toEqual({ label: '(nm, deg or lambda state)', why: "this job's record has no unit: it was run before gmx-cypher read it from the run input" });
+  });
+
+  it('a run input without AWH, or a pull coordinate it does not have: said, not guessed', () => {
+    expect(awhUnits(readFileSync(new URL('gmx-2025.4/dump-head.txt', FIX), 'utf8'))).toEqual([]);
+    const missing = awhUnits(dump('dump-distance-2025.txt').replace(/coord-index(\s*=\s*)1/, 'coord-index$12'));
+    expect(missing).toEqual([{ bias: 1, unit: null, what: 'pull coordinate 2', why: 'the run input has no pull coordinate 2' }]);
   });
 });

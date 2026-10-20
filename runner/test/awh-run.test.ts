@@ -65,6 +65,8 @@ describe('a run of gmx awh (R5)', () => {
     const { job, record } = await startRun(s.ctx, req, roots);
     const r = await record;
     expect(r).toMatchObject({ status: 'done', analysis: 'awh', groups: [], problems: [], frames: { analysed: 3, lastTime: 16 } });
+    // What ξ is, read from the run input when the job started (R7c), kept in the record.
+    expect(r.awhUnits).toEqual([{ bias: 1, unit: 'nm', what: 'pull coordinate 1, distance' }]);
     expect(r.outputs.map(o => o.path.split('/').pop())).toEqual(['awh_awh_t0.xvg', 'awh_awh_t8.xvg', 'awh_awh_t16.xvg']);
     expect(readdirSync(join(dir, 'awh')).sort()).toEqual(['awh_awh.run.json', 'awh_awh_t0.xvg', 'awh_awh_t16.xvg', 'awh_awh_t8.xvg']);
     expect(recordProblems(JSON.parse(readFileSync(join(dir, 'awh/awh_awh.run.json'), 'utf8')))).toEqual([]);

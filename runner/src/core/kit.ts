@@ -802,7 +802,7 @@ export function decypherKit(data: KitData) {
   }
   /** The readout's heading: `g(r) at r = 0.374 nm`, the unit from the x label's parentheses, x at its own precision. */
   function readoutTitle(geom: ChartGeom, xlabel: string, ylabel: string, x: number) {
-    const u = /^(.*?)\s*\(([^()]*)\)\s*$/.exec(xlabel)
+    const u = /^(.*?)\s*\(([^()]*)\)(?:\s*·.*)?$/.exec(xlabel)
     return ylabel + ' at ' + ((u ? u[1] : xlabel) || 'x') + ' = ' + x.toFixed(geom.xDigits) + (u ? ' ' + u[2] : '')
   }
   /** The decimals a number is written with (at most 6): 0.374 → 3, 12 → 0. */

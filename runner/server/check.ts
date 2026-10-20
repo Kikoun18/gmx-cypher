@@ -23,9 +23,12 @@ export interface InputCheck {
   estimate?: { frames: number; start: number; end: number } | null;
 }
 
-/** The run input's parameters and atom count as gmx reads them (`gmx dump -s`, stopped at `natoms`). */
+/** The head of `gmx dump -s`: the run input's parameters, stopped once it has printed `natoms`. */
+export const dumpText = async (gmx: GmxState, runInput: string, cwd: string) => (await capture(gmx.path!, ['dump', '-s', runInput], { cwd, until: /^\s*natoms\s*=\s*\d+/m })).stdout;
+
+/** The run input's parameters and atom count as gmx reads them. */
 export async function dumpRunInput(gmx: GmxState, runInput: string, cwd: string): Promise<Dump> {
-  return parseDump((await capture(gmx.path!, ['dump', '-s', runInput], { cwd, until: /^\s*natoms\s*=\s*\d+/m })).stdout);
+  return parseDump(await dumpText(gmx, runInput, cwd));
 }
 
 const NEEDED: [Slot, string][] = [['runInput', 'no run input'], ['structure', 'no structure']];

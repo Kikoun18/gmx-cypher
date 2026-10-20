@@ -8,7 +8,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, statSyn
 import { basename, dirname, join } from 'node:path';
 import { atomTable, type Atom } from '../src/lib/atoms';
 import { allNames, COMMANDS, commandOf, roleProblems, type CommandDef, type InputSlot, type OutputNames, type RunIo } from '../src/lib/commands';
-import { awhFrames, awhNames, framesWritten, type AwhFrame } from '../src/lib/awh';
+import { awhFrames, awhNames, awhUnits, framesWritten, type AwhFrame } from '../src/lib/awh';
 import { commonFolder, listFile, whamOutputNames } from '../src/lib/wham';
 import { parseDistanceStats } from '../src/lib/distance';
 import { summaryLines } from '../src/lib/hbond';
@@ -24,7 +24,7 @@ import { buildRecord, type FileInfo, type Output, type RunRecord } from '../src/
 import { structFormat } from '../../matrix/src/lib/structFile';
 import type { Ctx } from './api';
 import { awhScan } from './awh';
-import { checkSizes, dumpRunInput } from './check';
+import { checkSizes, dumpRunInput, dumpText } from './check';
 import { energyMenu } from './energy';
 import { inside, replaceOwn, sha256File, within } from './files';
 import { findTool, toolHelp } from './gmx';
@@ -248,6 +248,8 @@ export async function startRun(ctx: Ctx, req: RunRequest, roots: string[]): Prom
   const env = { ...Object.fromEntries(Object.entries(process.env).filter(([k]) => k.startsWith('GMX'))) as Record<string, string>, ...plan.env };
   const help = await toolHelp(ctx.gmx, plan.gmxTool);
   const windows = plan.windows ? await Promise.all(plan.windows.map(async w => ({ tpr: await fileInfo(w.tpr, true), pull: await fileInfo(w.pull, true) }))) : null;
+  // What gmx awh's ξ is (R7c): read once from the run input, kept in the record so it never needs the run input again.
+  const awhUnitsRead = plan.tool === 'awh' ? awhUnits(await dumpText(ctx.gmx, inside(req.inputs.runInput!, roots), plan.cwd)) : null;
   const recordOf = (j: Job, outputs: Output[], problems: string[]): RunRecord => buildRecord({
     analysis: plan.tool, record: plan.names.record, runner: ctx.version, gmx: { path: ctx.gmx.path!, version: ctx.gmx.version! }, env, command: { cwd: plan.cwd, file: plan.file, args: plan.argv },
     inputs, groups: req.groups ?? [], atoms, sizes, options: plan.options, help, form: cmd.options, template: req.template || DEFAULT_TEMPLATE,
@@ -257,6 +259,7 @@ export async function startRun(ctx: Ctx, req: RunRequest, roots: string[]): Prom
     ...(plan.tool === 'distance' ? { distances: parseDistanceStats(j.log) } : {}),
     // What gmx hbond found (R8): the donors and acceptors of each group, and the legacy tool's average.
     ...(cmd.summary ? { summary: summaryLines(j.log, cmd.summary) } : {}),
+    ...(awhUnitsRead ? { awhUnits: awhUnitsRead } : {}),
     // gmx awh's frames are its files: how many it wrote, and the time of the last (the one for the vault).
     ...(plan.tool === 'awh' ? { frames: j.ended ? awhRecordFrames(plan.stem, outputs.map(o => o.path.split('/').pop()!)) : null } : {}),
   });

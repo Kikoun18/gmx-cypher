@@ -117,6 +117,13 @@ describe('the core chart serves every result (R5c)', () => {
     expect(texts(kit.chart({ ...base, curves: [rdf], grid: rdf.x, marks: 'maximum' }).tree)).toContain('0.374')
   })
 
+  it("the readout's heading takes the unit from the x label, with what follows it left out (AWH's ξ, R7c)", () => {
+    const { geom } = kit.chart({ ...base, curves: [one([0.3, 0.35], [0, 1])], grid: [0.3, 0.35], y: 'data', rule: 0 })
+    expect(kit.readoutTitle(geom, 'ξ (nm) · pull coordinate 1, distance', 'PMF (kJ/mol)', 0.35)).toBe('PMF (kJ/mol) at ξ = 0.35 nm')
+    expect(kit.readoutTitle(geom, 'r (nm)', 'g(r)', 0.3)).toBe('g(r) at r = 0.30 nm')
+    expect(kit.readoutTitle(geom, 'atom', 'RMSF (nm)', 0.3)).toBe('RMSF (nm) at atom = 0.30')
+  })
+
   it('the hover reads the nearest point, on an uneven x too (atom numbers)', () => {
     const x = [1, 2, 5, 9], y = [10, 20, 50, 90], c = one(x, y)
     expect(kit.valAt(x, y, 4.4)).toBe(50)

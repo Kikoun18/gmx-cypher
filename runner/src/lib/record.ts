@@ -2,6 +2,7 @@
 // which groups and options, and what it wrote. It goes back into the form for "run again" (section 11.4).
 
 import { toRanges } from '../core/index';
+import type { AwhUnit } from './awh';
 import type { Atom } from './atoms';
 import type { HelpOption } from './gmxText';
 import { groupAtoms, type Group } from './groups';
@@ -50,6 +51,8 @@ export interface RunRecord {
   /** gmx distance's averages per selection, as it printed them (version 3, R7). */
   distances?: DistanceStat[];
   /** The lines of gmx's output a result shows (version 3, R8): the donors and acceptors gmx hbond found. */
+  /** What gmx awh's ξ is for each bias, read with `gmx dump -s` when the job started (version 3, R7c, question 22). */
+  awhUnits?: AwhUnit[];
   summary?: string[];
   /** Every option of the form this gmx has, with its value and whether that is the installed default. */
   options: { flag: string; value: string | boolean | null; default: string | boolean | null; isDefault: boolean }[];
@@ -86,6 +89,7 @@ export interface RecordParts {
   windows?: { tpr: FileInfo; pull: FileInfo }[];
   pull?: 'pullx' | 'pullf';
   distances?: DistanceStat[];
+  awhUnits?: AwhUnit[];
   summary?: string[];
   /** Whether the job has ended and this is its final record (R2b). */
   complete?: boolean;
@@ -96,7 +100,7 @@ export function buildRecord(p: RecordParts): RunRecord {
   const by = new Map(formHelp((p.form ?? FORM) as CommandOption[], p.help).map(o => [o.flag, o]));
   return {
     format: 'gmx-cypher run', version: 3, analysis: p.analysis, ...(p.record ? { record: p.record } : {}), ...(p.stdin != null ? { stdin: p.stdin } : {}), ...(p.statistics !== undefined ? { statistics: p.statistics } : {}),
-    ...(p.windows ? { windows: p.windows } : {}), ...(p.distances ? { distances: p.distances } : {}), ...(p.summary ? { summary: p.summary } : {}),
+    ...(p.windows ? { windows: p.windows } : {}), ...(p.distances ? { distances: p.distances } : {}), ...(p.summary ? { summary: p.summary } : {}), ...(p.awhUnits ? { awhUnits: p.awhUnits } : {}),
     runner: { name: 'gmx-cypher', version: p.runner }, gmx: p.gmx, job: p.job.id, command: p.command, env: p.env,
     started: p.job.started ?? null, ended: p.job.ended ?? null, status: p.job.status, ...(p.complete !== undefined ? { complete: p.complete } : {}), exit: p.job.exit ?? null,
     frames: p.frames !== undefined ? p.frames : p.job.progress.analysed ? { analysed: p.job.progress.analysed.frames, lastTime: p.job.progress.analysed.lastTime } : null, log: p.job.log, inputs: p.inputs,
