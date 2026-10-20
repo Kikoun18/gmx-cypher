@@ -161,21 +161,21 @@ describe('clicking a reference atom, in the structure view', () => {
   const ctx = new Proxy({}, { get: (_t, p) => (p === 'measureText' ? () => ({ width: 40 }) : p === 'createRadialGradient' ? () => ({ addColorStop() {} }) : () => undefined), set: () => true })
 
   function open(pickRef?: (ref: number, add: boolean) => void) {
-    g.window = { devicePixelRatio: 1 }; g.requestAnimationFrame = () => 0; g.cancelAnimationFrame = () => {}
+    g.window = { devicePixelRatio: 1, addEventListener() {}, removeEventListener() {} }; g.requestAnimationFrame = () => 0; g.cancelAnimationFrame = () => {}
     const handlers: Record<string, ((e: unknown) => void)[]> = {}
     const canvas = { width: 0, height: 0, style: {} as Record<string, string>, getContext: () => ctx, addEventListener: (t: string, f: (e: unknown) => void) => { (handlers[t] ||= []).push(f) }, removeEventListener() {}, getBoundingClientRect: () => ({ left: 0, top: 0 }), setPointerCapture() {} }
-    const picked: [number, boolean][] = [], hovered: unknown[] = []
+    const picked: [number, boolean][] = [], hovered: unknown[] = [], groups: [number[], boolean][] = []
     const { analyses: [h, s] } = loaded()
     const sels = h.sels, struct = parseStructure(readFileSync(F + '9.multiwalker.gro', 'utf8'), 'gro')
     const mol = kit.buildMol(struct, new Set(sels.flatMap(x => x.atoms)), new Set([...h.ref!.atoms, ...s.ref!.atoms]), 'side by side')
-    const view = kit.structureView(canvas as unknown as HTMLCanvasElement, { clientWidth: 700, clientHeight: 560 } as HTMLElement, { hover: x => hovered.push(x), pick: () => {}, pickRef: pickRef && ((i, add) => { pickRef(i, add); picked.push([i, add]) }) })
+    const view = kit.structureView(canvas as unknown as HTMLCanvasElement, { clientWidth: 700, clientHeight: 560 } as HTMLElement, { hover: x => hovered.push(x), pick: (is, add) => groups.push([is, add]), pickRef: pickRef && ((i, add) => { pickRef(i, add); picked.push([i, add]) }) })
     const pal = kit.palette(false, themeTokens(readFileSync(RUNNER + 'src/tokens.json', 'utf8'), readFileSync(RUNNER + 'src/roles.json', 'utf8')).light)
     const state = (on: boolean[]): SceneState => ({ mol, pal, rep: 'ball & stick', rest: 'grey', labels: true, hydrogens: true, sels, selected: [0], refs: [{ label: 'S', atoms: s.ref!.atoms, on: on[0] }, { label: 'H', atoms: h.ref!.atoms, on: on[1] }], hoverSel: -1, hoverRef: -1 })
-    const click = (x: number, y: number, add = false) => {
-      const e = { clientX: x, clientY: y, button: 0, pointerId: 1, altKey: false, metaKey: add, ctrlKey: false, shiftKey: false }
+    const click = (x: number, y: number, add = false, shiftKey = false) => {
+      const e = { clientX: x, clientY: y, button: 0, pointerId: 1, altKey: false, metaKey: add, ctrlKey: false, shiftKey }
       handlers.pointerdown.forEach(f => f(e)); handlers.pointerup.forEach(f => f(e))
     }
-    return { view, state, click, picked, h, s }
+    return { view, state, click, picked, groups, h, s, mol }
   }
 
   it('picks that reference, ⌘-click adds it; both references draw, plotted or not, without a fault', () => {
@@ -202,5 +202,21 @@ describe('clicking a reference atom, in the structure view', () => {
     t.click(p.x, p.y)
     expect(t.picked).toEqual([])
     expect(t.view.where(999999)).toBeNull()
+  })
+
+  it('a click picks the group of its atom; Shift-click every group with an atom in its residue (R8a)', () => {
+    const t = open()
+    t.view.set(t.state([true, true]))
+    const sels = t.h.sels, at = sels.map(g => g.atoms.map(nr => t.view.where(nr)).find(p => !!p))
+    const i = at.findIndex(p => !!p), p = at[i]!
+    t.click(p.x, p.y)
+    expect(t.groups.at(-1)).toEqual([[i], false])
+    t.click(p.x, p.y, false, true)
+    const [is, add] = t.groups.at(-1)!
+    expect(add).toBe(false)
+    expect(is).toContain(i)
+    // Every group picked has an atom in the clicked atom's residue.
+    const mol = t.mol!, L = mol.g2l, k = L[sels[i].atoms.find(nr => t.view.where(nr))!], res = (l: number) => mol.molOf[l] + ':' + mol.resnr[l]
+    for (const j of is) expect(sels[j].atoms.some(nr => L[nr] >= 0 && res(L[nr]) === res(k))).toBe(true)
   })
 })

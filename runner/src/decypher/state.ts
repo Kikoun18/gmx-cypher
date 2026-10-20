@@ -97,12 +97,6 @@ export function useView() {
   return [view, patch] as const
 }
 
-/** Picking a group: alone (a second click clears it), or added to / taken from the others. */
-export function pickGroup(list: string[], name: string, add: boolean): string[] {
-  if (add) return list.includes(name) ? list.filter(x => x !== name) : [...list, name]
-  return list.length === 1 && list[0] === name ? [] : [name]
-}
-
 /** `other` joins `lead`'s card (making one if it has none), its reference plotted; any card it was in loses it. */
 export function joinMorph(list: Morph[], lead: string, other: string): Morph[] {
   if (lead === other) return list

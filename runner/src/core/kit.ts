@@ -10,6 +10,10 @@ export type Rep = 'ball & stick' | 'sticks' | 'spheres'
 export type Rest = 'tinted' | 'grey' | 'ghost'
 export type Arrange = 'side by side' | 'frame positions'
 export type ColorBy = 'group' | 'job'
+/** What a click on a structure takes (R8a): the atom, its residue, or its atom name in every residue of that name. */
+export type Scope = 'atom' | 'residue' | 'name'
+/** The keys a structure view reads while held (R8a, from the key registry): C centres on a group, Space pans. */
+export interface HeldKeys { centre: string; pan: string }
 
 /**
  * A structure's atoms in file order (R5b), each with its GROMACS number (`nr`, 1-based; a subset keeps the numbers),
@@ -374,13 +378,16 @@ export function decypherKit(data: KitData) {
    * a double click fits the plotted groups, a click on a group's atom picks it (⌘, ctrl or shift: adds it); where
    * several references are shown (morphed RDFs), a click on a reference's atom picks that reference the same way.
    */
-  function structureView(canvas: HTMLCanvasElement, wrap: HTMLElement, cb: { hover: (h: AtomHover | null) => void; pick: (sel: number, add: boolean) => void; pickRef?: (ref: number, add: boolean) => void }) {
+  function structureView(canvas: HTMLCanvasElement, wrap: HTMLElement, cb: { hover: (h: AtomHover | null) => void; pick: (sels: number[], add: boolean) => void; pickRef?: (ref: number, add: boolean) => void }, keys: HeldKeys = { centre: 'c', pan: ' ' }) {
     const cam = { M: initRot(), zoom: 1, panX: 0, panY: 0 }
     let st: SceneState | null = null, cw = 0, ch = 0, dpr = 1, fitScale = 0
     let P: Float64Array | null = null, hitR = new Float32Array(0), vis = new Uint8Array(0)
     let memb: { groupOf: Int16Array; ref: Uint8Array; refOwner: Int8Array; groupAtoms: number[][]; refAtoms: number[][] } | null = null
     let hoverAtom = -1, camRaf = 0, fadeRaf = 0
     let drag: { sx: number; sy: number; x: number; y: number; moved: boolean; pan: boolean } | null = null
+    // The keys held (R8a): Space pans with a left drag; C makes a click centre on the atom's group. Over the canvas, Space doesn't scroll the page.
+    const held = { centre: false, pan: false }
+    let over = false
     let fade: { img: HTMLCanvasElement; t0: number; dur: number } | null = null
 
     const cy0 = () => ch / 2 - 14
@@ -564,6 +571,15 @@ export function decypherKit(data: KitData) {
       const s2 = fitScale * z
       animateCam({ zoom: z, panX: -((x0 + x1) / 2) * s2, panY: -((y0 + y1) / 2) * s2 + 16 })
     }
+    /** Centre the view on these atoms, keeping the zoom (C + click, R8a). */
+    function centreOn(atoms: number[]) {
+      atoms = atoms.filter(k => vis[k])
+      if (!P || !atoms.length) return
+      const s = fitScale * cam.zoom, cx = cw / 2 + cam.panX, cy = cy0() + cam.panY
+      let ux = 0, uy = 0
+      atoms.forEach(k => { ux += (P![4 * k] - cx) / s; uy += (P![4 * k + 1] - cy) / s })
+      animateCam({ zoom: cam.zoom, panX: -(ux / atoms.length) * s, panY: -(uy / atoms.length) * s })
+    }
     function reset() { cam.M = initRot(); animateCam({ zoom: 1, panX: 0, panY: 0 }) }
     function resize() {
       const w = wrap.clientWidth, h = wrap.clientHeight, d = window.devicePixelRatio || 1
@@ -598,7 +614,7 @@ export function decypherKit(data: KitData) {
       cb.hover({ atom: '#' + mol.gnr[k] + ' ' + mol.name[k] + ' · ' + mol.resn[k] + ' ' + mol.resnr[k], sel: si, ref: mb.ref[k] ? mb.refOwner[k] : -1, left: Math.max(8, left), top: Math.max(8, Math.min(ch - 100, y - 30)) })
     }
     const onDown = (e: PointerEvent) => {
-      drag = { sx: e.clientX, sy: e.clientY, x: e.clientX, y: e.clientY, moved: false, pan: e.button !== 0 || e.altKey }
+      drag = { sx: e.clientX, sy: e.clientY, x: e.clientX, y: e.clientY, moved: false, pan: pans(e.button, held.pan) }
       try { canvas.setPointerCapture(e.pointerId) } catch { /* capture is a nicety */ }
     }
     const onMove = (e: PointerEvent) => {
@@ -615,14 +631,27 @@ export function decypherKit(data: KitData) {
     }
     const onUp = (e: PointerEvent) => {
       const d = drag; drag = null
-      if (d && !d.moved && e.button === 0) {
-        const k = hit(e), si = selOf(k), ri = refOf(k), add = e.metaKey || e.ctrlKey || e.shiftKey
-        if (si >= 0) cb.pick(si, add)
-        else if (ri >= 0 && cb.pickRef) cb.pickRef(ri, add)
+      if (d && !d.moved && e.button === 0 && st && st.mol) {
+        const k = hit(e), si = selOf(k), ri = refOf(k), { scope, add } = clickScope(e), mb = membership()
+        if (k >= 0 && held.centre && mb) centreOn(si >= 0 ? mb.groupAtoms[si] : ri >= 0 ? mb.refAtoms[ri] : [k])
+        else if (ri >= 0 && scope === 'atom' && cb.pickRef) cb.pickRef(ri, add)
+        else if (k >= 0) {
+          const sis = [...new Set(scopeAtoms(st.mol, k, scope).map(selOf).filter(x => x >= 0))]
+          if (sis.length) cb.pick(sis, add)
+        }
       }
       hoverAt(e)
     }
-    const onLeave = () => { if (!drag && hoverAtom >= 0) { hoverAtom = -1; draw(); cb.hover(null) } }
+    const onLeave = () => { over = false; if (!drag && hoverAtom >= 0) { hoverAtom = -1; draw(); cb.hover(null) } }
+    const onEnter = () => { over = true }
+    const typingIn = (t: EventTarget | null) => t instanceof HTMLElement && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))
+    const onKey = (e: KeyboardEvent) => {
+      const down = e.type === 'keydown'
+      if (down && (typingIn(e.target) || e.metaKey || e.ctrlKey || e.altKey)) return
+      if (e.key.toLowerCase() === keys.centre) { held.centre = down; canvas.style.cursor = down && over ? 'crosshair' : 'grab' }
+      else if (e.key === keys.pan) { held.pan = down; if (down && over) e.preventDefault() }
+    }
+    const onBlur = () => { held.centre = held.pan = false }
     const onWheel = (e: WheelEvent) => {
       e.preventDefault(); cancelAnimationFrame(camRaf)
       const z = Math.min(12, Math.max(0.25, cam.zoom * Math.exp(-e.deltaY * 0.0015))), kk = z / cam.zoom
@@ -635,9 +664,10 @@ export function decypherKit(data: KitData) {
     const onDbl = () => fitSel()
     const events: [string, EventListener, AddEventListenerOptions?][] = [
       ['pointerdown', onDown as EventListener], ['pointermove', onMove as EventListener], ['pointerup', onUp as EventListener], ['pointerleave', onLeave],
-      ['wheel', onWheel as EventListener, { passive: false }], ['contextmenu', onCtx], ['dblclick', onDbl],
+      ['wheel', onWheel as EventListener, { passive: false }], ['contextmenu', onCtx], ['dblclick', onDbl], ['pointerenter', onEnter],
     ]
     events.forEach(([t, f, o]) => canvas.addEventListener(t, f, o))
+    window.addEventListener('keydown', onKey); window.addEventListener('keyup', onKey); window.addEventListener('blur', onBlur)
     const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => resize()) : null
     if (ro) ro.observe(wrap)
     resize()
@@ -663,6 +693,7 @@ export function decypherKit(data: KitData) {
       },
       destroy() {
         events.forEach(([t, f]) => canvas.removeEventListener(t, f))
+        window.removeEventListener('keydown', onKey); window.removeEventListener('keyup', onKey); window.removeEventListener('blur', onBlur)
         if (ro) ro.disconnect()
         cancelAnimationFrame(camRaf); cancelAnimationFrame(fadeRaf)
       },
@@ -710,12 +741,32 @@ export function decypherKit(data: KitData) {
     return lost.length === a.sels.length ? 'none of its groups match: "' + a.sels[0].name + '" is not among its ' + b.sels.length + ' (' + b.sels.slice(0, 2).map(g => '"' + g.name + '"').join(', ') + (b.sels.length > 2 ? ', …' : '') + ')'
       : lost.length + ' of the ' + a.sels.length + ' groups here have no match there, e.g. "' + lost[0].name + '"'
   }
-  /**
-   * The references plotted after a click on one of `all`: it alone, or with ⌘, ctrl or shift added to or taken from
-   * those plotted; a second click on the only one brings them all back, and never none.
-   */
+  // ---------- gestures (R8a, contract §3): one meaning each, in compare, in its exported page and in the app ----------
+  /** A legend's or chips' shown set after a click on `key`: it alone (again: all); with ⌘/Ctrl, it shown or hidden, in its place. */
+  function legendPick(all: string[], shown: string[], key: string, add: boolean): string[] {
+    if (add) return shown.includes(key) ? shown.filter(x => x !== key) : all.filter(x => x === key || shown.includes(x))
+    return shown.length === 1 && shown[0] === key ? all.slice() : [key]
+  }
+  /** What a click on a structure takes: Shift its residue, Alt its atom name in every residue of that name; ⌘/Ctrl adds. */
+  const clickScope = (e: { shiftKey: boolean; altKey: boolean; metaKey: boolean; ctrlKey: boolean }) => ({ scope: (e.shiftKey ? 'residue' : e.altKey ? 'name' : 'atom') as Scope, add: e.metaKey || e.ctrlKey })
+  /** Whether a drag pans: a right or middle drag, or a left one with Space held (Alt-drag no longer does). */
+  const pans = (button: number, held: boolean) => button !== 0 || held
+  /** The atoms a click takes, by index: this one, its residue (in its molecule), or its atom name in every residue of that name. */
+  function scopeAtoms(mol: { n: number; name: ArrayLike<string>; resn: ArrayLike<string>; resnr: ArrayLike<number>; molOf: ArrayLike<number> }, k: number, scope: Scope): number[] {
+    if (scope === 'atom') return [k]
+    const out: number[] = []
+    for (let j = 0; j < mol.n; j++) if (scope === 'residue' ? mol.molOf[j] === mol.molOf[k] && mol.resnr[j] === mol.resnr[k] : mol.name[j] === mol.name[k] && mol.resn[j] === mol.resn[k]) out.push(j)
+    return out
+  }
+  /** The groups plotted after a click on a structure took `names`: they alone (the same again: none); with ⌘/Ctrl added, or taken off when all are plotted. */
+  function pickGroups(list: string[], names: string[], add: boolean): string[] {
+    const all = names.every(n => list.includes(n))
+    if (add) return all ? list.filter(x => !names.includes(x)) : [...list, ...names.filter(n => !list.includes(n))]
+    return all && list.length === names.length ? [] : names
+  }
+  /** The references plotted after a click on one of `all`, as a legend does, and never none. */
   function pickRefs(all: string[], on: string[], id: string, add: boolean): string[] {
-    const next = add ? (on.includes(id) ? on.filter(x => x !== id) : all.filter(x => x === id || on.includes(x))) : on.length === 1 && on[0] === id ? all.slice() : [id]
+    const next = legendPick(all, on, id, add)
     return next.length ? next : all.slice()
   }
   /** What each RDF of a morph is called in a legend: its reference's name (with the RDF's label after it when two are named alike), or, with no reference known, the RDF's label. */
@@ -980,25 +1031,20 @@ export function decypherKit(data: KitData) {
       return { el: wrap, render }
     }
 
-    /** Group chips: a click plots only that group (or clears it), ⌘, ctrl or shift adds or removes it. */
-    function pick(list: string[], name: string, add: boolean): string[] {
-      if (add) return list.includes(name) ? list.filter(x => x !== name) : [...list, name]
-      return list.length === 1 && list[0] === name ? [] : [name]
-    }
     function chips(a: Analysis, sel: () => string[], set: (s: string[]) => void, hoverTo: (i: number) => void, many?: { items: () => { id: string; label: string; count: number; on: boolean; plain: boolean }[]; pick: (id: string, add: boolean) => void }) {
       const box = h('div', { class: 'dc-chips' })
       const render = () => {
         const s = sel(), T = pal().hues
         box.replaceChildren(
           ...(many ? many.items().map((r, i) => h('button', { type: 'button', class: 'dc-chip dc-ref dc-pick' + (i ? ' dc-alt' : '') + (r.on ? '' : ' dc-off'), 'aria-pressed': r.on ? 'true' : 'false', title: 'click: plot only this reference · ⌘-click: add or remove',
-            onclick: (e: MouseEvent) => many.pick(r.id, e.metaKey || e.ctrlKey || e.shiftKey) }, (r.plain ? '' : 'ref ') + r.label, r.plain ? null : h('span', { class: 'dc-n' }, String(r.count || '—'))))
+            onclick: (e: MouseEvent) => many.pick(r.id, e.metaKey || e.ctrlKey) }, (r.plain ? '' : 'ref ') + r.label, r.plain ? null : h('span', { class: 'dc-n' }, String(r.count || '—'))))
             : a.ref ? [h('span', { class: 'dc-chip dc-ref' }, 'ref ' + a.ref.name, h('span', { class: 'dc-n' }, String(a.ref.atoms.length || '—')))] : []),
           ...a.sels.map((g, i) => {
             const on = s.includes(g.name), t = T[g.tone]
             return h('button', {
               type: 'button', class: 'dc-chip' + (on ? ' dc-on' : ''), 'aria-pressed': on ? 'true' : 'false',
               style: { background: on ? t.base : t.soft, color: on ? t.fg : t.strong },
-              onclick: (e: MouseEvent) => set(pick(sel(), g.name, e.metaKey || e.ctrlKey || e.shiftKey)),
+              onclick: (e: MouseEvent) => set(legendPick(a.sels.map(x => x.name), sel(), g.name, e.metaKey || e.ctrlKey)),
               onmouseenter: () => hoverTo(i), onmouseleave: () => hoverTo(-1),
             }, h('span', { class: 'dc-dot', style: { background: on ? t.fg : t.strong } }), g.name, h('span', { class: 'dc-n' }, String(g.atoms.length || '—')))
           }))
@@ -1027,7 +1073,7 @@ export function decypherKit(data: KitData) {
       const canvas = h('canvas', { class: 'dc-canvas' }) as HTMLCanvasElement, tip = h('div', { class: 'dc-tip', hidden: true })
       const wrap = h('div', { class: 'dc-struct' }, canvas, tip,
         h('div', { class: 'dc-legend' }, h('span', null, h('i', { class: 'dc-k dc-k-sel' }), 'plotted'), h('span', null, h('i', { class: 'dc-k dc-k-rest' }), 'not plotted'), h('span', null, h('i', { class: 'dc-k dc-k-ref' }), 'reference'),
-          h('span', { class: 'dc-grow' }), h('span', null, 'drag rotate · right-drag pan · scroll zoom · double-click fit')))
+          h('span', { class: 'dc-grow' }), h('span', null, 'drag rotate · right- or Space-drag pan · scroll zoom · double-click fit · Shift-click residue · C + click centre')))
       let hoverSel = -1
       const view = structureView(canvas, wrap, {
         hover: hv => {
@@ -1036,9 +1082,9 @@ export function decypherKit(data: KitData) {
           tip.hidden = false; tip.style.left = hv.left + 'px'; tip.style.top = hv.top + 'px'
           tip.replaceChildren(h('div', { class: 'dc-cap' }, hv.atom),
             h('b', { style: { color: g ? pal().hues[g.tone].strong : 'var(--foreground)' } }, g ? g.name + ' · ' + g.atoms.length + ' atoms' : r ? 'reference · ' + r.label : 'not in any group'),
-            h('div', { class: 'dc-cap' }, g ? (sel().includes(g.name) ? 'click: remove · ⌘-click: keep the others' : 'click: plot · ⌘-click: add') : r ? (pickRef ? 'click: plot only this one · ⌘-click: add or remove' : 'g(r) is measured from these atoms') : ''))
+            h('div', { class: 'dc-cap' }, g ? 'click: plot only this · ⌘-click: add or remove · Shift: its residue' : r ? (pickRef ? 'click: plot only this one · ⌘-click: add or remove' : 'g(r) is measured from these atoms') : ''))
         },
-        pick: (i, add) => set(pick(sel(), a.sels[i].name, add)),
+        pick: (is, add) => set(pickGroups(sel(), is.map(i => a.sels[i].name), add)),
         pickRef,
       })
       const update = () => {
@@ -1133,7 +1179,7 @@ export function decypherKit(data: KitData) {
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => redraws.forEach(f => f()))
   }
 
-  return { TONES, DASH, DASH_NAMES, REPS, RESTS, SOLV, palette, toRanges, fromRanges, parseStructure, mix, buildMol, structureView, matchGroup, rdfLooks, buildCurves, looseName, sameButReference, morphWhy, pickRefs, refLabels, niceTicks, xDigitsOf, valAt, hoverRows, hoverX, readoutTitle, chart, mount }
+  return { legendPick, pickGroups, clickScope, pans, scopeAtoms, TONES, DASH, DASH_NAMES, REPS, RESTS, SOLV, palette, toRanges, fromRanges, parseStructure, mix, buildMol, structureView, matchGroup, rdfLooks, buildCurves, looseName, sameButReference, morphWhy, pickRefs, refLabels, niceTicks, xDigitsOf, valAt, hoverRows, hoverX, readoutTitle, chart, mount }
 }
 
 export type Kit = ReturnType<typeof decypherKit>

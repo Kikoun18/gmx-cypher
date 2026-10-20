@@ -201,3 +201,31 @@ test('the old addresses open their view; a drop anywhere is split by type, and t
   await expect(page.getByRole('region', { name: 'compare', exact: true }).getByText('rdf_dropped', { exact: false }).first()).toBeVisible()
   expect(errors).toEqual([])
 })
+
+test('Shift-click on an atom in the picker takes its residue (R8a)', async ({ page }) => {
+  const errors: string[] = []
+  page.on('pageerror', e => errors.push(e.message))
+  await page.goto(url)
+  await page.getByRole('button', { name: 'nvt.xtc' }).click()
+  await expect(page.getByText('the inputs agree')).toBeVisible()
+  await page.getByRole('button', { name: 'use these inputs' }).click()
+  const view = page.getByRole('group', { name: /^3D view/ }), card = page.locator('section[aria-label^="reference "]')
+  await expect(view.locator('canvas')).toBeVisible()
+  await page.waitForTimeout(500)
+  // An oxygen of a sulfate (water is hidden in a system this size): its element red, found in a picture of the view.
+  const shot = await view.screenshot()
+  const spot = await page.evaluate(async b64 => {
+    const img = new Image(); img.src = 'data:image/png;base64,' + b64; await img.decode()
+    const c = document.createElement('canvas'); c.width = img.width; c.height = img.height
+    const x = c.getContext('2d')!; x.drawImage(img, 0, 0)
+    const d = x.getImageData(0, 0, c.width, c.height).data
+    for (let i = 0; i < d.length; i += 4) if (d[i] > 190 && d[i + 1] < 70 && d[i + 2] < 70) return { x: ((i / 4) % c.width) / c.width, y: Math.floor(i / 4 / c.width) / c.height }
+    return null
+  }, shot.toString('base64'))
+  expect(spot).not.toBeNull()
+  const b = (await view.boundingBox())!
+  // Nudge into the atom's disc: the first red pixel is its top edge.
+  await page.keyboard.down('Shift'); await page.mouse.click(b.x + b.width * spot!.x, b.y + b.height * spot!.y + 3); await page.keyboard.up('Shift')
+  await expect(card.getByText('5 atoms')).toBeVisible()
+  expect(errors).toEqual([])
+})

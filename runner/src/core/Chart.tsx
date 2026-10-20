@@ -6,7 +6,10 @@ import * as React from 'react'
 import { Download } from 'lucide-react'
 import { download, renderBatch } from '../../../matrix/src/lib/export'
 import { formatHints } from '../../../matrix/src/lib/exportPrefs'
+import { nearestIndex, roundToAxis } from '../../../matrix/src/lib/interact'
+import { chartKey } from './gestures'
 import { Select, SelectContent, SelectItem, SelectTrigger } from '../ui/select'
+import { Legend } from '../ui/legend'
 import { cn } from '../lib/utils'
 import { figureFile, graphData, resultAnalysis, type Figure } from './export'
 import { fileName, useExportPrefs, type NameFields } from './exportPrefs'
@@ -35,7 +38,12 @@ export interface ChartOptions {
   xDigits?: number
 }
 
-/** The chart, filling its box (or `height` tall); under the pointer, a rule, a dot on each curve and their values. */
+/**
+ * The chart, filling its box (or `height` tall); under the pointer, a rule, a dot on each curve and their values. The
+ * gestures are the Matrix's (R8a): a click marks the nearest point (again: unmarks it), ⌘/Ctrl-click draws a vertical
+ * line, with Shift a horizontal one; focused, ← → step along a curve (Shift: ten), ↑ ↓ change curve, Enter marks,
+ * Esc hides the cursor.
+ */
 export function ChartPanel({ curves, grid, xlabel, ylabel, pal, marks, y, rule, xDigits, height, className, empty }: ChartOptions & {
   curves: Curve[]; grid: number[]; xlabel: string; ylabel: string; pal: Palette; marks: Marks; height?: number; className?: string; empty?: { title: string; hint: string } | null
 }) {
@@ -43,6 +51,7 @@ export function ChartPanel({ curves, grid, xlabel, ylabel, pal, marks, y, rule, 
   const id = 'plot-' + React.useId().replace(/[^\w-]/g, '')
   const [size, setSize] = React.useState({ w: 0, h: 0 })
   const [hover, setHover] = React.useState<number | null>(null), [near, setNear] = React.useState<string | null>(null)
+  const [pins, setPins] = React.useState<{ key: string; i: number }[]>([]), [lines, setLines] = React.useState<{ axis: 'x' | 'y'; v: number }[]>([]), [said, setSaid] = React.useState('')
   React.useLayoutEffect(() => {
     const el = box.current
     if (!el) return
@@ -55,8 +64,50 @@ export function ChartPanel({ curves, grid, xlabel, ylabel, pal, marks, y, rule, 
   const out = React.useMemo(() => (size.w && size.h ? kit.chart({ W: size.w, H: size.h, curves: drawn, grid, xlabel, ylabel, hover, marks, pal, animate: true, y, rule, id, xDigits }) : null), [size, drawn, grid, xlabel, ylabel, hover, marks, pal, y, rule, id, xDigits])
   const geom: ChartGeom | null = out?.geom ?? null
   const xv = geom && hover != null ? geom.m.l + ((hover - geom.x0) / (geom.x1 - geom.x0 || 1)) * geom.iw : 0
+  // Data ↔ pixels on this chart's axes.
+  const px = (x: number) => geom!.m.l + ((x - geom!.x0) / (geom!.x1 - geom!.x0 || 1)) * geom!.iw, py = (y: number) => geom!.m.t + geom!.ih - ((y - geom!.y0) / (geom!.y1 - geom!.y0 || 1)) * geom!.ih
+  const fmt = (v: number, d: number) => v.toFixed(d)
+  const pin = (c: Curve, i: number) => {
+    const had = pins.some(p => p.key === c.key && p.i === i)
+    setPins(had ? pins.filter(p => !(p.key === c.key && p.i === i)) : [...pins, { key: c.key, i }])
+    setSaid((had ? 'unmarked ' : 'marked ') + c.name + ' at ' + fmt(c.x[i], geom!.xDigits) + ', ' + fmt(c.y[i], geom!.yDigits))
+  }
+  const line = (axis: 'x' | 'y', v: number) => {
+    const had = lines.some(l => l.axis === axis && l.v === v)
+    setLines(had ? lines.filter(l => !(l.axis === axis && l.v === v)) : [...lines, { axis, v }])
+    setSaid((had ? 'removed the ' : '') + (axis === 'x' ? 'vertical line at ' : 'horizontal line at ') + v)
+  }
+  const onClick = (e: React.MouseEvent) => {
+    if (!geom || !curves.length) return
+    const r = e.currentTarget.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top
+    if (x < geom.m.l || x > geom.m.l + geom.iw || y < geom.m.t || y > geom.m.t + geom.ih) return
+    const dx = geom.x0 + ((x - geom.m.l) / geom.iw) * (geom.x1 - geom.x0), dy = geom.y0 + ((geom.m.t + geom.ih - y) / geom.ih) * (geom.y1 - geom.y0)
+    if (e.metaKey || e.ctrlKey) { line(e.shiftKey ? 'y' : 'x', e.shiftKey ? roundToAxis(dy, geom.y0, geom.y1) : roundToAxis(dx, geom.x0, geom.x1)); return }
+    // The nearest point on screen, within 12 px, among a few on either side of the pointer's x on each curve.
+    let best: { c: Curve; i: number; d: number } | null = null
+    for (const c of curves) {
+      const i0 = nearestIndex(c.x, c.y, dx)
+      for (let i = Math.max(0, i0 - 4); i <= Math.min(c.x.length - 1, i0 + 4); i++) { const d = Math.hypot(px(c.x[i]) - x, py(c.y[i]) - y); if (d <= 12 && (!best || d < best.d)) best = { c, i, d } }
+    }
+    if (best) pin(best.c, best.i)
+  }
+  const onKey = (e: React.KeyboardEvent) => {
+    const a = chartKey(e)
+    if (!a || !geom || !curves.length) return
+    const c = curves.find(x => x.key === near) ?? curves[0], i = hover == null ? 0 : nearestIndex(c.x, c.y, hover), at = (k: Curve, j: number) => { setNear(k.key); setHover(k.x[Math.max(0, Math.min(k.x.length - 1, j))]) }
+    if (a === 'hide') { if (hover == null) return; setHover(null); setNear(null) }
+    else if (a === 'mark') { if (hover != null) pin(c, i) }
+    else if ('step' in a) at(c, hover == null ? 0 : i + a.step)
+    else if ('to' in a) at(c, a.to === 'first' ? 0 : c.x.length - 1)
+    else if ('curve' in a) { const k = curves[(curves.indexOf(c) + a.curve + curves.length) % curves.length]; at(k, hover == null ? 0 : nearestIndex(k.x, k.y, hover)) }
+    else if (hover != null) line(a.line, a.line === 'x' ? c.x[i] : c.y[i])
+    e.preventDefault(); e.stopPropagation()
+  }
+  const shownPins = pins.flatMap(p => { const c = curves.find(x => x.key === p.key); return c && p.i < c.x.length ? [{ c, i: p.i }] : [] })
   return (
-    <div ref={box} data-slot="chart" className={cn('relative', height ? null : 'min-h-[260px]', className)} style={height ? { height } : undefined}
+    <div ref={box} data-slot="chart" className={cn('relative outline-offset-2', height ? null : 'min-h-[260px]', className)} style={height ? { height } : undefined}
+      tabIndex={curves.length ? 0 : undefined} role={curves.length ? 'group' : undefined} aria-label={curves.length ? ylabel + ' against ' + xlabel + ': hover or use the arrow keys to read values; click marks a point' : undefined}
+      onClick={onClick} onKeyDown={onKey} onBlur={() => { setHover(null); setNear(null) }}
       onMouseMove={e => {
         if (!geom) return
         const box = e.currentTarget.getBoundingClientRect(), r = kit.hoverX(geom, e.clientX - box.left), py = e.clientY - box.top
@@ -68,6 +119,27 @@ export function ChartPanel({ curves, grid, xlabel, ylabel, pal, marks, y, rule, 
       }}
       onMouseLeave={() => { setHover(null); setNear(null) }}>
       <div className="absolute inset-0">{out && toReact(out.tree, 0)}</div>
+      {geom && (shownPins.length > 0 || lines.length > 0) && (
+        <svg className="pointer-events-none absolute inset-0 size-full overflow-visible" aria-hidden>
+          {lines.map(l => { const v = l.axis === 'x' ? px(l.v) : py(l.v); if (l.axis === 'x' ? v < geom.m.l || v > geom.m.l + geom.iw : v < geom.m.t || v > geom.m.t + geom.ih) return null; return (
+            <g key={l.axis + l.v} className="fill-muted-foreground stroke-muted-foreground text-[10px]">
+              {l.axis === 'x' ? <line x1={v} x2={v} y1={geom.m.t} y2={geom.m.t + geom.ih} strokeDasharray="2 3" /> : <line x1={geom.m.l} x2={geom.m.l + geom.iw} y1={v} y2={v} strokeDasharray="2 3" />}
+              <text x={l.axis === 'x' ? v + 5 : geom.m.l + geom.iw - 4} y={l.axis === 'x' ? geom.m.t + geom.ih - 6 : v - 4} textAnchor={l.axis === 'x' ? 'start' : 'end'} stroke="none">{(l.axis === 'x' ? 'x = ' : 'y = ') + l.v}</text>
+            </g>
+          ) })}
+          {shownPins.map(({ c, i }) => (
+            <g key={c.key + ':' + i}>
+              <circle cx={px(c.x[i])} cy={py(c.y[i])} r={6} fill="var(--card)" /><circle cx={px(c.x[i])} cy={py(c.y[i])} r={4} fill={c.color} />
+              <text x={px(c.x[i]) + 8} y={py(c.y[i]) - 8} className="fill-foreground text-[11px]">{fmt(c.x[i], geom.xDigits) + ', ' + fmt(c.y[i], geom.yDigits)}</text>
+            </g>
+          ))}
+        </svg>
+      )}
+      {geom && (shownPins.length > 0 || lines.length > 0) && (
+        <button type="button" className="absolute text-caption text-muted-foreground underline underline-offset-2 hover:text-foreground" style={{ left: 0, top: geom.m.t + geom.ih + 22 }}
+          onClick={e => { e.stopPropagation(); setPins([]); setLines([]); setSaid('marks cleared') }}>clear marks</button>
+      )}
+      <span className="sr-only" aria-live="polite">{said}</span>
       {empty && (
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-1.5 px-6 text-center">
           <div className="text-heading font-bold">{empty.title}</div>
@@ -173,8 +245,9 @@ async function resultHtml(exp: ChartExport, series: Series[], xlabel: string, yl
 }
 
 /**
- * A result's chart (R5c): its series as the core's curves, in the page's theme, and under it, when asked, a legend
- * of each curve's line and name (dimmed ones dimmed); with `exp`, its export menu (R6a).
+ * A result's chart (R5c): its series as the core's curves, in the page's theme, and under it, when asked, the one
+ * legend (R8a): a curve alone, shown or hidden (a hidden one leaves the scale), highlighted, or dimmed from its menu;
+ * with `exp`, its export menu (R6a), which exports every curve, shown or not.
  */
 export function SeriesChart({ series, xlabel, ylabel, marks = 'none', height = 240, legend = false, ramp, exp, ...o }: ChartOptions & {
   series: Series[]; xlabel: string; ylabel: string; marks?: Marks; height?: number; legend?: boolean; exp?: ChartExport
@@ -182,7 +255,9 @@ export function SeriesChart({ series, xlabel, ylabel, marks = 'none', height = 2
   ramp?: { first: string; last: string }
 }) {
   const pal = PALETTES[usePageTheme()]
-  const curves = React.useMemo(() => curvesOf(series, pal), [series, pal])
+  const all = React.useMemo(() => curvesOf(series, pal), [series, pal])
+  const [hidden, setHidden] = React.useState<string[]>([]), [dimmed, setDimmed] = React.useState<string[]>([]), [lit, setLit] = React.useState<string | null>(null)
+  const curves = React.useMemo(() => all.filter(c => !hidden.includes(c.key)).map(c => (lit ? { ...c, dim: c.key !== lit } : dimmed.includes(c.key) ? { ...c, dim: true } : c)), [all, hidden, dimmed, lit])
   // On a result page, the chart is one of its figures (R9b) while it is drawn.
   const figures = React.useContext(FiguresContext), fid = React.useId()
   React.useEffect(() => {
@@ -204,9 +279,13 @@ export function SeriesChart({ series, xlabel, ylabel, marks = 'none', height = 2
           <span>· {curves.length} curves, in order · hover one to see it alone</span>
         </figcaption>
       )}
+      {!curves.length && <p className="m-0 text-caption text-muted-foreground">every curve is hidden · click a name below to show it</p>}
       {legend && !ramp && (
-        <figcaption className="flex flex-wrap items-center gap-x-4 gap-y-1 text-caption text-muted-foreground">
-          {curves.map(c => <span key={c.key} className="inline-flex items-center gap-2" style={{ opacity: c.dim ? 0.4 : 1 }}><Swatch color={c.color} dash={c.dash} />{c.name}</span>)}
+        <figcaption>
+          <Legend label={'curves of ' + ylabel} items={all.map(c => ({ ...c, label: c.name }))} shown={all.filter(c => !hidden.includes(c.key)).map(c => c.key)} onShown={k => setHidden(all.filter(c => !k.includes(c.key)).map(c => c.key))}
+            onHover={setLit} dimmed={dimmed} onDimmed={setDimmed} className="gap-x-3 gap-y-1"
+            itemClass={(_, on) => cn('inline-flex items-center gap-2 rounded-md px-1 text-caption hover:text-foreground', on ? 'text-muted-foreground' : 'text-muted-foreground/60 line-through')}
+            itemStyle={c => ({ opacity: dimmed.includes(c.key) ? 0.4 : 1 })} item={c => <><Swatch color={c.color} dash={c.dash} />{c.name}</>} />
         </figcaption>
       )}
     </figure>

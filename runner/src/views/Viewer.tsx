@@ -5,6 +5,7 @@ import { Kbd } from '../ui/kbd'
 import { ToggleGroup, ToggleGroupItem } from '../ui/toggle-group'
 import { DisplayMenu, DisplayRow, StyleRow } from '../ui/display-menu'
 import type { Style } from '../core/contract'
+import { clickScope, pans } from '../core/gestures'
 import { defaultView, structStyle, toPdb, type Look } from '../../../matrix/src/lib/structFile'
 import { drawnNumbers, type Atom } from '../lib/atoms'
 import type { Tone } from '../lib/tones'
@@ -101,13 +102,18 @@ export function Viewer({ text, format, model, atoms, colour, onPick, describe, g
   const theme = useThemeName()
   // C held: a click sets the centre of rotation instead of picking (T140).
   const [cHeld, setCHeld] = React.useState(false)
-  const cDown = React.useRef(false)
+  const cDown = React.useRef(false), spaceDown = React.useRef(false), overView = React.useRef(false)
   const [centre, setCentre] = React.useState<{ label: string; count: number } | null>(null)
   React.useEffect(() => {
     const set = (v: boolean) => { cDown.current = v; setCHeld(v) }
-    const down = (e: KeyboardEvent) => { if (e.key.toLowerCase() === 'c' && !e.ctrlKey && !e.metaKey && !e.altKey && !typing(e.target)) set(true) }
-    const up = (e: KeyboardEvent) => { if (e.key.toLowerCase() === 'c') set(false) }
-    const off = () => set(false)
+    // Space held over the view pans with a left drag (R8a), and doesn't scroll the page.
+    const down = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey || e.altKey || typing(e.target)) return
+      if (e.key.toLowerCase() === 'c') set(true)
+      else if (e.key === ' ' && overView.current) { spaceDown.current = true; e.preventDefault() }
+    }
+    const up = (e: KeyboardEvent) => { if (e.key.toLowerCase() === 'c') set(false); else if (e.key === ' ') spaceDown.current = false }
+    const off = () => { set(false); spaceDown.current = false }
     window.addEventListener('keydown', down); window.addEventListener('keyup', up); window.addEventListener('blur', off)
     return () => { window.removeEventListener('keydown', down); window.removeEventListener('keyup', up); window.removeEventListener('blur', off) }
   }, [])
@@ -134,7 +140,7 @@ export function Viewer({ text, format, model, atoms, colour, onPick, describe, g
       main.current = v.addModel(pdb, 'pdb', { keepH: true })
       v.setHoverDuration(60)
       v.setHoverable({}, true, (a: { index: number }) => setHover(numbers[a.index]), () => setHover(null))
-      v.setClickable({}, true, (a: { index: number }, _v: unknown, e: MouseEvent) => (cDown.current ? click.current(numbers[a.index]) : pick.current(numbers[a.index], e?.shiftKey ? 'residue' : e?.altKey ? 'name' : 'atom')))
+      v.setClickable({}, true, (a: { index: number }, _v: unknown, e: MouseEvent) => (cDown.current ? click.current(numbers[a.index]) : pick.current(numbers[a.index], e ? clickScope(e).scope : 'atom')))
       v.zoomTo()
       setViewer(v)
     })
@@ -176,6 +182,17 @@ export function Viewer({ text, format, model, atoms, colour, onPick, describe, g
     viewer.render()
   }, [viewer, cell, showCell, theme])
 
+  // A right drag, or a left one with Space held, pans (R8a): 3Dmol's own right drag zooms, so the drag is taken before it sees it.
+  const panFrom = React.useRef<{ x: number; y: number } | null>(null)
+  const panDown = (e: React.PointerEvent) => {
+    if (!viewer || e.button === 1 || !pans(e.button, spaceDown.current)) return
+    e.preventDefault(); e.stopPropagation(); e.currentTarget.setPointerCapture(e.pointerId); panFrom.current = { x: e.clientX, y: e.clientY }
+  }
+  const panMove = (e: React.PointerEvent) => {
+    const p = panFrom.current
+    if (!p || !viewer) return
+    e.stopPropagation(); viewer.translateScene(e.clientX - p.x, e.clientY - p.y); viewer.render(); panFrom.current = { x: e.clientX, y: e.clientY }
+  }
   const h = hover != null ? byNr.get(hover) : null
   const virtual = atoms.filter(a => a.elem === 'virtual').length
   return (
@@ -212,7 +229,9 @@ export function Viewer({ text, format, model, atoms, colour, onPick, describe, g
         {centre && <button type="button" className="rounded text-caption text-foreground underline underline-offset-2 hover:no-underline" onClick={resetCentre}>reset</button>}
       </p>
       {/* B toggles the box while the 3D view has focus (a click in it gives it focus), as section 9.2 asks: a control and a key. */}
-      <div className={'relative h-[460px] overflow-hidden rounded-xl border border-border bg-card focus-visible:outline-2 focus-visible:outline-ring' + (cHeld ? ' cursor-crosshair' : '')} tabIndex={0} role="group" aria-label="3D view · B shows or hides the box"
+      <div className={'relative h-[460px] overflow-hidden rounded-xl border border-border bg-card focus-visible:outline-2 focus-visible:outline-ring' + (cHeld ? ' cursor-crosshair' : '')} tabIndex={0} role="group" aria-label="3D view · B shows or hides the box · right- or Space-drag pans"
+        onPointerDownCapture={panDown} onPointerMoveCapture={panMove} onPointerUpCapture={() => { panFrom.current = null }} onContextMenu={e => e.preventDefault()}
+        onPointerEnter={() => { overView.current = true }} onPointerLeave={() => { overView.current = false }}
         onKeyDown={e => { if (e.key.toLowerCase() === 'b' && !e.ctrlKey && !e.metaKey && !e.altKey && cell.vectors) { e.preventDefault(); setShowCell(v => !v) } }}>
         <div ref={box} className="absolute inset-0" role="img" aria-label="3D structure: atoms can also be picked by rule or as a list" />
         {h && (

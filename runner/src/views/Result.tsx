@@ -4,7 +4,7 @@ import { Alert, AlertDescription, AlertTitle } from '../ui/alert'
 import { Button } from '../ui/button'
 import { Stat } from '../ui/card'
 import { TONES, type Series } from '../core/index'
-import { ExportAll, FiguresContext, SeriesChart, Swatch, type ChartExport, type PageFigure } from '../core/Chart'
+import { ExportAll, FiguresContext, SeriesChart, type ChartExport, type PageFigure } from '../core/Chart'
 import { rampColors } from '../core/ramp'
 import { TOKENS_BY_THEME } from '../core/theme'
 import { Section } from '../ui/separator'
@@ -19,7 +19,7 @@ import { peaks, resultSeries } from '../lib/rdf'
 import { parseTable } from '../../../matrix/src/lib/seq'
 import { csvMeta, curvesCsv, xvgCsv } from '../lib/csv'
 import type { RunRecord } from '../lib/record'
-import { groupText, toneText, toneVar, type Tone } from '../lib/tones'
+import { groupText, toneText, type Tone } from '../lib/tones'
 import { cn } from '../lib/utils'
 import { SendDialog } from './SendDialog'
 import { Status } from '../ui/status'
@@ -74,40 +74,13 @@ function chartExport(job: Job, record: RunRecord, source: string, parts: { text:
 /** Every y column of an xvg, named. */
 const columns = (text: string, names: string[]) => names.map((name, i) => ({ text, col: i + 1, name }))
 
-type Shown = 'on' | 'dim' | 'off'
-const NEXT: Record<Shown, Shown> = { on: 'dim', dim: 'off', off: 'on' }
-const WORD: Record<Shown, string> = { on: 'shown', dim: 'dimmed', off: 'hidden' }
-
-/**
- * Curves in their groups' hues, drawn by the core with both peak rules marked (g(r): the maximum filled, the first
- * shell hollow); a click on a name cycles shown → dimmed → hidden, and hidden curves leave the scale.
- */
-function Curves({ text, tones, yLabel, height, shown, setShown, marked = true, exp }: {
-  text: string; tones: Tone[]; yLabel: string; height: number; shown: Shown[]; setShown: (s: Shown[]) => void; marked?: boolean; exp: ChartExport
-}) {
-  const curves = React.useMemo(() => resultSeries(text), [text])
-  const state = (i: number) => shown[i] ?? 'on'
-  const series = React.useMemo(() => curves.flatMap((c, i): Series[] => {
-    if ((shown[i] ?? 'on') === 'off') return []
+/** Curves in their groups' hues, drawn by the core with both peak rules marked (g(r): the maximum filled, the first shell hollow), with the one legend. */
+function Curves({ text, tones, yLabel, height, marked = true, exp }: { text: string; tones: Tone[]; yLabel: string; height: number; marked?: boolean; exp: ChartExport }) {
+  const series = React.useMemo(() => resultSeries(text).map((c, i): Series => {
     const p = marked ? peaks(c.points) : null
-    return [{ label: c.label, points: c.points, tone: tones[i] ?? TONES[i % TONES.length], dim: shown[i] === 'dim', peak: p?.maximum ?? null, shell: p?.firstShell ?? null }]
-  }), [curves, tones, shown, marked])
-  return (
-    <div className="flex flex-col gap-2">
-      {series.length ? <SeriesChart series={series} xlabel="r (nm)" ylabel={yLabel} height={height} marks={marked ? 'both' : 'none'} rule={marked ? 1 : null} xDigits={3} exp={exp} />
-        : <p className="m-0 text-caption text-muted-foreground">every curve is hidden</p>}
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-        {curves.map((c, i) => (
-          <button key={i} type="button" aria-label={c.label + ': ' + WORD[state(i)] + '; click to ' + (state(i) === 'on' ? 'dim' : state(i) === 'dim' ? 'hide' : 'show')}
-            onClick={() => setShown(curves.map((_, j) => (j === i ? NEXT[state(j)] : state(j))))}
-            className="inline-flex items-center gap-2 rounded-md px-1 text-caption text-muted-foreground hover:text-foreground" style={{ opacity: state(i) === 'on' ? 1 : state(i) === 'dim' ? 0.55 : 0.35 }}>
-            <Swatch color={toneVar(tones[i] ?? TONES[i % TONES.length])} dash="none" />
-            {c.label}{state(i) !== 'on' && <span>· {WORD[state(i)]}</span>}
-          </button>
-        ))}
-      </div>
-    </div>
-  )
+    return { label: c.label, points: c.points, tone: tones[i] ?? TONES[i % TONES.length], peak: p?.maximum ?? null, shell: p?.firstShell ?? null }
+  }), [text, tones, marked])
+  return <SeriesChart series={series} xlabel="r (nm)" ylabel={yLabel} height={height} marks={marked ? 'both' : 'none'} rule={marked ? 1 : null} xDigits={3} legend exp={exp} />
 }
 
 /** Under the chart: the options that change g(r), each in words (section 10.5). */
@@ -124,15 +97,14 @@ function optionsLine(r: RunRecord): string {
 /** g(r) and the cumulative number of a done run, its first peaks and frames (R4c). */
 function RdfChart({ job, record }: { job: Job; record: RunRecord }) {
   const xvg = useOutput(job.id, 'xvg'), cn = useOutput(job.id, record.outputs.some(o => o.kind === 'cn') ? 'cn' : null)
-  const [shown, setShown] = React.useState<Shown[]>([])
   const tones = React.useMemo(() => record.groups.slice(1).map(g => g.tone), [record])
   const curves = React.useMemo(() => (xvg ? resultSeries(xvg) : []), [xvg])
   if (!xvg) return <p className="m-0 text-caption text-muted-foreground" aria-live="polite">reading {String((job.meta?.names as { xvg: string })?.xvg)}…</p>
   const dt = Number(record.options.find(o => o.flag === 'dt')?.value) || 0, start = estimateOf(job)?.start ?? 0
   return (
     <div className="flex flex-col gap-3">
-      <Curves text={xvg} tones={tones} yLabel="g(r)" height={300} shown={shown} setShown={setShown} exp={chartExport(job, record, outName(job, record), columns(xvg, curves.map(c => c.label)), 'r (nm)', 'g(r)')} />
-      <p className="m-0 text-caption text-muted-foreground">click a curve's name: shown → dimmed → hidden · ● maximum · ○ first shell</p>
+      <Curves text={xvg} tones={tones} yLabel="g(r)" height={300} exp={chartExport(job, record, outName(job, record), columns(xvg, curves.map(c => c.label)), 'r (nm)', 'g(r)')} />
+      <p className="m-0 text-caption text-muted-foreground">a curve's name: click shows it alone (again: all), ⌘-click shows or hides it · ● maximum · ○ first shell</p>
       <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3">
         {curves.flatMap((c, i) => {
           const { firstShell, maximum } = peaks(c.points)
@@ -145,7 +117,7 @@ function RdfChart({ job, record }: { job: Job; record: RunRecord }) {
       </div>
       {cn && <>
         <Section label="Cumulative number" />
-        <Curves text={cn} tones={tones} yLabel="n(r)" height={180} shown={shown} setShown={setShown} marked={false} exp={chartExport(job, record, outName(job, record, 'cn'), columns(cn, resultSeries(cn).map(c => c.label)), 'r (nm)', 'n(r)')} />
+        <Curves text={cn} tones={tones} yLabel="n(r)" height={180} marked={false} exp={chartExport(job, record, outName(job, record, 'cn'), columns(cn, resultSeries(cn).map(c => c.label)), 'r (nm)', 'n(r)')} />
       </>}
     </div>
   )

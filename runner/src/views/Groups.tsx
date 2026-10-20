@@ -219,6 +219,7 @@ export function Groups({ draft, setDraft }: { draft: Draft; setDraft: React.Disp
           <span className="whitespace-nowrap"><Kbd>shift</Kbd> click: its residue</span>
           <span className="whitespace-nowrap"><Kbd>{altName(browserPlatform())}</Kbd> click: its atom name in every residue of that name</span>
           <span className="whitespace-nowrap"><Kbd>C</Kbd> click: rotate around its group (or the atom, in none)</span>
+          <span className="whitespace-nowrap">right-drag or <Kbd>space</Kbd> drag: pan</span>
         </p>
       </div>
       <div className="flex flex-col gap-3">

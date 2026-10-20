@@ -31,7 +31,8 @@ import { fileBase } from '../../../matrix/src/lib/exportPrefs'
 import { CurveTable, GroupChips, StructurePanel, type StructureHandle } from './panels'
 import type { LoadedFile } from './parse'
 import { useAnalyses, type Item } from './sources'
-import { activeMorphs, joinMorph, pickGroup, refKey, setMorphRefs, splitMorph, useView, type ActiveMorph, type DecypherSources, type SourceRef, type View } from './state'
+import { pickGroups } from '../core/gestures'
+import { activeMorphs, joinMorph, refKey, setMorphRefs, splitMorph, useView, type ActiveMorph, type DecypherSources, type SourceRef, type View } from './state'
 import { kit, PALETTES, TOKENS_BY_THEME, usePageTheme } from '../core/theme'
 import type { VaultRdfs } from './vaultTypes'
 import { cardsOf, cardTitle, DEFAULT_HEADER, download, exportData, exportHtml, exportName, fontData } from './export'
@@ -161,7 +162,7 @@ export function AnalysisCard({ members, on, tone, mol, pal, view, selected, tone
               {mol && <><Button variant="outline" size="sm" onClick={() => ref.current?.fit()}>fit selection</Button><Button variant="ghost" size="sm" onClick={() => ref.current?.reset()}>reset view</Button><Button variant="ghost" size="sm" onClick={() => void savePng(ref.current, a.label)} title="the structure as drawn now, as a PNG">png</Button></>}
             </div>
             <StructurePanel ref={h => { ref.current = h; handle(h) }} className="min-h-[420px]" mol={mol} pal={pal} view={view} sels={a.sels} selected={idx} refs={refs} hoverSel={hoverSel}
-              onPick={(i, add) => onSelect(pickGroup(selected, a.sels[i].name, add))} onPickRef={pickRef} onActive={onActive}
+              onPick={(is, add) => onSelect(pickGroups(selected, is.map(i => a.sels[i].name), add))} onPickRef={pickRef} onActive={onActive}
               empty={<><span className="text-heading font-bold">No structure</span><span className="max-w-[40ch] text-caption text-muted-foreground">{a.structNote}</span></>} />
           </div>
           <div className="flex min-w-0 flex-col gap-2">
@@ -178,7 +179,7 @@ export function AnalysisCard({ members, on, tone, mol, pal, view, selected, tone
             <Button variant="ghost" size="sm" onClick={() => onSelect([])}>none</Button>
           </Section>
           <GroupChips refs={chipRefs} sels={a.sels} selected={selected} pal={pal} dim={selected.length > 0 && view.rest !== 'tinted'} hover={hover}
-            onPick={(n, add) => onSelect(pickGroup(selected, n, add))} onPickRef={pickChip} onHover={setHover} />
+            onShown={onSelect} onPickRef={pickChip} onHover={setHover} />
         </>}
         provenance={members.map(m => <p key={m.id} className="m-0 text-caption text-muted-foreground">{many ? m.label + ' · ' : ''}{m.structNote}</p>)} />
     </section>
@@ -223,7 +224,7 @@ function CompareView({ shown, focus, setFocus, mols, pal, view, patch, selected,
           {mols.get(focus.struct ?? '') && <><Button variant="outline" size="sm" onClick={() => ref.current?.fit()}>fit selection</Button><Button variant="ghost" size="sm" onClick={() => ref.current?.reset()}>reset view</Button><Button variant="ghost" size="sm" onClick={() => void savePng(ref.current, focus.label)} title="the structure as drawn now, as a PNG">png</Button></>}
         </div>
         <StructurePanel ref={h => { ref.current = h; handle(h) }} className="flex-1" mol={mols.get(focus.struct ?? '') ?? null} pal={pal} view={view} sels={focus.sels} selected={idx} refs={refs}
-          hoverSel={hover ? focus.sels.findIndex(g => g.name === hover) : -1} onPick={(k, add) => onSelect(pickGroup(selected, focus.sels[k].name, add))} onActive={onActive}
+          hoverSel={hover ? focus.sels.findIndex(g => g.name === hover) : -1} onPick={(ks, add) => onSelect(pickGroups(selected, ks.map(k => focus.sels[k].name), add))} onActive={onActive}
           empty={<><span className="text-heading font-bold">No structure</span><span className="max-w-[40ch] text-caption text-muted-foreground">{focus.structNote}</span></>} />
         <div className="flex flex-col gap-2.5 border-t border-border px-4 pb-4 pt-3">
           <Section label={'Groups ' + pad(focus.sels.length) + ' · plotted ' + pad(idx.length)}>
@@ -231,7 +232,7 @@ function CompareView({ shown, focus, setFocus, mols, pal, view, patch, selected,
             <Button variant="ghost" size="sm" onClick={() => onSelect([])}>none</Button>
           </Section>
           <GroupChips refs={refs.map((r, k) => ({ label: r.label, count: r.atoms.length, dashed: k > 0 }))} sels={focus.sels} selected={selected} pal={pal} dim={selected.length > 0 && view.rest !== 'tinted'} hover={hover}
-            onPick={(n, add) => onSelect(pickGroup(selected, n, add))} onHover={setHover} />
+            onShown={onSelect} onHover={setHover} />
         </div>
       </section>
       <section aria-label="one graph" className="flex min-w-0 flex-col rounded-xl border border-border bg-card">

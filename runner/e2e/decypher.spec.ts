@@ -79,7 +79,7 @@ test('tick two jobs, see them side by side and on one graph, export them as one 
   await expect(h).toBeVisible()
   await expect(h.getByText('249 atoms · solvent hidden', { exact: false })).toBeVisible()
   await expect(h.getByText('Groups 13 · plotted 01')).toBeVisible()
-  await h.getByRole('button', { name: /^O5\.\.\.S/ }).click({ modifiers: ['Shift'] })
+  await h.getByRole('button', { name: /^O5\.\.\.S/ }).click({ modifiers: ['ControlOrMeta'] })
   await expect(h.getByText('Groups 13 · plotted 02')).toBeVisible()
   await expect(h.getByRole('button', { name: 'take O5...S off the plot' })).toBeVisible()
 
@@ -110,7 +110,7 @@ test('tick two jobs, see them side by side and on one graph, export them as one 
   await expect(exported.locator('canvas')).toHaveCount(2)
   await expect(exported.getByText('ONE GRAPH')).toBeVisible()
   const card = exported.locator('section').filter({ has: exported.getByRole('heading', { name: /rdf_o111_Methionine_S/ }) })
-  await card.getByRole('button', { name: /^CH\.\.\.S/ }).click({ modifiers: ['Shift'] })
+  await card.getByRole('button', { name: /^CH\.\.\.S/ }).click({ modifiers: ['ControlOrMeta'] })
   await expect(card.locator('.dc-trow b', { hasText: 'CH...S' })).toBeVisible()
   await exported.getByRole('button', { name: 'dark' }).click()
   await expect(exported.locator('html')).toHaveAttribute('data-theme', 'dark')
@@ -181,13 +181,13 @@ test('morph the two runs into one card, pick their references, sorted values, he
   await expect(card.getByRole('button', { name: 'take NH_N...S off the plot' })).toHaveCount(1)
   await refs.nth(1).click()
   await expect(refs.nth(0)).toHaveAttribute('aria-pressed', 'true')
-  await refs.nth(0).click({ modifiers: ['Shift'] })
+  await refs.nth(0).click({ modifiers: ['ControlOrMeta'] })
   await expect(refs.nth(0)).toHaveAttribute('aria-pressed', 'false')
-  await refs.nth(0).click({ modifiers: ['Shift'] })
+  await refs.nth(0).click({ modifiers: ['ControlOrMeta'] })
   await expect(card.getByRole('button', { name: 'take NH_N...S off the plot' })).toHaveCount(2)
 
   // A group plotted too, then the values under the pointer come highest first.
-  await card.getByRole('button', { name: /^CH\.\.\.S/ }).click({ modifiers: ['Shift'] })
+  await card.getByRole('button', { name: /^CH\.\.\.S/ }).click({ modifiers: ['ControlOrMeta'] })
   const chart = card.locator('svg[role=img]').first()
   const box = (await chart.boundingBox())!
   await page.mouse.move(box.x + box.width * 0.35, box.y + box.height * 0.5)
@@ -220,7 +220,7 @@ test('morph the two runs into one card, pick their references, sorted values, he
   await expect(chips.nth(0)).toHaveAttribute('aria-pressed', 'true')
   await expect(chips.nth(1)).toHaveAttribute('aria-pressed', 'false')
   await expect(one.locator('.dc-trow b')).toHaveCount(2)
-  await chips.nth(1).click({ modifiers: ['Shift'] })
+  await chips.nth(1).click({ modifiers: ['ControlOrMeta'] })
   await expect(one.locator('.dc-trow b')).toHaveCount(4)
 
   // The maximum is the highest point of the curve (the table gives it as "r · g", beside the first shell), and the exported values come highest first as well.
@@ -272,5 +272,58 @@ test('two RDFs of the vault, whose runs are unknown: the morph menu is there, an
   await expect(card.getByRole('button', { name: 'take NH_N...S off the plot' })).toHaveCount(2)
   await card.getByRole('button', { name: 'split' }).click()
   await expect(cards).toHaveCount(2)
+  expect(errors).toEqual([])
+})
+
+test('one gesture scheme (R8a): a legend acts alike on a result chart and in compare; Shift-click on a structure takes the residue', async ({ page }) => {
+  const errors = watch(page)
+  const legendCase = async (items: (name: RegExp) => ReturnType<Page['getByRole']>, count: () => Promise<number>) => {
+    await items(/^O5\.\.\.S/).click()
+    await expect(items(/^O5\.\.\.S/)).toHaveAttribute('aria-pressed', 'true')
+    expect(await count()).toBe(1)
+    await items(/^O5\.\.\.S/).click()
+    await expect.poll(count).toBe(13)
+    await items(/^O5\.\.\.S/).click({ modifiers: ['ControlOrMeta'] })
+    await expect(items(/^O5\.\.\.S/)).toHaveAttribute('aria-pressed', 'false')
+    expect(await count()).toBe(12)
+  }
+  // A result chart's legend.
+  await page.goto(url + '#results/jaaaaaaaaaaa1')
+  const legend = page.getByRole('group', { name: 'curves of g(r)' })
+  await expect(legend).toBeVisible()
+  await legendCase(n => legend.getByRole('button', { name: n }), () => legend.locator('button[aria-pressed=true]').count())
+  // Compare's chips: the same rules.
+  await page.goto(url + '#compare?jobs=jaaaaaaaaaaa1')
+  const card = page.getByRole('region', { name: /rdf_o111_Methionine_H/ }), chips = card.getByRole('group', { name: 'groups' })
+  await expect(card.getByText(/Groups 13 · plotted/)).toBeVisible()
+  await legendCase(n => chips.getByRole('button', { name: n }), () => chips.locator('button[aria-pressed=true]').count())
+
+  // Shift-click on an atom of a group: every group with an atom in its residue. A plotted group's atom is found by its
+  // hue in a picture of the view (the rest is grey, the reference ink), then confirmed by its hover card.
+  // Labels off (from the display menu), so the hues left are atoms, not the groups' name tags.
+  await card.getByRole('button', { name: /^display/ }).click()
+  await card.getByRole('checkbox', { name: 'labels' }).click()
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(300)
+  const canvas = card.locator('canvas'), box = (await canvas.boundingBox())!
+  const spots = await page.evaluate(async b64 => {
+    const img = new Image(); img.src = 'data:image/png;base64,' + b64; await img.decode()
+    const c = document.createElement('canvas'); c.width = img.width; c.height = img.height
+    const x = c.getContext('2d')!; x.drawImage(img, 0, 0)
+    const d = x.getImageData(0, 0, c.width, c.height).data, out: { x: number; y: number }[] = []
+    for (let i = 0; i < d.length && out.length < 40; i += 4 * 7) if (Math.max(d[i], d[i + 1], d[i + 2]) - Math.min(d[i], d[i + 1], d[i + 2]) > 90 && Math.floor(i / 4 / c.width) < c.height * 0.85) out.push({ x: ((i / 4) % c.width) / c.width, y: Math.floor(i / 4 / c.width) / c.height })
+    return out
+  }, (await canvas.screenshot()).toString('base64'))
+  let at: { x: number; y: number } | null = null
+  for (const sp of spots) {
+    const p = { x: box.x + box.width * sp.x, y: box.y + box.height * sp.y + 2 }
+    await page.mouse.move(p.x, p.y)
+    if (await card.getByText(/Shift: its residue/).count()) { at = p; break }
+  }
+  expect(at).not.toBeNull()
+  await page.mouse.click(at!.x, at!.y)
+  await expect(card.getByText('Groups 13 · plotted 01')).toBeVisible()
+  await page.keyboard.down('Shift'); await page.mouse.click(at!.x, at!.y); await page.keyboard.up('Shift')
+  await expect(card.getByText(/Groups 13 · plotted (0[2-9]|1[0-3])/)).toBeVisible()
   expect(errors).toEqual([])
 })
