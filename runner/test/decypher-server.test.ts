@@ -85,7 +85,9 @@ describe('(de)Cypher reads the RDFs of the Matrix, with their structures (read o
     // Another machine sent it: its paths under its own allowed folder, which here is `sims`, holding the structure too.
     const theirs = rec.inputs.structure.path.split('/').slice(0, -1), last = theirs[theirs.length - 1]
     mkdirSync(join(sims, last), { recursive: true }); copyFileSync(F + '9.multiwalker.gro', join(sims, last, '9.multiwalker.gro'))
-    copyRecord(dir, sha, { ...rec, inputs: { ...rec.inputs, structure: { ...rec.inputs.structure, path: theirs.join('/') + '/9.multiwalker.gro' } } }, [theirs.slice(0, -1).join('/')], '/home/them', 'gmx-cypher 0.1.0')
+    // The record names the structure it ran with: this file, by its size and SHA-256.
+    const gro = readFileSync(F + '9.multiwalker.gro'), groInfo = { size: gro.length, sha256: createHash('sha256').update(gro).digest('hex') }
+    copyRecord(dir, sha, { ...rec, inputs: { ...rec.inputs, structure: { ...rec.inputs.structure, ...groInfo, path: theirs.join('/') + '/9.multiwalker.gro' } } }, [theirs.slice(0, -1).join('/')], '/home/them', 'gmx-cypher 0.1.0')
     const before = listing(dir), all = await vaultRdfs(await openVault(dir), new Jobs(join(tmp('home'), 'jobs')), [sims])
     const run = all.projects[0].rows[0].rdfs[0].run
     expect(run).toMatchObject({ from: 'space', title: 'rdf_o111_Methionine_H', bin: 0.03, frames: { analysed: 51, lastTime: 200000 } })
@@ -94,6 +96,9 @@ describe('(de)Cypher reads the RDFs of the Matrix, with their structures (read o
     // Not under the allowed folders here: no structure, the groups still.
     const elsewhere = await vaultRdfs(await openVault(dir), new Jobs(join(tmp('home'), 'jobs')), [tmp('other')])
     expect(elsewhere.projects[0].rows[0].rdfs[0].run).toMatchObject({ from: 'space', structure: null })
+    // Another file at that place is not taken for it (review): the groups still, no structure.
+    writeFileSync(join(sims, last, '9.multiwalker.gro'), 'not the structure\n')
+    expect((await vaultRdfs(await openVault(dir), new Jobs(join(tmp('home'), 'jobs')), [sims])).projects[0].rows[0].rdfs[0].run).toMatchObject({ from: 'space', structure: null })
     expect(listing(dir)).toEqual(before)
   })
 

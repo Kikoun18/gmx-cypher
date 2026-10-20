@@ -26,8 +26,8 @@ function Choice<T extends string>({ id, label, value, options, words, onChange }
 
 /** A number typed freely and kept when it is left (Enter or elsewhere); one out of range goes back to its default. */
 function NumberField({ id, label, value, onChange, hint }: { id: string; label: string; value: number; onChange: (v: number) => void; hint?: string }) {
-  const [text, setText] = React.useState(String(value))
-  React.useEffect(() => setText(String(value)), [value])
+  const [text, setText] = React.useState(String(value)), [was, setWas] = React.useState(value)
+  if (was !== value) { setWas(value); setText(String(value)) }
   const keep = () => { const v = Number(text); if (text.trim() !== '' && Number.isFinite(v) && v !== value) onChange(v); else setText(String(value)) }
   return (
     <Field>

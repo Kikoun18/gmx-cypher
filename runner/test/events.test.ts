@@ -44,12 +44,14 @@ describe('jobs over HTTP', () => {
   it('streams a job as it runs: its state, its output, and its end; then lists and shows it', async () => {
     const cwd = tmp('sim');
     writeFileSync(join(cwd, 'g.ndx'), '[ a ]\n 1\n[ b ]\n 2\n');
-    const seen: string[] = [];
-    let id = '';
+    const seen: string[] = [], text: string[] = [];
+    let id = '', end = 0;
     const done = listen((name, d) => {
-      const x = d as { id: string; status?: string; s?: string; log?: string };
+      const x = d as { id: string; status?: string; s?: string; end?: number; log?: string };
       if (x.id !== id) return false;
       seen.push(name === 'job' ? 'job:' + x.status : 'out');
+      // Each chunk says where it ends in the log (review): one after another, they add up to it.
+      if (name === 'out') { end += x.s!.length; expect(x.end).toBe(end); text.push(x.s!); }
       expect(x.log).toBeUndefined();
       return name === 'job' && x.status === 'done';
     });
@@ -66,6 +68,7 @@ describe('jobs over HTTP', () => {
     expect(one.log).toBeUndefined();
     const log = await (await fetch(base + '/api/jobs/' + id + '/log?from=0', { headers })).json();
     expect([log.text, log.from, log.size]).toEqual([expect.stringContaining('Analyzed 11 frames'), 0, one.logSize]);
+    expect([text.join(''), end]).toEqual([log.text, log.size]);
     expect((await fetch(base + '/api/jobs/' + id + '/log?from=x', { headers })).status).toBe(400);
     // Archived (R12c): gone from the list and its events, listed with ?archived=1; unarchived, a job again.
     const post = (path: string) => fetch(base + path, { method: 'POST', headers: { ...headers, 'content-type': 'application/json', origin: base }, body: '{}' });

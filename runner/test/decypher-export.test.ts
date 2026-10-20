@@ -72,3 +72,18 @@ describe('the HTML export: one file, nothing fetched, each job still interactive
     expect(html).not.toMatch(/https?:\/\/fonts/)
   })
 })
+
+describe('a result chart\'s interactive page carries what its chart shows (review)', () => {
+  it('its groups\' labels, and its marks and lines keyed as the page keys its curves', async () => {
+    const { resultPins } = await import('../src/core/export')
+    const { kit } = await import('../src/core/index')
+    const { resultAnalysis } = await import('../src/core/export')
+    const series = [{ label: 'water', tone: 'sky' as const, points: [[0, 1], [1, 2], [2, 3]] as [number, number][] }, { label: 'ion', tone: 'coral' as const, points: [[0, 3], [1, 2], [2, 1]] as [number, number][] }]
+    const pins = { points: [{ key: '1', i: 2, label: 'low' }, { key: '7', i: 0 }], lines: [{ axis: 'y' as const, v: 2 }] }
+    expect(resultPins({ points: [], lines: [] }, series)).toEqual({})
+    const a = kit.withLabels(resultAnalysis({ id: 'result', title: 't', sub: '', xlabel: 'x', ylabel: 'y', series })!, { water: 'solvent' })
+    const d = exportData({ analyses: [a], structs: {}, selected: () => ['water', 'ion'], tones: {}, compare: null, view: { ...view, pins: resultPins(pins, series) }, theme: 'light', tokens, structures: false, by: 'gmx-cypher' })
+    expect(d.analyses[0].sels.map(g => [g.name, g.label])).toEqual([['water', 'solvent'], ['ion', undefined]])
+    expect(d.view.pins).toEqual({ a1: { points: [{ key: 'a1|ion|ion', i: 2, label: 'low' }], lines: [{ axis: 'y', v: 2 }] } })
+  })
+})

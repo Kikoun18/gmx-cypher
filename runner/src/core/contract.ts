@@ -12,8 +12,9 @@ export const NEVER_SHOWN: { phrase: RegExp; instead: string }[] = [
   { phrase: /\b(each|every) job\b/i, instead: 'each result, every result' },
   { phrase: /\brun again\b/i, instead: 'open in set-up' },
   // "run input" is GROMACS's .tpr, and "run number" or "run slot" the Matrix's run: both keep the word.
-  { phrase: /\b(this|that|the|a) run\b(?!['’]?s? input| number| slot)/i, instead: 'this job, the job' },
-  { phrase: /\brun['’]s\b(?! input)|\bruns on disk\b|\bthe runs\b/i, instead: "the job's, records on disk, the jobs" },
+  // Review: "its run" and "no run" mean a job too; "a run's inputs" is not GROMACS's run input.
+  { phrase: /\b(this|that|the|a|its|no) run\b(?! inputs?\b| number| slot)/i, instead: 'this job, the job' },
+  { phrase: /\brun['’]s\b(?! input\b)|\bruns on disk\b|\bthe runs\b/i, instead: "the job's, records on disk, the jobs" },
   { phrase: /\bby job\b|\beach job its\b/i, instead: 'colour by result' },
   { phrase: /\bopen in \(de\)Cypher\b|\b(open|close) \(de\)Cypher\b|\binside \(de\)Cypher\b/i, instead: 'compare' },
 ]
@@ -57,6 +58,8 @@ export const RESULT_ORDER = ['actions', 'charts', 'settings', 'provenance'] as c
 /** The one set of structure styles (question 17): each 3D view offers these; one its renderer can't draw is shown disabled, with the reason. */
 export const STYLES = ['ball & stick', 'sticks', 'spheres', 'lines', 'cartoon'] as const
 export type Style = (typeof STYLES)[number]
+/** What compare's renderer can't draw of the one set of styles, and why (question 17). */
+export const CANNOT: Partial<Record<Style, string>> = { lines: 'compare draws every atom, so no bonds alone', cartoon: 'compare reads no secondary structure, so no ribbon' }
 
 /** The actions that have a key (R8b, contract §3): what each does, in words, where it works, and its key by default. Settings → keyboard rebinds them. */
 export type KeyAction = 'compare' | 'export' | 'sheet' | 'fit' | 'reset' | 'box' | 'centre' | 'hydrogens' | 'labels' | 'prev' | 'next'

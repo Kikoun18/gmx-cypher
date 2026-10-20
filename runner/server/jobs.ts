@@ -221,7 +221,8 @@ export class Jobs extends EventEmitter {
       this.tails.set(id, tail);
       j.logSize += s.length;
       j.progress = parseProgress(tail);
-      this.emit('out', id, s);
+      // Where the chunk ends in the log, so a page that read the log meanwhile adds only what it lacks (review).
+      this.emit('out', id, s, j.logSize);
       this.changed(j);
     };
     p.stdout!.on('data', out);

@@ -71,9 +71,10 @@ export function Settings({ state, open, onOpenChange, onState, returnFocus }: { 
   const toolsChanged = tools.qq.trim() !== (state.config.qq || '') || tools.gmxEta.trim() !== (state.config.gmxEta || '')
   const savePmfUrl = async () => { try { onState(await postJson<AppState>('/api/config', { pmfUrl: pmfUrl.trim() || null })); setPmfError('') } catch (e) { setPmfError((e as Error).message) } }
   // The vault's projects, for the connected one (R14b): read again when the vault changes.
-  const [projects, setProjects] = React.useState<{ id: string; name: string }[]>([])
+  const vaultAt = state.config.vault, [read, setRead] = React.useState<{ vault: string; projects: { id: string; name: string }[] } | null>(null)
   const [projectError, setProjectError] = React.useState('')
-  React.useEffect(() => { if (state.config.vault) getJson<{ projects?: { id: string; name: string }[] }>('/api/vault').then(v => setProjects(v.projects ?? []), () => setProjects([])); else setProjects([]) }, [state.config.vault])
+  React.useEffect(() => { if (vaultAt) getJson<{ projects?: { id: string; name: string }[] }>('/api/vault').then(v => setRead({ vault: vaultAt, projects: v.projects ?? [] }), () => setRead({ vault: vaultAt, projects: [] })) }, [vaultAt])
+  const projects = vaultAt && read?.vault === vaultAt ? read.projects : []
   const chooseProject = async (id: string | null) => { try { onState(await postJson<AppState>('/api/config', { project: id })); setProjectError('') } catch (e) { setProjectError((e as Error).message) } }
   const chooseVault = async (path: string | null) => {
     try { onState(await postJson<AppState>('/api/config', { vault: path })); setVaultError(''); if (!path) setVault('') } catch (e) { setVaultError((e as Error).message) }

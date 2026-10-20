@@ -58,7 +58,7 @@ function BatchCard({ b, jobs, vault, onOpenJob }: { b: Batch; jobs: Job[]; vault
         <span className="text-control font-bold">{b.recipe}</span>
         <span className="min-w-0 flex-1 truncate text-caption text-muted-foreground">{b.template} · {b.concurrency} at a time</span>
         <span className="text-caption" aria-live="polite">{batchSummary(b.items, id => job(id)?.status)}</span>
-        {running && <Button variant="destructive" size="sm" onClick={() => { if (armed) { postJson('/api/batches/' + b.id + '/cancel', {}).catch(() => {}); setArmed(false) } else setArmed(true) }}>{armed ? 'click again to cancel all' : 'cancel all'}</Button>}
+        {running && <Button variant={armed ? 'destructive' : 'outline'} size="sm" onClick={() => { if (armed) { postJson('/api/batches/' + b.id + '/cancel', {}).catch(() => {}); setArmed(false) } else setArmed(true) }}>{armed ? 'click again to cancel all' : 'cancel all'}</Button>}
       </div>
       <table className="text-control"><tbody>
         {b.items.map(i => {

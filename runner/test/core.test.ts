@@ -62,7 +62,7 @@ describe('one copy of each: tones, dashes, ticks, atom ranges (R5a) and the stru
   })
 })
 
-describe('with 1 to 14 RDFs on one graph, no two curves share both colour and dash', () => {
+describe('with 1 to 50 RDFs on one graph, no two curves share colour, dash and width (review: from 21 on, some did)', () => {
   const tokens = themeTokens(readFileSync(RUNNER + 'src/tokens.json', 'utf8'), readFileSync(RUNNER + 'src/roles.json', 'utf8'))
   const x = [0.1, 0.2, 0.3]
   const rdf = (i: number, groups: string[]): Analysis => ({
@@ -72,12 +72,12 @@ describe('with 1 to 14 RDFs on one graph, no two curves share both colour and da
   for (const dark of [false, true]) for (const colorBy of ['group', 'job'] as const) for (const groups of [['O'], ['O', 'N', 'S']]) {
     it((dark ? 'dark' : 'light') + ', by ' + colorBy + ', ' + groups.length + ' group(s)', () => {
       const pal = kit.palette(dark, dark ? tokens.dark : tokens.light)
-      for (let n = 1; n <= 14; n++) {
+      for (let n = 1; n <= 50; n++) {
         const plotted = Array.from({ length: n }, (_, i) => rdf(i, groups))
         const tones = Object.fromEntries(plotted.map((a, i) => [a.id, TONES[i % TONES.length]]))
         const curves = kit.buildCurves({ focus: plotted[0], plotted, selected: groups, colorBy, pal, tones })
         expect(curves).toHaveLength(n * groups.length)
-        const looks = curves.map(c => c.color + ' ' + c.dash)
+        const looks = curves.map(c => c.color + ' ' + c.dash + ' ' + (c.width ?? 2))
         expect(new Set(looks).size, n + ' RDFs: ' + looks.join(' | ')).toBe(looks.length)
       }
     })

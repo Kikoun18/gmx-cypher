@@ -2,7 +2,8 @@
 // each RDF file the gmx-cypher run that wrote it, found by its SHA-256 among the runs' records: the record holds
 // the atoms of each group, so the structure view can show them. Only those files are ever sent to the page.
 
-import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import type { RowRecord } from '../../matrix/src/lib/storage/records';
 import { recordComplete, type RunRecord } from '../src/lib/record';
@@ -49,9 +50,11 @@ async function spaceRun(v: VaultView, sha: string, roots: string[]): Promise<Vau
   let rec: RunRecord;
   try { rec = JSON.parse(await v.io.backend.readText(spacePaths.record(sha))) as RunRecord; } catch { return null; }
   if (rec?.format !== 'gmx-cypher run' || !Array.isArray(rec.groups)) return null;
-  const bin = rec.options?.find(o => o.flag === 'bin')?.value, sp = rec.inputs?.structure?.path;
-  const structure = !sp ? null : sp.startsWith('/') ? (existsSync(sp) ? sp : null) : roots.map(r => join(r, sp)).find(p => existsSync(p)) ?? null;
-  const title = (rec.outputs ?? []).find(o => o.kind === 'xvg' && o.sha256 === sha)?.path.split('/').pop()?.replace(/\.xvg$/, '') ?? 'a gmx-cypher run';
+  const bin = rec.options?.find(o => o.flag === 'bin')?.value, s = rec.inputs?.structure, sp = s?.path;
+  // The structure the copy names, found again only if it is the same file: its size, and its SHA-256 when recorded (review).
+  const same = (p: string) => { try { return statSync(p).size === s!.size && (!s!.sha256 || createHash('sha256').update(readFileSync(p)).digest('hex') === s!.sha256); } catch { return false; } };
+  const structure = !sp ? null : (sp.startsWith('/') ? [sp] : roots.map(r => join(r, sp))).find(same) ?? null;
+  const title = (rec.outputs ?? []).find(o => o.kind === 'xvg' && o.sha256 === sha)?.path.split('/').pop()?.replace(/\.xvg$/, '') ?? 'a gmx-cypher job';
   return { job: String(rec.job ?? ''), title, groups: rec.groups, frames: rec.frames, bin: bin == null || bin === '' ? null : Number(bin), structure, from: 'space' };
 }
 

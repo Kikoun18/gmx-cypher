@@ -1,4 +1,4 @@
-import { copyFileSync, readFileSync, readdirSync } from 'node:fs';
+import { copyFileSync, readFileSync, readdirSync, realpathSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { densityCommand, formHelp, roleProblems } from '../src/lib/commands';
@@ -82,6 +82,23 @@ describe('a run of gmx density (R16a)', () => {
     expect(r).toMatchObject({ status: 'done', analysis: 'density', stdin: '0\n1\n', problems: [] });
     expect(data(readFileSync(join(dir, 'density/density_nvt.xvg'), 'utf8'))).toEqual(data(text('r16/density/density_mass.xvg')));
     expect(readdirSync(join(dir, 'density')).sort()).toEqual(['density_nvt.ndx', 'density_nvt.run.json', 'density_nvt.xvg']);
+    await s.close();
+  });
+});
+
+describe('the electrons file is an input like any other (review)', () => {
+  it('outside the allowed folders: refused; inside: given to gmx by its real path and recorded with its SHA-256', async () => {
+    const dir = tmp('density-ei');
+    for (const f of ['nvt.tpr', 'nvt.gro', 'nvt.xtc']) copyFileSync(RUNNER + 'test/fixtures/nvt/' + f, join(dir, f));
+    writeFileSync(join(dir, 'electrons.dat'), '1\nNA = 10\n');
+    const s = await apiServer({ gmx: { ok: true, name: 'gmx', path: FAKE_GMX, version: '2025.4' } });
+    const req = (ei: string): RunRequest => ({ tool: 'density', inputs: { trajectory: join(dir, 'nvt.xtc'), runInput: join(dir, 'nvt.tpr'), structure: join(dir, 'nvt.gro') },
+      groups: [resname('sodium', 'coral', 'reference', 'Na')], options: { dens: 'electron', ei } });
+    await expect(planRun(s.ctx, req('/etc/passwd'), [dir])).rejects.toThrow('outside the allowed folders');
+    expect((await planRun(s.ctx, req(join(dir, 'electrons.dat')), [dir])).argv).toContain(realpathSync(join(dir, 'electrons.dat')));
+    // The fake has no electron density: the job fails, and its record still names the file it was given.
+    const r = await (await startRun(s.ctx, req(join(dir, 'electrons.dat')), [dir])).record;
+    expect(r.inputs.electrons).toMatchObject({ path: realpathSync(join(dir, 'electrons.dat')), sha256: expect.stringMatching(/^[0-9a-f]{64}$/) });
     await s.close();
   });
 });

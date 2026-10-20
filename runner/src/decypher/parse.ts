@@ -164,7 +164,7 @@ export function fromVault(o: { id: string; title: string; label: string; source:
   return {
     id: o.id, kind: 'vault', title: o.title, label: o.label, x, xlabel: head.xLabel || 'r (nm)', ylabel: head.yLabel || 'g(r)', ref: groups.ref, sels,
     struct: o.struct, structNote: o.structNote,
-    sub: facts([o.source, o.record?.frames ? o.record.frames.analysed + ' frames' : null, x.length > 1 ? 'bin ' + +(x[1] - x[0]).toFixed(4) + ' nm' : null, groups.ref ? 'ref ' + groups.ref.name : o.record ? null : 'no atom groups (no run of this gmx-cypher wrote this file)']),
+    sub: facts([o.source, o.record?.frames ? o.record.frames.analysed + ' frames' : null, x.length > 1 ? 'bin ' + +(x[1] - x[0]).toFixed(4) + ' nm' : null, groups.ref ? 'ref ' + groups.ref.name : o.record ? null : 'no atom groups (no record of the job that wrote this file)']),
   }
 }
 

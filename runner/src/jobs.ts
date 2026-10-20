@@ -37,12 +37,32 @@ export const statusOf = (j: Job): { level: Level; word: string } => (j.unfollowe
 /** A job's log as read (R12a): its text from `from` (0: all of it) to its end, of `size` characters. */
 export interface Log { text: string; from: number; size: number }
 
+/** A chunk of a job's output as the event stream sends it: its text, and where it ends in the log. */
+export interface Chunk { s: string; end: number }
+
+/** The log with the part of a chunk it lacks (review): nothing when it has it, nothing past a gap (the log is read again). */
+export function joinLog(g: Log, c: Chunk): Log {
+  const start = c.end - c.s.length
+  return c.end <= g.size || start > g.size ? g : { ...g, text: g.text + c.s.slice(g.size - start), size: c.end }
+}
+
 /** Every job, kept current by the server's event stream; a reload or a restart loses nothing (T7). Each is named by the connected project (R3c). */
 export function useJobs(naming: Naming | null = null) {
   const [jobs, setJobs] = React.useState<Job[]>([])
   const [logs, setLogs] = React.useState<Record<string, Log>>({})
   // Whether the list came: until it does, a job (de)Cypher remembers is not yet missing.
   const [loaded, setLoaded] = React.useState(false)
+  // The output that came while a job's log was being read, by job, with the number of reads under way.
+  const reading = React.useRef(new Map<string, { n: number; chunks: Chunk[] }>())
+  const held = React.useRef(logs)
+  React.useEffect(() => { held.current = logs }, [logs])
+  // A job's log from its file: its last 64 kB, or all of it when asked (R12a).
+  const loadLog = React.useCallback((id: string, all = false) => {
+    const r = reading.current.get(id) ?? { n: 0, chunks: [] }
+    r.n++; reading.current.set(id, r)
+    const done = () => { if (--r.n === 0) reading.current.delete(id) }
+    getJson<Log>('/api/jobs/' + id + '/log' + (all ? '?from=0' : '')).then(g => { setLogs(l => ({ ...l, [id]: r.chunks.reduce(joinLog, g) })); done() }, done)
+  }, [])
   React.useEffect(() => {
     getJson<Job[]>('/api/jobs').then(j => { setJobs(j); setLoaded(true) }, () => {})
     const es = new EventSource('/api/events')
@@ -53,22 +73,24 @@ export function useJobs(naming: Naming | null = null) {
     // An archived job leaves the list (R12c); unarchived, it comes back as a job event.
     es.addEventListener('gone', e => { const { id } = JSON.parse((e as MessageEvent).data) as { id: string }; setJobs(list => list.filter(j => j.id !== id)) })
     es.addEventListener('out', e => {
-      const { id, s } = JSON.parse((e as MessageEvent).data) as { id: string; s: string }
-      setLogs(l => (id in l ? { ...l, [id]: { ...l[id], text: l[id].text + s, size: l[id].size + s.length } } : l))
+      const { id, ...c } = JSON.parse((e as MessageEvent).data) as Chunk & { id: string }
+      reading.current.get(id)?.chunks.push(c)
+      setLogs(l => (id in l ? { ...l, [id]: joinLog(l[id], c) } : l))
     })
+    // The stream came back after a break: what it missed is read again for each log shown.
+    let opened = false
+    es.addEventListener('open', () => { if (opened) for (const [id, g] of Object.entries(held.current)) loadLog(id, g.from === 0); opened = true })
     return () => es.close()
-  }, [])
-  // A job's log from its file: its last 64 kB, or all of it when asked (R12a).
-  const loadLog = React.useCallback((id: string, all = false) => { getJson<Log>('/api/jobs/' + id + '/log' + (all ? '?from=0' : '')).then(g => setLogs(l => ({ ...l, [id]: g })), () => {}) }, [])
+  }, [loadLog])
   const named = React.useMemo(() => { const n = displayNames(jobs, naming); return jobs.map(j => ({ ...j, name: n.get(j.id), fields: nameFields(j, naming) })) }, [jobs, naming])
   return { jobs: named, logs, loadLog, loaded }
 }
 
 /** The connected project's naming (R3c), read again when the vault or the project changes. */
 export function useNaming(vault: string | null, project: string | null): Naming | null {
-  const [n, setN] = React.useState<Naming | null>(null)
-  React.useEffect(() => { if (vault && project) getJson<Naming | null>('/api/naming').then(setN, () => setN(null)); else setN(null) }, [vault, project])
-  return n
+  const at = vault && project ? vault + '\n' + project : null, [n, setN] = React.useState<{ at: string; n: Naming | null } | null>(null)
+  React.useEffect(() => { if (at) getJson<Naming | null>('/api/naming').then(x => setN({ at, n: x }), () => setN({ at, n: null })) }, [at])
+  return at && n?.at === at ? n.n : null
 }
 
 type Estimate = { frames: number; start: number; end: number }

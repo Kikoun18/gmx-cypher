@@ -23,7 +23,7 @@ import type { LoadedFile } from './decypher/parse'
 import { keyLabel, matches, typing, useBindings } from './lib/shortcuts'
 import { formatRoute, parseRoute, type Route } from './lib/route'
 import { dropEntries, dropSummary, routeDrop } from './lib/drop'
-import { exportFocused } from './core/Chart'
+import { exportFocused } from './core/chartState'
 import { ShortcutSheet } from './ui/shortcut-sheet'
 
 // (de)Cypher is loaded the first time compare opens, as 3Dmol is: the page starts without it.
@@ -86,10 +86,10 @@ export function App() {
   const running = jobs.jobs.filter(j => j.status === 'running').length
   React.useEffect(() => { getJson<AppState>('/api/state').then(setState, e => setError(String(e.message || e))) }, [])
   // Each tab opens where it was left; results remember their selection, for the compare key from anywhere.
-  const last = React.useRef<Record<string, Route>>({})
-  const tab = route.view === 'compare' ? 'results' : route.view
-  last.current[tab] = route
-  const selection = (r => (r?.view === 'compare' ? r.jobs : r?.view === 'results' && r.job ? [r.job] : []))(last.current.results)
+  const tab = route.view === 'compare' ? 'results' : route.view, [kept, setKept] = React.useState<Record<string, Route>>({})
+  if (kept[tab] !== route) setKept({ ...kept, [tab]: route })
+  const last = { ...kept, [tab]: route }
+  const selection = (r => (r?.view === 'compare' ? r.jobs : r?.view === 'results' && r.job ? [r.job] : []))(last.results)
   // Compare: the jobs in the address, the vault RDFs and records on disk kept in this browser, the files dropped (never kept).
   const sources = useDecypherSources(route.view === 'compare' ? route.jobs : [], ids => go({ view: 'compare', jobs: ids }))
   const [files, setFiles] = React.useState<LoadedFile[]>([]), [uploads, setUploads] = React.useState<File[]>([])
@@ -153,7 +153,7 @@ export function App() {
           <ToggleGroupItem value="auto">auto</ToggleGroupItem>
         </ToggleGroup>
       </header>
-      <Tabs value={tab} onValueChange={v => go(last.current[v] ?? (v === 'setup' ? { view: 'setup', step: 'inputs', batch: false } : v === 'results' ? { view: 'results', job: null } : { view: 'cluster' }))} className="flex-1 gap-0">
+      <Tabs value={tab} onValueChange={v => go(last[v] ?? (v === 'setup' ? { view: 'setup', step: 'inputs', batch: false } : v === 'results' ? { view: 'results', job: null } : { view: 'cluster' }))} className="flex-1 gap-0">
         <TabsList className="px-3">
           <TabsTrigger value="setup">set-up</TabsTrigger>
           <TabsTrigger value="results">results {jobs.jobs.length > 0 && <TabsCount>{running ? running + ' running' : String(jobs.jobs.length).padStart(2, '0')}</TabsCount>}</TabsTrigger>
@@ -188,7 +188,7 @@ export function App() {
       {dragging && (
         <div className="pointer-events-none fixed inset-3 z-50 flex flex-col items-center justify-center gap-1.5 rounded-2xl border-2 border-dashed border-ring bg-secondary/90">
           <span className="text-display font-bold">Drop files or a folder</span>
-          <span className="text-control text-muted-foreground">a run's inputs go to set-up · xvg and run.json, with their structure and index, go to compare</span>
+          <span className="text-control text-muted-foreground">a simulation's inputs go to set-up · xvg and run.json, with their structure and index, go to compare</span>
         </div>
       )}
     </div>

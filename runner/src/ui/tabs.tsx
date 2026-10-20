@@ -53,7 +53,7 @@ function TabsTrigger({ className, ...props }: React.ComponentProps<typeof TabsPr
 
 /** A count after a tab's name: "All sequences 12". */
 function TabsCount({ className, ...props }: React.ComponentProps<"span">) {
-  return <span data-slot="tabs-count" className={cn("text-[10px] font-normal opacity-75", className)} {...props} />
+  return <span data-slot="tabs-count" className={cn("text-[10px] font-normal", className)} {...props} />
 }
 
 function TabsContent({ className, ...props }: React.ComponentProps<typeof TabsPrimitive.Content>) {

@@ -12,7 +12,7 @@ import { Status } from '../ui/status'
 import { ToggleGroup, ToggleGroupItem } from '../ui/toggle-group'
 import { modName } from '../lib/platform'
 import { setLabel } from '../lib/labels'
-import { Input } from '../ui/input'
+import { LabelInput } from '../ui/label-input'
 import type { View } from './state'
 import { kit } from '../core/theme'
 
@@ -36,8 +36,7 @@ export const StructurePanel = React.forwardRef<StructureHandle, {
   const pick = React.useRef(onPick), pickRef = React.useRef(onPickRef)
   // The held keys, from the registry: read by the view at each press, so a key rebound in settings applies at once.
   const [bindings] = useBindings(), held = React.useRef<HeldKeys>({ centre: 'c', pan: ' ' })
-  held.current.centre = bindings.centre?.key ?? ''
-  React.useLayoutEffect(() => { pick.current = onPick; pickRef.current = onPickRef })
+  React.useLayoutEffect(() => { pick.current = onPick; pickRef.current = onPickRef; held.current.centre = bindings.centre?.key ?? '' })
   React.useImperativeHandle(ref, () => ({ fit: () => ctl.current?.fit(), reset: () => ctl.current?.reset(), where: nr => ctl.current?.where(nr) ?? null, png: () => new Promise(ok => (canvas.current ? canvas.current.toBlob(ok, 'image/png') : ok(null))) }), [])
   React.useEffect(() => {
     if (!wrap.current || !canvas.current || !mol) return
@@ -179,15 +178,15 @@ export function GroupChips({ refs, sels, selected, pal, dim, hover, onShown, onP
     <div className="flex flex-wrap gap-1.5">
       {refs.map((r, i) => {
         const cls = cn('inline-flex h-[26px] items-center gap-1.5 whitespace-nowrap rounded-full border-[1.5px] border-foreground px-2.5 text-caption', r.dashed || r.on === false ? 'border-dashed text-foreground' : 'text-foreground', r.on === false && 'opacity-45')
-        const body = <>{r.plain ? '' : 'ref '}{r.label}{!r.plain && <span className="opacity-70">{r.count || '—'}</span>}</>
+        const body = <>{r.plain ? '' : 'ref '}{r.label}{!r.plain && <span className="font-normal tabular-nums">{r.count || '—'}</span>}</>
         return onPickRef
           ? <button key={r.label} type="button" aria-pressed={r.on !== false} title={'click: plot only this reference · ' + modName() + '-click: add or remove'} className={cn(cls, 'cursor-pointer')} onClick={e => onPickRef(i, e.metaKey || e.ctrlKey)}>{body}</button>
           : <span key={r.label} className={cls}>{body}</span>
       })}
       <Legend label="groups" className="contents" items={sels.map(g => ({ key: g.name, label: kit.shownName(g), g }))} shown={selected} onShown={onShown} onHover={onHover}
         itemClass={(_, on) => cn('inline-flex h-[26px] items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 text-caption transition-[background-color,box-shadow] duration-[120ms]', on && 'font-bold')}
-        itemStyle={({ g }, on) => { const t = pal.hues[g.tone]; return { background: on ? t.base : dim ? pal.secondary : t.soft, color: on ? t.fg : dim ? pal.muted : t.strong, boxShadow: hover === g.name ? '0 0 0 2px ' + pal.fg : 'none' } }}
-        item={({ g }, on) => <><span className="size-[7px] shrink-0 rounded-full" style={{ background: on ? pal.hues[g.tone].fg : pal.hues[g.tone].strong }} /><span title={g.label ? 'gmx name: ' + g.name : undefined}>{kit.shownName(g)}</span>{counts && <span className="opacity-70">{g.atoms.length || '—'}</span>}</>} />
+        itemStyle={({ g }, on) => { const t = pal.hues[g.tone]; return { background: on ? t.base : dim ? pal.secondary : t.soft, color: on ? t.fg : dim ? pal.muted : pal.fg, boxShadow: hover === g.name ? '0 0 0 2px ' + pal.fg : 'none' } }}
+        item={({ g }, on) => <><span className="size-[7px] shrink-0 rounded-full" style={{ background: on ? pal.hues[g.tone].fg : pal.hues[g.tone].strong }} /><span title={g.label ? 'gmx name: ' + g.name : undefined}>{kit.shownName(g)}</span>{counts && <span className="font-normal tabular-nums">{g.atoms.length || '—'}</span>}</>} />
     </div>
   )
 }
@@ -207,7 +206,7 @@ export function Renames({ a }: { a: { id: string; ref: Group | null; sels: Group
           {groups.map(({ g, ref }) => (
             <React.Fragment key={g.name}>
               <span className="truncate text-muted-foreground">{(ref ? 'ref ' : '') + g.name}</span>
-              <Input className="h-6 text-caption" defaultValue={g.label ?? ''} placeholder={g.name} aria-label={'label for ' + g.name} onChange={e => setLabel(a.id, g.name, e.target.value)} />
+              <LabelInput className="h-6 text-caption" name={g.name} label={g.label ?? ''} placeholder={g.name} onLabel={t => setLabel(a.id, g.name, t)} />
             </React.Fragment>
           ))}
           <span className="col-span-2 text-muted-foreground">a label shows here, in results and in exports; the record, the .ndx and the .xvg keep gmx's names</span>

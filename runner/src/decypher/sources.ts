@@ -103,7 +103,7 @@ async function loadVault(ref: Extract<SourceRef, { kind: 'vault' }>, list: Vault
     try {
       const st = await structAt('path:' + run.structure, '/api/file?path=' + enc(run.structure), run.structure)
       key = 'path:' + run.structure; out[key] = st
-      note = basename(run.structure) + ' · the structure its run used' + (run.from === 'space' ? ', found under the allowed folders' : '') + (tried.length ? ' (' + tried.join('; ') + ')' : '')
+      note = basename(run.structure) + ' · the structure its job used' + (run.from === 'space' ? ', found under the allowed folders' : '') + (tried.length ? ' (' + tried.join('; ') + ')' : '')
     } catch (e) { tried.push(basename(run.structure) + ': ' + (e as Error).message) }
   }
   if (!key) note = tried.length ? 'no structure fits: ' + tried.join(' · ') : 'the row has no structure, and no record of the job that wrote this file is known (this gmx-cypher\'s jobs, the vault\'s gmx-cypher folder)'

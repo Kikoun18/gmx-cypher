@@ -10,7 +10,8 @@ import { ToggleGroup, ToggleGroupItem } from '../ui/toggle-group'
 import { Analysis } from './Analysis'
 import { BatchView, type BatchPreset } from './Batch'
 import { Groups } from './Groups'
-import { Inputs, useInputsCheck } from './Inputs'
+import { Inputs } from './Inputs'
+import { useInputsCheck } from '../inputsCheck'
 
 const plural = (n: number, one: string) => n + ' ' + one + (n === 1 ? '' : 's')
 

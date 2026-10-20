@@ -15,18 +15,19 @@ import { Section } from '../ui/separator'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
 import { ToggleGroup, ToggleGroupItem } from '../ui/toggle-group'
 import { getJson, postJson } from '../api'
-import { cleanLabels, setLabel, useLabels } from '../lib/labels'
+import { cleanLabels, setLabels, useLabels } from '../lib/labels'
 import type { SavedView } from '../lib/space'
 import type { Job } from '../jobs'
 import { Status } from '../ui/status'
 import { cn } from '../lib/utils'
 import type { Analysis, Curve, LineStyle, Marks, Mol, Palette, Pins, Rep, Struct, Tone } from '../core/kit'
-import type { KeyAction, Style } from '../core/contract'
+import { CANNOT, type KeyAction } from '../core/contract'
 import { isKey, keyLabel, pressed, useBindings } from '../lib/shortcuts'
 import { modName } from '../lib/platform'
 import { DisplayMenu, DisplayRow, StyleRow } from '../ui/display-menu'
 import { ResultPage } from '../ui/result-page'
-import { ChartPanel, ExportMenu, Swatch, type ChartExport } from '../core/Chart'
+import { ChartPanel, ExportMenu, Swatch } from '../core/Chart'
+import type { ChartExport } from '../core/chartState'
 import { curvesCsv, groupNotes } from '../lib/csv'
 import { unlike } from '../core/cards'
 import { download as downloadBlob, renderBatch } from '../../../matrix/src/lib/export'
@@ -47,8 +48,6 @@ const pad = (n: number) => String(n).padStart(2, '0')
 const plural = (n: number, one: string, many = one + 's') => n + ' ' + (n === 1 ? one : many)
 const WANTED = /\.(gro|pdb|ndx|xvg|json)$/i
 const NO_MORPHS: ActiveMorph[] = []
-/** What compare's renderer can't draw of the one set of styles, and why (question 17). */
-export const CANNOT: Partial<Record<Style, string>> = { lines: 'compare draws every atom, so no bonds alone', cartoon: 'compare reads no secondary structure, so no ribbon' }
 const MARKS: readonly Marks[] = ['both', 'maximum', 'first shell', 'none']
 
 /** How an analysis's chart is drawn: an RDF from zero with g = 1 and its peak marks; any other result as its plot says (R10a). */
@@ -617,7 +616,9 @@ export function Decypher({ sources, files, onFiles, onClearFiles, jobs, jobsLoad
   const openView = (v: SavedView) => {
     sources.replace((v.sources as unknown[]).filter(isRef))
     patch(checkView(v.view) ?? DEFAULT_VIEW)
-    for (const [source, m] of Object.entries(cleanLabels(v.labels))) for (const [name, label] of Object.entries(m)) setLabel(source, name, label)
+    // Each of its sources with the labels it saved, and none it did not (review).
+    const saved = cleanLabels(v.labels)
+    for (const r of (v.sources as unknown[]).filter(isRef)) setLabels(refKey(r), saved[refKey(r)] ?? {})
   }
   const loading = items.filter(i => i.status === 'loading').length
   const subtitle = !items.length ? 'results of several jobs at once, with their structures' : [plural(ready.length, 'result'), plural(new Set(ready.map(a => a.struct).filter(Boolean)).size, 'structure'), loading ? 'reading ' + loading + '…' : null, shown.length < ready.length ? (ready.length - shown.length) + ' hidden' : null].filter(Boolean).join(' · ')

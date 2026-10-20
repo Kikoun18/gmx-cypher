@@ -105,7 +105,7 @@ export function Viewer({ text, format, model, atoms, colour, onPick, describe, g
   const cDown = React.useRef(false), spaceDown = React.useRef(false), overView = React.useRef(false)
   // The keys, from the registry (R8b); the window's listeners read the latest.
   const [bindings] = useBindings(), keys = React.useRef(bindings)
-  keys.current = bindings
+  React.useLayoutEffect(() => { keys.current = bindings })
   const [centre, setCentre] = React.useState<{ label: string; count: number } | null>(null)
   React.useEffect(() => {
     const set = (v: boolean) => { cDown.current = v; setCHeld(v) }

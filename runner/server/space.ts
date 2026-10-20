@@ -85,8 +85,9 @@ export function listViews(vault: string, project: string): { name: string; saved
 
 /** One saved view, its records found again under the allowed folders (and those found nowhere, named). */
 export function readView(vault: string, project: string, name: string, roots: string[]): { view: SavedView; missing: string[] } {
-  let v: SavedView;
-  try { v = JSON.parse(readFileSync(join(vault, spacePaths.view(project, name)), 'utf8')); }
+  let v: SavedView, rel: string;
+  try { rel = spacePaths.view(project, name); } catch (e) { throw new HttpError(400, (e as Error).message); }
+  try { v = JSON.parse(readFileSync(join(vault, rel), 'utf8')); }
   catch (e) { if ((e as NodeJS.ErrnoException).code === 'ENOENT') throw new HttpError(404, 'no view named "' + name + '" in this project'); throw e; }
   if (v?.format !== 'gmx-cypher view' || !Array.isArray(v.sources)) throw new HttpError(400, name + ' is not a gmx-cypher view');
   return resolvedView(v, roots, p => existsSync(p));

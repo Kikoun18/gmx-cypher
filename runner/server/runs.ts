@@ -120,6 +120,8 @@ export async function planRun(ctx: Ctx, req: RunRequest, roots: string[]): Promi
   stem = freeStem(stem, existsSync(outDir) ? readdirSync(outDir) : [], extra);
   const help = found.help, { cwd, io } = cmd.io(paths, outDir, stem);
   let options: Options = req.options || {};
+  // gmx density's electrons file (-ei, R16a) is read by gmx: inside the allowed folders, like every input (review).
+  if (typeof options.ei === 'string' && options.ei.trim()) options = { ...options, ei: inside(options.ei.trim(), roots) };
   const notes: string[] = [], tempProblems: string[] = [];
   if (windows && (options.temp === undefined || options.temp === '')) {
     // gmx wham doesn't read the temperature from the run inputs (it assumes 298 K): gmx-cypher does, and passes it.
@@ -245,6 +247,7 @@ export async function startRun(ctx: Ctx, req: RunRequest, roots: string[]): Prom
 
   const inputs: RunRecord['inputs'] = {};
   for (const [slot, p] of Object.entries(req.inputs) as [Slot, string][]) if (p) inputs[slot] = await fileInfo(inside(p, roots), slot !== 'trajectory' || ctx.config.hashTrajectories);
+  if (typeof plan.options.ei === 'string' && plan.options.ei) inputs.electrons = await fileInfo(plan.options.ei, true);
   // The frames it will read (≈), for its progress: the run input's schedule narrowed by -b, -e and -dt.
   const estimate = d && cmd.groups ? runEstimate(frameEstimate(d, inputs.trajectory!.path), req.options || {}) : null;
   const env = { ...Object.fromEntries(Object.entries(process.env).filter(([k]) => k.startsWith('GMX'))) as Record<string, string>, ...plan.env };

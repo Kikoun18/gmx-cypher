@@ -39,7 +39,7 @@ const summary = (j: Job) => j;
 function events(jobs: Jobs, batches: Batches, res: ServerResponse) {
   res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-store', connection: 'keep-alive' });
   const send = (name: string, data: unknown) => res.write('event: ' + name + '\ndata: ' + JSON.stringify(data) + '\n\n');
-  const onJob = (j: Job) => send('job', summary(j)), onOut = (id: string, s: string) => send('out', { id, s });
+  const onJob = (j: Job) => send('job', summary(j)), onOut = (id: string, s: string, end: number) => send('out', { id, s, end });
   const onBatch = (b: unknown) => send('batch', b), onGone = (id: string) => send('gone', { id });
   jobs.on('job', onJob);
   jobs.on('gone', onGone);
@@ -202,8 +202,8 @@ export function makeApi(ctx: Ctx): Api {
     if (is(req, 'POST', url, '/api/landing')) {
       const b = await readJson<{ job: string; project: string; fields?: Fields; name?: string }>(req);
       const j = ctx.jobs.get(b.job);
-      if (!j || !COMMANDS.some(c => c.tool === j.kind)) throw new HttpError(404, 'no run ' + b.job);
-      if (j.status !== 'done') throw new HttpError(409, 'only a finished run can be sent');
+      if (!j || !COMMANDS.some(c => c.tool === j.kind)) throw new HttpError(404, 'no job ' + b.job);
+      if (j.status !== 'done') throw new HttpError(409, 'only a finished job can be sent');
       if (!ctx.config.vault) throw new HttpError(409, 'no vault set');
       const names = j.meta!.names as { xvg: string }, rec = JSON.parse(readFileSync(String(j.meta!.record), 'utf8')) as RunRecord;
       const v = await openVault(ctx.config.vault);
@@ -213,14 +213,14 @@ export function makeApi(ctx: Ctx): Api {
     if (is(req, 'POST', url, '/api/send')) {
       const b = await readJson<{ job: string; project: string; name: string }>(req);
       const j = ctx.jobs.get(b.job);
-      if (!j || !COMMANDS.some(c => c.tool === j.kind)) throw new HttpError(404, 'no run ' + b.job);
-      if (j.status !== 'done') throw new HttpError(409, 'only a finished run can be sent');
+      if (!j || !COMMANDS.some(c => c.tool === j.kind)) throw new HttpError(404, 'no job ' + b.job);
+      if (j.status !== 'done') throw new HttpError(409, 'only a finished job can be sent');
       if (!ctx.config.vault) throw new HttpError(409, 'no vault set');
       const v = await openVault(ctx.config.vault), project = (await listProjects(v)).find(p => p.id === b.project);
       if (!project) throw new HttpError(404, 'no project ' + b.project + ' in the vault');
       // Only g(r): the cumulative-number file is titled "Cumulative Number RDF", which the Matrix would read as another RDF (T35).
-      const sent = sendToInbox(v, project, join(String(j.meta!.outDir), (j.meta!.names as { xvg: string }).xvg), String(b.name ?? ''), ctx.config.pmfUrl);
-      return { body: { ...sent, record: keepRecord(v, String(j.meta!.record), roots(), 'gmx-cypher ' + ctx.version) } };
+      const file = join(String(j.meta!.outDir), (j.meta!.names as { xvg: string }).xvg), sent = sendToInbox(v, project, file, String(b.name ?? ''), ctx.config.pmfUrl);
+      return { body: { ...sent, ...keepRecord(v, String(j.meta!.record), file, roots(), 'gmx-cypher ' + ctx.version) } };
     }
     if (is(req, 'POST', url, '/api/batch/preview')) {
       const b = await readJson<{ root: string; template: string; recipe: unknown }>(req);
@@ -271,7 +271,9 @@ export function makeApi(ctx: Ctx): Api {
       const v = await openVault(ctx.config.vault), project = ctx.config.project;
       if (!(await listProjects(v)).some(p => p.id === project)) throw new HttpError(404, 'the connected project is no longer in the vault: choose it again in settings');
       // Records on disk are named by their real paths (findRuns): both forms of each allowed folder.
-      const rs = [...new Set(roots().flatMap(r => [r, real(r) ?? r]))], name = decodeURIComponent(url.pathname.slice('/api/space/views/'.length));
+      const rs = [...new Set(roots().flatMap(r => [r, real(r) ?? r]))];
+      let name: string;
+      try { name = decodeURIComponent(url.pathname.slice('/api/space/views/'.length)); } catch { throw new HttpError(400, 'not a view name: ' + url.pathname.slice('/api/space/views/'.length)); }
       if (is(req, 'GET', url, '/api/space/views')) return { body: { project, views: listViews(v.path, project) } };
       if (is(req, 'POST', url, '/api/space/views')) return { body: { view: saveView(v.path, project, await readJson(req), rs, 'gmx-cypher ' + ctx.version) } };
       if (req.method === 'GET' && name) return { body: readView(v.path, project, name, rs) };
@@ -279,6 +281,8 @@ export function makeApi(ctx: Ctx): Api {
     // Archive and unarchive (R12c): the job's file moved, never over another; refusals in words.
     const shelf = /^\/api\/jobs\/([\w-]+)\/(archive|unarchive)$/.exec(url.pathname);
     if (shelf && req.method === 'POST') {
+      // A job just ended may still be completing its record from its file (review): archived once that is done.
+      if (shelf[2] === 'archive') await recordWritten(shelf[1]);
       try { if (shelf[2] === 'archive') ctx.jobs.archive(shelf[1]); else ctx.jobs.unarchive(shelf[1]); } catch (e) { throw new HttpError(409, (e as Error).message); }
       return { body: { ok: true } };
     }

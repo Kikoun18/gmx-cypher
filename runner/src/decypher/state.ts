@@ -102,6 +102,17 @@ export function checkView(v: unknown): View | null {
   }
 }
 
+/** The view with only these sources' state (R14b, review): what a source removed since left behind is not saved. */
+export function viewOf(v: View, ids: Set<string>): View {
+  const keep = (id: string) => ids.has(id), only = <T>(o: Record<string, T>, ok: (k: string) => boolean) => Object.fromEntries(Object.entries(o).filter(([k]) => ok(k)))
+  return {
+    ...v, hidden: v.hidden.filter(keep), selected: only(v.selected, keep), focus: v.focus && keep(v.focus) ? v.focus : null,
+    morphed: v.morphed.map(m => ({ ids: m.ids.filter(keep), off: m.off.filter(keep) })).filter(m => m.ids.length > 1), ownScale: v.ownScale.filter(keep),
+    // A curve's style is keyed by its result's id, its group and its name; the one graph's marks by `one`.
+    styles: only(v.styles, k => keep(k.split('|')[0])), pins: only(v.pins, k => k === 'one' || keep(k)),
+  }
+}
+
 export function useView() {
   const [view, setView] = React.useState<View>(() => load(VIEW, checkView) ?? DEFAULT_VIEW)
   React.useEffect(() => save(VIEW, view), [view])

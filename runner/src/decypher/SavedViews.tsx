@@ -9,7 +9,7 @@ import type { SavedView } from '../lib/space'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 import { Status } from '../ui/status'
-import { refKey, type SourceRef, type View } from './state'
+import { refKey, viewOf, type SourceRef, type View } from './state'
 
 interface Listed { name: string; saved: string; sources: number }
 
@@ -25,7 +25,7 @@ export function SavedViews({ refs, view, labels, onOpen, onClose }: {
     if (!n) return
     // The labels of what compare shows, by each source's id (files dropped are not kept, so neither are theirs).
     const keys = new Set(refs.map(refKey)), mine = Object.fromEntries(Object.entries(labels).filter(([k]) => keys.has(k)))
-    try { await postJson('/api/space/views', { name: n, sources: refs, view, labels: mine }); setSaid({ ok: true, text: 'saved: ' + n }); setName(''); read() }
+    try { await postJson('/api/space/views', { name: n, sources: refs, view: viewOf(view, keys), labels: mine }); setSaid({ ok: true, text: 'saved: ' + n }); setName(''); read() }
     catch (e) { setSaid({ ok: false, text: (e as Error).message }) }
   }
   const open = (n: string) => getJson<{ view: SavedView; missing: string[] }>('/api/space/views/' + encodeURIComponent(n)).then(r => { onOpen(r.view, r.missing); setSaid({ ok: true, text: 'opened: ' + n + (r.missing.length ? ' · not found under the allowed folders: ' + r.missing.join(', ') : '') }) }, e => setSaid({ ok: false, text: (e as Error).message }))

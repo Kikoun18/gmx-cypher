@@ -55,7 +55,7 @@ function JobDetail({ job, jobs, log, onAllLog, onRunAgain, vault, allow, onCompa
       {(running || job.progress.frame != null) && !job.unfollowed && <p className="m-0 text-control" aria-live="polite">{job.status === 'failed' || job.status === 'cancelled' ? 'stopped at ' : ''}{progressText(job)}{took && ' · ' + took}</p>}
       {job.status === 'interrupted' && <p className="m-0 text-caption text-muted-foreground">{job.error}</p>}
       <RunResult job={job} jobs={jobs} log={log?.text} logCut={log && log.from > 0 ? { from: log.from, size: log.size } : undefined} onAllLog={onAllLog} allow={allow} vault={vault} onRunAgain={onRunAgain} onCompare={onCompare}
-        actions={job.status === 'running' && !job.unfollowed && <Button variant="destructive" onClick={cancel}>{armed ? 'click again to cancel' : 'cancel'}</Button>} />
+        actions={job.status === 'running' && !job.unfollowed && <Button variant={armed ? 'destructive' : 'outline'} onClick={cancel}>{armed ? 'click again to cancel' : 'cancel'}</Button>} />
       <p className="m-0 text-caption text-muted-foreground">a job keeps running when this page is closed or reloaded · started {new Date(job.created).toLocaleString()}</p>
     </div>
   )
@@ -107,7 +107,8 @@ export function JobsView({ jobs, logs, loadLog, route, go, onRunAgain, vault, al
     <div className="grid grid-cols-[220px_minmax(0,1fr)] gap-5">
       <nav className="flex flex-col gap-1" aria-label="jobs">
         <Section label={'Jobs ' + String(jobs.length).padStart(2, '0')} />
-        {(jobs.length > 0 || archive) && <JobFilters jobs={archive ? shelf ?? [] : jobs} filter={filter} onFilter={onFilter} shown={listed.length} allow={allow} />}
+        {/* Always there: with every job archived, the archived toggle is the way back (review). */}
+        <JobFilters jobs={archive ? shelf ?? [] : jobs} filter={filter} onFilter={onFilter} shown={listed.length} allow={allow} />
         {!archive && openCompare}
         {!archive && selected.length === 2 && <Button variant="outline" size="sm" className="mb-1 justify-start" onClick={() => go({ view: 'compare', jobs: selected, filter, diff: true })} aria-current={diffing ? 'page' : undefined}
           title="what differs between the two jobs' records: options, inputs, groups, gmx, environment, frames">diff</Button>}

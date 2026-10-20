@@ -66,7 +66,7 @@ describe('one set of style names (question 17)', () => {
   it('compare draws some of them, and says why not the others', async () => {
     const { STYLES } = await import('../src/core/contract');
     const { kit } = await import('../src/core/index');
-    const { CANNOT } = await import('../src/decypher/Decypher');
+    const { CANNOT } = await import('../src/core/contract');
     for (const s of kit.REPS) expect(STYLES).toContain(s);
     expect(STYLES.filter(s => !(kit.REPS as string[]).includes(s))).toEqual(Object.keys(CANNOT));
   });

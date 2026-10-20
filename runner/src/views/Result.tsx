@@ -4,9 +4,10 @@ import { Alert, AlertDescription, AlertTitle } from '../ui/alert'
 import { Button } from '../ui/button'
 import { Stat } from '../ui/card'
 import { TONES, type Series } from '../core/index'
-import { ExportAll, FiguresContext, LabelsContext, SeriesChart, type ChartExport, type PageFigure } from '../core/Chart'
+import { ExportAll, SeriesChart } from '../core/Chart'
+import { FiguresContext, LabelsContext, type ChartExport, type PageFigure } from '../core/chartState'
 import { labelsOf, setLabel, useLabels } from '../lib/labels'
-import { Input } from '../ui/input'
+import { LabelInput } from '../ui/label-input'
 import { rampColors } from '../core/ramp'
 import { TOKENS_BY_THEME } from '../core/theme'
 import { Section } from '../ui/separator'
@@ -69,12 +70,14 @@ const outName = (job: Job, r: RunRecord, which: 'xvg' | 'cn' | string = 'xvg') =
   ? String((job.meta?.names as Record<string, string> | undefined)?.[which] ?? '').split('/').pop()!
   : r.outputs.map(o => o.path.split('/').pop()!).find(n => n.endsWith(which)) ?? '')
 /** A result chart's export (R6a): named after the run's file (and the chart, when a run draws several); its CSV the columns `parts`, with where they came from. */
-function chartExport(job: Job, record: RunRecord, source: string, parts: { text: string; col: number; name: string }[], xlabel: string, ylabel: string, part = ''): ChartExport {
+type Part = { text: string; col: number; name: string }
+/** A chart's export: its CSV from `parts`, or from every file `parts` reads when the CSV is made (an AWH run's frames, review). */
+function chartExport(job: Job, record: RunRecord, source: string, parts: Part[] | (() => Promise<Part[]>), xlabel: string, ylabel: string, part = ''): ChartExport {
   return {
     file: source.replace(/\.xvg$/i, '') + (part ? '_' + part : ''), title: (job.name ?? job.title) + (part ? ' · ' + part : ''),
     fields: { ...job.fields, command: job.kind, group: record.groups[0]?.name ?? '' },
     // A renamed group's column and its line take its label (R11d), the line keeping gmx's name; read when the CSV is made.
-    csv: () => { const l = labelsOf('job:' + job.id); return xvgCsv(parts.map(p => ({ ...p, name: l[p.name] ?? p.name })), xlabel, ylabel, csvMeta(record, String(job.meta?.record ?? ''), source, g => l[g.name] ?? g.name)) },
+    csv: async () => { const l = labelsOf('job:' + job.id); return xvgCsv((typeof parts === 'function' ? await parts() : parts).map(p => ({ ...p, name: l[p.name] ?? p.name })), xlabel, ylabel, csvMeta(record, String(job.meta?.record ?? ''), source, g => l[g.name] ?? g.name)) },
   }
 }
 /** Every y column of an xvg, named. */
@@ -182,11 +185,12 @@ function AwhChart({ job, record }: { job: Job; record: RunRecord }) {
   const names = React.useMemo(() => record.outputs.filter(o => o.kind === 'xvg').map(o => o.path.split('/').pop()!).sort((a, b) => frameTime(a) - frameTime(b)), [record])
   const shown = React.useMemo(() => spread(names, 12), [names])
   const [texts, setTexts] = React.useState<Record<string, string>>({})
+  const read = React.useCallback((n: string) => fetch('/api/jobs/' + job.id + '/output?name=' + encodeURIComponent(n)).then(r => (r.ok ? r.text() : Promise.reject(new Error(n + ' could not be read')))), [job.id])
   React.useEffect(() => {
     let alive = true
-    for (const n of shown) fetch('/api/jobs/' + job.id + '/output?name=' + encodeURIComponent(n)).then(r => (r.ok ? r.text() : '')).then(t => alive && setTexts(x => ({ ...x, [n]: t })), () => {})
+    for (const n of shown) read(n).catch(() => '').then(t => alive && setTexts(x => ({ ...x, [n]: t })))
     return () => { alive = false }
-  }, [job.id, shown])
+  }, [read, shown])
   if (shown.some(n => texts[n] == null)) return <p className="m-0 text-caption text-muted-foreground" aria-live="polite">reading {shown.length} PMF file{shown.length > 1 ? 's' : ''}…</p>
   const time = (n: string) => /_t(-?\d+(?:\.\d+)?)\.xvg$/.exec(n)?.[1] ?? '?', colors = rampColors(shown.length, TOKENS_BY_THEME)
   // The frames along the ramp, oldest to newest (R7a).
@@ -197,7 +201,7 @@ function AwhChart({ job, record }: { job: Job; record: RunRecord }) {
   return (
     <div className="flex flex-col gap-3">
       <SeriesChart series={series} xlabel={xLabel} ylabel="PMF (kJ/mol)" height={300} ramp={{ first: series[0].label, last: series[series.length - 1].label }} y="data" rule={0}
-        exp={chartExport(job, record, shown[shown.length - 1], shown.map((n, i) => ({ text: texts[n], col: 1, name: series[i].label })), xLabel, 'PMF (kJ/mol)')} />
+        exp={chartExport(job, record, shown[shown.length - 1], () => Promise.all(names.map(async n => ({ text: texts[n] ?? await read(n), col: 1, name: 't = ' + time(n) + ' ps' }))), xLabel, 'PMF (kJ/mol)')} />
       {names.length > shown.length && <p className="m-0 text-caption text-muted-foreground">{shown.length} of {names.length} frames drawn, evenly spaced; every file is in the folder</p>}
       {axis.why ? <Status level="info" className="text-control">the axis keeps gmx awh's own label: {axis.why}</Status> : <p className="m-0 text-caption text-muted-foreground">ξ read from the run input when the job started · the files keep gmx's own label</p>}
       <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3">
@@ -590,7 +594,7 @@ export function ResultView({ job, record: rec, recordError, log, logCut, onAllLo
               <tr key={g.index}>
                 <td className="py-0.5 pr-4 text-muted-foreground">group {g.index}</td>
                 <td className={cn('pr-4 font-bold', groupText(g))}>{g.name}</td>
-                <td className="pr-4"><Input className="h-6 w-40 text-caption" defaultValue={labels[g.name] ?? ''} placeholder="label" aria-label={'label for ' + g.name} title="shown in place of the name, here, in compare and in exports; the record keeps gmx's name" onChange={e => setLabel('job:' + job.id, g.name, e.target.value)} /></td>
+                <td className="pr-4"><LabelInput className="h-6 w-40 text-caption" name={g.name} label={labels[g.name] ?? ''} placeholder="label" title="shown in place of the name, here, in compare and in exports; the record keeps gmx's name" onLabel={t => setLabel('job:' + job.id, g.name, t)} /></td>
                 <td className="pr-4 text-right">{g.count} atoms</td>
                 <td className="text-caption text-muted-foreground"> {g.gmxCount === g.count ? <Status inline level="ok" word="gmx agrees" /> : <Status inline level="warning" word={'gmx: ' + g.gmxCount} />} · {g.atoms.length > 40 ? g.atoms.slice(0, 40) + '…' : g.atoms}</td>
               </tr>

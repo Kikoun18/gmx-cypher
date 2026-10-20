@@ -194,7 +194,7 @@ export async function sendAll(ctx: Ctx, b: Batch, project: string): Promise<{ re
       const why = [...l.missing.map(t => 'no value for ' + t), ...l.preview.problems, ...l.reasons];
       if (why.length) { out.push({ rel: i.rel, skipped: why.join('; ') }); continue; }
       out.push({ rel: i.rel, sent: sendToInbox(v, p, xvg, l.name, ctx.config.pmfUrl).path });
-      keepRecord(v, String(j.meta!.record), [...ctx.config.allow, join(ctx.home, 'uploads')], 'gmx-cypher ' + ctx.version);
+      keepRecord(v, String(j.meta!.record), xvg, [...ctx.config.allow, join(ctx.home, 'uploads')], 'gmx-cypher ' + ctx.version);
     } catch (e) { out.push({ rel: i.rel, skipped: 'could not be sent: ' + (e as Error).message }); }
   }
   return out;

@@ -326,8 +326,11 @@ test('a compare view saved in the vault with the connected project, and opened a
     await panel.getByLabel('view name').fill('two runs')
     await panel.getByRole('button', { name: 'save view' }).click()
     await expect(panel.getByText('a view named "two runs" exists: nothing was replaced; choose another name')).toBeVisible()
-    // An empty compare (this browser forgets its working state), then the saved view: both runs, on one graph.
-    await page.evaluate(() => localStorage.clear())
+    // An empty compare (this browser forgets its working state), then the saved view: both runs, on one graph. A label
+    // this browser kept for one of its sources, which the view did not save, goes (review).
+    const first = (await api('/api/space/views/two%20runs') as { view: { sources: { project: string; row: string; rdf: string }[] } }).view.sources[0]
+    const key = 'vault:' + first.project + '/' + first.row + '/' + first.rdf
+    await page.evaluate(k => { localStorage.clear(); localStorage.setItem('gmx-cypher-labels', JSON.stringify({ [k]: { H_Met: 'stale' }, other: { x: 'kept' } })) }, key)
     await page.reload()
     const again = page.getByRole('region', { name: 'compare', exact: true })
     await expect(again.getByText('nothing picked yet · tick jobs in the jobs list, or add below')).toBeVisible()
@@ -336,6 +339,7 @@ test('a compare view saved in the vault with the connected project, and opened a
     await expect(again.getByText('opened: two runs')).toBeVisible()
     await expect(again.getByRole('radio', { name: 'one graph' })).toBeChecked()
     await expect(again.getByRole('complementary', { name: 'sources' }).getByRole('button', { name: /^remove Methionine × PG/ })).toHaveCount(2)
+    expect(JSON.parse(await page.evaluate(() => localStorage.getItem('gmx-cypher-labels') ?? '{}'))).toEqual({ other: { x: 'kept' } })
   } finally { await api('/api/config', { project: null }) }
   // The two refusals above (no project yet, a name taken) are answers in words, logged by the browser as 409s.
   expect(errors.filter(e => !/status of 409/.test(e))).toEqual([])

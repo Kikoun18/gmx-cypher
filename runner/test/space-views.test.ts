@@ -8,6 +8,7 @@ import { NodeBackend } from '../../matrix/scripts/node-backend';
 import { newVault } from '../../matrix/test/helpers';
 import { portableView, resolvedView, spacePaths, type SavedView } from '../src/lib/space';
 import { copyRecord, listRecords, listViews, readRecordCopy, readView, saveView } from '../server/space';
+import { DEFAULT_VIEW, viewOf, type View } from '../src/decypher/state';
 import { apiServer, RUNNER, tmp } from './helpers';
 
 const view = (sources: SavedView['sources'], v: Record<string, unknown> = {}, labels: SavedView['labels'] = {}): SavedView =>
@@ -89,5 +90,21 @@ describe('views in the space: listed, read and saved once (R14b)', () => {
       const one = await s.call<{ view: SavedView }>('/api/space/views/' + encodeURIComponent('mine'));
       expect(one.json.view).toMatchObject({ name: 'mine', sources: [{ kind: 'job', id: 'jmk2abcd1x9z' }], view: { mode: 'one' } });
     } finally { await s.close() }
+  });
+});
+
+describe('a saved view carries only its sources, each by one path (review)', () => {
+  it('two records that would read the same relative path are refused; so is a record named but not a source', () => {
+    const v = view([{ kind: 'record', path: '/scratch/p/rdf/a.run.json' }, { kind: 'record', path: '/home/u/p/rdf/a.run.json' }])
+    expect(() => portableView(v, ['/scratch', '/home/u'])).toThrow('/scratch/p/rdf/a.run.json and /home/u/p/rdf/a.run.json would both be saved as p/rdf/a.run.json')
+    const stray = view([{ kind: 'record', path: '/scratch/a.run.json' }], { hidden: ['record:/home/me/gone.run.json'] })
+    expect(() => portableView(stray, ['/scratch'])).toThrow('the view still names /home/me/gone.run.json, which is not among its sources')
+  });
+
+  it('the page leaves out what a removed source left behind', () => {
+    const A = 'record:/s/a.run.json', B = 'record:/s/gone.run.json', J = 'job:jmk2abcd1x9z'
+    const v = { ...DEFAULT_VIEW, hidden: [B], selected: { [A]: ['w'], [B]: ['x'] }, focus: B, morphed: [{ ids: [A, B], off: [] }, { ids: [A, J], off: [J] }], ownScale: [B, J],
+      styles: { [A + '|w|w']: { dash: 'dot' }, [B + '|x|x']: { dash: 'dot' } }, pins: { one: { marks: [] }, [B]: { marks: [] } } } as unknown as View
+    expect(viewOf(v, new Set([A, J]))).toMatchObject({ hidden: [], selected: { [A]: ['w'] }, focus: null, morphed: [{ ids: [A, J], off: [J] }], ownScale: [J], styles: { [A + '|w|w']: { dash: 'dot' } }, pins: { one: { marks: [] } } })
   });
 });
