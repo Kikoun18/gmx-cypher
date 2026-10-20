@@ -10,7 +10,9 @@ export interface Job {
   id: string; kind: string; title: string; file: string; args: string[]; cwd: string; env?: Record<string, string>
   status: 'running' | 'done' | 'failed' | 'cancelled' | 'interrupted'
   created: string; started?: string; ended?: string; pid?: number
-  exit?: { code: number | null; signal: string | null }; progress: Progress; error?: string; log?: string
+  exit?: { code: number | null; signal: string | null }; progress: Progress; error?: string
+  /** Its log's length; the log is read on demand (R12a). */
+  logSize?: number
   meta?: Record<string, unknown>
   /** Found running at start, its end never seen: it runs on, and nothing follows it (R2a). */
   unfollowed?: boolean
@@ -32,10 +34,13 @@ export const STATUS: Record<Job['status'], { level: Level; word: string }> = {
 /** A job's state: a job found running at start says it is no longer followed (R2a). */
 export const statusOf = (j: Job): { level: Level; word: string } => (j.unfollowed ? { level: 'warning', word: 'still running, not followed (pid ' + j.pid + ')' } : STATUS[j.status])
 
+/** A job's log as read (R12a): its text from `from` (0: all of it) to its end, of `size` characters. */
+export interface Log { text: string; from: number; size: number }
+
 /** Every job, kept current by the server's event stream; a reload or a restart loses nothing (T7). Each is named by the connected project (R3c). */
 export function useJobs(naming: Naming | null = null) {
   const [jobs, setJobs] = React.useState<Job[]>([])
-  const [logs, setLogs] = React.useState<Record<string, string>>({})
+  const [logs, setLogs] = React.useState<Record<string, Log>>({})
   // Whether the list came: until it does, a job (de)Cypher remembers is not yet missing.
   const [loaded, setLoaded] = React.useState(false)
   React.useEffect(() => {
@@ -47,11 +52,12 @@ export function useJobs(naming: Naming | null = null) {
     })
     es.addEventListener('out', e => {
       const { id, s } = JSON.parse((e as MessageEvent).data) as { id: string; s: string }
-      setLogs(l => (id in l ? { ...l, [id]: l[id] + s } : l))
+      setLogs(l => (id in l ? { ...l, [id]: { ...l[id], text: l[id].text + s, size: l[id].size + s.length } } : l))
     })
     return () => es.close()
   }, [])
-  const loadLog = React.useCallback((id: string) => { getJson<Job>('/api/jobs/' + id).then(j => setLogs(l => ({ ...l, [id]: j.log || '' })), () => {}) }, [])
+  // A job's log from its file: its last 64 kB, or all of it when asked (R12a).
+  const loadLog = React.useCallback((id: string, all = false) => { getJson<Log>('/api/jobs/' + id + '/log' + (all ? '?from=0' : '')).then(g => setLogs(l => ({ ...l, [id]: g })), () => {}) }, [])
   const named = React.useMemo(() => { const n = displayNames(jobs, naming); return jobs.map(j => ({ ...j, name: n.get(j.id), fields: nameFields(j, naming) })) }, [jobs, naming])
   return { jobs: named, logs, loadLog, loaded }
 }

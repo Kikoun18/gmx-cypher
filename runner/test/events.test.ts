@@ -61,8 +61,12 @@ describe('jobs over HTTP', () => {
     const list = await (await fetch(base + '/api/jobs', { headers })).json();
     expect(list.find((j: { id: string }) => j.id === id)).toMatchObject({ status: 'done', title: 'rdf_x' });
     expect(list[0].log).toBeUndefined();
+    // The log from its file (R12a): its tail, and every character with from=0.
     const one = await (await fetch(base + '/api/jobs/' + id, { headers })).json();
-    expect(one.log).toContain('Analyzed 11 frames');
+    expect(one.log).toBeUndefined();
+    const log = await (await fetch(base + '/api/jobs/' + id + '/log?from=0', { headers })).json();
+    expect([log.text, log.from, log.size]).toEqual([expect.stringContaining('Analyzed 11 frames'), 0, one.logSize]);
+    expect((await fetch(base + '/api/jobs/' + id + '/log?from=x', { headers })).status).toBe(400);
   });
 
   it('cancels a running job by its id, and refuses an unknown one', async () => {

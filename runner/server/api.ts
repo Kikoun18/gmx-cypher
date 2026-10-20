@@ -31,8 +31,8 @@ import { saveConfig, type Config } from './state';
 
 export interface Ctx { home: string; version: string; config: Config; gmx: GmxState; jobs: Jobs }
 
-/** A job without its log, for lists and events (the log comes with GET /api/jobs/:id). */
-const summary = ({ log: _log, ...j }: Job) => j;
+/** A job as lists and events send it: its log stays on disk, read with GET /api/jobs/:id/log (R12a). */
+const summary = (j: Job) => j;
 
 /** Server-Sent Events: every job and batch change and every piece of output, to every open page. */
 function events(jobs: Jobs, batches: Batches, res: ServerResponse) {
@@ -247,11 +247,17 @@ export function makeApi(ctx: Ctx): Api {
       if (!role || role === 'output') throw new HttpError(400, name + ' is not a GROMACS input (.xtc .trr .tng .tpr .gro .pdb .ndx .edr); not uploaded');
       return { body: await saveUpload(req, ctx.home, name) };
     }
-    const job = /^\/api\/jobs\/([\w-]+)(\/cancel|\/record|\/output|\/awh-convergence)?$/.exec(url.pathname);
+    const job = /^\/api\/jobs\/([\w-]+)(\/cancel|\/record|\/output|\/awh-convergence|\/log)?$/.exec(url.pathname);
     if (job) {
       const j = ctx.jobs.get(job[1]);
       if (!j) throw new HttpError(404, 'no job ' + job[1]);
       if (req.method === 'GET' && !job[2]) return { body: j };
+      // Its log from its file (R12a): the last 64 kB unless a range is asked for (from=0: all of it).
+      if (req.method === 'GET' && job[2] === '/log') {
+        const n = (k: string) => { const v = url.searchParams.get(k); return v == null || v === '' ? undefined : Number(v); }, from = n('from'), to = n('to');
+        if ([from, to].some(v => v !== undefined && !Number.isFinite(v))) throw new HttpError(400, 'from and to are character offsets');
+        return { body: ctx.jobs.logRange(j.id, from, to) };
+      }
       if (req.method === 'POST' && job[2] === '/cancel') { ctx.jobs.cancel(j.id); return { body: summary(j) }; }
       if (req.method === 'GET' && job[2] === '/record') {
         const path = j.meta?.record as string | undefined;

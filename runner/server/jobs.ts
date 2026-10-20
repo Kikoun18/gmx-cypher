@@ -1,6 +1,7 @@
 // Jobs (T6, T7): each runs without a shell in its own process group, so cancel stops everything it
 // started. Its life is an append-only event log, <home>/jobs/<id>.ndjson, replayed at start: a reload
-// or a restart loses nothing, and a job a crash left behind shows as interrupted.
+// or a restart loses nothing, and a job a crash left behind shows as interrupted. A job's log stays in that file (R12a):
+// what is held is its size, and while it runs its last 64 kB, for its progress; the log is read when asked for.
 
 import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
 import { EventEmitter } from 'node:events';
@@ -20,7 +21,8 @@ export interface Job extends JobSpec {
   exit?: { code: number | null; signal: string | null };
   progress: Progress;
   error?: string;
-  log: string;
+  /** Its log's length, in characters; the log itself is read from its file (R12a). */
+  logSize: number;
   /** Found running at start, its end never seen: it runs on, and nothing here follows it (R2a). */
   unfollowed?: boolean;
 }
@@ -32,21 +34,58 @@ type Event =
   | { t: 'cancel'; at: string }
   | { t: 'ended'; at: string; status: JobStatus; code: number | null; signal: string | null; error?: string };
 
-/** A job's state from its events, in order. */
-function fold(id: string, events: Event[]): Job | null {
-  let j: Job | null = null;
+/** The end of a log kept while its job runs, and the part of it sent unless all is asked for (R12a). */
+export const LOG_TAIL = 65536;
+
+/** A job's state from its events, in order, without its log: its size, and its tail (the progress is read from it). */
+export function foldJob(id: string, events: Event[]): { job: Job; tail: string } | null {
+  let j: Job | null = null, tail = '';
   for (const e of events) {
-    if (e.t === 'created') j = { ...e.spec, id, status: 'running', created: e.at, progress: {}, log: '' };
+    if (e.t === 'created') j = { ...e.spec, id, status: 'running', created: e.at, progress: {}, logSize: 0 };
     else if (!j) return null;
     else if (e.t === 'started') { j.started = e.at; j.pid = e.pid; }
-    else if (e.t === 'out') j.log += e.s;
+    else if (e.t === 'out') { j.logSize += e.s.length; tail = (tail + e.s).slice(-LOG_TAIL); }
     else if (e.t === 'ended') {
       j.status = e.status; j.ended = e.at; j.exit = { code: e.code, signal: e.signal };
       if (e.error) j.error = e.error;
     }
   }
-  if (j) j.progress = parseProgress(j.log);
-  return j;
+  if (!j) return null;
+  j.progress = parseProgress(tail);
+  return { job: j, tail };
+}
+const OUT = '{"t":"out","s":"';
+/** A JSON string's length once decoded, without decoding it: each escape is one character (\\uXXXX one UTF-16 unit). */
+function decodedLength(json: string, from: number, to: number): number {
+  let n = to - from;
+  for (let i = json.indexOf('\\', from); i >= 0 && i < to; ) { const u = json.charCodeAt(i + 1) === 117; n -= u ? 5 : 1; i = json.indexOf('\\', i + (u ? 6 : 2)); }
+  return n;
+}
+/**
+ * A job from its file's text, as foldJob gives it, at start (R12a): its output lines, as this file writes them, are only
+ * measured, and only the last of them, enough for the tail, decoded.
+ */
+export function foldFile(id: string, text: string): { job: Job; tail: string } | null {
+  const lines = text.split('\n'), events: Event[] = [], outs: number[] = [];
+  let size = 0;
+  lines.forEach((l, i) => {
+    if (l.startsWith(OUT) && l.endsWith('"}')) { size += decodedLength(l, OUT.length, l.length - 2); outs.push(i); }
+    else if (l) try { events.push(JSON.parse(l) as Event); } catch { /* a line cut short by a crash */ }
+  });
+  const f = foldJob(id, events);
+  if (!f) return null;
+  let tail = '';
+  for (let k = outs.length - 1; k >= 0 && tail.length < LOG_TAIL; k--) tail = (JSON.parse(lines[outs[k]]) as { s: string }).s + tail;
+  f.tail = tail.slice(-LOG_TAIL);
+  Object.assign(f.job, { logSize: size, progress: parseProgress(f.tail) });
+  return f;
+}
+
+/** A job's events from its file; none when the file is gone. */
+function readEvents(file: string): Event[] {
+  let text = '';
+  try { text = readFileSync(file, 'utf8'); } catch { return []; }
+  return text.split('\n').filter(Boolean).flatMap(l => { try { return [JSON.parse(l) as Event]; } catch { return []; } });
 }
 
 /**
@@ -74,20 +113,24 @@ export class Jobs extends EventEmitter {
   private readonly jobs = new Map<string, Job>();
   private readonly procs = new Map<string, ChildProcess>();
   private readonly cancelling = new Set<string>();
+  /** The last 64 kB of each running job's log. */
+  private readonly tails = new Map<string, string>();
 
   constructor(dir: string) {
     super();
     this.dir = dir;
     mkdirSync(dir, { recursive: true });
     for (const f of readdirSync(dir).filter(n => n.endsWith('.ndjson')).sort()) {
-      const id = f.slice(0, -'.ndjson'.length);
-      const events = readFileSync(join(dir, f), 'utf8').split('\n').filter(Boolean).flatMap(l => { try { return [JSON.parse(l) as Event]; } catch { return []; } });
-      const j = fold(id, events);
-      if (!j) continue;
+      let text = '';
+      try { text = readFileSync(join(dir, f), 'utf8'); } catch { continue; }
+      const id = f.slice(0, -'.ndjson'.length), folded = foldFile(id, text);
+      if (!folded) continue;
+      const j = folded.job;
       this.jobs.set(id, j);
       // Started and never ended: the runner stopped without seeing the end. A process still running this job's
       // command runs on, not followed (R2a): gmx-cypher never invents its end. Otherwise the job was interrupted.
       if (j.ended) continue;
+      this.tails.set(id, folded.tail);
       if (j.pid && sameProgram(commandLine(j.pid), j)) j.unfollowed = true;
       else this.end(id, 'interrupted', null, null, 'gmx-cypher stopped while this job ran' + (j.pid ? ' (pid ' + j.pid + ')' : ''));
     }
@@ -97,6 +140,14 @@ export class Jobs extends EventEmitter {
   get(id: string): Job | undefined { return this.jobs.get(id); }
   running(): Job[] { return this.list().filter(j => j.status === 'running'); }
 
+  /** A job's whole log, read from its file. */
+  logText(id: string): string { return readEvents(join(this.dir, id + '.ndjson')).map(e => (e.t === 'out' ? e.s : '')).join(''); }
+  /** A part of a job's log (R12a): from `from` to `to` (characters, clamped), by default its last 64 kB. */
+  logRange(id: string, from?: number, to?: number): { text: string; from: number; to: number; size: number } {
+    const text = this.logText(id), size = text.length, b = Math.min(size, Math.max(0, to ?? size)), a = Math.min(b, Math.max(0, from ?? size - LOG_TAIL));
+    return { text: text.slice(a, b), from: a, to: b, size };
+  }
+
   private append(id: string, e: Event) { appendFileSync(join(this.dir, id + '.ndjson'), JSON.stringify(e) + '\n'); }
   private changed(j: Job) { this.emit('job', j); }
 
@@ -105,7 +156,8 @@ export class Jobs extends EventEmitter {
     if (j.ended) return;
     const e: Event = { t: 'ended', at: new Date().toISOString(), status, code, signal, ...(error ? { error } : {}) };
     this.append(id, e);
-    Object.assign(j, { status, ended: e.at, exit: { code, signal }, progress: parseProgress(j.log) }, error ? { error } : {});
+    Object.assign(j, { status, ended: e.at, exit: { code, signal }, progress: parseProgress(this.tails.get(id) ?? '') }, error ? { error } : {});
+    this.tails.delete(id);
     this.procs.delete(id);
     this.cancelling.delete(id);
     this.changed(j);
@@ -115,8 +167,9 @@ export class Jobs extends EventEmitter {
     const id = 'j' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
     const created: Event = { t: 'created', at: new Date().toISOString(), spec };
     this.append(id, created);
-    const j = fold(id, [created])!;
+    const j = foldJob(id, [created])!.job;
     this.jobs.set(id, j);
+    this.tails.set(id, '');
     // An argument array and no shell: names, selections and paths are data. detached: its own process group.
     const p = spawn(spec.file, spec.args, { cwd: spec.cwd, env: { ...process.env, ...spec.env }, shell: false, detached: true, stdio: [spec.stdin == null ? 'ignore' : 'pipe', 'pipe', 'pipe'] });
     if (spec.stdin != null) { p.stdin!.on('error', () => { /* the program may end before it reads its answers */ }); p.stdin!.end(spec.stdin); }
@@ -129,8 +182,10 @@ export class Jobs extends EventEmitter {
     const out = (d: Buffer) => {
       const s = d.toString('utf8');
       this.append(id, { t: 'out', s });
-      j.log += s;
-      j.progress = parseProgress(j.log);
+      const tail = (this.tails.get(id) + s).slice(-LOG_TAIL);
+      this.tails.set(id, tail);
+      j.logSize += s.length;
+      j.progress = parseProgress(tail);
       this.emit('out', id, s);
       this.changed(j);
     };
@@ -139,7 +194,7 @@ export class Jobs extends EventEmitter {
     p.on('error', e => this.end(id, 'failed', null, null, spec.file + ': ' + e.message));
     p.on('close', (code, signal) => {
       const status: JobStatus = this.cancelling.has(id) ? 'cancelled' : code === 0 ? 'done' : 'failed';
-      this.end(id, status, code, signal, status === 'failed' ? gmxError(j.log) || (signal ? 'stopped by ' + signal : 'exit ' + code) : undefined);
+      this.end(id, status, code, signal, status === 'failed' ? gmxError(this.logText(id)) || (signal ? 'stopped by ' + signal : 'exit ' + code) : undefined);
     });
     this.changed(j);
     return j;

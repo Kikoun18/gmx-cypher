@@ -490,8 +490,10 @@ function Charts({ job, record }: { job: Job; record: RunRecord }) {
  * settings line and the groups as gmx counted them; and, collapsed, its files (within their allowed folder), its
  * command and its log. While it runs or when it failed, the log is open.
  */
-export function ResultView({ job, record: rec, recordError, log, allow, vault, onRunAgain, onCompare, actions }: {
+export function ResultView({ job, record: rec, recordError, log, logCut, onAllLog, allow, vault, onRunAgain, onCompare, actions }: {
   job: Job; record: RunRecord | null; recordError?: string; log: string | undefined; allow: string[]; vault: string | null
+  /** Where the log shown starts, when it is its tail only (R12a), and reading all of it. */
+  logCut?: { from: number; size: number }; onAllLog?: () => void
   onRunAgain: (r: RunRecord) => void; onCompare: () => void; actions?: React.ReactNode
 }) {
   const [sending, setSending] = React.useState(false), [figures] = React.useState(() => new Map<string, PageFigure>())
@@ -540,7 +542,8 @@ export function ResultView({ job, record: rec, recordError, log, allow, vault, o
           </tbody></table></>}
           <Section label="Command" />
           <Code label="command line" text={commandText(job)} />
-          <Section label="Log"><span className="text-caption text-muted-foreground">{live ? 'live · stdout and stderr' : 'stdout and stderr'}</span></Section>
+          <Section label="Log"><span className="text-caption text-muted-foreground">{live ? 'live · stdout and stderr' : 'stdout and stderr'}{logCut ? ' · its last ' + size(logCut.size - logCut.from) + ' of ' + size(logCut.size) : ''}</span>
+            {logCut && onAllLog && <Button variant="ghost" size="sm" onClick={onAllLog}>show all</Button>}</Section>
           <div ref={logRef}><Code label="log" text={asTerminal(log ?? '')} className="max-h-80 text-muted-foreground" /></div>
         </>} />
       {vault && <SendDialog job={job} open={sending} onOpenChange={setSending} returnFocus={sendButton} />}

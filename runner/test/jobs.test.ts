@@ -24,7 +24,7 @@ describe('jobs', () => {
     const j = jobs.start({ kind: 'test', title: 'echo', file: process.execPath, args, cwd });
     const done = await ended(jobs, j.id);
     expect(done.status).toBe('done');
-    expect(JSON.parse(jobs.get(j.id)!.log.trim())).toEqual(args.slice(2));
+    expect(JSON.parse(jobs.logText(j.id).trim())).toEqual(args.slice(2));
   });
 
   it('records progress, the frames analysed and a clean exit; the log is kept and replayed', async () => {
@@ -35,8 +35,8 @@ describe('jobs', () => {
     expect(existsSync(join(cwd, 'out.xvg'))).toBe(true);
     const again = new Jobs(join(home, 'jobs')).get(j.id)!;
     expect(again).toMatchObject({ status: 'done', title: 'rdf_nvt', progress: done.progress });
-    expect(again.log).toBe(jobs.get(j.id)!.log);
-    expect(again.log).toContain('Analyzed 11 frames');
+    expect(again.logSize).toBe(jobs.logText(j.id).length);
+    expect(new Jobs(join(home, 'jobs')).logText(j.id)).toContain('Analyzed 11 frames');
   });
 
   it("records a failure with gmx's own error", async () => {

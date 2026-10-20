@@ -250,7 +250,8 @@ export async function startRun(ctx: Ctx, req: RunRequest, roots: string[]): Prom
   const windows = plan.windows ? await Promise.all(plan.windows.map(async w => ({ tpr: await fileInfo(w.tpr, true), pull: await fileInfo(w.pull, true) }))) : null;
   // What gmx awh's ξ is (R7c): read once from the run input, kept in the record so it never needs the run input again.
   const awhUnitsRead = plan.tool === 'awh' ? awhUnits(await dumpText(ctx.gmx, inside(req.inputs.runInput!, roots), plan.cwd)) : null;
-  const recordOf = (j: Job, outputs: Output[], problems: string[]): RunRecord => buildRecord({
+  // The record holds the job's log, read from its file (R12a): at the start nothing yet, at the end all of it.
+  const recordOf = (j0: Job, outputs: Output[], problems: string[]): RunRecord => { const j = { ...j0, log: ctx.jobs.logText(j0.id) }; return buildRecord({
     analysis: plan.tool, record: plan.names.record, runner: ctx.version, gmx: { path: ctx.gmx.path!, version: ctx.gmx.version! }, env, command: { cwd: plan.cwd, file: plan.file, args: plan.argv },
     inputs, groups: req.groups ?? [], atoms, sizes, options: plan.options, help, form: cmd.options, template: req.template || DEFAULT_TEMPLATE,
     outDir: req.outDir ?? null, job: j, outputs, problems, stdin: plan.stdin, terms: req.terms, complete: !!j.ended,
@@ -262,7 +263,7 @@ export async function startRun(ctx: Ctx, req: RunRequest, roots: string[]): Prom
     ...(awhUnitsRead ? { awhUnits: awhUnitsRead } : {}),
     // gmx awh's frames are its files: how many it wrote, and the time of the last (the one for the vault).
     ...(plan.tool === 'awh' ? { frames: j.ended ? awhRecordFrames(plan.stem, outputs.map(o => o.path.split('/').pop()!)) : null } : {}),
-  });
+  }); };
   const json = (r: RunRecord) => JSON.stringify(r, null, 2) + '\n';
   const job = ctx.jobs.start({
     kind: plan.tool, title: !cmd.groups ? plan.stem + ' · gmx ' + plan.tool : plan.stem + ' · ' + req.groups[0].name + (req.groups.length > 1 ? ' → ' + req.groups.slice(1).map(g => g.name).join(', ') : ''),

@@ -6,7 +6,7 @@ import { Checkbox } from '../ui/checkbox'
 import { Kbd } from '../ui/kbd'
 import { Section } from '../ui/separator'
 import { postJson } from '../api'
-import { clock, fraction, jobLine, progressText, statusOf, type Job, type useJobs } from '../jobs'
+import { clock, fraction, jobLine, progressText, statusOf, type Job, type Log, type useJobs } from '../jobs'
 import { Status } from '../ui/status'
 import { cn } from '../lib/utils'
 import { RunResult } from './Result'
@@ -28,7 +28,7 @@ function useNow(on: boolean) {
   return now
 }
 
-function JobDetail({ job, log, onRunAgain, vault, allow, onCompare }: { job: Job; log: string | undefined; onRunAgain: (r: RunRecord) => void; vault: string | null; allow: string[]; onCompare: () => void }) {
+function JobDetail({ job, log, onAllLog, onRunAgain, vault, allow, onCompare }: { job: Job; log: Log | undefined; onAllLog: () => void; onRunAgain: (r: RunRecord) => void; vault: string | null; allow: string[]; onCompare: () => void }) {
   const [armed, press] = useArmed()
   const cancel = () => { if (press()) postJson('/api/jobs/' + job.id + '/cancel', {}).catch(() => {}) }
   const s = statusOf(job), running = job.status === 'running', now = useNow(running), f = fraction(job)
@@ -51,7 +51,7 @@ function JobDetail({ job, log, onRunAgain, vault, allow, onCompare }: { job: Job
       {job.unfollowed && <p className="m-0 text-caption text-muted-foreground">gmx-cypher restarted while this job ran: it still runs (pid {job.pid}), but its output and its end are no longer read here, and its record is not completed</p>}
       {(running || job.progress.frame != null) && !job.unfollowed && <p className="m-0 text-control" aria-live="polite">{job.status === 'failed' || job.status === 'cancelled' ? 'stopped at ' : ''}{progressText(job)}{took && ' · ' + took}</p>}
       {job.status === 'interrupted' && <p className="m-0 text-caption text-muted-foreground">{job.error}</p>}
-      <RunResult job={job} log={log} allow={allow} vault={vault} onRunAgain={onRunAgain} onCompare={onCompare}
+      <RunResult job={job} log={log?.text} logCut={log && log.from > 0 ? { from: log.from, size: log.size } : undefined} onAllLog={onAllLog} allow={allow} vault={vault} onRunAgain={onRunAgain} onCompare={onCompare}
         actions={job.status === 'running' && !job.unfollowed && <Button variant="destructive" onClick={cancel}>{armed ? 'click again to cancel' : 'cancel'}</Button>} />
       <p className="m-0 text-caption text-muted-foreground">a job keeps running when this page is closed or reloaded · started {new Date(job.created).toLocaleString()}</p>
     </div>
@@ -100,7 +100,7 @@ export function JobsView({ jobs, logs, loadLog, route, go, onRunAgain, vault, al
           )
         })}
       </nav>
-      {route.view === 'compare' ? compare : job && <JobDetail key={job.id} job={job} log={logs[job.id]} onRunAgain={onRunAgain} vault={vault} allow={allow} onCompare={() => go({ view: 'compare', jobs: [job.id] })} />}
+      {route.view === 'compare' ? compare : job && <JobDetail key={job.id} job={job} log={logs[job.id]} onAllLog={() => loadLog(job.id, true)} onRunAgain={onRunAgain} vault={vault} allow={allow} onCompare={() => go({ view: 'compare', jobs: [job.id] })} />}
     </div>
   )
 }

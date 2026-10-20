@@ -22,7 +22,7 @@ describe('stdin answers (T99)', () => {
     const jobs = new Jobs(tmp('stdin-jobs'));
     const job = jobs.start({ kind: 'test', title: 'echo', file: process.execPath, args: ECHO, cwd: tmp('stdin-cwd'), stdin: 'answer 42\n' });
     for (let n = 0; n < 100 && jobs.get(job.id)!.status === 'running'; n++) await new Promise(r => setTimeout(r, 50));
-    expect(jobs.get(job.id)!.log).toBe('answer 42\n');
+    expect(jobs.logText(job.id)).toBe('answer 42\n');
     expect(jobs.get(job.id)!.stdin).toBe('answer 42\n');
   });
 });
