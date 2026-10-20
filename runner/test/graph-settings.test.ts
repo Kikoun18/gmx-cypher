@@ -54,8 +54,43 @@ describe('the same scale (R11a)', () => {
   it('the export says which axes are shared, and which charts are reset, by their ids in the export', () => {
     const NAMES = ['9.multiwalker.gro', 'rdf_o111_Methionine_H.ndx', 'rdf_o111_Methionine_H.run.json', 'rdf_o111_Methionine_H.xvg', 'rdf_o111_Methionine_S.ndx', 'rdf_o111_Methionine_S.run.json', 'rdf_o111_Methionine_S.xvg']
     const { analyses, structs } = fromFiles(NAMES.map(n => ({ path: '/sims/' + n, text: readFileSync(RUNNER + 'test/fixtures/decypher/' + n, 'utf8') })))
-    const view = { rep: 'ball & stick' as const, rest: 'grey' as const, labels: true, hydrogens: true, arrange: 'side by side' as const, scale: 'y' as const, ownScale: [analyses[1].id, 'gone'] }
+    const styles = { [analyses[1].id + '|O5...S|O5...S']: { dash: 'dotted' }, 'job:gone|x|x': { width: 1.5 } }
+    const view = { rep: 'ball & stick' as const, rest: 'grey' as const, labels: true, hydrogens: true, arrange: 'side by side' as const, scale: 'y' as const, ownScale: [analyses[1].id, 'gone'], styles }
     const d = exportData({ analyses, structs, selected: () => [], tones: {}, compare: null, view, theme: 'light', tokens: TOKENS, structures: false, by: 'x' })
-    expect([d.view.scale, d.view.ownScale]).toEqual(['y', ['a2']])
+    // The line styles (R11b) too, by the curves' keys in the export.
+    expect([d.view.scale, d.view.ownScale, d.view.styles]).toEqual(['y', ['a2'], { 'a2|O5...S|O5...S': { dash: 'dotted' } }])
+  })
+})
+
+describe('line styles (R11b)', () => {
+  const curve = (key: string, tone: 'coral' | 'sky', color: string, dash = 'none') => ({ key, name: key, source: '', analysis: 'a', x: [0, 1], y: [1, 2], color, dash, peak: null, atoms: 1, tone })
+  const [a, b, c] = [curve('a', 'coral', '#c0392b'), curve('b', 'coral', '#d4675c', '5 4'), curve('c', 'sky', '#2471a3')]
+  it('takes a dash by its Matrix name, a width within 1.5–2 px, a shade within three steps; anything else is left out', () => {
+    expect(kit.cleanStyles({ a: { dash: 'dotted', width: 1.5, shade: 2 }, b: { dash: 'wavy', width: 3, shade: 9 }, c: { width: NaN }, d: 'x', e: { dash: 'solid' } })).toEqual({ a: { dash: 'dotted', width: 1.5, shade: 2 }, b: { width: 2, shade: 3 }, e: { dash: 'solid' } })
+    const [sa, sb] = kit.styleCurves([a, b], { a: { dash: 'dotted', width: 1.5 }, b: { dash: 'solid' } }, pal)
+    expect([sa.dash, sa.width, sa.styled, sb.dash, sb.width]).toEqual(['2 3', 1.5, true, 'none', undefined])
+  })
+  it('shades a curve lighter or darker, never below 3:1 against the card', () => {
+    const lighter = kit.styleCurves([a], { a: { shade: 3 } }, pal)[0].color, darker = kit.styleCurves([a], { a: { shade: -1 } }, pal)[0].color
+    expect([lighter !== a.color, darker !== a.color]).toEqual([true, true])
+    expect(kit.contrast(lighter, pal.card)).toBeGreaterThanOrEqual(3)
+    expect(kit.contrast(kit.styleCurves([c], { c: { shade: 3 } }, pal)[0].color, pal.card)).toBeGreaterThanOrEqual(3)
+  })
+  it('warns when a choice makes two curves of one tone alike: the same, or apart by shade alone', () => {
+    // As drawn: a tone's curves apart by their dash, nothing to say.
+    expect(kit.sameLooks([a, b, c])).toEqual([])
+    const solid = kit.styleCurves([a, b, c], { b: { dash: 'solid' } }, pal)
+    expect(kit.sameLooks(solid).map(w => [w.a.key, w.b.key, w.why])).toEqual([['a', 'b', 'shade']])
+    const same = kit.styleCurves([a, { ...b, color: a.color }, c], { b: { dash: 'solid' } }, pal)
+    expect(kit.sameLooks(same).map(w => w.why)).toEqual(['same'])
+    // A width apart is enough; another tone is another hue.
+    expect(kit.sameLooks(kit.styleCurves([a, b, c], { b: { dash: 'solid', width: 1.5 }, c: { dash: 'solid' } }, pal))).toEqual([])
+  })
+  it('draws a curve at its own width, and figures in print a half pixel heavier', () => {
+    const sa = kit.styleCurves([a], { a: { width: 1.5 } }, pal)[0]
+    const path = (kit.chart({ W: 300, H: 200, curves: [sa], grid: sa.x, xlabel: 'x', ylabel: 'y', hover: null, marks: 'none', pal }).tree as unknown as unknown[])
+    expect(JSON.stringify(path)).toContain('"strokeWidth":1.5')
+    const fig = (theme: 'light' | 'print') => graphData({ title: 't', file: 'f', xlabel: 'x', ylabel: 'y', curves: [sa, b] }, theme).series.map(s => s.width)
+    expect([fig('light'), fig('print')]).toEqual([[1.5, 2], [2, 2.5]])
   })
 })

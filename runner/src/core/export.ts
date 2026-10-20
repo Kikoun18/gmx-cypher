@@ -21,7 +21,8 @@ export function graphData(f: Figure, theme: ExportPrefs['theme']): GraphData {
   const ink = (c: Curve) => (theme === 'print' ? c.print ?? grey(c.color) : c.color), rule = f.rule === undefined ? 1 : f.rule, marks = f.marks ?? 'none'
   const name = (c: Curve) => c.name + (c.source ? ' · ' + c.source : ''), digits = f.xDigits ?? kit.xDigitsOf(f.curves[0]?.x ?? [])
   const series = f.curves.flatMap(c => {
-    const s = { x: c.x, y: c.y, label: name(c), color: ink(c), width: 2, dash: c.dash === 'none' ? undefined : c.dash }
+    // Its own width (R11b); in print, half a pixel heavier.
+    const s = { x: c.x, y: c.y, label: name(c), color: ink(c), width: (c.width ?? 2) + (theme === 'print' ? 0.5 : 0), dash: c.dash === 'none' ? undefined : c.dash }
     if (!c.err) return [s]
     const band = (sign: 1 | -1) => ({ x: c.x, y: c.y.map((v, i) => v + sign * (c.err![i] || 0)), label: name(c) + (sign > 0 ? ' + σ' : ' − σ'), color: s.color, width: 1, dash: '2 3' })
     return [s, band(1), band(-1)]

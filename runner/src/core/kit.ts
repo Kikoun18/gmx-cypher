@@ -9,6 +9,8 @@ export type Tone = 'coral' | 'sky' | 'mint' | 'butter' | 'lilac' | 'aqua' | 'ros
 export type Rep = 'ball & stick' | 'sticks' | 'spheres'
 export type Rest = 'tinted' | 'grey' | 'ghost'
 export type Arrange = 'side by side' | 'frame positions'
+/** A curve's style of its own (R11b): a dash by the Matrix's name, a width within Morpheus's 1.5–2 px, a shade in steps (−3…3). */
+export interface LineStyle { dash?: string; width?: number; shade?: number }
 /** Same scale (R11a): the axes compare's charts share, among charts of like quantities. */
 export type Scale = 'own' | 'x' | 'y' | 'both'
 export type ColorBy = 'group' | 'job'
@@ -124,6 +126,8 @@ export interface Curve {
   key: string; name: string; source: string; analysis: string
   x: number[]; y: number[]; color: string; dash: string; peak: Peak | null; shell?: Peak | null; atoms: number
   hot?: boolean; dim?: boolean
+  /** Its line's width in px (R11b: 1.5 or 2; 2 when not set); the tone that coloured it; whether a style of its own was set. */
+  width?: number; tone?: Tone; styled?: boolean
   /** ± per point, drawn as a band in the curve's colour (WHAM's bootstrap error). */
   err?: number[]
   /** Its grey in print (an ordered curve's even grey, R7a); else the Matrix greys its colour. */
@@ -147,7 +151,7 @@ export interface ExportData {
   compare: { ids: string[]; focus: string; selected: string[]; colorBy: ColorBy } | null
   /** RDFs shown as one card (they differ only in their reference): the first leads; `on` are those whose reference is plotted. */
   morphs?: { ids: string[]; on: string[]; title: string }[]
-  view: { rep: Rep; rest: Rest; labels: boolean; hydrogens: boolean; arrange: Arrange; scale?: Scale; ownScale?: string[] }
+  view: { rep: Rep; rest: Rest; labels: boolean; hydrogens: boolean; arrange: Arrange; scale?: Scale; ownScale?: string[]; styles?: Record<string, LineStyle> }
 }
 
 /** What the kit is made from (src/core/index.ts): the tones in palette order, and the Matrix's dashes with their names. */
@@ -300,6 +304,12 @@ export function decypherKit(data: KitData) {
     const A = hex(a), B = hex(b)
     const r = Math.round(A[0] + (B[0] - A[0]) * t), g = Math.round(A[1] + (B[1] - A[1]) * t), bb = Math.round(A[2] + (B[2] - A[2]) * t)
     return '#' + ((1 << 24) | (r << 16) | (g << 8) | bb).toString(16).slice(1)
+  }
+  /** WCAG contrast of two colours. */
+  function contrast(a: string, b: string): number {
+    const lum = (c: string) => { const [r, g, bb] = hex(c).map(v => { v /= 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4 }); return 0.2126 * r + 0.7152 * g + 0.0722 * bb }
+    const x = lum(a), y = lum(b)
+    return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05)
   }
   function rgba(c: string, a: number): string { const h = hex(c); return 'rgba(' + h[0] + ',' + h[1] + ',' + h[2] + ',' + a + ')' }
 
@@ -973,7 +983,7 @@ export function decypherKit(data: KitData) {
           if (mi > 0) color = mix(color, ink, look.shade)
           dash = DASH[look.groupDash]
         }
-        out.push({ key: an.id + '|' + gg.name + '|' + name, name, source: an.label, analysis: an.id, x: an.x, y: gg.y, color, dash, peak: gg.peak, shell: gg.shell ?? null, atoms: gg.atoms.length })
+        out.push({ key: an.id + '|' + gg.name + '|' + name, name, source: an.label, analysis: an.id, x: an.x, y: gg.y, color, dash, peak: gg.peak, shell: gg.shell ?? null, atoms: gg.atoms.length, tone: o.colorBy === 'job' ? look.tone : g0.tone })
       })
     })
     return out
@@ -1030,6 +1040,46 @@ export function decypherKit(data: KitData) {
    * hollow, and at `hover` a rule with a dot on each curve. The y range starts at 0 (`zero`: g(r), counts) or is the
    * data's own (`data`). Axis labels keep their case: data names and units are not shouted.
    */
+  /** Line styles kept as they may be (R11b): a known dash name, a width clamped to 1.5–2 px, a shade to three steps either way. */
+  function cleanStyles(v: unknown): Record<string, LineStyle> {
+    const out: Record<string, LineStyle> = {}
+    for (const [k, s] of Object.entries(v && typeof v === 'object' ? v : {})) {
+      if (!s || typeof s !== 'object') continue
+      const o = s as Record<string, unknown>, st: LineStyle = {}
+      if (typeof o.dash === 'string' && DASH_NAMES.includes(o.dash)) st.dash = o.dash
+      if (typeof o.width === 'number' && Number.isFinite(o.width)) st.width = Math.min(2, Math.max(1.5, o.width))
+      if (typeof o.shade === 'number' && Number.isFinite(o.shade) && Math.round(o.shade)) st.shade = Math.min(3, Math.max(-3, Math.round(o.shade)))
+      if (Object.keys(st).length) out[k] = st
+    }
+    return out
+  }
+  /**
+   * Curves with their styles of their own (R11b): the dash by name, the width, and the shade, each step a tenth of the
+   * way to the theme's light end (lighter) or its dark end (darker), as far as the colour keeps 3:1 against the card.
+   */
+  function styleCurves(curves: Curve[], styles: Record<string, LineStyle>, pal: Palette): Curve[] {
+    return curves.map(c => {
+      const s = styles[c.key]
+      if (!s) return c
+      let color = c.color
+      const end = (s.shade ?? 0) > 0 === pal.dark ? pal.fg : pal.card
+      for (let k = Math.abs(s.shade ?? 0); k > 0; k--) { const t = mix(c.color, end, 0.1 * k); if (contrast(t, pal.card) >= 3) { color = t; break } }
+      const d = s.dash ? DASH_NAMES.indexOf(s.dash) : -1
+      return { ...c, color, ...(d >= 0 ? { dash: DASH[d] } : {}), ...(s.width ? { width: s.width } : {}), styled: true }
+    })
+  }
+  /**
+   * Curves a style of their own made alike (R11b): of one tone, with the same dash and width, they differ by shade alone
+   * (Morpheus: never by hue alone), or not at all. Curves left as drawn are apart already (rdfLooks).
+   */
+  function sameLooks(curves: Curve[]): { a: Curve; b: Curve; why: 'same' | 'shade' }[] {
+    const out: { a: Curve; b: Curve; why: 'same' | 'shade' }[] = []
+    curves.forEach((a, i) => curves.slice(i + 1).forEach(b => {
+      if ((a.styled || b.styled) && a.tone === b.tone && a.dash === b.dash && (a.width ?? 2) === (b.width ?? 2)) out.push({ a, b, why: a.color === b.color ? 'same' : 'shade' })
+    }))
+    return out
+  }
+
   /** The range of several series on one axis (R11a): every finite value, a y's error band with it; null for none. */
   function sharedDomain(series: { x: number[]; y: number[]; err?: number[] }[], axis: 'x' | 'y'): [number, number] | null {
     let lo = Infinity, hi = -Infinity
@@ -1111,7 +1161,7 @@ export function decypherKit(data: KitData) {
         const down = c.y.map((v, j) => 'L' + sx(c.x[j]).toFixed(1) + ',' + sy(v - (c.err![j] || 0)).toFixed(1)).reverse().join('')
         line.push(['path', { key: 'band', d: up + down + 'Z', fill: c.color, fillOpacity: 0.18, stroke: 'none' }])
       }
-      line.push(['path', { key: 'p', d, fill: 'none', stroke: c.color, strokeWidth: c.hot ? 2.8 : 2, strokeLinejoin: 'round', strokeLinecap: 'round', strokeDasharray: c.dash === 'none' ? undefined : c.dash, style: o.animate ? { d: 'path("' + d + '")', transition: 'd 360ms ' + ease + ', stroke 200ms ease' } : undefined }])
+      line.push(['path', { key: 'p', d, fill: 'none', stroke: c.color, strokeWidth: (c.width ?? 2) + (c.hot ? 0.8 : 0), strokeLinejoin: 'round', strokeLinecap: 'round', strokeDasharray: c.dash === 'none' ? undefined : c.dash, style: o.animate ? { d: 'path("' + d + '")', transition: 'd 360ms ' + ease + ', stroke 200ms ease' } : undefined }])
       g.push(line)
       // The first shell, hollow and unlabelled (R3d); the maximum below it, filled, with its r.
       if ((o.marks === 'both' || o.marks === 'first shell') && c.shell) g.push(['circle', { key: 'sh', cx: sx(c.shell.r), cy: sy(c.shell.g), r: 3.6, fill: BG, stroke: c.color, strokeWidth: 1.8 }])
@@ -1304,7 +1354,7 @@ export function decypherKit(data: KitData) {
       if (!focus) return null
       let selected = c.selected.slice(), colorBy = c.colorBy
       const shown: Record<string, 'on' | 'dim' | 'off'> = {}
-      const curves = () => buildCurves({ focus, plotted, selected, colorBy, pal: pal(), tones })
+      const curves = () => styleCurves(buildCurves({ focus, plotted, selected, colorBy, pal: pal(), tones }), styles, pal())
       const drawn = () => curves().filter(x => shown[x.key] !== 'off').map(x => ({ ...x, dim: shown[x.key] === 'dim' }))
       const ch = chartBox(() => ({ curves: drawn(), grid: focus.x, xlabel: focus.xlabel, ylabel: focus.ylabel, plot: focus.plot }))
       const legend = h('div', { class: 'dc-chips' })
@@ -1329,7 +1379,7 @@ export function decypherKit(data: KitData) {
 
     // The same scale (R11a), as exported: the cards' charts, each drawn on the ranges it shares; all drawn again when one changes.
     const scaled: { id: string; xlabel: string; ylabel: string; curves: () => Curve[]; render: () => void }[] = []
-    const scale = data.view.scale ?? 'own', shareOf = (id: string) => (scale === 'own' ? undefined : sharedScales(scaled.map(c => ({ ...c, curves: c.curves() })), scale, data.view.ownScale ?? [])[id])
+    const styles = cleanStyles(data.view.styles), scale = data.view.scale ?? 'own', shareOf = (id: string) => (scale === 'own' ? undefined : sharedScales(scaled.map(c => ({ ...c, curves: c.curves() })), scale, data.view.ownScale ?? [])[id])
 
     /** One RDF's card; or, for RDFs that differ only in their reference, one card for them all (`morph`), led by the first. */
     function jobSection(members: Analysis[], ea: ExportAnalysis, morph: { title: string; on: string[] } | null) {
@@ -1338,10 +1388,10 @@ export function decypherKit(data: KitData) {
       if (!on.length) on = ids
       let selected = ea.selected.filter(n => a.sels.some(g => g.name === n))
       let hoverSel = -1
-      const curves = () => buildCurves({ focus: a, plotted: members, selected, colorBy: 'group', pal: pal(), tones }).filter(c => on.includes(c.analysis)).map(c => {
+      const curves = () => styleCurves(buildCurves({ focus: a, plotted: members, selected, colorBy: 'group', pal: pal(), tones }).filter(c => on.includes(c.analysis)).map(c => {
         const m = members.find(x => x.id === c.analysis)!
         return { ...c, source: m.ref ? 'ref ' + names[m.id] : names[m.id], dim: hoverSel >= 0 && c.name !== a.sels[hoverSel]?.name }
-      })
+      }), styles, pal())
       const ch = chartBox(() => ({ curves: curves(), grid: a.x, xlabel: a.xlabel, ylabel: a.ylabel, plot: a.plot, share: shareOf(a.id) }))
       scaled.push({ id: a.id, xlabel: a.xlabel, ylabel: a.ylabel, curves, render: ch.render })
       const tb = table(curves, !!a.plot)
@@ -1377,7 +1427,7 @@ export function decypherKit(data: KitData) {
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => redraws.forEach(f => f()))
   }
 
-  return { sharedDomain, sharedScales, rampAt, paintOf, structureNote, legendPick, pickGroups, clickScope, pans, scopeAtoms, TONES, DASH, DASH_NAMES, REPS, RESTS, SOLV, palette, toRanges, fromRanges, parseStructure, mix, buildMol, structureView, matchGroup, rdfLooks, buildCurves, looseName, sameButReference, morphWhy, pickRefs, refLabels, niceTicks, xDigitsOf, valAt, hoverRows, hoverX, readoutTitle, chart, mount }
+  return { contrast, cleanStyles, styleCurves, sameLooks, sharedDomain, sharedScales, rampAt, paintOf, structureNote, legendPick, pickGroups, clickScope, pans, scopeAtoms, TONES, DASH, DASH_NAMES, REPS, RESTS, SOLV, palette, toRanges, fromRanges, parseStructure, mix, buildMol, structureView, matchGroup, rdfLooks, buildCurves, looseName, sameButReference, morphWhy, pickRefs, refLabels, niceTicks, xDigitsOf, valAt, hoverRows, hoverX, readoutTitle, chart, mount }
 }
 
 export type Kit = ReturnType<typeof decypherKit>

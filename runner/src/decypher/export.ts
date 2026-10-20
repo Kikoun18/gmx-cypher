@@ -77,6 +77,13 @@ const round = (v: number, d: number) => +v.toFixed(d)
 /** A note without this machine's folders: an absolute path keeps only its last name. */
 const scrub = (s: string) => s.replace(/(^|[\s(])(\/[^\s/]+)+\/?/g, (m, pre: string) => pre + (m.slice(pre.length).replace(/\/$/, '').split('/').pop() || ''))
 
+/** Curve styles (R11b) keyed by the export's analysis ids: a curve's key starts with its analysis's id. Others' are dropped. */
+function renameKeys<T>(styles: Record<string, T>, id: Map<string, string>): Record<string, T> {
+  const out: Record<string, T> = {}
+  for (const [k, s] of Object.entries(styles)) for (const [from, to] of id) if (k.startsWith(from + '|')) { out[to + k.slice(from.length)] = s; break }
+  return out
+}
+
 export function exportData(o: ExportInput): ExportData {
   const id = new Map(o.analyses.map((a, i) => [a.id, 'a' + (i + 1)])), sid = new Map<string, string>(), structs: Record<string, Struct> = {}
   if (o.structures) for (const a of o.analyses) {
@@ -102,7 +109,7 @@ export function exportData(o: ExportInput): ExportData {
   // A morph keeps the RDFs that are in the export, the first of them leading; fewer than two is no morph.
   const morphs = cardsOf(o.analyses, o.morphs ?? []).filter(c => c.members.length > 1)
     .map(c => ({ ids: c.members.map(a => id.get(a.id)!), on: c.on.map(x => id.get(x)!), title: chosen(c.lead) || cardTitle(c.members) }))
-  return { header: (o.header ?? '').trim() || DEFAULT_HEADER, made: o.made ?? new Date().toISOString(), by: o.by, theme: o.theme, tokens: o.tokens, structs, analyses, compare, ...(morphs.length ? { morphs } : {}), view: { ...o.view, ...(o.view.ownScale ? { ownScale: o.view.ownScale.filter(x => id.has(x)).map(x => id.get(x)!) } : {}) } }
+  return { header: (o.header ?? '').trim() || DEFAULT_HEADER, made: o.made ?? new Date().toISOString(), by: o.by, theme: o.theme, tokens: o.tokens, structs, analyses, compare, ...(morphs.length ? { morphs } : {}), view: { ...o.view, ...(o.view.ownScale ? { ownScale: o.view.ownScale.filter(x => id.has(x)).map(x => id.get(x)!) } : {}), ...(o.view.styles ? { styles: renameKeys(o.view.styles, id) } : {}) } }
 }
 
 const CSS = `*{box-sizing:border-box}

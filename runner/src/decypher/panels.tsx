@@ -5,8 +5,11 @@ import * as React from 'react'
 import { cn } from '../lib/utils'
 import { Swatch } from '../core/Chart'
 import { Legend } from '../ui/legend'
-import type { AtomHover, Curve, Group, HeldKeys, Mol, Paint, Palette, SceneState } from '../core/kit'
-import { useBindings } from '../lib/shortcuts'
+import type { AtomHover, Curve, Group, HeldKeys, LineStyle, Mol, Paint, Palette, SceneState } from '../core/kit'
+import { pressed, useBindings } from '../lib/shortcuts'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
+import { Status } from '../ui/status'
+import { ToggleGroup, ToggleGroupItem } from '../ui/toggle-group'
 import { modName } from '../lib/platform'
 import type { View } from './state'
 import { kit } from '../core/theme'
@@ -79,8 +82,60 @@ const mean = (y: number[]) => { const v = y.filter(Number.isFinite); return v.le
 const fmtStat = (v: number) => (Number.isFinite(v) ? Number(v.toPrecision(4)).toString() : '—')
 
 /** The curves under a chart: series, source, atoms, then an RDF's both peak rules (R3d), or any other result's mean and range (R10a); × takes one off the plot. */
-export function CurveTable({ curves, onRemove, onHover, source = true, stats = 'peaks' }: { curves: Curve[]; onRemove: (name: string) => void; onHover: (c: Curve | null) => void; source?: boolean; stats?: 'peaks' | 'series' }) {
+/**
+ * A curve's style of its own (R11b), from its swatch: the dash by the Matrix's name, the width (1.5 or 2 px), the shade
+ * a step lighter or darker; reset to the curve as drawn. Esc or a click outside closes it.
+ */
+function StyleMenu({ curve, style, onStyle }: { curve: Curve; style: LineStyle | undefined; onStyle: (s: LineStyle | null) => void }) {
+  // Placed on the window, not in the table's scrolling box: below the swatch, or above it near the window's foot.
+  const [open, setOpen] = React.useState<React.CSSProperties | null>(null), box = React.useRef<HTMLDivElement>(null), s = style ?? {}
+  const toggle = (e: React.MouseEvent) => {
+    const r = e.currentTarget.getBoundingClientRect()
+    setOpen(o => (o ? null : r.bottom + 220 > window.innerHeight ? { left: r.left, bottom: window.innerHeight - r.top + 4 } : { left: r.left, top: r.bottom + 4 }))
+  }
+  React.useEffect(() => {
+    if (!open) return
+    // The dash's list opens in a portal of its own: a pick there is not a click outside.
+    const out = (e: PointerEvent) => { const t = e.target as Element; if (!box.current?.contains(t) && !t.closest?.('[data-radix-popper-content-wrapper]')) setOpen(null) }
+    document.addEventListener('pointerdown', out)
+    return () => document.removeEventListener('pointerdown', out)
+  }, [open])
+  const set = (p: LineStyle) => { const n = kit.cleanStyles({ k: { ...s, ...p } }).k; onStyle(n ?? null) }
+  const shade = s.shade ?? 0
+  return (
+    <div ref={box} className="relative" onKeyDown={e => { if (open && pressed(e, 'escape')) { e.stopPropagation(); setOpen(null) } }}>
+      <button type="button" aria-expanded={!!open} aria-label={'style of ' + curve.name + (curve.source ? ' · ' + curve.source : '')} title="its dash, width and shade" onClick={toggle}
+        className="grid h-[22px] w-[26px] place-items-center rounded hover:bg-accent"><Swatch color={curve.color} dash={curve.dash} /></button>
+      {open && (
+        <div role="group" aria-label={'style of ' + curve.name} style={open} className="fixed z-30 flex w-max flex-col gap-2.5 rounded-lg border border-border bg-popover p-3 shadow-menu">
+          <Select value={s.dash ?? ''} onValueChange={v => set({ dash: v })}>
+            <SelectTrigger size="sm" className="w-40" aria-label="dash"><SelectValue placeholder="dash · as drawn" /></SelectTrigger>
+            <SelectContent>{kit.DASH_NAMES.map((n, i) => <SelectItem key={n} value={n}><span className="inline-flex items-center gap-2"><Swatch color="currentColor" dash={kit.DASH[i]} />{n}</span></SelectItem>)}</SelectContent>
+          </Select>
+          <ToggleGroup type="single" size="sm" value={String(s.width ?? curve.width ?? 2)} onValueChange={v => v && set({ width: Number(v) })} aria-label="width">
+            <ToggleGroupItem value="1.5">1.5 px</ToggleGroupItem><ToggleGroupItem value="2">2 px</ToggleGroupItem>
+          </ToggleGroup>
+          <div className="flex items-center gap-1.5 text-caption">
+            <span className="text-muted-foreground">shade</span>
+            <button type="button" className="rounded px-2 py-0.5 hover:bg-accent disabled:opacity-40" disabled={shade <= -3} onClick={() => set({ shade: shade - 1 })}>darker</button>
+            <span className="w-5 text-center">{shade > 0 ? '+' + shade : shade}</span>
+            <button type="button" className="rounded px-2 py-0.5 hover:bg-accent disabled:opacity-40" disabled={shade >= 3} onClick={() => set({ shade: shade + 1 })}>lighter</button>
+          </div>
+          <button type="button" className="self-start text-caption text-muted-foreground underline underline-offset-2 hover:text-foreground" disabled={!style} onClick={() => onStyle(null)}>as drawn</button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+export function CurveTable({ curves, onRemove, onHover, source = true, stats = 'peaks', styles, onStyle }: {
+  curves: Curve[]; onRemove: (name: string) => void; onHover: (c: Curve | null) => void; source?: boolean; stats?: 'peaks' | 'series'
+  /** Curves' styles of their own (R11b), and setting one (null: as drawn). */
+  styles?: Record<string, LineStyle>; onStyle?: (key: string, s: LineStyle | null) => void
+}) {
   if (!curves.length) return null
+  // Never by hue alone (Morpheus): a style that makes two curves of one tone alike is said, with the way out.
+  const alike = kit.sameLooks(curves), who = (c: Curve) => c.name + (source && c.source ? ' · ' + c.source : '')
   const cols = source ? 'grid-cols-[26px_minmax(0,1fr)_minmax(0,1.1fr)_44px_96px_96px_26px]' : 'grid-cols-[26px_minmax(0,1fr)_44px_96px_96px_26px]'
   return (
     <div className="flex max-h-64 flex-col gap-0.5 overflow-auto">
@@ -89,7 +144,7 @@ export function CurveTable({ curves, onRemove, onHover, source = true, stats = '
       </div>
       {curves.map(c => (
         <div key={c.key} className={cn('grid min-h-[26px] items-center gap-2 text-control', cols)} onMouseEnter={() => onHover(c)} onMouseLeave={() => onHover(null)}>
-          <Swatch color={c.color} dash={c.dash} />
+          {onStyle ? <StyleMenu curve={c} style={styles?.[c.key]} onStyle={s => onStyle(c.key, s)} /> : <Swatch color={c.color} dash={c.dash} />}
           <span className="truncate font-bold" style={{ color: c.color }}>{c.name}</span>
           {source && <span className="truncate text-muted-foreground">{c.source}</span>}
           <span className="text-right">{c.atoms || '—'}</span>
@@ -103,6 +158,7 @@ export function CurveTable({ curves, onRemove, onHover, source = true, stats = '
           <button type="button" aria-label={'take ' + c.name + ' off the plot'} onClick={() => onRemove(c.name)} className="grid size-[22px] place-items-center justify-self-end rounded-full text-muted-foreground hover:bg-accent hover:text-foreground">×</button>
         </div>
       ))}
+      {alike.map(w => <Status key={w.a.key + w.b.key} level="warning">{who(w.a) + ' and ' + who(w.b) + (w.why === 'same' ? ' look the same' : ' differ by shade alone') + ': give one another dash or width'}</Status>)}
     </div>
   )
 }
