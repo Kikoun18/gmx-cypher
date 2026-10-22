@@ -7,14 +7,20 @@ import { Checkbox } from '../ui/checkbox'
 import { Input } from '../ui/input'
 import { FieldHint } from '../ui/label'
 import { Section } from '../ui/separator'
-import { postJson } from '../api'
-import { ageText, etaOf, mergeJobs, nextPoll, type ClusterRow, type EtaLine, type JobState, type QqTable } from '../lib/cluster'
+import { getJson, postJson } from '../api'
+import { ageText, etaOf, mergeJobs, nextPoll, type ClusterRow, type Ended, type EtaLine, type JobState, type QqTable } from '../lib/cluster'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
+import { FORM } from './Batch'
 import { cn } from '../lib/utils'
 import { Status } from '../ui/status'
 
 /** What POST /api/cluster answers (server/cluster.ts): one read of qq jobs and gmx-eta -a. */
 type Part<T> = ({ ok: true } & T) | { ok: false; error: string }
-interface ClusterRead { at: string; finished: boolean; qq: Part<{ path: string; args: string[]; table: QqTable }>; eta: Part<{ path: string; sha256: string; lines: EtaLine[]; other: string[] }> }
+interface ClusterRead {
+  at: string; finished: boolean; qq: Part<{ path: string; args: string[]; table: QqTable }>; eta: Part<{ path: string; sha256: string; lines: EtaLine[]; other: string[] }>
+  /** The jobs seen to end since gmx-cypher started (R15), each with a batch offered on its input folder, or why not. */
+  ended: (Ended & { at: string; offer: { root: string } | null; refused: string | null })[]
+}
 
 const hms = (s: number | null) => (s === null ? '' : [Math.floor(s / 3600), Math.floor(s / 60) % 60, s % 60].map(n => String(n).padStart(2, '0')).join(':'))
 /** A row's state: qq's; for a job only gmx-eta lists, none (it may have finished), or unknown when qq couldn't be read. */
@@ -82,14 +88,41 @@ function useNow() {
   return now
 }
 
+/**
+ * A job seen to end (R15): "run <recipe> on <its input folder>" opens batch set-up filled with them, nothing more;
+ * the folder is the one qq jobs -e printed, offered only inside the allowed folders.
+ */
+function EndedJob({ e, recipes, onOffer }: { e: ClusterRead['ended'][number]; recipes: { id: string; name: string }[]; onOffer: (root: string, recipe: string) => void }) {
+  const [recipe, setRecipe] = React.useState(FORM), name = recipe === FORM ? 'the form' : recipes.find(r => r.id === recipe)?.name ?? recipe
+  return (
+    <li className="flex flex-wrap items-center gap-x-3 gap-y-1 text-control">
+      <span className="font-bold">{e.name}</span>
+      <span className="tabular-nums text-muted-foreground">{e.key}</span>
+      <Badge tone={e.word === 'finished' ? 'mint' : 'stone'}>{e.word}</Badge>
+      <span className="text-caption text-muted-foreground">seen at {new Date(e.at).toLocaleTimeString()}</span>
+      {e.offer ? (
+        <>
+          <Select value={recipe} onValueChange={setRecipe}>
+            <SelectTrigger size="sm" className="w-56" aria-label={'recipe for ' + e.key}><SelectValue /></SelectTrigger>
+            <SelectContent><SelectItem value={FORM}>the form, as it is</SelectItem>{recipes.map(r => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}</SelectContent>
+          </Select>
+          <Button variant="outline" size="sm" onClick={() => onOffer(e.offer!.root, recipe)} title={'opens batch set-up with ' + e.offer.root + ' as its root: preview, then run; nothing runs before'}>run {name} on {e.offer.root.split('/').slice(-2).join('/')}</Button>
+        </>
+      ) : <span className="text-caption text-muted-foreground">{e.refused}</span>}
+    </li>
+  )
+}
+
 /** The cluster tab (R10c): your jobs from qq jobs, each with gmx-eta's time left; watch only. */
-export function ClusterView() {
+export function ClusterView({ onOffer }: { onOffer: (root: string, recipe: string) => void }) {
   const [finished, setFinished] = React.useState(false)
   const { read, error, busy, refresh, failures } = useCluster(finished)
   const now = useNow()
   const [name, setName] = React.useState('')
   const [hidden, setHidden] = React.useState<Set<string>>(new Set())
   const [sort, setSort] = React.useState<{ key: SortKey; dir: 1 | -1 } | null>(null)
+  const [recipes, setRecipes] = React.useState<{ id: string; name: string }[]>([])
+  React.useEffect(() => { getJson<{ id: string; name: string }[]>('/api/recipes').then(setRecipes, () => {}) }, [])
   const rows: Row[] = React.useMemo(() => (read ? mergeJobs(read.qq.ok ? read.qq.table.jobs : [], read.eta.ok ? read.eta.lines : []).map(r => ({ ...r, state: r.qq?.state ?? (read.qq.ok ? NOT_LISTED : UNREAD) })) : []), [read])
   const states = React.useMemo(() => {
     const m = new Map<string, { state: JobState; n: number }>()
@@ -133,6 +166,13 @@ export function ClusterView() {
           {read?.qq.ok && Object.keys(read.qq.table.counts).length > 0 && <span className="text-caption text-muted-foreground">qq counts {Object.entries(read.qq.table.counts).map(([k, v]) => k + ' ' + v).join(' · ')}</span>}
         </div>
       )}
+      {read && read.ended.length > 0 && (
+        <div className="flex flex-col gap-1.5">
+          <Section label={'Ended since gmx-cypher started ' + String(read.ended.length).padStart(2, '0')} />
+          <ul className="m-0 flex list-none flex-col gap-1.5 p-0" aria-label="ended jobs">{read.ended.map(e => <EndedJob key={e.key} e={e} recipes={recipes} onOffer={onOffer} />)}</ul>
+          <FieldHint>a job running at one read and gone from qq jobs at the next is no longer running; finished only when qq jobs -a says so · the folder is the one qq jobs -e printed</FieldHint>
+        </div>
+      )}
       {read && (
         <div className="overflow-x-auto">
           <table className="w-full text-control">
@@ -153,7 +193,7 @@ export function ClusterView() {
                 return (
                   <tr key={r.key} className="border-b border-border/60 align-top">
                     <td className="py-1.5 pr-4 tabular-nums">{q?.id ?? r.eta?.id}</td>
-                    <td className="pr-4">{nameOf(r)}</td>
+                    <td className="pr-4">{nameOf(r)}{q?.inputDir && <div className="max-w-96 truncate text-caption text-muted-foreground" title={q.inputDir}>{q.inputDir}</div>}</td>
                     <td className="pr-4"><Badge tone={s.tone}>{s.word}</Badge></td>
                     <td className="pr-4 tabular-nums">{q ? [q.cpus, q.gpus, q.nodes].map(x => x ?? '?').join(' · ') : ''}</td>
                     <td className="pr-4 tabular-nums">{q?.runtime != null ? hms(q.runtime) + ' / ' + hms(q.walltime) : q?.waiting != null ? 'waiting ' + hms(q.waiting) : ''}</td>

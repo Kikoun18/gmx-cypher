@@ -27,10 +27,14 @@ const all = () => (current ??= read())
 export const labelsOf = (source: string): Record<string, string> => all()[source] ?? NONE
 
 /** A group's label (trimmed); empty removes it. */
-export function setLabel(source: string, original: string, label: string) {
-  const mine = { ...labelsOf(source) }, l = label.trim()
-  if (l && l !== original) mine[original] = l
-  else delete mine[original]
+export const setLabel = (source: string, original: string, label: string) => setLabels(source, { ...labelsOf(source), [original]: label })
+
+/** The label a group's field keeps for what is typed in it: trimmed, none when it is the name. */
+export const labelFor = (original: string, text: string) => { const l = text.trim(); return l === original ? '' : l }
+
+/** One source's labels, all at once (a saved view opened, R14b): those it does not name are removed. */
+export function setLabels(source: string, labels: Record<string, string>) {
+  const mine = Object.fromEntries(Object.entries(cleanLabels({ [source]: labels })[source] ?? {}).map(([n, l]) => [n, labelFor(n, l)]).filter(e => e[1]))
   const { [source]: _, ...rest } = all()
   current = Object.keys(mine).length ? { ...rest, [source]: mine } : rest
   try { localStorage.setItem(KEY, JSON.stringify(current)) } catch { /* kept for this page only */ }

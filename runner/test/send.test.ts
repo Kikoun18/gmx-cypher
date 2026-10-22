@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { copyFileSync, cpSync, mkdirSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { copyFileSync, cpSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { NodeBackend } from '../../matrix/scripts/node-backend';
@@ -8,6 +8,8 @@ import { scanProject } from '../../matrix/src/lib/storage/index';
 import { Vault } from '../../matrix/src/lib/storage/vault';
 import { newVault } from '../../matrix/test/helpers';
 import { startRun } from '../server/runs';
+import { keepRecord } from '../server/send';
+import type { VaultView } from '../server/vault';
 import { apiServer, RUNNER, tmp } from './helpers';
 
 /** Files with size and mtime, and folders, under a root. */
@@ -135,3 +137,23 @@ describe('the connected project (R14b, T158)', () => {
   });
 });
 
+
+describe('the record copy is named by the file sent (review)', () => {
+  it('a job with more .xvg files (gmx order\'s tensor first): the copy goes under the sent file\'s SHA-256', () => {
+    const dir = tmp('order'), vault = tmp('vault'), rec = JSON.parse(readFileSync(RUNNER + 'test/fixtures/decypher/rdf_o111_Methionine_H.run.json', 'utf8'));
+    const A = 'a'.repeat(64), B = 'b'.repeat(64), path = join(dir, 'o.run.json');
+    writeFileSync(path, JSON.stringify({ ...rec, outputs: [{ kind: 'xvg', path: join(dir, 'o_tensor.xvg'), size: 1, sha256: A }, { kind: 'xvg', path: join(dir, 'o.xvg'), size: 1, sha256: B }] }));
+    expect(keepRecord({ path: vault } as VaultView, path, join(dir, 'o.xvg'), [dir], 'gmx-cypher 0')).toEqual({ record: 'gmx-cypher/records/' + B + '.run.json' });
+    expect(readdirSync(join(vault, 'gmx-cypher/records'))).toEqual([B + '.run.json']);
+  });
+
+  it('a copy that can\'t be made never undoes the send: no record, and the reason', async () => {
+    const { s, vdir, job, project } = await setup();
+    mkdirSync(join(vdir, 'gmx-cypher'));
+    const r = await s.call('/api/send', { job: job.id, project: project.id, name: 'x.xvg' });
+    expect(r.status).toBe(200);
+    expect(r.json).toMatchObject({ name: 'x.xvg', record: null, recordError: expect.stringContaining("is not gmx-cypher's space") });
+    expect(readdirSync(join(vdir, project.dir, '_inbox'))).toEqual(['x.xvg']);
+    await s.close();
+  });
+});

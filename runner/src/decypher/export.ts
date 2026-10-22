@@ -170,11 +170,11 @@ button:focus-visible{outline:2px solid var(--ring);outline-offset:2px}
 .dc-chip.dc-ref{background:transparent;color:var(--foreground);cursor:default;border:1.5px solid var(--foreground)}
 .dc-chip.dc-pick{cursor:pointer}
 .dc-chip.dc-alt{background:transparent;color:var(--foreground);border-style:dashed}
-.dc-chip.dc-off{opacity:.45;background:transparent;color:var(--foreground)}
+.dc-chip.dc-off{background:transparent;color:var(--muted-foreground);border-color:var(--input);border-style:dashed}
 .dc-chip.dc-curve{border:1px solid var(--border)}
 .dc-chip.dc-curve:hover{background:var(--accent)}
 .dc-dot{width:7px;height:7px;border-radius:9999px;flex-shrink:0}
-.dc-n{opacity:.7}
+.dc-n{font-weight:400;font-variant-numeric:tabular-nums}
 .dc-table{display:flex;flex-direction:column;gap:2px}
 .dc-trow{display:grid;grid-template-columns:26px minmax(0,1fr) minmax(0,1.1fr) 44px 70px 56px;gap:8px;align-items:center;font-size:12px;line-height:16px;min-height:24px}
 .dc-trow.dc-plain{grid-template-columns:26px minmax(0,1fr) minmax(0,1.1fr)}

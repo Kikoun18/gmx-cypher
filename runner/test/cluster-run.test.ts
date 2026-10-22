@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { Cluster } from '../server/cluster';
@@ -8,7 +8,7 @@ import { apiServer, RUNNER, tmp } from './helpers';
 // The cluster runner (R10a) with fakes that print your samples: qq jobs and gmx-eta -a, on this machine, one at a time.
 const QQ = RUNNER + 'test/fake-qq.mjs', ETA = RUNNER + 'test/fake-gmx-eta.mjs';
 const env = (k: string, v: string | undefined) => { if (v === undefined) delete process.env[k]; else process.env[k] = v; };
-afterEach(() => { for (const k of ['FAKE_QQ_LOG', 'FAKE_QQ_SLOW', 'FAKE_QQ_FAIL']) env(k, undefined); });
+afterEach(() => { for (const k of ['FAKE_QQ_LOG', 'FAKE_QQ_SLOW', 'FAKE_QQ_FAIL', 'FAKE_QQ_OUT']) env(k, undefined); });
 const log = () => { const f = join(tmp('qq'), 'log'); writeFileSync(f, ''); env('FAKE_QQ_LOG', f); return () => readFileSync(f, 'utf8').trim().split('\n').filter(Boolean).map(l => JSON.parse(l)); };
 
 describe('reading the cluster (R10a)', () => {
@@ -16,10 +16,10 @@ describe('reading the cluster (R10a)', () => {
     const calls = log(), c = new Cluster(() => ({ qq: QQ, gmxEta: ETA }));
     const r = await c.read(false);
     expect(r.qq.ok && r.qq.table.jobs).toHaveLength(11);
-    expect(r.qq).toMatchObject({ ok: true, path: QQ, args: ['jobs'] });
+    expect(r.qq).toMatchObject({ ok: true, path: QQ, args: ['jobs', '-e'] });
     expect(r.eta).toMatchObject({ ok: true, path: ETA, sha256: expect.stringMatching(/^[0-9a-f]{64}$/) });
     expect(r.eta.ok && r.eta.lines).toHaveLength(17);
-    expect(calls()).toEqual([{ args: ['jobs'], columns: '250' }]);
+    expect(calls()).toEqual([{ args: ['jobs', '-e'], columns: '250' }]);
   });
 
   it('"show finished" runs qq jobs -a; nothing else is ever run', async () => {
@@ -40,7 +40,7 @@ describe('reading the cluster (R10a)', () => {
     // The other list asked for during a read: run after it, never alongside, and never answered with it.
     const [now, finished] = await Promise.all([c.read(false, 0), c.read(true)]);
     expect([now.finished, finished.finished]).toEqual([false, true]);
-    expect(calls().map(x => x.args)).toEqual([['jobs'], ['jobs'], ['jobs'], ['jobs', '-a']]);
+    expect(calls().map(x => x.args)).toEqual([['jobs', '-e'], ['jobs', '-e'], ['jobs', '-e'], ['jobs', '-a']]);
   });
 
   it('what went wrong, in words: not on PATH, its own message with the ticket hint, too slow', async () => {
@@ -49,7 +49,7 @@ describe('reading the cluster (R10a)', () => {
     expect(missing.eta).toEqual({ ok: false, error: 'gmx-eta-not-here is not on PATH: the ETA column shows — (set its path in settings)' });
     env('FAKE_QQ_FAIL', '1');
     const failed = await new Cluster(() => ({ qq: QQ, gmxEta: ETA })).read(false);
-    expect(failed.qq).toEqual({ ok: false, error: 'qq jobs failed (exit 1): fake qq (invented text): could not authenticate: no valid Kerberos ticket\nyour Kerberos ticket may have expired: run kinit in a terminal, then refresh' });
+    expect(failed.qq).toEqual({ ok: false, error: 'qq jobs -e failed (exit 1): fake qq (invented text): could not authenticate: no valid Kerberos ticket\nyour Kerberos ticket may have expired: run kinit in a terminal, then refresh' });
     // gmx-eta still ran: its column is filled even when qq failed.
     expect(failed.eta.ok).toBe(true);
   });
@@ -80,6 +80,45 @@ describe('reading the cluster (R10a)', () => {
     for (const qq of ['qq; rm -rf ~', 'rm', 'test/fake-qq.mjs', '/no/such/qq']) expect((await s.call('/api/config', { qq })).json).toEqual(refused);
     expect((await s.call('/api/config', { qq: 'qq' })).status).toBe(200);
     expect((await s.call('/api/config', { gmxEta: ETA })).status).toBe(200);
+    await s.close();
+  });
+});
+
+// From the cluster tab to analysis (R15, T169): your `qq jobs -e` sample, read twice, a job gone in between.
+const E = readFileSync(RUNNER + 'test/fixtures/cluster-tools/qq-jobs-e.txt', 'utf8');
+/** The sample without one job's row and the lines -e prints under it. */
+const without = (key: string, text = E) => { const l = text.split('\n'), i = l.findIndex(x => x.includes(' ' + key + ' ')); return [...l.slice(0, i), ...l.slice(i + 5)].join('\n'); };
+const PEP1 = '/storage/store1-shard/home/user2/project-a/systems/PEP1-POPC/5_md';
+
+describe('a cluster job that ended (R15)', () => {
+  it('is said with the input folder qq -e printed, once, and nothing is run but the reads', async () => {
+    const out = join(tmp('qq'), 'out.txt'), calls = log(), c = new Cluster(() => ({ qq: QQ, gmxEta: ETA }));
+    writeFileSync(out, E); env('FAKE_QQ_OUT', out);
+    expect((await c.read(false)).ended).toEqual([]);
+    writeFileSync(out, without('1523727'));
+    const r = await c.read(false, 0);
+    expect(r.ended).toEqual([{ key: '1523727', name: 'qq_loop_md+0001', word: 'no longer running', inputDir: PEP1, at: r.at }]);
+    // Still gone at the next read: said once. Shown finished by qq jobs -a: finished.
+    expect((await c.read(false, 0)).ended).toHaveLength(1);
+    writeFileSync(out, without('1523727').replace(/│  R  1523728/, '│  F  1523728'));
+    const all = await c.read(true, 0);
+    expect(all.ended.map(e => [e.key, e.word])).toEqual([['1523728', 'finished'], ['1523727', 'no longer running']]);
+    expect(calls().map(x => x.args)).toEqual([['jobs', '-e'], ['jobs', '-e'], ['jobs', '-e'], ['jobs', '-a']]);
+  });
+
+  it('the API offers a batch only on a folder inside the allowed ones; any other is refused in words', async () => {
+    const s = await apiServer(), sims = tmp('sims'), md = join(sims, 'PEP2-POPC', '5_md'), out = join(tmp('qq'), 'out.txt');
+    mkdirSync(md, { recursive: true });
+    s.ctx.config = { ...s.ctx.config, qq: QQ, gmxEta: ETA, allow: [sims] };
+    // PEP2's folder is here, on this machine and allowed; PEP1's is not.
+    const here = E.replace('/storage/store1-shard/home/user2/project-a/systems/PEP2-POPC/5_md', md);
+    writeFileSync(out, here); env('FAKE_QQ_OUT', out);
+    await s.call('/api/cluster', { finished: false, refresh: true });
+    writeFileSync(out, without('1523728', without('1523727', here)));
+    const r = await s.call('/api/cluster', { finished: false, refresh: true });
+    const by = Object.fromEntries(r.json.ended.map((e: { key: string }) => [e.key, e]));
+    expect(by['1523728']).toMatchObject({ word: 'no longer running', inputDir: md, offer: { root: realpathSync(md) } });
+    expect(by['1523727']).toMatchObject({ inputDir: PEP1, offer: null, refused: expect.stringContaining('not offered: ') });
     await s.close();
   });
 });

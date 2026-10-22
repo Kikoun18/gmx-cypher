@@ -952,15 +952,18 @@ export function decypherKit(data: KitData) {
 
   /**
    * How each RDF of one graph is told apart, for its curves and its legend. By group: a dash each, and past the
-   * Matrix's ten dashes a lighter shade as well. By job: its tone, and when an RDF before it had that tone, the
+   * Matrix's ten dashes a shade for each round of ten, and every third round a wider line (review: the third round
+   * repeated the second). By job: its tone, and when an RDF before it had that tone, the
    * next dashes along, so two curves never share both colour and dash.
    */
+  const ROUND_SHADES = [0.45, 0.15, 0.75]
   function rdfLooks(plotted: Analysis[], tones: Record<string, Tone>, groups: number) {
     const seen: Record<string, number> = {}
     return plotted.map((an, mi) => {
       const tone = tones[an.id] || TONES[mi % TONES.length], rep = seen[tone] || 0
       seen[tone] = rep + 1
-      return { tone, jobDash: rep * Math.max(1, groups), groupDash: mi % DASH.length, shade: mi < DASH.length ? Math.min(0.6, 0.3 * mi) : 0.45, round: Math.floor(mi / DASH.length) }
+      const round = Math.floor(mi / DASH.length)
+      return { tone, jobDash: rep * Math.max(1, groups), groupDash: mi % DASH.length, shade: round ? ROUND_SHADES[(round - 1) % ROUND_SHADES.length] : Math.min(0.6, 0.3 * mi), width: round ? 2 + 0.75 * Math.floor((round - 1) / ROUND_SHADES.length) : 2, round }
     })
   }
 
@@ -990,7 +993,8 @@ export function decypherKit(data: KitData) {
           if (mi > 0) color = mix(color, ink, look.shade)
           dash = DASH[look.groupDash]
         }
-        out.push({ key: an.id + '|' + gg.name + '|' + name, name, source: an.label, analysis: an.id, x: an.x, y: gg.y, color, dash, peak: gg.peak, shell: gg.shell ?? null, atoms: gg.atoms.length, tone: o.colorBy === 'job' ? look.tone : g0.tone, ...(g0.label ? { label: g0.label } : {}) })
+        const width = o.colorBy === 'group' && look.width !== 2 ? { width: look.width } : {}
+        out.push({ key: an.id + '|' + gg.name + '|' + name, name, source: an.label, analysis: an.id, x: an.x, y: gg.y, color, dash, ...width, peak: gg.peak, shell: gg.shell ?? null, atoms: gg.atoms.length, tone: o.colorBy === 'job' ? look.tone : g0.tone, ...(g0.label ? { label: g0.label } : {}) })
       })
     })
     return out

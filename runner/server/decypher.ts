@@ -2,10 +2,12 @@
 // each RDF file the gmx-cypher run that wrote it, found by its SHA-256 among the runs' records: the record holds
 // the atoms of each group, so the structure view can show them. Only those files are ever sent to the page.
 
+import { createHash } from 'node:crypto';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import type { RowRecord } from '../../matrix/src/lib/storage/records';
 import { recordComplete, type RunRecord } from '../src/lib/record';
+import { spacePaths } from '../src/lib/space';
 import { mainXvg } from '../src/core/cards';
 import type { VaultRdfs, VaultRow, VaultRun } from '../src/decypher/vaultTypes';
 import { inside, real, within } from './files';
@@ -40,13 +42,30 @@ export function runsBySha(jobs: Jobs): Map<string, VaultRun> {
   return out;
 }
 
+/**
+ * A sent file's run from the record copy in the vault's space (R14c, T158): whichever gmx-cypher sent it kept it there,
+ * its paths relative to its allowed folder; the structure is looked for under this runner's. null without a copy.
+ */
+async function spaceRun(v: VaultView, sha: string, roots: string[]): Promise<VaultRun | null> {
+  let rec: RunRecord;
+  try { rec = JSON.parse(await v.io.backend.readText(spacePaths.record(sha))) as RunRecord; } catch { return null; }
+  if (rec?.format !== 'gmx-cypher run' || !Array.isArray(rec.groups)) return null;
+  const bin = rec.options?.find(o => o.flag === 'bin')?.value, s = rec.inputs?.structure, sp = s?.path;
+  // The structure the copy names, found again only if it is the same file: its size, and its SHA-256 when recorded (review).
+  const same = (p: string) => { try { return statSync(p).size === s!.size && (!s!.sha256 || createHash('sha256').update(readFileSync(p)).digest('hex') === s!.sha256); } catch { return false; } };
+  const structure = !sp ? null : (sp.startsWith('/') ? [sp] : roots.map(r => join(r, sp))).find(same) ?? null;
+  const title = (rec.outputs ?? []).find(o => o.kind === 'xvg' && o.sha256 === sha)?.path.split('/').pop()?.replace(/\.xvg$/, '') ?? 'a gmx-cypher job';
+  return { job: String(rec.job ?? ''), title, groups: rec.groups, frames: rec.frames, bin: bin == null || bin === '' ? null : Number(bin), structure, from: 'space' };
+}
+
 /** Whether a project's analysis type is an RDF: the Matrix's own `rdf`, or a type of the project's named so. */
 const rdfTypes = (types: { k: string; label: string; name: string; match: string }[]) =>
   new Set(['rdf', ...types.filter(t => /\b(rdf|radial)\b/i.test(t.label + ' ' + t.name + ' ' + t.match)).map(t => t.k)]);
 
 /** The vault's RDF analyses, by project and row (in the project's order), each with its curves, its row's structures and its run. */
-export async function vaultRdfs(v: VaultView, jobs: Jobs): Promise<VaultRdfs> {
-  const runs = runsBySha(jobs), projects: VaultRdfs['projects'] = [];
+export async function vaultRdfs(v: VaultView, jobs: Jobs, roots: string[] = []): Promise<VaultRdfs> {
+  const runs = runsBySha(jobs), projects: VaultRdfs['projects'] = [], copies = new Map<string, VaultRun | null>();
+  const copy = async (sha: string) => { if (!copies.has(sha)) copies.set(sha, /^[0-9a-f]{64}$/.test(sha) ? await spaceRun(v, sha, roots) : null); return copies.get(sha)!; };
   for (const p of await listProjects(v)) {
     const read = await readProject(v, p.id), types = rdfTypes(projectSummary(read).settings.analyses), st = read.state;
     const label = (k: string) => st.columns.get(k)?.label || k;
@@ -55,11 +74,18 @@ export async function vaultRdfs(v: VaultView, jobs: Jobs): Promise<VaultRdfs> {
     for (const r of rows as RowRecord[]) {
       // Curves and structures name their file by its ID; the row's file list has its path, name and hash.
       const meta = (id: string) => r.files.find(f => f.id === id);
-      const rdfs = r.analyses.filter(a => types.has(a.type) && a.curves.some(c => meta(c.file))).map(a => ({
-        id: a.id, column: label(a.column), slot: a.slot, time: a.time,
-        curves: a.curves.flatMap(c => { const f = meta(c.file); return f ? [{ label: c.label, file: f.path, name: f.name, xCol: c.parse.xCol, yCol: c.parse.yCol, xScale: c.parse.xScale || 1 }] : []; }),
-        run: a.curves.map(c => runs.get(meta(c.file)?.sha256 || '')).find(Boolean) ?? null,
-      }));
+      const rdfs = [];
+      for (const a of r.analyses.filter(a => types.has(a.type) && a.curves.some(c => meta(c.file)))) {
+        const shas = a.curves.map(c => meta(c.file)?.sha256 || '');
+        // One of this runner's jobs wrote it, else the record copy in the space says which run did (R14c).
+        let run = shas.map(s => runs.get(s)).find(Boolean) ?? null;
+        for (const s of shas) if (!run) run = await copy(s);
+        rdfs.push({
+          id: a.id, column: label(a.column), slot: a.slot, time: a.time,
+          curves: a.curves.flatMap(c => { const f = meta(c.file); return f ? [{ label: c.label, file: f.path, name: f.name, xCol: c.parse.xCol, yCol: c.parse.yCol, xScale: c.parse.xScale || 1 }] : []; }),
+          run,
+        });
+      }
       const structures = r.structures.flatMap(x => { const f = meta(x.file); return f ? [{ file: f.path, name: f.name, format: x.format, atoms: x.atoms, title: x.title }] : []; });
       if (rdfs.length) out.push({ id: r.id, name: r.name, seq: r.seq, structures, rdfs });
     }
@@ -72,15 +98,15 @@ export async function vaultRdfs(v: VaultView, jobs: Jobs): Promise<VaultRdfs> {
 let lastList: { path: string; at: number; list: VaultRdfs } | null = null;
 
 /** The list as GET /api/decypher/vault gives it, kept for the files asked for just after. */
-export async function listVault(v: VaultView, jobs: Jobs): Promise<VaultRdfs> {
-  const list = await vaultRdfs(v, jobs);
+export async function listVault(v: VaultView, jobs: Jobs, roots: string[] = []): Promise<VaultRdfs> {
+  const list = await vaultRdfs(v, jobs, roots);
   lastList = { path: v.path, at: Date.now(), list };
   return list;
 }
 
 /** One file of the vault, if an RDF analysis or the structure of a row with one refers to it; anything else is refused. */
-export async function vaultFile(v: VaultView, jobs: Jobs, path: string): Promise<string> {
-  const all = lastList && lastList.path === v.path && Date.now() - lastList.at < 60_000 ? lastList.list : await listVault(v, jobs);
+export async function vaultFile(v: VaultView, jobs: Jobs, path: string, roots: string[] = []): Promise<string> {
+  const all = lastList && lastList.path === v.path && Date.now() - lastList.at < 60_000 ? lastList.list : await listVault(v, jobs, roots);
   const known = all.projects.some(p => p.rows.some(r => r.structures.some(s => s.file === path) || r.rdfs.some(a => a.curves.some(c => c.file === path))));
   if (!known) throw new HttpError(404, path + ' is not an RDF or a structure of the vault');
   return v.io.backend.readText(path);
@@ -127,12 +153,16 @@ export function findRuns(root: string, roots: string[], limit = 400, budget = 50
 }
 
 /** A found record and its main file (R10a): the record in the allowed folders, its main .xvg too. */
-export function readRun(path: string, roots: string[]): { record: RunRecord; xvg: string; pairs?: string } {
+export function readRun(path: string, roots: string[]): { record: RunRecord; xvg: string; pairs?: string };
+/** `recordOnly`: the record alone (a run diff, R13), read even when its files have moved. */
+export function readRun(path: string, roots: string[], recordOnly: true): { record: RunRecord };
+export function readRun(path: string, roots: string[], recordOnly = false): { record: RunRecord; xvg?: string; pairs?: string } {
   const p = inside(path, roots);
   if (!p.endsWith('.run.json')) throw new HttpError(400, path + ' is not a gmx-cypher run record (.run.json)');
   const rec = recordAt(p, false);
   if (!isRecord(rec)) throw new HttpError(400, path + ' is not a gmx-cypher run record');
   if (!recordComplete(rec)) throw new HttpError(409, path + " is incomplete: its job didn't finish (the record was written when it started)");
+  if (recordOnly) return { record: rec };
   const main = mainXvg(rec.outputs, stemOf(p));
   if (!main) throw new HttpError(404, path + ' names no .xvg of its own');
   // The selection tool's H-bond pairs (R10c), when the record lists them and they are still there.

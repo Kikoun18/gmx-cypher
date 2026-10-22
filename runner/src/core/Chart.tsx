@@ -11,7 +11,8 @@ import { chartKey } from './gestures'
 import { Select, SelectContent, SelectItem, SelectTrigger } from '../ui/select'
 import { Legend } from '../ui/legend'
 import { cn } from '../lib/utils'
-import { figureFile, graphData, resultAnalysis, type Figure } from './export'
+import { figureFile, graphData, resultAnalysis, resultPins } from './export'
+import { charts, FiguresContext, LabelsContext, NO_PINS, type ChartExport, type PageFigure } from './chartState'
 import { fileName, useExportPrefs, type NameFields } from './exportPrefs'
 import { curvesOf, kit, type Series } from './index'
 import type { ChartGeom, Curve, Marks, Palette, Pins, VNode } from './kit'
@@ -43,9 +44,6 @@ export interface ChartOptions {
   /** Marks and lines put on the chart (R11c), drawn, listed under it, and carried into its exports. */
   pins?: Pins
 }
-export const NO_PINS: Pins = { points: [], lines: [] }
-/** A result page's labels (R11d), by gmx name: a curve named for a renamed group shows its label. */
-export const LabelsContext = React.createContext<Record<string, string>>({})
 
 /**
  * A chart's marks and lines under it (R11c): each with what it marks, a label of its own (empty: its value), and ×;
@@ -77,16 +75,6 @@ function PinList({ pins, curves, geom, onPins }: { pins: Pins; curves: Curve[]; 
       <button type="button" className="self-start text-caption text-muted-foreground underline underline-offset-2 hover:text-foreground" onClick={() => onPins(NO_PINS)}>clear all</button>
     </div>
   )
-}
-
-/** The export key's charts (R8b): each export menu by its trigger, and the chart under the pointer. */
-const menus = new Map<HTMLElement, () => void>()
-let pointed: HTMLElement | null = null
-/** The export key: the focused chart, else the one under the pointer, in the default format; false when there is none. */
-export function exportFocused(): boolean {
-  let el = (document.activeElement as HTMLElement | null)?.closest<HTMLElement>('[data-slot=chart]') ?? pointed
-  for (; el; el = el.parentElement) for (const [t, go] of menus) if (el.contains(t)) { go(); return true }
-  return false
 }
 
 /**
@@ -165,7 +153,7 @@ export function ChartPanel({ curves, grid, xlabel, ylabel, pal, marks, y, rule, 
   return (<>
     <div ref={box} data-slot="chart" className={cn('relative outline-offset-2', height ? null : 'min-h-[260px]', className)} style={height ? { height } : undefined}
       tabIndex={curves.length ? 0 : undefined} role={curves.length ? 'group' : undefined} aria-label={curves.length ? ylabel + ' against ' + xlabel + ': hover or use the arrow keys to read values; click marks a point' : undefined}
-      onClick={onClick} onKeyDown={onKey} onBlur={() => { setHover(null); setNear(null) }} onMouseEnter={e => { pointed = e.currentTarget }}
+      onClick={onClick} onKeyDown={onKey} onBlur={() => { setHover(null); setNear(null) }} onMouseEnter={e => { charts.pointed = e.currentTarget }}
       onMouseMove={e => {
         if (!geom) return
         const box = e.currentTarget.getBoundingClientRect(), r = kit.hoverX(geom, e.clientX - box.left), py = e.clientY - box.top
@@ -175,7 +163,7 @@ export function ChartPanel({ curves, grid, xlabel, ylabel, pal, marks, y, rule, 
         if (r != null) for (const c of curves) { const at = geom.m.t + geom.ih - ((kit.valAt(c.x, c.y, r) - geom.y0) / (geom.y1 - geom.y0 || 1)) * geom.ih; if (Math.abs(at - py) < d) { d = Math.abs(at - py); best = c.key } }
         if (best !== near) setNear(best)
       }}
-      onMouseLeave={e => { setHover(null); setNear(null); if (pointed === e.currentTarget) pointed = null }}>
+      onMouseLeave={e => { setHover(null); setNear(null); if (charts.pointed === e.currentTarget) charts.pointed = null }}>
       <div className="absolute inset-0">{out && toReact(out.tree, 0)}</div>
       <span className="sr-only" aria-live="polite">{said}</span>
       {empty && (
@@ -204,7 +192,6 @@ export function ChartPanel({ curves, grid, xlabel, ylabel, pal, marks, y, rule, 
 }
 
 /** What a chart exports under (R6a): its file's own name and the fields of the name template (R6b), its title, its data as CSV, and (when it can be one) an HTML page. */
-export interface ChartExport { file: string; fields?: NameFields; title: string; sub?: string; csv: () => string; html?: (() => Promise<string>) | null; why?: string }
 
 /**
  * A chart's export menu (R6a): SVG, PDF and PNG through the Matrix's figures, in the export theme's palette; CSV at
@@ -215,14 +202,12 @@ export function ExportMenu({ exp, curves, xlabel, ylabel, marks, className, ...o
 }) {
   const [busy, setBusy] = React.useState(false), [prefs] = useExportPrefs(), hints = formatHints(prefs, '')
   const trigger = React.useRef<HTMLButtonElement>(null)
-  // The export key exports this chart in the default format while it is focused or under the pointer (R8b).
-  React.useEffect(() => { const t = trigger.current; if (!t) return; menus.set(t, () => void go(prefs.format)); return () => { menus.delete(t) } })
   const go = async (f: string) => {
     setBusy(true)
     try {
       const name = (ext: string) => fileName(prefs.name, { ...exp.fields, file: exp.file }, ext)
       // The marks and lines (R11c) as comment lines above the CSV's own.
-      if (f === 'csv') download(new Blob([withNotes(exp.csv(), o.pins ? pinNotes(o.pins, curves(PALETTES.light)) : [])], { type: 'text/csv;charset=utf-8' }), name('csv'))
+      if (f === 'csv') download(new Blob([withNotes(await exp.csv(), o.pins ? pinNotes(o.pins, curves(PALETTES.light)) : [])], { type: 'text/csv;charset=utf-8' }), name('csv'))
       else if (f === 'html') { if (exp.html) download(new Blob([await exp.html()], { type: 'text/html;charset=utf-8' }), name('html')) }
       else if (f === 'svg' || f === 'pdf' || f === 'png') {
         const pal = PALETTES[prefs.theme === 'dark' ? 'dark' : 'light']
@@ -230,6 +215,8 @@ export function ExportMenu({ exp, curves, xlabel, ylabel, marks, className, ...o
       }
     } finally { setBusy(false) }
   }
+  // The export key exports this chart in the default format while it is focused or under the pointer (R8b).
+  React.useEffect(() => { const t = trigger.current; if (!t) return; charts.menus.set(t, () => void go(prefs.format)); return () => { charts.menus.delete(t) } })
   return (
     <Select value="" onValueChange={v => void go(v)}>
       <SelectTrigger ref={trigger} size="sm" className={cn('h-7 gap-1.5 border-transparent bg-transparent px-2 text-muted-foreground hover:text-foreground', className)} aria-label={'export ' + exp.title} disabled={busy}>
@@ -244,10 +231,6 @@ export function ExportMenu({ exp, curves, xlabel, ylabel, marks, className, ...o
   )
 }
 
-/** A page's charts, for its one export (R9b): each chart that exports is listed while it is drawn, in page order. */
-export interface PageFigure { exp: ChartExport; figure: (pal: Palette) => Figure }
-export const FiguresContext = React.createContext<Map<string, PageFigure> | null>(null)
-
 /**
  * A result's export (R9b, the action bar's): every chart of the page as figures, laid out as settings → export says
  * (one PDF, a file each, or one grid), or every chart's CSV, a file each.
@@ -260,7 +243,7 @@ export function ExportAll({ figures, file, fields }: { figures: Map<string, Page
     setBusy(true)
     try {
       const taken = new Set<string>(), name = (f: PageFigure, ext: string) => fileName(prefs.name, { ...f.exp.fields, file: f.exp.file }, ext, taken)
-      if (what === 'csv') { list.forEach(f => { const g = f.figure(PALETTES.light); download(new Blob([withNotes(f.exp.csv(), g.pins ? pinNotes(g.pins, g.curves) : [])], { type: 'text/csv;charset=utf-8' }), name(f, 'csv')) }); return }
+      if (what === 'csv') { for (const f of list) { const g = f.figure(PALETTES.light); download(new Blob([withNotes(await f.exp.csv(), g.pins ? pinNotes(g.pins, g.curves) : [])], { type: 'text/csv;charset=utf-8' }), name(f, 'csv')) } return }
       const pal = PALETTES[prefs.theme === 'dark' ? 'dark' : 'light'], ext = prefs.layout === 'pdf' ? 'pdf' : prefs.format
       const out = await renderBatch(list.map(f => ({ data: graphData(f.figure(pal), prefs.theme), name: name(f, ext) })), prefs, fileName(prefs.name, { ...fields, file }, 'x').replace(/\.x$/, ''))
       out.forEach(f => download(f.blob, f.name))
@@ -278,12 +261,12 @@ export function ExportAll({ figures, file, fields }: { figures: Map<string, Page
   )
 }
 
-/** The interactive page of a result's chart (R6a), from the (de)Cypher export, loaded when asked. */
-async function resultHtml(exp: ChartExport, series: Series[], xlabel: string, ylabel: string, o: ChartOptions) {
+/** The interactive page of a result's chart (R6a), from the (de)Cypher export, loaded when asked: with its groups' labels and its marks and lines (review). */
+async function resultHtml(exp: ChartExport, series: Series[], xlabel: string, ylabel: string, o: Pick<ChartOptions, 'y' | 'rule' | 'xDigits'>, pins: Pins, named: Record<string, string>) {
   const { exportData, exportHtml, fontData } = await import('../decypher/export')
-  const a = resultAnalysis({ id: 'result', title: exp.title, sub: exp.sub ?? '', xlabel, ylabel, series, y: o.y ?? 'zero', rule: o.rule === undefined ? 1 : o.rule, xDigits: o.xDigits })!
+  const a = kit.withLabels(resultAnalysis({ id: 'result', title: exp.title, sub: exp.sub ?? '', xlabel, ylabel, series, y: o.y ?? 'zero', rule: o.rule === undefined ? 1 : o.rule, xDigits: o.xDigits })!, named)
   const theme = document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light'
-  const d = exportData({ analyses: [a], structs: {}, selected: () => a.sels.map(g => g.name), tones: {}, compare: null, view: { rep: 'ball & stick', rest: 'grey', labels: true, hydrogens: true, arrange: 'side by side' }, theme, tokens: TOKENS_BY_THEME, structures: false, by: 'gmx-cypher', header: exp.title })
+  const d = exportData({ analyses: [a], structs: {}, selected: () => a.sels.map(g => g.name), tones: {}, compare: null, view: { rep: 'ball & stick', rest: 'grey', labels: true, hydrogens: true, arrange: 'side by side', pins: resultPins(pins, series) }, theme, tokens: TOKENS_BY_THEME, structures: false, by: 'gmx-cypher', header: exp.title })
   return exportHtml(d, await fontData())
 }
 
@@ -309,8 +292,9 @@ export function SeriesChart({ series, xlabel, ylabel, marks = 'none', height = 2
     figures.set(fid, { exp, figure: p => ({ title: exp.title, sub: exp.sub, file: exp.file, xlabel, ylabel, curves: labelled(p), marks, ...o, pins }) })
     return () => { figures.delete(fid) }
   })
-  const full = React.useMemo(() => exp && { ...exp, ...(resultAnalysis({ id: 'r', title: '', sub: '', xlabel, ylabel, series }) ? { html: () => resultHtml(exp, series, xlabel, ylabel, o) } : { html: null, why: 'its curves are on different x grids' }) },
-    [exp, series, xlabel, ylabel, o.y, o.rule, o.xDigits])
+  const { y, rule, xDigits } = o
+  const full = React.useMemo(() => exp && { ...exp, ...(resultAnalysis({ id: 'r', title: '', sub: '', xlabel, ylabel, series }) ? { html: () => resultHtml(exp, series, xlabel, ylabel, { y, rule, xDigits }, pins, named) } : { html: null, why: 'its curves are on different x grids' }) },
+    [exp, series, xlabel, ylabel, y, rule, xDigits, pins, named])
   return (
     <figure className="relative m-0 flex flex-col gap-2">
       {full && <ExportMenu className="absolute right-0 top-0 z-[1]" exp={full} curves={labelled} xlabel={xlabel} ylabel={ylabel} marks={marks} {...o} pins={pins} />}

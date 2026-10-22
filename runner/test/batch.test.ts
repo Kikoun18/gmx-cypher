@@ -95,6 +95,8 @@ describe('batches over HTTP', () => {
     let b = started.json;
     for (let n = 0; n < 100 && !b.items.every((i: { job?: string; status: string }) => i.status === 'started' && i.job); n++) { await new Promise(r => setTimeout(r, 100)); b = (await s.call('/api/batches')).json[0]; }
     for (const i of b.items) for (let n = 0; n < 100 && s.ctx.jobs.get(i.job)!.status === 'running'; n++) await new Promise(r => setTimeout(r, 100));
+    // Each job keeps the batch that started it, for the jobs list's filter (R12b).
+    expect(b.items.map((i: { job: string }) => s.ctx.jobs.get(i.job)!.meta)).toEqual(b.items.map(() => expect.objectContaining({ batch: b.id, batchName: b.recipe })));
     await new Promise(r => setTimeout(r, 300));
     const project = (await s.call('/api/vault')).json.projects[0].id;
     const sent = await s.call('/api/batches/' + b.id + '/send', { project });

@@ -31,7 +31,9 @@ function useBatches() {
   return list
 }
 
-const FORM = '__form'
+export const FORM = '__form'
+/** What the cluster tab hands over (R15): a finished job's input folder as the root, and a recipe (FORM: the form). Nothing runs. */
+export interface BatchPreset { id: number; root: string; recipe: string }
 
 /** One batch: its matches' states, cancel all (armed), and send all to the vault. */
 function BatchCard({ b, jobs, vault, onOpenJob }: { b: Batch; jobs: Job[]; vault: string | null; onOpenJob: (id: string) => void }) {
@@ -56,7 +58,7 @@ function BatchCard({ b, jobs, vault, onOpenJob }: { b: Batch; jobs: Job[]; vault
         <span className="text-control font-bold">{b.recipe}</span>
         <span className="min-w-0 flex-1 truncate text-caption text-muted-foreground">{b.template} · {b.concurrency} at a time</span>
         <span className="text-caption" aria-live="polite">{batchSummary(b.items, id => job(id)?.status)}</span>
-        {running && <Button variant="destructive" size="sm" onClick={() => { if (armed) { postJson('/api/batches/' + b.id + '/cancel', {}).catch(() => {}); setArmed(false) } else setArmed(true) }}>{armed ? 'click again to cancel all' : 'cancel all'}</Button>}
+        {running && <Button variant={armed ? 'destructive' : 'outline'} size="sm" onClick={() => { if (armed) { postJson('/api/batches/' + b.id + '/cancel', {}).catch(() => {}); setArmed(false) } else setArmed(true) }}>{armed ? 'click again to cancel all' : 'cancel all'}</Button>}
       </div>
       <table className="text-control"><tbody>
         {b.items.map(i => {
@@ -88,10 +90,10 @@ function BatchCard({ b, jobs, vault, onOpenJob }: { b: Batch; jobs: Job[]; vault
 }
 
 /** Batches (R7b): one recipe over the trajectories a path template finds under a root; a preview first, then a queue. */
-export function BatchView({ state, draft, jobs, onOpenJob, onMatches }: { state: AppState; draft: Draft; jobs: Job[]; onOpenJob: (id: string) => void; onMatches: (n: number | null) => void }) {
+export function BatchView({ state, draft, jobs, onOpenJob, onMatches, preset }: { state: AppState; draft: Draft; jobs: Job[]; onOpenJob: (id: string) => void; onMatches: (n: number | null) => void; preset?: BatchPreset | null }) {
   const [recipes, setRecipes] = React.useState<{ id: string; name: string }[]>([])
-  const [recipeId, setRecipeId] = React.useState(FORM)
-  const [root, setRoot] = React.useState(state.config.allow[0] || '')
+  const [recipeId, setRecipeId] = React.useState(preset?.recipe ?? FORM)
+  const [root, setRoot] = React.useState(preset?.root ?? (state.config.allow[0] || ''))
   const [template, setTemplate] = React.useState('')
   const [concurrency, setConcurrency] = React.useState(String(state.config.concurrency))
   const [items, setItems] = React.useState<Item[] | null>(null)

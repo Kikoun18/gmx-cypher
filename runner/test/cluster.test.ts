@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { ageText, clock, duration, etaOf, finishText, mergeJobs, nextPoll, parseGmxEta, parseQqJobs, span, stateOf } from '../src/lib/cluster';
+import { ageText, clock, duration, endedBetween, etaOf, finishText, mergeJobs, nextPoll, parseGmxEta, parseQqJobs, span, stateOf } from '../src/lib/cluster';
 
 // Your real samples (R10b), with your user name, scratch paths and host names replaced by stand-ins of the same length.
 const text = (p: string) => readFileSync(new URL('./fixtures/cluster-tools/' + p, import.meta.url), 'utf8');
@@ -15,7 +15,7 @@ describe('qq jobs, the table you sent (R10b)', () => {
   it('a running job: runtime and walltime, node, %CPU and %Mem; its name cut by qq', () => {
     expect(QQ.jobs[0]).toEqual({
       id: '1374603', key: '1374603', state: { letter: 'R', word: 'running', tone: 'sky' }, user: 'user01', name: 'hmr+fast+sol4_pull_r', truncated: true, queue: 'gpu',
-      cpus: 8, gpus: 1, nodes: 1, runtime: 48 * 60 + 36, walltime: 23 * 3600, waiting: null, node: 'node22', planned: null, cpu: 95, mem: 0,
+      cpus: 8, gpus: 1, nodes: 1, runtime: 48 * 60 + 36, walltime: 23 * 3600, waiting: null, node: 'node22', planned: null, cpu: 95, mem: 0, inputMachine: null, inputDir: null, comment: null,
       raw: 'R  1374603  user01 hmr+fast+sol4_pull_r…   gpu      8       1       1     00:48:36 / 23:00:00     node22        95     0',
     });
   });
@@ -108,5 +108,52 @@ describe('polling (R10c)', () => {
   it('how old the read is', () => {
     const at = '2026-10-10T10:00:00Z', t = Date.parse(at);
     expect([0, 59_000, 180_000, 7_500_000].map(d => ageText(at, t + d))).toEqual(['updated just now', 'updated just now', 'updated 3 min ago', 'updated 2 h 5 min ago']);
+  });
+});
+
+// Your `qq jobs -e` sample (R15, T169): user name, home and project folders, login host and nodes replaced by stand-ins
+// of the same length; the format and times as qq printed them. Its walltime is a day: "1d 00:00:00".
+const DAY = parseQqJobs(text('qq-jobs-1d.txt')), E = parseQqJobs(text('qq-jobs-e.txt'));
+
+describe('qq jobs with a day of walltime, and -e (R15)', () => {
+  it('"21:29:20 / 1d 00:00:00": runtime and walltime, the node and its use (before, a running job read as waiting)', () => {
+    expect(DAY.jobs).toHaveLength(12);
+    expect(DAY.jobs[0]).toMatchObject({ state: { letter: 'R' }, runtime: 21 * 3600 + 29 * 60 + 20, walltime: 86400, waiting: null, node: 'node11', planned: null, cpu: 99, mem: 27 });
+    expect(DAY.jobs.every(j => j.walltime === 86400 && j.node && j.waiting === null)).toBe(true);
+    expect(DAY.counts).toEqual({ R: 12, 'Σ': 12 });
+  });
+
+  it('days on either side, as qq may print them', () => {
+    const row = (times: string) => parseQqJobs('│  R  1  u  name  gpu  8  1  1  ' + times + '  node1  99  10 │').jobs[0]
+    expect(row('1d 02:00:00 / 2d 00:00:00')).toMatchObject({ runtime: 26 * 3600, walltime: 2 * 86400, node: 'node1' });
+    expect(clock('1d 00:00:30')).toBe(86430);
+    expect(clock('1d')).toBeNull();
+  });
+
+  it('-e: each job\'s input machine, input folder and comment, under its row; nothing else read as a job', () => {
+    expect(E.jobs).toHaveLength(12);
+    expect(E.jobs[0]).toMatchObject({ key: '1523408', inputMachine: 'login.cluster.test', inputDir: '/home/user2', comment: 'Job run at Mon Oct 19 at 00:33 on (node11:mem=8388608kb:ncpus=8:ngpus=1:scratch_local=8388608kb)' });
+    expect(E.jobs[6]).toMatchObject({ key: '1523727', name: 'qq_loop_md+0001', inputDir: '/storage/store1-shard/home/user2/project-a/systems/PEP1-POPC/5_md' });
+    expect(E.other.some(l => l.startsWith('>'))).toBe(false);
+    expect(DAY.jobs[0].inputDir).toBeNull();
+  });
+});
+
+describe('a job that ended between two reads (R15, T169)', () => {
+  const without = (t: typeof E, key: string) => t.jobs.filter(j => j.key !== key);
+  it('running, then gone from the list: "no longer running", with the input folder qq -e gave', () => {
+    expect(endedBetween(E.jobs, without(E, '1523727'))).toEqual([{ key: '1523727', name: 'qq_loop_md+0001', word: 'no longer running', inputDir: '/storage/store1-shard/home/user2/project-a/systems/PEP1-POPC/5_md' }]);
+  });
+  it('"finished" only when the list says so (qq jobs -a)', () => {
+    const after = E.jobs.map(j => (j.key === '1523728' ? { ...j, state: stateOf('F') } : j));
+    expect(endedBetween(E.jobs, after)).toEqual([expect.objectContaining({ key: '1523728', word: 'finished' })]);
+  });
+  it('nothing ended: the same list, a queued job that starts, a job never seen running; the folder never guessed', () => {
+    expect(endedBetween(E.jobs, E.jobs)).toEqual([]);
+    expect(endedBetween(QQ.jobs.filter(j => j.state.letter === 'Q'), [])).toEqual([]);
+    // Without -e there is no folder: the job is still said, with none.
+    expect(endedBetween(DAY.jobs, without(DAY, '1523727'))).toEqual([expect.objectContaining({ key: '1523727', inputDir: null })]);
+    // A folder known from an earlier read is used.
+    expect(endedBetween(DAY.jobs, without(DAY, '1523727'), new Map([['1523727', '/x/5_md']]))[0].inputDir).toBe('/x/5_md');
   });
 });

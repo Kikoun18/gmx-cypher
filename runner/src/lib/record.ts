@@ -39,7 +39,8 @@ export interface RunRecord {
   exit: { code: number | null; signal: string | null } | null;
   frames: { analysed: number; lastTime: number } | null;
   log: string;
-  inputs: Partial<Record<Slot, FileInfo>>;
+  /** The inputs by slot; `electrons`: gmx density's electrons file (-ei, R16a). */
+  inputs: Partial<Record<Slot | 'electrons', FileInfo>>;
   /** In -ref/-sel order: group N of the .ndx. `count` is gmx-cypher's, `gmxCount` gmx select's (T21). */
   groups: (Group & { index: number; atoms: string; count: number; gmxCount: number | null })[];
   /** The answers the program read on stdin (version 3, R4): for gmx energy, the term numbers and the closing 0. */
@@ -148,7 +149,8 @@ export function recipeFromRecord(r: RunRecord) {
   // A record names itself (Phase 6); an older one by its first .xvg, which was the run's own until runs wrote others first.
   const why = 'from ' + (r.record ?? (r.outputs.find(o => o.kind === 'xvg')?.path.split('/').pop()?.replace(/\.xvg$/, '') ?? r.job) + '.run.json');
   return {
-    inputs: Object.fromEntries(Object.entries(r.inputs).map(([slot, f]) => [slot, { path: f!.path, why }])) as Partial<Record<Slot, { path: string; why: string }>>,
+    // The electrons file is an option's (-ei), which the recipe keeps: not an input slot of the steps.
+    inputs: Object.fromEntries(Object.entries(r.inputs).filter(([slot]) => slot !== 'electrons').map(([slot, f]) => [slot, { path: f!.path, why }])) as Partial<Record<Slot, { path: string; why: string }>>,
     // A command without groups (gmx energy) keeps the draft's groups: it has none of its own to bring back.
     ...(r.groups.length ? { groups: r.groups.map(({ role, name, tone, steps }) => ({ role, name, tone, steps })) } : {}),
     options: r.recipe.options, template: r.recipe.template, outDir: r.recipe.outDir, analysis: r.analysis ?? 'rdf', terms: r.recipe.terms,

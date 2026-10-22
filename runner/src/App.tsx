@@ -13,6 +13,7 @@ import { Status } from './ui/status'
 import { useDraft } from './draft'
 import { recipeFromRecord } from './lib/record'
 import { ClusterView } from './views/Cluster'
+import type { BatchPreset } from './views/Batch'
 import { withCommand } from './lib/commands'
 import { JobsView } from './views/Jobs'
 import { Settings } from './views/Settings'
@@ -22,18 +23,19 @@ import type { LoadedFile } from './decypher/parse'
 import { keyLabel, matches, typing, useBindings } from './lib/shortcuts'
 import { formatRoute, parseRoute, type Route } from './lib/route'
 import { dropEntries, dropSummary, routeDrop } from './lib/drop'
-import { exportFocused } from './core/Chart'
+import { exportFocused } from './core/chartState'
 import { ShortcutSheet } from './ui/shortcut-sheet'
 
 // (de)Cypher is loaded the first time compare opens, as 3Dmol is: the page starts without it.
 const Decypher = React.lazy(() => import('./decypher/Decypher').then(m => ({ default: m.Decypher })))
 
 /** The view in the address (R9a): a reload keeps it, back and forward move through it, an old address is written anew. */
-function useRoute(): [Route, (r: Route) => void] {
+function useRoute(): [Route, (r: Route, o?: { replace?: boolean }) => void] {
   const read = () => { const p = parseRoute(location.hash); if (p.redirect) history.replaceState(null, '', formatRoute(p.route)); return p.route }
   const [route, setRoute] = React.useState<Route>(read)
   React.useEffect(() => { const on = () => setRoute(read()); window.addEventListener('hashchange', on); return () => window.removeEventListener('hashchange', on) }, [])
-  return [route, r => { const h = formatRoute(r); if (h !== location.hash) location.hash = h }]
+  // A replace (a search being typed) changes the address without a step back for each key.
+  return [route, (r, o) => { const h = formatRoute(r); if (h === location.hash) return; if (o?.replace) { history.replaceState(null, '', h); setRoute(r) } else location.hash = h }]
 }
 
 /** Whether a dialog is open: its keys and drops are its own. */
@@ -84,10 +86,10 @@ export function App() {
   const running = jobs.jobs.filter(j => j.status === 'running').length
   React.useEffect(() => { getJson<AppState>('/api/state').then(setState, e => setError(String(e.message || e))) }, [])
   // Each tab opens where it was left; results remember their selection, for the compare key from anywhere.
-  const last = React.useRef<Record<string, Route>>({})
-  const tab = route.view === 'compare' ? 'results' : route.view
-  last.current[tab] = route
-  const selection = (r => (r?.view === 'compare' ? r.jobs : r?.view === 'results' && r.job ? [r.job] : []))(last.current.results)
+  const tab = route.view === 'compare' ? 'results' : route.view, [kept, setKept] = React.useState<Record<string, Route>>({})
+  if (kept[tab] !== route) setKept({ ...kept, [tab]: route })
+  const last = { ...kept, [tab]: route }
+  const selection = (r => (r?.view === 'compare' ? r.jobs : r?.view === 'results' && r.job ? [r.job] : []))(last.results)
   // Compare: the jobs in the address, the vault RDFs and records on disk kept in this browser, the files dropped (never kept).
   const sources = useDecypherSources(route.view === 'compare' ? route.jobs : [], ids => go({ view: 'compare', jobs: ids }))
   const [files, setFiles] = React.useState<LoadedFile[]>([]), [uploads, setUploads] = React.useState<File[]>([])
@@ -133,6 +135,9 @@ export function App() {
     return () => { window.removeEventListener('dragover', over); window.removeEventListener('dragleave', leave); window.removeEventListener('drop', drop) }
   })
   const openJob = (id: string) => go({ view: 'results', job: id })
+  // A cluster job's folder and a recipe (R15): batch set-up opens filled with them; nothing runs until run.
+  const [batchPreset, setBatchPreset] = React.useState<BatchPreset | null>(null)
+  const offerBatch = (root: string, recipe: string) => { setBatchPreset({ id: Date.now(), root, recipe }); go({ view: 'setup', step: 'inputs', batch: true }) }
 
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground">
@@ -148,7 +153,7 @@ export function App() {
           <ToggleGroupItem value="auto">auto</ToggleGroupItem>
         </ToggleGroup>
       </header>
-      <Tabs value={tab} onValueChange={v => go(last.current[v] ?? (v === 'setup' ? { view: 'setup', step: 'inputs', batch: false } : v === 'results' ? { view: 'results', job: null } : { view: 'cluster' }))} className="flex-1 gap-0">
+      <Tabs value={tab} onValueChange={v => go(last[v] ?? (v === 'setup' ? { view: 'setup', step: 'inputs', batch: false } : v === 'results' ? { view: 'results', job: null } : { view: 'cluster' }))} className="flex-1 gap-0">
         <TabsList className="px-3">
           <TabsTrigger value="setup">set-up</TabsTrigger>
           <TabsTrigger value="results">results {jobs.jobs.length > 0 && <TabsCount>{running ? running + ' running' : String(jobs.jobs.length).padStart(2, '0')}</TabsCount>}</TabsTrigger>
@@ -165,7 +170,7 @@ export function App() {
             <AlertActions><Button variant="outline" size="sm" onClick={() => setSettings(true)}>set gmx</Button></AlertActions>
           </Alert>
         )}
-        <TabsContent value="setup">{state && route.view === 'setup' && <Setup route={route} go={go} state={state} draft={draft} setDraft={setDraft} jobs={jobs.jobs} uploads={uploads} onUploaded={() => setUploads([])} onSettings={() => setSettings(true)} onOpenJob={openJob} />}</TabsContent>
+        <TabsContent value="setup">{state && route.view === 'setup' && <Setup route={route} go={go} state={state} draft={draft} setDraft={setDraft} jobs={jobs.jobs} uploads={uploads} onUploaded={() => setUploads([])} onSettings={() => setSettings(true)} onOpenJob={openJob} batchPreset={batchPreset} />}</TabsContent>
         <TabsContent value="results">{(route.view === 'results' || route.view === 'compare') && (
           <JobsView {...jobs} route={route} go={go} vault={state?.config.vault ?? null} allow={state?.config.allow ?? []} keyName={bindings.compare ? keyLabel(bindings.compare) : null}
             onRunAgain={r => { setDraft(d => ({ ...withCommand(d, r.analysis ?? 'rdf'), ...recipeFromRecord(r) })); go({ view: 'setup', step: 'command', batch: false }) }}
@@ -174,7 +179,7 @@ export function App() {
                 keyName={bindings.compare ? keyLabel(bindings.compare) : null} />
             </React.Suspense>} />
         )}</TabsContent>
-        <TabsContent value="cluster"><ClusterView /></TabsContent>
+        <TabsContent value="cluster"><ClusterView onOffer={offerBatch} /></TabsContent>
       </main>
       </Tabs>
       <Toaster />
@@ -183,7 +188,7 @@ export function App() {
       {dragging && (
         <div className="pointer-events-none fixed inset-3 z-50 flex flex-col items-center justify-center gap-1.5 rounded-2xl border-2 border-dashed border-ring bg-secondary/90">
           <span className="text-display font-bold">Drop files or a folder</span>
-          <span className="text-control text-muted-foreground">a run's inputs go to set-up · xvg and run.json, with their structure and index, go to compare</span>
+          <span className="text-control text-muted-foreground">a simulation's inputs go to set-up · xvg and run.json, with their structure and index, go to compare</span>
         </div>
       )}
     </div>

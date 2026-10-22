@@ -19,7 +19,7 @@ function load<T>(key: string, check: (v: unknown) => T | null): T | null {
 }
 function save(key: string, v: unknown) { try { localStorage.setItem(key, JSON.stringify(v)) } catch { /* a convenience only */ } }
 
-const isRef = (r: unknown): r is SourceRef => {
+export const isRef = (r: unknown): r is SourceRef => {
   const x = r as Record<string, unknown> | null
   return !!x && ((x.kind === 'job' && typeof x.id === 'string') || (x.kind === 'record' && typeof x.path === 'string') || (x.kind === 'vault' && ['project', 'row', 'rdf'].every(k => typeof x[k] === 'string')))
 }
@@ -40,6 +40,8 @@ export function useDecypherSources(jobs: string[], setJobs: (ids: string[]) => v
     toggle: (r: SourceRef) => set(keys.has(refKey(r)) ? refs.filter(x => refKey(x) !== refKey(r)) : [...refs, r]),
     add: (rs: SourceRef[]) => set([...refs, ...rs.filter(r => !keys.has(refKey(r)))]),
     remove: (key: string) => set(refs.filter(x => refKey(x) !== key)),
+    /** What a saved view shows (R14b), in place of what compare shows now. */
+    replace: (next: SourceRef[]) => set(next),
   }
 }
 export type DecypherSources = ReturnType<typeof useDecypherSources>
@@ -80,7 +82,7 @@ export interface View {
 
 export const DEFAULT_VIEW: View = { mode: 'each', colorBy: 'group', rep: 'ball & stick', rest: 'grey', arrange: 'side by side', labels: true, hydrogens: true, marks: 'both', link: false, hidden: [], selected: {}, focus: null, morphed: [], scale: 'own', ownScale: [], styles: {}, pins: {} }
 
-function checkView(v: unknown): View | null {
+export function checkView(v: unknown): View | null {
   if (!v || typeof v !== 'object') return null
   const o = v as Partial<View>, d = DEFAULT_VIEW, one = <T>(x: unknown, ok: readonly T[], def: T) => (ok.includes(x as T) ? (x as T) : def)
   const bool = (x: unknown, def: boolean) => (typeof x === 'boolean' ? x : def)
@@ -97,6 +99,17 @@ function checkView(v: unknown): View | null {
     hidden: Array.isArray(o.hidden) ? o.hidden.filter(x => typeof x === 'string') : [], selected, focus: typeof o.focus === 'string' ? o.focus : null, morphed,
     scale: one(o.scale, ['own', 'x', 'y', 'both'] as const, d.scale), ownScale: strs(o.ownScale), styles: kit.cleanStyles(o.styles),
     pins: Object.fromEntries(Object.entries(o.pins && typeof o.pins === 'object' ? o.pins : {}).map(([k, p]) => [k, kit.cleanPins(p)])),
+  }
+}
+
+/** The view with only these sources' state (R14b, review): what a source removed since left behind is not saved. */
+export function viewOf(v: View, ids: Set<string>): View {
+  const keep = (id: string) => ids.has(id), only = <T>(o: Record<string, T>, ok: (k: string) => boolean) => Object.fromEntries(Object.entries(o).filter(([k]) => ok(k)))
+  return {
+    ...v, hidden: v.hidden.filter(keep), selected: only(v.selected, keep), focus: v.focus && keep(v.focus) ? v.focus : null,
+    morphed: v.morphed.map(m => ({ ids: m.ids.filter(keep), off: m.off.filter(keep) })).filter(m => m.ids.length > 1), ownScale: v.ownScale.filter(keep),
+    // A curve's style is keyed by its result's id, its group and its name; the one graph's marks by `one`.
+    styles: only(v.styles, k => keep(k.split('|')[0])), pins: only(v.pins, k => k === 'one' || keep(k)),
   }
 }
 

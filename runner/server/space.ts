@@ -2,10 +2,10 @@
 // Matrix never scans (proved with its own code in test/space.test.ts). With <project>/_inbox/ (send.ts), the only
 // place gmx-cypher writes in a vault. Every file is created exclusively; nothing is deleted or replaced.
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, normalize } from 'node:path';
 import type { RunRecord } from '../src/lib/record';
-import { portableRecord, SPACE, spacePaths } from '../src/lib/space';
+import { portableRecord, portableView, resolvedView, SPACE, spacePaths, type SavedView } from '../src/lib/space';
 import { HttpError } from './http';
 
 const README = `# gmx-cypher
@@ -46,6 +46,62 @@ export function writeInSpace(vault: string, rel: string, text: string, by: strin
   mkdirSync(dirname(p), { recursive: true });
   try { writeFileSync(p, text, { flag: 'wx' }); return 'written'; }
   catch (e) { if ((e as NodeJS.ErrnoException).code === 'EEXIST') return 'exists'; throw e; }
+}
+
+/** The record copies in the space (R13, R14c): each sent result's run, newest first, for a run diff. */
+export function listRecords(vault: string): { sha256: string; name: string; analysis: string; ended: string | null }[] {
+  const dir = dirname(join(vault, spacePaths.record('0'.repeat(64))));
+  let names: string[] = [];
+  try { names = readdirSync(dir).filter(n => /^[0-9a-f]{64}\.run\.json$/.test(n)); } catch { return []; }
+  return names.flatMap(n => {
+    const sha256 = n.slice(0, 64);
+    try {
+      const r = JSON.parse(readFileSync(join(dir, n), 'utf8')) as RunRecord;
+      if (r.format !== 'gmx-cypher run') return [];
+      const file = (r.outputs ?? []).find(o => o.sha256 === sha256)?.path.split('/').pop() ?? sha256.slice(0, 12);
+      return [{ sha256, name: file.replace(/\.xvg$/, ''), analysis: r.analysis ?? 'rdf', ended: r.ended ?? null }];
+    } catch { return []; }
+  }).sort((a, b) => (b.ended ?? '').localeCompare(a.ended ?? '') || a.name.localeCompare(b.name));
+}
+
+/** One record copy, by the sent file's SHA-256. */
+export function readRecordCopy(vault: string, sha256: string): RunRecord {
+  let rel: string;
+  try { rel = spacePaths.record(sha256); } catch (e) { throw new HttpError(400, (e as Error).message); }
+  try { return JSON.parse(readFileSync(join(vault, rel), 'utf8')) as RunRecord; }
+  catch { throw new HttpError(404, 'no record copy of ' + sha256.slice(0, 12) + '… in the vault'); }
+}
+
+/** The saved views of a project (R14b), by name, newest first; [] before the first. */
+export function listViews(vault: string, project: string): { name: string; saved: string; sources: number }[] {
+  const dir = dirname(join(vault, spacePaths.view(project, 'x')));
+  let names: string[] = [];
+  try { names = readdirSync(dir).filter(n => n.endsWith('.json')); } catch { return []; }
+  return names.flatMap(n => {
+    try { const v = JSON.parse(readFileSync(join(dir, n), 'utf8')) as SavedView; return v.format === 'gmx-cypher view' ? [{ name: n.slice(0, -5), saved: String(v.saved), sources: Array.isArray(v.sources) ? v.sources.length : 0 }] : []; }
+    catch { return []; }
+  }).sort((a, b) => b.saved.localeCompare(a.saved) || a.name.localeCompare(b.name));
+}
+
+/** One saved view, its records found again under the allowed folders (and those found nowhere, named). */
+export function readView(vault: string, project: string, name: string, roots: string[]): { view: SavedView; missing: string[] } {
+  let v: SavedView, rel: string;
+  try { rel = spacePaths.view(project, name); } catch (e) { throw new HttpError(400, (e as Error).message); }
+  try { v = JSON.parse(readFileSync(join(vault, rel), 'utf8')); }
+  catch (e) { if ((e as NodeJS.ErrnoException).code === 'ENOENT') throw new HttpError(404, 'no view named "' + name + '" in this project'); throw e; }
+  if (v?.format !== 'gmx-cypher view' || !Array.isArray(v.sources)) throw new HttpError(400, name + ' is not a gmx-cypher view');
+  return resolvedView(v, roots, p => existsSync(p));
+}
+
+/** A view saved once (R14b): records named relative to their allowed folder; a name taken is refused, never replaced. */
+export function saveView(vault: string, project: string, body: Pick<SavedView, 'name' | 'sources' | 'view' | 'labels'>, roots: string[], by: string): SavedView {
+  let rel: string;
+  try { rel = spacePaths.view(project, String(body.name ?? '').trim()); } catch (e) { throw new HttpError(400, (e as Error).message); }
+  let v: SavedView;
+  try { v = portableView({ format: 'gmx-cypher view', version: 1, name: String(body.name).trim(), saved: new Date().toISOString(), by, sources: body.sources ?? [], view: body.view ?? {}, labels: body.labels ?? {} }, roots); }
+  catch (e) { throw new HttpError(400, (e as Error).message); }
+  if (writeInSpace(vault, rel, JSON.stringify(v, null, 2) + '\n', by) === 'exists') throw new HttpError(409, 'a view named "' + v.name + '" exists: nothing was replaced; choose another name');
+  return v;
 }
 
 /** A sent result's record, portable (T158), under the sent file's SHA-256; the same result sent again is already there. */

@@ -7,7 +7,7 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, statSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import { atomTable, type Atom } from '../src/lib/atoms';
-import { allNames, COMMANDS, commandOf, roleProblems, type CommandDef, type InputSlot, type OutputNames, type RunIo } from '../src/lib/commands';
+import { allNames, COMMANDS, commandOf, roleProblems, rolesOf, type CommandDef, type InputSlot, type OutputNames, type RunIo } from '../src/lib/commands';
 import { awhFrames, awhNames, awhUnits, framesWritten, type AwhFrame } from '../src/lib/awh';
 import { commonFolder, listFile, whamOutputNames } from '../src/lib/wham';
 import { parseDistanceStats } from '../src/lib/distance';
@@ -41,6 +41,8 @@ export interface RunRequest {
   names?: Record<string, string>;
   /** A batch run whose names were taken meanwhile takes the next free stem instead of stopping (review finding 5). */
   retryNames?: boolean;
+  /** The batch that started it (R12b): its id and its recipe's name, kept with the job for the jobs list's filter. */
+  batch?: { id: string; name: string };
   /** gmx wham's windows (R6): each window's run input and pull file, in the order of the lists. */
   windows?: { tpr: string; pull: string }[];
   /** gmx wham: positions (pullx) or forces (pullf). */
@@ -118,6 +120,8 @@ export async function planRun(ctx: Ctx, req: RunRequest, roots: string[]): Promi
   stem = freeStem(stem, existsSync(outDir) ? readdirSync(outDir) : [], extra);
   const help = found.help, { cwd, io } = cmd.io(paths, outDir, stem);
   let options: Options = req.options || {};
+  // gmx density's electrons file (-ei, R16a) is read by gmx: inside the allowed folders, like every input (review).
+  if (typeof options.ei === 'string' && options.ei.trim()) options = { ...options, ei: inside(options.ei.trim(), roots) };
   const notes: string[] = [], tempProblems: string[] = [];
   if (windows && (options.temp === undefined || options.temp === '')) {
     // gmx wham doesn't read the temperature from the run inputs (it assumes 298 K): gmx-cypher does, and passes it.
@@ -243,6 +247,7 @@ export async function startRun(ctx: Ctx, req: RunRequest, roots: string[]): Prom
 
   const inputs: RunRecord['inputs'] = {};
   for (const [slot, p] of Object.entries(req.inputs) as [Slot, string][]) if (p) inputs[slot] = await fileInfo(inside(p, roots), slot !== 'trajectory' || ctx.config.hashTrajectories);
+  if (typeof plan.options.ei === 'string' && plan.options.ei) inputs.electrons = await fileInfo(plan.options.ei, true);
   // The frames it will read (≈), for its progress: the run input's schedule narrowed by -b, -e and -dt.
   const estimate = d && cmd.groups ? runEstimate(frameEstimate(d, inputs.trajectory!.path), req.options || {}) : null;
   const env = { ...Object.fromEntries(Object.entries(process.env).filter(([k]) => k.startsWith('GMX'))) as Record<string, string>, ...plan.env };
@@ -250,7 +255,8 @@ export async function startRun(ctx: Ctx, req: RunRequest, roots: string[]): Prom
   const windows = plan.windows ? await Promise.all(plan.windows.map(async w => ({ tpr: await fileInfo(w.tpr, true), pull: await fileInfo(w.pull, true) }))) : null;
   // What gmx awh's ξ is (R7c): read once from the run input, kept in the record so it never needs the run input again.
   const awhUnitsRead = plan.tool === 'awh' ? awhUnits(await dumpText(ctx.gmx, inside(req.inputs.runInput!, roots), plan.cwd)) : null;
-  const recordOf = (j: Job, outputs: Output[], problems: string[]): RunRecord => buildRecord({
+  // The record holds the job's log, read from its file (R12a): at the start nothing yet, at the end all of it.
+  const recordOf = (j0: Job, outputs: Output[], problems: string[]): RunRecord => { const j = { ...j0, log: ctx.jobs.logText(j0.id) }; return buildRecord({
     analysis: plan.tool, record: plan.names.record, runner: ctx.version, gmx: { path: ctx.gmx.path!, version: ctx.gmx.version! }, env, command: { cwd: plan.cwd, file: plan.file, args: plan.argv },
     inputs, groups: req.groups ?? [], atoms, sizes, options: plan.options, help, form: cmd.options, template: req.template || DEFAULT_TEMPLATE,
     outDir: req.outDir ?? null, job: j, outputs, problems, stdin: plan.stdin, terms: req.terms, complete: !!j.ended,
@@ -262,11 +268,12 @@ export async function startRun(ctx: Ctx, req: RunRequest, roots: string[]): Prom
     ...(awhUnitsRead ? { awhUnits: awhUnitsRead } : {}),
     // gmx awh's frames are its files: how many it wrote, and the time of the last (the one for the vault).
     ...(plan.tool === 'awh' ? { frames: j.ended ? awhRecordFrames(plan.stem, outputs.map(o => o.path.split('/').pop()!)) : null } : {}),
-  });
+  }); };
   const json = (r: RunRecord) => JSON.stringify(r, null, 2) + '\n';
   const job = ctx.jobs.start({
-    kind: plan.tool, title: !cmd.groups ? plan.stem + ' · gmx ' + plan.tool : plan.stem + ' · ' + req.groups[0].name + (req.groups.length > 1 ? ' → ' + req.groups.slice(1).map(g => g.name).join(', ') : ''),
-    file: plan.file, args: plan.argv, cwd: plan.cwd, env: plan.env, meta: { stem: plan.stem, outDir: plan.outDir, record: recordPath, names: plan.names, estimate },
+    // Groups of one kind (density's groups, order's carbons, R16) are listed; a first that measures the others leads with →.
+    kind: plan.tool, title: !cmd.groups ? plan.stem + ' · gmx ' + plan.tool : plan.stem + ' · ' + req.groups[0].name + (req.groups.length > 1 ? (rolesOf(cmd).first === rolesOf(cmd).rest ? ', ' : ' → ') + req.groups.slice(1).map(g => g.name).join(', ') : ''),
+    file: plan.file, args: plan.argv, cwd: plan.cwd, env: plan.env, meta: { stem: plan.stem, outDir: plan.outDir, record: recordPath, names: plan.names, estimate, ...(req.batch ? { batch: req.batch.id, batchName: req.batch.name } : {}) },
     ...(plan.stdin != null ? { stdin: plan.stdin } : {}),
   });
   // The record from the start (R2b): what is known now, the job running. A command with groups writes it new under its

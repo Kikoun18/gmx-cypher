@@ -44,12 +44,14 @@ describe('jobs over HTTP', () => {
   it('streams a job as it runs: its state, its output, and its end; then lists and shows it', async () => {
     const cwd = tmp('sim');
     writeFileSync(join(cwd, 'g.ndx'), '[ a ]\n 1\n[ b ]\n 2\n');
-    const seen: string[] = [];
-    let id = '';
+    const seen: string[] = [], text: string[] = [];
+    let id = '', end = 0;
     const done = listen((name, d) => {
-      const x = d as { id: string; status?: string; s?: string; log?: string };
+      const x = d as { id: string; status?: string; s?: string; end?: number; log?: string };
       if (x.id !== id) return false;
       seen.push(name === 'job' ? 'job:' + x.status : 'out');
+      // Each chunk says where it ends in the log (review): one after another, they add up to it.
+      if (name === 'out') { end += x.s!.length; expect(x.end).toBe(end); text.push(x.s!); }
       expect(x.log).toBeUndefined();
       return name === 'job' && x.status === 'done';
     });
@@ -61,8 +63,25 @@ describe('jobs over HTTP', () => {
     const list = await (await fetch(base + '/api/jobs', { headers })).json();
     expect(list.find((j: { id: string }) => j.id === id)).toMatchObject({ status: 'done', title: 'rdf_x' });
     expect(list[0].log).toBeUndefined();
+    // The log from its file (R12a): its tail, and every character with from=0.
     const one = await (await fetch(base + '/api/jobs/' + id, { headers })).json();
-    expect(one.log).toContain('Analyzed 11 frames');
+    expect(one.log).toBeUndefined();
+    const log = await (await fetch(base + '/api/jobs/' + id + '/log?from=0', { headers })).json();
+    expect([log.text, log.from, log.size]).toEqual([expect.stringContaining('Analyzed 11 frames'), 0, one.logSize]);
+    expect([text.join(''), end]).toEqual([log.text, log.size]);
+    expect((await fetch(base + '/api/jobs/' + id + '/log?from=x', { headers })).status).toBe(400);
+    // Archived (R12c): gone from the list and its events, listed with ?archived=1; unarchived, a job again.
+    const post = (path: string) => fetch(base + path, { method: 'POST', headers: { ...headers, 'content-type': 'application/json', origin: base }, body: '{}' });
+    const gone = listen((name, d) => name === 'gone' && (d as { id: string }).id === id);
+    await new Promise(r => setTimeout(r, 100));
+    expect((await post('/api/jobs/' + id + '/archive')).status).toBe(200);
+    await gone;
+    const ids = async (q = '') => ((await (await fetch(base + '/api/jobs' + q, { headers })).json()) as { id: string }[]).map(j => j.id);
+    expect([(await ids()).includes(id), await ids('?archived=1')]).toEqual([false, [id]]);
+    const again = await post('/api/jobs/' + id + '/archive');
+    expect([again.status, (await again.json()).error]).toEqual([409, 'no job ' + id]);
+    expect((await post('/api/jobs/' + id + '/unarchive')).status).toBe(200);
+    expect([(await ids()).includes(id), await ids('?archived=1')]).toEqual([true, []]);
   });
 
   it('cancels a running job by its id, and refuses an unknown one', async () => {

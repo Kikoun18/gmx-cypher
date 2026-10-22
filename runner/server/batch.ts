@@ -139,7 +139,7 @@ export class Batches extends EventEmitter {
       const item = b.items.find(i => i.status === 'queued');
       if (!item) break;
       item.status = 'starting';
-      const req = { tool: r.analysis ?? 'rdf', inputs: { trajectory: item.trajectory, runInput: item.runInput ?? '', structure: item.structure ?? undefined }, groups: r.groups, options: r.options, template: r.template, outDir: r.outDir, names: nameValues(item), retryNames: true };
+      const req = { tool: r.analysis ?? 'rdf', inputs: { trajectory: item.trajectory, runInput: item.runInput ?? '', structure: item.structure ?? undefined }, groups: r.groups, options: r.options, template: r.template, outDir: r.outDir, names: nameValues(item), retryNames: true, batch: { id: b.id, name: r.name } };
       startRun(this.ctx, req, this.roots()).then(({ job }) => {
         Object.assign(item, { status: 'started', job: job.id });
         if (b.cancelled) this.ctx.jobs.cancel(job.id);
@@ -194,7 +194,7 @@ export async function sendAll(ctx: Ctx, b: Batch, project: string): Promise<{ re
       const why = [...l.missing.map(t => 'no value for ' + t), ...l.preview.problems, ...l.reasons];
       if (why.length) { out.push({ rel: i.rel, skipped: why.join('; ') }); continue; }
       out.push({ rel: i.rel, sent: sendToInbox(v, p, xvg, l.name, ctx.config.pmfUrl).path });
-      keepRecord(v, String(j.meta!.record), [...ctx.config.allow, join(ctx.home, 'uploads')], 'gmx-cypher ' + ctx.version);
+      keepRecord(v, String(j.meta!.record), xvg, [...ctx.config.allow, join(ctx.home, 'uploads')], 'gmx-cypher ' + ctx.version);
     } catch (e) { out.push({ rel: i.rel, skipped: 'could not be sent: ' + (e as Error).message }); }
   }
   return out;

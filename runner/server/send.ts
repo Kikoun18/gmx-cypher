@@ -4,7 +4,7 @@
 
 import { constants, copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { safeFileName, uniqueName } from '../../matrix/src/lib/storage/path';
 import { recordComplete, type RunRecord } from '../src/lib/record';
 import { spacePaths } from '../src/lib/space';
@@ -35,13 +35,17 @@ export function sendToInbox(v: VaultView, project: { id: string; name: string; d
 }
 
 /**
- * A sent result's record, kept in the space under the sent file's SHA-256 (R14a, T158): its path there, or null for
- * a record that isn't complete or has no hash of its g(r). The same result sent again finds its copy already there.
+ * A sent result's record, kept in the space under the sent file's SHA-256 (R14a, T158): the output that is the sent file
+ * (review: a job's other .xvg files are listed before it), its path in the space, or null with the reason (a record that
+ * isn't complete, a space that can't be written). The file is already sent then: a failed copy never undoes that. The
+ * same result sent again finds its copy already there.
  */
-export function keepRecord(v: VaultView, recordPath: string, roots: string[], by: string): string | null {
-  const r = JSON.parse(readFileSync(recordPath, 'utf8')) as RunRecord, sha = r.outputs.find(o => o.kind === 'xvg')?.sha256;
-  if (!recordComplete(r) || !sha) return null;
-  copyRecord(v.path, sha, r, roots, homedir(), by);
-  return spacePaths.record(sha);
+export function keepRecord(v: VaultView, recordPath: string, sent: string, roots: string[], by: string): { record: string | null; recordError?: string } {
+  try {
+    const r = JSON.parse(readFileSync(recordPath, 'utf8')) as RunRecord, sha = r.outputs.find(o => basename(o.path) === basename(sent))?.sha256;
+    if (!recordComplete(r) || !sha) return { record: null, recordError: 'the record is not complete, or names no SHA-256 of ' + basename(sent) };
+    copyRecord(v.path, sha, r, roots, homedir(), by);
+    return { record: spacePaths.record(sha) };
+  } catch (e) { return { record: null, recordError: (e as Error).message } }
 }
 

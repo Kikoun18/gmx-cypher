@@ -1,0 +1,18 @@
+# This file was created Tue Oct 20 15:01:18 2026
+# Created by:
+#                      :-) GROMACS - gmx order, 2025.4 (-:
+# 
+# Executable:   /opt/gromacs-2025.4/bin/gmx
+# Data prefix:  /opt/gromacs-2025.4
+# Working dir:  /home/user/sim/na2so4/nvt
+# Command line:
+#   gmx order -f nvt.xtc -s nvt.tpr -n order.ndx -o order_nvt.xvg -od order_nvt_scd.xvg -os order_nvt_sliced.xvg
+# gmx order is part of G R O M A C S:
+#
+# Guyana Rwanda Oman Macau Angola Cameroon Senegal
+#
+@    title "Order tensor diagonal elements"
+@    xaxis  label "Atom"
+@    yaxis  label "S"
+@TYPE xy
+           1     -0.0736035      0.0613538      0.0122498

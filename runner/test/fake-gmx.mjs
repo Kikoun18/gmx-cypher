@@ -186,11 +186,11 @@ function distance() {
 const OLD = process.env.FAKE_GMX_VERSION === '2023.3';
 
 /**
- * The real outputs of an R9 command in test/fixtures/r9/<dir>, with this run's group names in place of the fixture's
- * (`names`: fixture name → this run's), written where the flags say; then what gmx printed.
+ * The real outputs of an R9 command in test/fixtures/r9/<dir> (R16: r16/<dir>), with this run's group names in place of
+ * the fixture's (`names`: fixture name → this run's), written where the flags say; then what gmx printed.
  */
-function r9Outputs(dir, names, files) {
-  const text = n => readFileSync(new URL('./fixtures/r9/' + dir + '/' + n, import.meta.url), 'utf8');
+function r9Outputs(dir, names, files, base = 'r9') {
+  const text = n => readFileSync(new URL('./fixtures/' + base + '/' + dir + '/' + n, import.meta.url), 'utf8');
   const w = n => text(n).replace(new RegExp('\\b(' + Object.keys(names).join('|') + ')\\b', 'g'), m => names[m]);
   const log = [];
   for (const [flag, name] of files) { const o = one(flag); if (o) { backUp(o, log); writeFileSync(o, w(name)); } }
@@ -280,6 +280,21 @@ else if (tool === 'mindist') {
 else if (tool === 'rmsf' && argv[1] === '-h') process.stdout.write(read('rmsf-h.txt'));
 // gmx rmsf (R9b): its one group on stdin; the fixture is sulfate's, per atom or per residue (-res), fitted.
 else if (tool === 'rmsf') { const [g] = stdinGroups(1); if (argv.includes('-nofit')) { process.stderr.write('fake gmx rmsf: -nofit is not in the fixtures\n'); process.exit(1); } r9Outputs(argv.includes('-res') ? 'rmsf-res' : 'rmsf', { sulfate: g }, [['-o', 'rmsf_nvt.xvg']]); }
+else if ((tool === 'density' || tool === 'order') && argv[1] === '-h') process.stdout.write(OLD ? readFileSync(new URL('./fixtures/gmx-2023.3/' + tool + '-h.txt', import.meta.url), 'utf8') : read(tool + '-h.txt'));
+// gmx density (R16a): the group to centre on (with -center or -symm), then -ng groups, on stdin; the fixtures are sodium
+// and water, by mass or number, and centred on sodium.
+else if (tool === 'density') {
+  const ng = Number(one('-ng') || 1), centred = argv.includes('-center') || argv.includes('-symm'), groups = stdinGroups(ng + (centred ? 1 : 0)), [a, b] = centred ? groups.slice(1) : groups;
+  const file = argv.includes('-symm') ? 'density_symm.xvg' : centred ? 'density_center.xvg' : one('-dens') === 'number' ? 'density_number.xvg' : 'density_mass.xvg';
+  if (ng !== 2 || (centred && groups[0] !== a) || ![undefined, 'mass', 'number'].includes(one('-dens')) || (one('-d') ?? 'Z') !== 'Z' || (one('-sl') ?? '50') !== '50') { process.stderr.write('fake gmx density: only two groups along Z, 50 slices, by mass or number (centred on the first) are in the fixtures\n'); process.exit(1); }
+  r9Outputs('density', { sodium: a, water: b }, [['-o', file]], 'r16');
+}
+// gmx order (R16b): every group of the index, nothing on stdin; the fixture has three.
+else if (tool === 'order') {
+  const g = groupNames(one('-n'));
+  if (g.length !== 3) { process.stderr.write('fake gmx order: the fixture has three carbon groups, not ' + g.length + '\n'); process.exit(1); }
+  r9Outputs('order', { C1: g[0], C2: g[1], C3: g[2] }, [['-o', 'order_tensor.xvg'], ['-od', 'order_scd.xvg']], 'r16');
+}
 else if (tool === 'energy') energy();
 else if (tool === 'rdf') await rdf();
 // gmx dump: the real head of the test system's dump, or of an umbrella window's (300 K, 663 atoms) for those (R6).

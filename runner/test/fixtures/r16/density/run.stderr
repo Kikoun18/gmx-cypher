@@ -1,0 +1,20 @@
+                     :-) GROMACS - gmx density, 2025.4 (-:
+
+Executable:   /opt/gromacs-2025.4/bin/gmx
+Data prefix:  /opt/gromacs-2025.4
+Working dir:  /home/user/sim/na2so4/nvt
+Command line:
+  gmx density -f nvt.xtc -s nvt.tpr -n groups.ndx -o density_mass.xvg -d Z -sl 50 -dens mass -ng 2
+
+Reading file nvt.tpr, VERSION 2025.1-Homebrew (single precision)
+
+Select 2 groups to calculate density for:
+Group     0 (        sulfate) has    30 elements
+Group     1 (         sodium) has    12 elements
+Group     2 (          water) has  3200 elements
+Select a group: Select a group: Reading frame       0 time    0.000   Reading frame       1 time    1.000   Reading frame       2 time    2.000   Reading frame       3 time    3.000   Reading frame       4 time    4.000   Reading frame       5 time    5.000   Reading frame       6 time    6.000   Reading frame       7 time    7.000   Reading frame       8 time    8.000   Reading frame       9 time    9.000   Reading frame      10 time   10.000   Reading frame      11 time   11.000   Reading frame      12 time   12.000   Reading frame      13 time   13.000   Reading frame      14 time   14.000   Reading frame      15 time   15.000   Reading frame      16 time   16.000   Reading frame      17 time   17.000   Reading frame      18 time   18.000   Reading frame      19 time   19.000   Reading frame      20 time   20.000   Last frame         20 time   20.000   
+
+Read 21 frames from trajectory. Calculating density
+
+GROMACS reminds you: "I am at two with nature." (Woody Allen)
+

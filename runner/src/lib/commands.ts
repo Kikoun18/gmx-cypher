@@ -14,6 +14,8 @@ import { outputNames } from './names';
 import { RMS_FORM, rmsArgv, rmsOptionProblems, rmsStdin, type RmsIo } from './rms';
 import { RMSF_FORM, rmsfArgv, rmsfOptionProblems, rmsfStdin, type RmsfIo } from './rmsf';
 import { MINDIST_FORM, MINDIST_SUFFIXES, mindistArgv, mindistNames, mindistOptionProblems, mindistStdin, type MindistIo } from './mindist';
+import { DENSITY_FORM, densityArgv, densityOptionProblems, densityStdin, type DensityIo } from './density';
+import { ORDER_FORM, ORDER_SUFFIXES, orderArgv, orderNames, orderOptionProblems, type OrderIo } from './order';
 import { GYRATE_FORM, GYRATE_LEGACY_FORM, gyrateArgv, gyrateKind, gyrateLegacyArgv, gyrateLegacyStdin, gyrateOptionProblems, type GyrateIo } from './gyrate';
 import { FORM, rdfArgs, rdfIo, recipeProblems, relPath, type Options, type RdfIo } from './rdf';
 
@@ -22,9 +24,10 @@ export type InputSlot = 'trajectory' | 'runInput' | 'structure' | 'index' | 'edr
 export type RunIo = Record<string, string>;
 /**
  * An option of a command's form. `switch` turns one of gmx's optional output files on (`cn` → -cn, `all` → -oall) and
- * gmx-cypher names the file; `own` is gmx-cypher's own choice, not a gmx flag (what gmx distance measures, R7).
+ * gmx-cypher names the file; `own` is gmx-cypher's own choice, not a gmx flag (what gmx distance measures, R7). `only`:
+ * values offered only once another option is set (R16a: electron density, once an electrons file is given).
  */
-export interface CommandOption { flag: string; group: string; label: string; unit?: string; what: string; switch?: string; own?: { values: string[]; default: string } }
+export interface CommandOption { flag: string; group: string; label: string; unit?: string; what: string; switch?: string; own?: { values: string[]; default: string }; only?: Record<string, string> }
 
 /** The form's options described as gmx's -h describes its own: a switch as a bool, an own choice as an enum; ones this gmx lacks left out. */
 export function formHelp(form: CommandOption[], help: HelpOption[]): HelpOption[] {
@@ -402,7 +405,52 @@ export const mindistCommand: CommandDef = {
   stdin: r => mindistStdin(r.selections),
 };
 
-export const COMMANDS: CommandDef[] = [rdfCommand, distanceCommand, hbondCommand, hbondLegacyCommand, rmsCommand, rmsfCommand, gyrateCommand, gyrateLegacyCommand, mindistCommand, energyCommand, awhCommand, whamCommand];
+/** gmx density (R16a): the density of each group along one box axis; one curve per group. */
+export const densityCommand: CommandDef = {
+  tool: 'density',
+  title: 'density of each group along one axis of the box',
+  section: 'trajectory and groups',
+  inputs: ['trajectory', 'runInput', 'structure', 'index'],
+  required: ['trajectory', 'runInput'],
+  groups: true,
+  roles: { first: 'group', rest: 'group', min: 0 },
+  options: DENSITY_FORM,
+  outputNames: oneOutput,
+  outputs: [{ file: 'xvg', type: 'density', vault: true, why: 'The Matrix reads every curve: one per group' }],
+  io: trajectoryIo,
+  problems: densityOptionProblems,
+  argv: (r, io, help) => densityArgv(r, io as DensityIo, help),
+  stdin: r => densityStdin(r.selections, r.options),
+};
+
+/**
+ * gmx order (R16b): S_CD per carbon of a lipid tail. Its groups are the carbons in tail order, one each (question 27),
+ * written to its index in that order; gmx reads them all.
+ */
+export const orderCommand: CommandDef = {
+  tool: 'order',
+  title: 'lipid tail order parameters (S_CD) per carbon',
+  section: 'trajectory and groups',
+  inputs: ['trajectory', 'runInput', 'structure', 'index'],
+  required: ['trajectory', 'runInput'],
+  groups: true,
+  roles: { first: 'carbon', rest: 'carbon', min: 2 },
+  options: ORDER_FORM,
+  outputNames: orderNames,
+  suffixes: ORDER_SUFFIXES,
+  outputs: [
+    { file: 'xvg', type: 'order', vault: true, why: 'titled "Deuterium order parameters": the Matrix\'s Order parameters, drawn as points' },
+    { file: 'tensor', type: null, vault: false, why: 'the order tensor\'s diagonal, titled "Order tensor diagonal elements": general Data in the Matrix, so kept beside the result' },
+  ],
+  io: (p, outDir, stem) => {
+    const { cwd, io } = trajectoryIo(p, outDir, stem);
+    return { cwd, io: { ...io, tensor: relPath(cwd, outDir + '/' + stem + '_tensor.xvg') } };
+  },
+  problems: orderOptionProblems,
+  argv: (r, io, help) => orderArgv(r, io as OrderIo, help),
+};
+
+export const COMMANDS: CommandDef[] = [rdfCommand, distanceCommand, hbondCommand, hbondLegacyCommand, rmsCommand, rmsfCommand, gyrateCommand, gyrateLegacyCommand, mindistCommand, densityCommand, orderCommand, energyCommand, awhCommand, whamCommand];
 export const commandOf = (tool: string) => COMMANDS.find(c => c.tool === tool);
 
 /** What a draft holds of commands: the picked one, its options and name template, and the others', kept aside. */

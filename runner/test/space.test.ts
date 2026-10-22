@@ -35,6 +35,25 @@ describe('the record copy names nothing of this machine (T158)', () => {
     expect(p.copy).toMatchObject({ paths: 'relative to their allowed folder', env: 'names only' });
   });
 
+  it('names no folder of this machine anywhere: gmx\'s install, the arguments, the options, the recipe, the log (review)', () => {
+    const r = record(), sims = r.command.cwd.split('/').slice(0, 4).join('/'), gmx = r.gmx.path, install = gmx.split('/').slice(0, -2).join('/');
+    const p = portableRecord({ ...r, command: { ...r.command, args: [...r.command.args, '-ei', '/home/me/e.dat'] }, options: [...r.options, { flag: 'ei', value: '/home/me/e.dat', default: 'electrons.dat', isDefault: false }],
+      recipe: { ...r.recipe, options: { ...r.recipe.options, ei: '/home/me/e.dat' } } }, [sims], '/home/me');
+    expect(p.command.file).toBe(gmx.split('/').pop());
+    expect(p.command.args.slice(-2)).toEqual(['-ei', '~/e.dat']);
+    expect(p.options.find(o => o.flag === 'ei')!.value).toBe('~/e.dat');
+    expect(p.recipe.options.ei).toBe('~/e.dat');
+    expect(p.log).toContain('Executable:   ' + gmx.split('/').pop() + '\n');
+    expect(p.log).toContain('Data prefix:  ' + install.split('/').pop() + '\n');
+    // No absolute folder of this machine is left in the copy.
+    expect(JSON.stringify(p)).not.toMatch(/\/(cvmfs|mnt|home\/me)\b/);
+  });
+
+  it('a folder is replaced only where it ends: /data never turns /database into .base (review)', () => {
+    const r = { ...record(), log: 'in /data and /data/x, not /database/top.itp; ~ for /home/me/w and /home/me, not /home/mel/z' };
+    expect(portableRecord(r, ['/data'], '/home/me').log).toBe('in . and x, not /database/top.itp; ~ for ~/w and ~, not /home/mel/z');
+  });
+
   it('builds paths only from a SHA-256, a Matrix ID and a plain name', () => {
     expect(spacePaths.record(SHA)).toBe('gmx-cypher/records/' + SHA + '.run.json');
     expect(spacePaths.view('pmvfksx5zt9oen', 'two runs')).toBe('gmx-cypher/projects/pmvfksx5zt9oen/views/two runs.json');

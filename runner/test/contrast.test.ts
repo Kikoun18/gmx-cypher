@@ -75,3 +75,25 @@ describe('colour roles (R4a, T159)', () => {
   });
 });
 
+
+describe('compare\'s group and reference chips keep their text readable (4.5:1), on the page and in the export (QA)', () => {
+  it('every tone, picked, not picked, greyed and not plotted, in both themes; no state is drawn by opacity', async () => {
+    const { kit } = await import('../src/core/index');
+    const { themeTokens } = await import('../src/core/tokens');
+    const T = themeTokens(readFileSync(new URL('../src/tokens.json', import.meta.url), 'utf8'), readFileSync(new URL('../src/roles.json', import.meta.url), 'utf8'));
+    for (const dark of [false, true]) {
+      const pal = kit.palette(dark, dark ? T.dark : T.light), low: string[] = [];
+      const pair = (what: string, text: string, bg: string) => { const r = kit.contrast(text, bg); if (r < 4.5) low.push(what + ' ' + r.toFixed(2)); };
+      for (const tone of kit.TONES) {
+        const t = pal.hues[tone];
+        pair(tone + ' picked', t.fg, t.base); pair(tone + ' not picked', pal.fg, t.soft); pair(tone + ' not picked, export', t.strong, t.soft);
+      }
+      pair('greyed (the rest grey)', pal.muted, pal.card); pair('reference not plotted', pal.muted, pal.card);
+      expect([dark ? 'dark' : 'light', low]).toEqual([dark ? 'dark' : 'light', []]);
+    }
+    const panels = readFileSync(new URL('../src/decypher/panels.tsx', import.meta.url), 'utf8'), page = readFileSync(new URL('../src/decypher/export.ts', import.meta.url), 'utf8');
+    expect(panels).toContain('grey ? pal.card');
+    expect(panels).not.toMatch(/opacity-(45|70|75)/);
+    expect(page).not.toMatch(/\.dc-(n|off)\{[^}]*opacity/);
+  });
+});

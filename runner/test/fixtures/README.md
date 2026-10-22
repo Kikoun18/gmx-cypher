@@ -61,3 +61,14 @@ GROMACS install as `/opt/gromacs-2025.4`, in the header and banner lines.
   `mmmmmmmm.gro` (the peptide alone, 139 atoms). `9.multiwalker.gro` is your 33,513-atom structure cut to its first 279
   atoms (the 249 atoms of sugars and peptide, then 10 waters), its atom count line set to 279 and its box line kept:
   the groups reach atom 246, so they read the same atoms as in the whole file.
+- `r16/` — `gmx density` and `gmx order` (GROMACS 2025.4) on `nvt/` (R16), the scratch folder written as
+  `/home/user/sim/na2so4/nvt` and the build as `/opt/gromacs-2025.4`. `density/`: with `r9/groups.ndx`, the density of
+  sodium and water along Z in 50 slices, by mass (`density_mass.xvg`, with what gmx printed), by number, centred on
+  sodium (`-center`) and symmetrised (`-symm`). `order/`: no membrane sample has come, so `carbons.ndx` holds three
+  stand-in "carbons", O1, S1 and O2 of each sulfate, in that order; `order_scd.xvg` (`-od`) and `order_tensor.xvg`
+  (`-o`) are what gmx wrote: real files, meaningless numbers. `gmx-2025.4/` and `gmx-2023.3/` hold both tools' `-h`
+  (the same in both versions).
+- `cluster-tools/qq-jobs-1d.txt` and `qq-jobs-e.txt` — your `qq jobs -e` paste (R15): the plain table, a day of walltime
+  ("1d 00:00:00"), and the one with each job's input machine, input folder and comment. The user name, home and
+  project folders, the login host and the nodes are replaced by stand-ins of the same length (T169); the prompt line is
+  left out.

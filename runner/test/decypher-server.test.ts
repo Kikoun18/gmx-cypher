@@ -7,6 +7,7 @@ import { newVault, withAnalysis, withPmf, withStructure, fixture } from '../../m
 import { findRuns, readRun, runsBySha, vaultFile, vaultRdfs } from '../server/decypher'
 import { Jobs } from '../server/jobs'
 import { openVault } from '../server/vault'
+import { copyRecord } from '../server/space'
 import { apiServer, RUNNER, tmp } from './helpers'
 
 const F = RUNNER + 'test/fixtures/decypher/'
@@ -78,6 +79,29 @@ describe('(de)Cypher reads the RDFs of the Matrix, with their structures (read o
     expect(all.projects[0].rows[0].rdfs[0].run).toBeNull()
   })
 
+  it('a run this runner does not know: its groups from the record copy in the vault\'s space (R14c, T156\'s case)', async () => {
+    const dir = await madeVault(), sims = tmp('sims'), rec = JSON.parse(readFileSync(F + 'rdf_o111_Methionine_H.run.json', 'utf8'))
+    const sha = createHash('sha256').update(readFileSync(F + 'rdf_o111_Methionine_H.xvg')).digest('hex')
+    // Another machine sent it: its paths under its own allowed folder, which here is `sims`, holding the structure too.
+    const theirs = rec.inputs.structure.path.split('/').slice(0, -1), last = theirs[theirs.length - 1]
+    mkdirSync(join(sims, last), { recursive: true }); copyFileSync(F + '9.multiwalker.gro', join(sims, last, '9.multiwalker.gro'))
+    // The record names the structure it ran with: this file, by its size and SHA-256.
+    const gro = readFileSync(F + '9.multiwalker.gro'), groInfo = { size: gro.length, sha256: createHash('sha256').update(gro).digest('hex') }
+    copyRecord(dir, sha, { ...rec, inputs: { ...rec.inputs, structure: { ...rec.inputs.structure, ...groInfo, path: theirs.join('/') + '/9.multiwalker.gro' } } }, [theirs.slice(0, -1).join('/')], '/home/them', 'gmx-cypher 0.1.0')
+    const before = listing(dir), all = await vaultRdfs(await openVault(dir), new Jobs(join(tmp('home'), 'jobs')), [sims])
+    const run = all.projects[0].rows[0].rdfs[0].run
+    expect(run).toMatchObject({ from: 'space', title: 'rdf_o111_Methionine_H', bin: 0.03, frames: { analysed: 51, lastTime: 200000 } })
+    expect(run!.groups.map(g => g.name)).toEqual(rec.groups.map((g: { name: string }) => g.name))
+    expect(run!.structure).toBe(join(sims, last, '9.multiwalker.gro'))
+    // Not under the allowed folders here: no structure, the groups still.
+    const elsewhere = await vaultRdfs(await openVault(dir), new Jobs(join(tmp('home'), 'jobs')), [tmp('other')])
+    expect(elsewhere.projects[0].rows[0].rdfs[0].run).toMatchObject({ from: 'space', structure: null })
+    // Another file at that place is not taken for it (review): the groups still, no structure.
+    writeFileSync(join(sims, last, '9.multiwalker.gro'), 'not the structure\n')
+    expect((await vaultRdfs(await openVault(dir), new Jobs(join(tmp('home'), 'jobs')), [sims])).projects[0].rows[0].rdfs[0].run).toMatchObject({ from: 'space', structure: null })
+    expect(listing(dir)).toEqual(before)
+  })
+
   it('the routes: no vault is said in words; with one, the list and its files', async () => {
     const s = await apiServer()
     try {
@@ -128,6 +152,8 @@ describe('(de)Cypher finds the jobs gmx-cypher ran before, by their records', ()
     expect(run.xvg).toBe(readFileSync(F + 'rdf_o111_Methionine_H.xvg', 'utf8'))
     // Any command's record is read since R10a; one that names no .xvg of its own has nothing to show, and is not listed.
     expect(() => readRun(join(out, 'energy_nvt.run.json'), [root])).toThrow('names no .xvg of its own')
+    // The record alone (a run diff, R13): read whatever its files.
+    expect(readRun(join(out, 'energy_nvt.run.json'), [root], true)).toEqual({ record: expect.objectContaining({ analysis: 'energy' }) })
     expect(() => readRun(join(out, 'rdf_o111_Methionine_H.xvg'), [root])).toThrow('is not a gmx-cypher run record')
     // gmx hbond's record brings its pairs file (R10c), while it is there.
     const H = new URL('./fixtures/hbond/new/', import.meta.url).pathname

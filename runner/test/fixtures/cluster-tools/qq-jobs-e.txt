@@ -1,0 +1,69 @@
+╭──────────────────────────────────────────────────── COLLECTED JOBS ────────────────────────────────────────────────────╮
+│                                                                                                                        │
+│  S   Job ID   User      Job Name      Queue   NCPUs   NGPUs   NNodes          Times           Node   %CPU   %Mem       │
+│  R  1523408  user2  qq_flex_md+0046    gpu      8       1       1     21:29:27 / 1d 00:00:00 node11   99     27        │
+│  >   Input machine:   login.cluster.test                                                                               │
+│  >   Input directory: /home/user2                                                                                      │
+│  >   Comment:         Job run at Mon Oct 19 at 00:33 on (node11:mem=8388608kb:ncpus=8:ngpus=1:scratch_local=8388608kb) │
+│                                                                                                                        │
+│  R  1523410  user2  qq_flex_md+0046    gpu      8       1       1     21:24:06 / 1d 00:00:00 node13   99     29        │
+│  >   Input machine:   login.cluster.test                                                                               │
+│  >   Input directory: /home/user2                                                                                      │
+│  >   Comment:         Job run at Mon Oct 19 at 00:39 on (node13:mem=8388608kb:ncpus=8:ngpus=1:scratch_local=8388608kb) │
+│                                                                                                                        │
+│  R  1523411  user2  qq_flex_md+0045    gpu      8       1       1     21:23:24 / 1d 00:00:00 node28   99     27        │
+│  >   Input machine:   login.cluster.test                                                                               │
+│  >   Input directory: /home/user2                                                                                      │
+│  >   Comment:         Job run at Mon Oct 19 at 00:39 on (node28:mem=8388608kb:ncpus=8:ngpus=1:scratch_local=8388608kb) │
+│                                                                                                                        │
+│  R  1523413  user2  qq_flex_md+0046    gpu      8       1       1     21:22:03 / 1d 00:00:00 node19   99     26        │
+│  >   Input machine:   login.cluster.test                                                                               │
+│  >   Input directory: /home/user2                                                                                      │
+│  >   Comment:         Job run at Mon Oct 19 at 00:41 on (node19:mem=8388608kb:ncpus=8:ngpus=1:scratch_local=8388608kb) │
+│                                                                                                                        │
+│  R  1523414  user2  qq_flex_md+0047    gpu      8       1       1     21:20:34 / 1d 00:00:00 node9    98     26        │
+│  >   Input machine:   login.cluster.test                                                                               │
+│  >   Input directory: /home/user2                                                                                      │
+│  >   Comment:         Job run at Mon Oct 19 at 00:42 on (node9:mem=8388608kb:ncpus=8:ngpus=1:scratch_local=8388608kb)  │
+│                                                                                                                        │
+│  R  1523416  user2  qq_flex_md+0046    gpu      8       1       1     21:20:03 / 1d 00:00:00 node12   99     28        │
+│  >   Input machine:   login.cluster.test                                                                               │
+│  >   Input directory: /home/user2                                                                                      │
+│  >   Comment:         Job run at Mon Oct 19 at 00:43 on (node12:mem=8388608kb:ncpus=8:ngpus=1:scratch_local=8388608kb) │
+│                                                                                                                        │
+│  R  1523727  user2  qq_loop_md+0001    cpu      8       0       1     11:42:05 / 1d 00:00:00 nodec2   99     10        │
+│  >   Input machine:   login.cluster.test                                                                               │
+│  >   Input directory: /storage/store1-shard/home/user2/project-a/systems/PEP1-POPC/5_md                                │
+│  >   Comment:         Job run at Mon Oct 19 at 10:21 on (nodec2:mem=8388608kb:ncpus=8:ngpus=0:scratch_local=8388608kb) │
+│                                                                                                                        │
+│  R  1523728  user2  qq_loop_md+0001    cpu      8       0       1     11:41:50 / 1d 00:00:00 nodec2   99     10        │
+│  >   Input machine:   login.cluster.test                                                                               │
+│  >   Input directory: /storage/store1-shard/home/user2/project-a/systems/PEP2-POPC/5_md                                │
+│  >   Comment:         Job run at Mon Oct 19 at 10:21 on (nodec2:mem=8388608kb:ncpus=8:ngpus=0:scratch_local=8388608kb) │
+│                                                                                                                        │
+│  R  1523729  user2  qq_loop_md+0001    cpu      8       0       1     11:41:36 / 1d 00:00:00 nodec2   99     10        │
+│  >   Input machine:   login.cluster.test                                                                               │
+│  >   Input directory: /storage/store1-shard/home/user2/project-a/systems/PEP3-POPC/5_md                                │
+│  >   Comment:         Job run at Mon Oct 19 at 10:21 on (nodec2:mem=8388608kb:ncpus=8:ngpus=0:scratch_local=8388608kb) │
+│                                                                                                                        │
+│  R  1523906  user2  martini_compress   cpu      8       0       1     06:29:28 / 1d 00:00:00 nodec7   99     9         │
+│  >   Input machine:   login.cluster.test                                                                               │
+│  >   Input directory: /storage/store1-shard/home/user2/project-a/models-b/systems                                      │
+│  >   Comment:         Job run at Mon Oct 19 at 15:33 on (nodec7:mem=8388608kb:ncpus=8:ngpus=0:scratch_local=8388608kb) │
+│                                                                                                                        │
+│  R  1523907  user2  martini_compress   cpu      8       0       1     06:29:28 / 1d 00:00:00 nodec7   99     9         │
+│  >   Input machine:   login.cluster.test                                                                               │
+│  >   Input directory: /storage/store1-shard/home/user2/project-a/models-b/systems                                      │
+│  >   Comment:         Job run at Mon Oct 19 at 15:33 on (nodec7:mem=8388608kb:ncpus=8:ngpus=0:scratch_local=8388608kb) │
+│                                                                                                                        │
+│  R  1523908  user2  martini_compress   cpu      8       0       1     06:29:28 / 1d 00:00:00 nodec1   99     10        │
+│  >   Input machine:   login.cluster.test                                                                               │
+│  >   Input directory: /storage/store1-shard/home/user2/project-a/models-b/systems                                      │
+│  >   Comment:         Job run at Mon Oct 19 at 15:33 on (nodec1:mem=8388608kb:ncpus=8:ngpus=0:scratch_local=8388608kb) │
+│                                                                                                                        │
+│                                                                                                                        │
+│                                           CPUs  GPUs  Nodes                                                            │
+│                                Requested   0     0      0                                                              │
+│  Jobs    R 12    Σ 12          Allocated   96    6     12                                                              │
+│                                                                                                                        │
+╰────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯

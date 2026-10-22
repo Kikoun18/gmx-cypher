@@ -49,8 +49,10 @@ function runBody(draft: Draft, tool: string) {
 const shown = (v: string | boolean | null) => (v === true ? 'yes' : v === false ? 'no' : String(v))
 
 /** One option: its label and flag, the control, `default` or `changed · default …` (which resets), and what it changes. */
-function OptionField({ f, o, value, set }: { f: CommandOption; o: HelpOption; value: string | boolean | undefined; set: (v: string | boolean | undefined) => void }) {
+function OptionField({ f, o, value, set, options }: { f: CommandOption; o: HelpOption; value: string | boolean | undefined; set: (v: string | boolean | undefined) => void; options: Record<string, string | boolean> }) {
   const id = React.useId(), changed = !isDefault(o, value)
+  // Values offered only once another option is set (R16a: electron density, with an electrons file).
+  const values = (o.values ?? []).filter(x => !f.only?.[x] || (options[f.only[x]] !== undefined && options[f.only[x]] !== ''))
   // A switch shows the gmx flag it turns on; gmx-cypher's own choices have none.
   const flag = f.own ? null : '-' + (f.switch ?? f.flag)
   const chip = changed
@@ -73,18 +75,21 @@ function OptionField({ f, o, value, set }: { f: CommandOption; o: HelpOption; va
     <Field>
       <Label htmlFor={id}>{f.label} {flag && <span className="normal-case tracking-normal">{flag}</span>}</Label>
       <div className="flex flex-wrap items-center gap-2">
-        {o.type === 'enum' && o.values!.length <= 3 ? (
+        {o.type === 'enum' && values.length <= 3 ? (
           <ToggleGroup id={id} type="single" size="sm" value={v ?? String(o.default)} onValueChange={x => x && set(x === o.default ? undefined : x)} aria-label={f.label}>
-            {o.values!.map(x => <ToggleGroupItem key={x} value={x}>{x}</ToggleGroupItem>)}
+            {values.map(x => <ToggleGroupItem key={x} value={x}>{x}</ToggleGroupItem>)}
           </ToggleGroup>
         ) : o.type === 'enum' ? (
           <Select value={v ?? String(o.default)} onValueChange={x => set(x === o.default ? undefined : x)}>
             <SelectTrigger id={id} size="sm" className="w-44"><SelectValue /></SelectTrigger>
-            <SelectContent>{o.values!.map(x => <SelectItem key={x} value={x}>{x}</SelectItem>)}</SelectContent>
+            <SelectContent>{values.map(x => <SelectItem key={x} value={x}>{x}</SelectItem>)}</SelectContent>
           </Select>
         ) : (
           // A list (-de N O) keeps its spaces while typed and is tidied on leaving the field; a number is trimmed as typed (review).
-          o.type === 'string'
+          // A file gmx reads (R16a: the electrons file) by its whole path.
+          o.type === 'file'
+            ? <Input id={id} size="sm" className="w-80" inputMode="text" value={typeof value === 'string' ? value : ''} placeholder={'/path/to/' + String(o.default)} onChange={e => set(e.target.value.trim() || undefined)} />
+          : o.type === 'string'
             ? <Input id={id} size="sm" className="w-28" inputMode="text" value={typeof value === 'string' ? value : ''} placeholder={String(o.default)} onChange={e => set(e.target.value.trim() ? e.target.value : undefined)} onBlur={e => set(e.target.value.trim().split(/\s+/).join(' ') || undefined)} />
             : <Input id={id} size="sm" className="w-28" inputMode="decimal" value={v ?? ''} placeholder={String(o.default)} onChange={e => set(e.target.value.trim() || undefined)} />
         )}
@@ -165,7 +170,7 @@ export function GroupCommand({ command, gmx, draft, setDraft, onStarted }: ViewP
   const where = plan && (plan.outDir === plan.cwd + '/' + tool ? tool + "/ in the trajectory's folder" : plan.outDir)
   const GROUPS = [...new Set(FORM.map(f => f.group))]
 
-  const field = (flag: string) => { const f = FORM.find(x => x.flag === flag)!, o = by.get(flag); return o ? <OptionField key={flag} f={f} o={o} value={options[flag]} set={v => set(flag, v)} /> : null }
+  const field = (flag: string) => { const f = FORM.find(x => x.flag === flag)!, o = by.get(flag); return o ? <OptionField key={flag} f={f} o={o} value={options[flag]} set={v => set(flag, v)} options={options} /> : null }
   // The periodic-boundary options are folded while all are at their defaults.
   const quiet = (g: string) => g.startsWith('periodic boundaries') && FORM.filter(f => f.group === g).every(f => !by.has(f.flag) || isDefault(by.get(f.flag)!, options[f.flag]))
   return (

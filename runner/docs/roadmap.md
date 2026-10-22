@@ -207,23 +207,23 @@ From [`batch-3.md`](batch-3.md) §5: one coherent app, (de)Cypher for every anal
 - [x] R11d Renamed groups and reference (T189)
 
 ### Phase 7: The runner at scale (R12, R13)
-- [ ] R12a Logs on demand; startup without logs in memory
-- [ ] R12b Search, filters, multi-select
-- [ ] R12c Archive
-- [ ] R13 Run diff
+- [x] R12a Logs on demand; startup without logs in memory (T190)
+- [x] R12b Search, filters, multi-select (T191)
+- [x] R12c Archive (T192)
+- [x] R13 Run diff (T193)
 
 ### Phase 8: Vault, cluster and commands (R14, R15, R16)
-- [ ] R14b Connect to a project: sends and saved compare views in the space (the setting itself: Phase 2, if agreed)
-- [ ] R14c Compare reads record copies from the space, giving groups for any sent RDF
-- [ ] R15 A finished cluster job offers a recipe or batch (only with a `qq jobs -e` sample)
-- [ ] R16a `gmx density` (needs your samples)
-- [ ] R16b `gmx order` (needs your samples)
+- [x] R14b Connect to a project: sends and saved compare views in the space (the setting itself: Phase 2) (T194)
+- [x] R14c Compare reads record copies from the space, giving groups for any sent RDF (T195)
+- [x] R15 A finished cluster job offers a recipe or batch (only with a `qq jobs -e` sample) (T196)
+- [x] R16a `gmx density` (checked on the test system; your membrane sample did not come) (T197)
+- [x] R16b `gmx order` (real files on stand-in carbons; your membrane sample did not come) (T198)
 
 ### Phase 9: Finish
-- [ ] `runner/README.md` updated (section 25)
-- [ ] Manual QA in Chromium, and with a real `gmx` where available; results recorded
-- [ ] Fresh-context review of the whole branch against section 26 and the design contract; findings fixed or recorded
-- [ ] Final report
+- [x] `runner/README.md` updated (section 25)
+- [x] Manual QA in Chromium, and with a real `gmx` where available; results recorded (62 checks on GROMACS 2025.4, light and dark; axe kept as an e2e test, T200)
+- [x] Fresh-context review of the whole branch against section 26 and the design contract; findings fixed or recorded (18 fixed, 1 recorded, T199)
+- [x] Final report ([`batch-3-report.md`](batch-3-report.md))
 
 ### Backlog (Batch 3: add to it, don't do it)
 - Job submission and killing jobs.
@@ -231,3 +231,4 @@ From [`batch-3.md`](batch-3.md) §5: one coherent app, (de)Cypher for every anal
 - Requests for the Matrix and for Morpheus (section 28). From batch 2's backlog: the Matrix's typing of distance and H-bond histograms and of gmx wham's profile (T118); Morpheus's Table, Combobox and the `LineChart` error band (the error band moves into the core with R5c).
 - Trajectory preparation (`trjconv`), still only a candidate.
 - Found in Phase 0, not on lines this batch changes: none yet.
+- From the final report (§11): load the Matrix's export pipeline on demand (the main bundle grew 66 kB gzip); vault types other than RDF in compare (needs a type map from the Matrix); several AWH biases and AWH's second dimension; a GROMACS 2021 dump for R7c; a membrane run for `gmx order` and a real electron file for `gmx density`; a `qq jobs -a -e` sample with a finished job; real-gmx tests that also run against 2023.3; `vault-read`'s listing still differs now and then under a loaded parallel run (the Matrix's own setup writing late; gmx-cypher's reads go through a backend that refuses writes).

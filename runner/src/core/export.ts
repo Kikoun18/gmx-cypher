@@ -58,6 +58,13 @@ export const figureFile = (f: Figure, format: 'svg' | 'pdf' | 'png', p: ExportPr
  * A result's chart as an analysis for the HTML page (any result, R6a): its curves as groups without atoms, drawn as
  * the result draws them (`plot`). Curves on different x grids can't share one: null, and the menu says why.
  */
+/** A result chart's marks and lines (R11c) as its interactive page keys them: a curve by its analysis, group and name. */
+export function resultPins(pins: Pins, series: Series[]): Record<string, Pins> {
+  if (!pins.points.length && !pins.lines.length) return {}
+  const key = (k: string) => { const s = series[Number(k)]; return s ? 'result|' + s.label + '|' + s.label : null }
+  return { result: { points: pins.points.flatMap(p => { const k = key(p.key); return k ? [{ ...p, key: k }] : [] }), lines: pins.lines } }
+}
+
 export function resultAnalysis(o: { id: string; title: string; sub: string; xlabel: string; ylabel: string; series: Series[]; y?: Plot['y']; rule?: number | null; xDigits?: number }): Analysis | null {
   const x = o.series[0]?.points.map(p => p[0]) ?? []
   if (!o.series.length || o.series.some(s => s.points.length !== x.length || s.points.some((p, i) => p[0] !== x[i]))) return null

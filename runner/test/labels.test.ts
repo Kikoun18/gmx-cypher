@@ -8,7 +8,10 @@ import { themeTokens } from '../src/core/tokens'
 import { exportData } from '../src/decypher/export'
 import { fromRecord, type RecordLike } from '../src/decypher/parse'
 import { curvesCsv, groupNotes } from '../src/lib/csv'
-import { cleanLabels, labelsOf, setLabel } from '../src/lib/labels'
+import * as React from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
+import { cleanLabels, labelFor, labelsOf, setLabel, setLabels } from '../src/lib/labels'
+import { LabelInput } from '../src/ui/label-input'
 import { RUNNER } from './helpers'
 
 const F = RUNNER + 'test/fixtures/decypher/'
@@ -25,6 +28,19 @@ describe('renamed groups and reference (R11d)', () => {
     expect(labelsOf('job:t')).toEqual({ H_Met: 'His', 'O5...S': 'O5 to S' })
     setLabel('job:t', 'O5...S', '')
     expect(labelsOf('job:t')).toEqual({ H_Met: 'His' })
+  })
+  it('a saved view sets a source\'s labels all at once: those it does not name go (review)', () => {
+    setLabel('job:v', 'H_Met', 'His'); setLabel('job:v', 'water', 'W'); setLabel('job:w', 'water', 'kept')
+    setLabels('job:v', { water: ' solvent ', x: '' })
+    expect([labelsOf('job:v'), labelsOf('job:w')]).toEqual([{ water: 'solvent' }, { water: 'kept' }])
+    setLabels('job:v', {})
+    expect(labelsOf('job:v')).toEqual({})
+  })
+  it('a label field shows the label kept, and keeps what is typed while it means the same label', () => {
+    expect([labelFor('water', ' W '), labelFor('water', 'water '), labelFor('water', '')]).toEqual(['W', '', ''])
+    const html = renderToStaticMarkup(React.createElement(LabelInput, { name: 'water', label: 'solvent', onLabel: () => {} }))
+    expect(html).toMatch(/value="solvent"/)
+    expect(html).toMatch(/aria-label="label for water"/)
   })
   it('labels an analysis\'s groups and reference for display; their names stay what everything is keyed by', () => {
     const a = analysis(), l = kit.withLabels(a, { H_Met: 'His', 'O5...S': 'O5 to S' })

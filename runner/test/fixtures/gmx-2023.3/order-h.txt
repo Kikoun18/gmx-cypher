@@ -1,0 +1,96 @@
+SYNOPSIS
+
+gmx order [-f [<.xtc/.trr/...>]] [-n [<.ndx>]] [-nr [<.ndx>]] [-s [<.tpr>]]
+          [-o [<.xvg>]] [-od [<.xvg>]] [-ob [<.pdb>]] [-os [<.xvg>]]
+          [-Sg [<.xvg>]] [-Sk [<.xvg>]] [-Sgsl [<.xvg>]] [-Sksl [<.xvg>]]
+          [-b <time>] [-e <time>] [-dt <time>] [-[no]w] [-xvg <enum>]
+          [-d <enum>] [-sl <int>] [-[no]szonly] [-[no]permolecule]
+          [-[no]radial] [-[no]calcdist]
+
+DESCRIPTION
+
+gmx order computes the order parameter per atom for carbon tails. For atom i
+the vector i-1, i+1 is used together with an axis. The index file should
+contain only the groups to be used for calculations, with each group of
+equivalent carbons along the relevant acyl chain in its own group. There
+should not be any generic groups (like System, Protein) in the index file to
+avoid confusing the program (this is not relevant to tetrahedral order
+parameters however, which only work for water anyway).
+
+gmx order can also give all diagonal elements of the order tensor and even
+calculate the deuterium order parameter Scd (default). If the option -szonly
+is given, only one order tensor component (specified by the -d option) is
+given and the order parameter per slice is calculated as well. If -szonly is
+not selected, all diagonal elements and the deuterium order parameter is
+given.
+
+The tetrahedrality order parameters can be determined around an atom. Both
+angle an distance order parameters are calculated. See P.-L. Chau and A.J.
+Hardwick, Mol. Phys., 93, (1998), 511-518. for more details.
+
+OPTIONS
+
+Options to specify input files:
+
+ -f      [<.xtc/.trr/...>]  (traj.xtc)
+           Trajectory: xtc trr cpt gro g96 pdb tng
+ -n      [<.ndx>]           (index.ndx)
+           Index file
+ -nr     [<.ndx>]           (index.ndx)      (Opt.)
+           Index file
+ -s      [<.tpr>]           (topol.tpr)
+           Portable xdr run input file
+
+Options to specify output files:
+
+ -o      [<.xvg>]           (order.xvg)
+           xvgr/xmgr file
+ -od     [<.xvg>]           (deuter.xvg)
+           xvgr/xmgr file
+ -ob     [<.pdb>]           (eiwit.pdb)      (Opt.)
+           Protein data bank file
+ -os     [<.xvg>]           (sliced.xvg)
+           xvgr/xmgr file
+ -Sg     [<.xvg>]           (sg-ang.xvg)     (Opt.)
+           xvgr/xmgr file
+ -Sk     [<.xvg>]           (sk-dist.xvg)    (Opt.)
+           xvgr/xmgr file
+ -Sgsl   [<.xvg>]           (sg-ang-slice.xvg) (Opt.)
+           xvgr/xmgr file
+ -Sksl   [<.xvg>]           (sk-dist-slice.xvg) (Opt.)
+           xvgr/xmgr file
+
+Other options:
+
+ -b      <time>             (0)
+           Time of first frame to read from trajectory (default unit ps)
+ -e      <time>             (0)
+           Time of last frame to read from trajectory (default unit ps)
+ -dt     <time>             (0)
+           Only use frame when t MOD dt = first time (default unit ps)
+ -[no]w                     (no)
+           View output .xvg, .xpm, .eps and .pdb files
+ -xvg    <enum>             (xmgrace)
+           xvg plot formatting: xmgrace, xmgr, none
+ -d      <enum>             (z)
+           Direction of the normal on the membrane: z, x, y
+ -sl     <int>              (1)
+           Calculate order parameter as function of box length, dividing the
+           box into this number of slices.
+ -[no]szonly                (no)
+           Only give Sz element of order tensor. (axis can be specified with
+           -d)
+ -[no]permolecule           (no)
+           Compute per-molecule Scd order parameters
+ -[no]radial                (no)
+           Compute a radial membrane normal
+ -[no]calcdist              (no)
+           Compute distance from a reference
+
+KNOWN ISSUES
+
+* This tool only works for saturated carbons and united atom force fields.
+* For anything else, it is highly recommended to use a different analysis
+  method!
+* The option -unsat claimed to do analysis for unsaturated carbons
+* this but hasn't worked ever since it was added and has thus been removed.

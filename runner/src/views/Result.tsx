@@ -4,9 +4,10 @@ import { Alert, AlertDescription, AlertTitle } from '../ui/alert'
 import { Button } from '../ui/button'
 import { Stat } from '../ui/card'
 import { TONES, type Series } from '../core/index'
-import { ExportAll, FiguresContext, LabelsContext, SeriesChart, type ChartExport, type PageFigure } from '../core/Chart'
+import { ExportAll, SeriesChart } from '../core/Chart'
+import { FiguresContext, LabelsContext, type ChartExport, type PageFigure } from '../core/chartState'
 import { labelsOf, setLabel, useLabels } from '../lib/labels'
-import { Input } from '../ui/input'
+import { LabelInput } from '../ui/label-input'
 import { rampColors } from '../core/ramp'
 import { TOKENS_BY_THEME } from '../core/theme'
 import { Section } from '../ui/separator'
@@ -20,6 +21,7 @@ import { curveStats } from '../lib/curves'
 import { peaks, resultSeries } from '../lib/rdf'
 import { parseTable } from '../../../matrix/src/lib/seq'
 import { csvMeta, curvesCsv, xvgCsv } from '../lib/csv'
+import { scdByCarbon } from '../lib/order'
 import type { RunRecord } from '../lib/record'
 import { groupText, toneText, type Tone } from '../lib/tones'
 import { cn } from '../lib/utils'
@@ -30,6 +32,7 @@ import { PathText, ResultPage } from '../ui/result-page'
 import { commandText } from '../lib/command'
 import { asTerminal } from '../lib/progress'
 import { Code } from './Code'
+import { CompareWith } from './RunDiff'
 
 const size = (n: number) => (n < 1024 ? n + ' B' : n < 1048576 ? (n / 1024).toFixed(1) + ' kB' : (n / 1048576).toFixed(1) + ' MB')
 
@@ -67,12 +70,14 @@ const outName = (job: Job, r: RunRecord, which: 'xvg' | 'cn' | string = 'xvg') =
   ? String((job.meta?.names as Record<string, string> | undefined)?.[which] ?? '').split('/').pop()!
   : r.outputs.map(o => o.path.split('/').pop()!).find(n => n.endsWith(which)) ?? '')
 /** A result chart's export (R6a): named after the run's file (and the chart, when a run draws several); its CSV the columns `parts`, with where they came from. */
-function chartExport(job: Job, record: RunRecord, source: string, parts: { text: string; col: number; name: string }[], xlabel: string, ylabel: string, part = ''): ChartExport {
+type Part = { text: string; col: number; name: string }
+/** A chart's export: its CSV from `parts`, or from every file `parts` reads when the CSV is made (an AWH run's frames, review). */
+function chartExport(job: Job, record: RunRecord, source: string, parts: Part[] | (() => Promise<Part[]>), xlabel: string, ylabel: string, part = ''): ChartExport {
   return {
     file: source.replace(/\.xvg$/i, '') + (part ? '_' + part : ''), title: (job.name ?? job.title) + (part ? ' · ' + part : ''),
     fields: { ...job.fields, command: job.kind, group: record.groups[0]?.name ?? '' },
     // A renamed group's column and its line take its label (R11d), the line keeping gmx's name; read when the CSV is made.
-    csv: () => { const l = labelsOf('job:' + job.id); return xvgCsv(parts.map(p => ({ ...p, name: l[p.name] ?? p.name })), xlabel, ylabel, csvMeta(record, String(job.meta?.record ?? ''), source, g => l[g.name] ?? g.name)) },
+    csv: async () => { const l = labelsOf('job:' + job.id); return xvgCsv((typeof parts === 'function' ? await parts() : parts).map(p => ({ ...p, name: l[p.name] ?? p.name })), xlabel, ylabel, csvMeta(record, String(job.meta?.record ?? ''), source, g => l[g.name] ?? g.name)) },
   }
 }
 /** Every y column of an xvg, named. */
@@ -180,11 +185,12 @@ function AwhChart({ job, record }: { job: Job; record: RunRecord }) {
   const names = React.useMemo(() => record.outputs.filter(o => o.kind === 'xvg').map(o => o.path.split('/').pop()!).sort((a, b) => frameTime(a) - frameTime(b)), [record])
   const shown = React.useMemo(() => spread(names, 12), [names])
   const [texts, setTexts] = React.useState<Record<string, string>>({})
+  const read = React.useCallback((n: string) => fetch('/api/jobs/' + job.id + '/output?name=' + encodeURIComponent(n)).then(r => (r.ok ? r.text() : Promise.reject(new Error(n + ' could not be read')))), [job.id])
   React.useEffect(() => {
     let alive = true
-    for (const n of shown) fetch('/api/jobs/' + job.id + '/output?name=' + encodeURIComponent(n)).then(r => (r.ok ? r.text() : '')).then(t => alive && setTexts(x => ({ ...x, [n]: t })), () => {})
+    for (const n of shown) read(n).catch(() => '').then(t => alive && setTexts(x => ({ ...x, [n]: t })))
     return () => { alive = false }
-  }, [job.id, shown])
+  }, [read, shown])
   if (shown.some(n => texts[n] == null)) return <p className="m-0 text-caption text-muted-foreground" aria-live="polite">reading {shown.length} PMF file{shown.length > 1 ? 's' : ''}…</p>
   const time = (n: string) => /_t(-?\d+(?:\.\d+)?)\.xvg$/.exec(n)?.[1] ?? '?', colors = rampColors(shown.length, TOKENS_BY_THEME)
   // The frames along the ramp, oldest to newest (R7a).
@@ -195,7 +201,7 @@ function AwhChart({ job, record }: { job: Job; record: RunRecord }) {
   return (
     <div className="flex flex-col gap-3">
       <SeriesChart series={series} xlabel={xLabel} ylabel="PMF (kJ/mol)" height={300} ramp={{ first: series[0].label, last: series[series.length - 1].label }} y="data" rule={0}
-        exp={chartExport(job, record, shown[shown.length - 1], shown.map((n, i) => ({ text: texts[n], col: 1, name: series[i].label })), xLabel, 'PMF (kJ/mol)')} />
+        exp={chartExport(job, record, shown[shown.length - 1], () => Promise.all(names.map(async n => ({ text: texts[n] ?? await read(n), col: 1, name: 't = ' + time(n) + ' ps' }))), xLabel, 'PMF (kJ/mol)')} />
       {names.length > shown.length && <p className="m-0 text-caption text-muted-foreground">{shown.length} of {names.length} frames drawn, evenly spaced; every file is in the folder</p>}
       {axis.why ? <Status level="info" className="text-control">the axis keeps gmx awh's own label: {axis.why}</Status> : <p className="m-0 text-caption text-muted-foreground">ξ read from the run input when the job started · the files keep gmx's own label</p>}
       <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3">
@@ -474,6 +480,62 @@ function MindistChart({ job, record }: { job: Job; record: RunRecord }) {
   )
 }
 
+/** A label as gmx writes it, its superscripts drawn ("kg m^{-3}" → "kg m⁻³"); the unit itself is gmx's. */
+const SUP: Record<string, string> = { '-': '⁻', '+': '⁺', 0: '⁰', 1: '¹', 2: '²', 3: '³', 4: '⁴', 5: '⁵', 6: '⁶', 7: '⁷', 8: '⁸', 9: '⁹' }
+const supLabel = (l: string) => l.replace(/\^\{([-+0-9]+)\}/g, (_, s: string) => [...s].map(c => SUP[c] ?? c).join(''))
+
+/**
+ * gmx density (R16a): each group's density along the axis, in its group's tone, units as gmx writes them; a tile each
+ * with its mean over the slices and its highest slice.
+ */
+function DensityChart({ job, record }: { job: Job; record: RunRecord }) {
+  const xvg = useOutput(job.id, 'xvg')
+  if (xvg == null) return <p className="m-0 text-caption text-muted-foreground" aria-live="polite">reading the densities…</p>
+  const curves = resultSeries(xvg), head = parseTable(xvg).head, at = (i: number) => record.groups[i] ?? { name: curves[i].label, tone: TONES[i % 8] }
+  const xLabel = head.xLabel || 'position (nm)', yLabel = supLabel(head.yLabel || 'density'), unit = /\(([^)]*)\)\s*$/.exec(yLabel)?.[1] ?? ''
+  const v = (f: string) => record.options.find(o => o.flag === f)?.value, centred = v('center') === true || v('symm') === true
+  return (
+    <div className="flex flex-col gap-3">
+      <SeriesChart series={curves.map((c, i) => ({ label: at(i).name, points: c.points, tone: at(i).tone }))} xlabel={xLabel} ylabel={yLabel} height={260} legend={curves.length > 1} y="zero" rule={null}
+        exp={chartExport(job, record, outName(job, record), columns(xvg, curves.map((_, i) => at(i).name)), xLabel, yLabel)} />
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3">
+        {curves.map((c, i) => {
+          const st = curveStats(c.points), top = c.points.reduce((a, p) => (p[1] > a[1] ? p : a), c.points[0])
+          return st && <Stat key={i} label={at(i).name + ' · mean'} value={fmt(st.mean) + ' ' + unit} hint={'highest ' + fmt(top[1]) + ' at ' + top[0] + ' nm · ' + st.frames + ' slices'} />
+        })}
+      </div>
+      <p className="m-0 text-caption text-muted-foreground">
+        along {String(v('d') ?? 'Z').toUpperCase()} · {v('dens') ?? 'mass'} density · {centred ? 'centred on ' + record.groups[0]?.name + (v('symm') === true ? ', symmetrised' : '') : 'in box coordinates'} · the Matrix reads every curve
+      </p>
+    </div>
+  )
+}
+
+/**
+ * gmx order (R16b): S_CD per carbon, named by its group (gmx gives the carbons between the first and the last), with
+ * gmx's own warning about the force fields its method suits.
+ */
+function OrderChart({ job, record }: { job: Job; record: RunRecord }) {
+  const xvg = useOutput(job.id, 'xvg')
+  if (xvg == null) return <p className="m-0 text-caption text-muted-foreground" aria-live="polite">reading S_CD…</p>
+  const rows = scdByCarbon(xvg, record.groups.map(g => g.name)), tone = record.groups[1]?.tone ?? 'coral'
+  return (
+    <div className="flex flex-col gap-3">
+      {/* One inner carbon gives one value: a table, no curve. */}
+      {rows.length > 1 && <SeriesChart series={[{ label: 'S_CD', points: rows.map(r => [r.n, r.scd] as [number, number]), tone }]} xlabel="carbon (gmx's number)" ylabel="S_CD" height={240} y="data" rule={0}
+        exp={chartExport(job, record, outName(job, record), [{ text: xvg, col: 1, name: 'S_CD' }], 'carbon', 'S_CD')} />}
+      <table className="text-control" aria-label="S_CD per carbon">
+        <thead><tr className="text-left text-label uppercase text-muted-foreground"><th className="py-1 pr-4 font-normal">carbon</th><th className="pr-4 font-normal">gmx's number</th><th className="font-normal">S_CD</th></tr></thead>
+        <tbody>{rows.map(r => <tr key={r.n} className="border-t border-border"><td className="py-0.5 pr-4">{r.carbon}</td><td className="pr-4 tabular-nums text-muted-foreground">{r.n}</td><td className="tabular-nums font-bold">{r.scd.toFixed(4)}</td></tr>)}</tbody>
+      </table>
+      <p className="m-0 text-caption text-muted-foreground">
+        {record.groups.length} carbon groups, in tail order: S_CD for each between the first and the last, from its neighbours · the Matrix draws these as points (Order parameters) · the order tensor is beside them, not sent
+      </p>
+      <Status level="info" className="text-control">gmx order's own known issues: "This tool only works for saturated carbons and united atom force fields. For anything else, it is highly recommended to use a different analysis method!"</Status>
+    </div>
+  )
+}
+
 /** The options a job changed, in gmx's own words (`-b 2 · -nofit`): the settings line of a result that has none in words. */
 const flagsLine = (r: RunRecord) => r.options.filter(o => !o.isDefault).map(o => (o.value === true ? '-' + o.flag : o.value === false ? '-no' + o.flag : '-' + o.flag + ' ' + o.value)).join(' · ') || 'gmx ' + (r.analysis ?? 'rdf') + ' defaults'
 
@@ -482,7 +544,8 @@ function Charts({ job, record }: { job: Job; record: RunRecord }) {
   const k = job.kind
   return k === 'energy' ? <EnergyChart job={job} record={record} /> : k === 'awh' ? <AwhChart job={job} record={record} /> : k === 'wham' ? <WhamChart job={job} record={record} />
     : k === 'distance' ? <DistanceChart job={job} record={record} /> : k === 'hbond' || k === 'hbond-legacy' ? <HbondChart job={job} record={record} /> : k === 'rms' ? <RmsChart job={job} record={record} />
-    : k === 'rmsf' ? <RmsfChart job={job} record={record} /> : k === 'gyrate' || k === 'gyrate-legacy' ? <GyrateChart job={job} record={record} /> : k === 'mindist' ? <MindistChart job={job} record={record} /> : <RdfChart job={job} record={record} />
+    : k === 'rmsf' ? <RmsfChart job={job} record={record} /> : k === 'gyrate' || k === 'gyrate-legacy' ? <GyrateChart job={job} record={record} /> : k === 'mindist' ? <MindistChart job={job} record={record} />
+    : k === 'density' ? <DensityChart job={job} record={record} /> : k === 'order' ? <OrderChart job={job} record={record} /> : <RdfChart job={job} record={record} />
 }
 
 /**
@@ -490,11 +553,15 @@ function Charts({ job, record }: { job: Job; record: RunRecord }) {
  * settings line and the groups as gmx counted them; and, collapsed, its files (within their allowed folder), its
  * command and its log. While it runs or when it failed, the log is open.
  */
-export function ResultView({ job, record: rec, recordError, log, allow, vault, onRunAgain, onCompare, actions }: {
+export function ResultView({ job, record: rec, recordError, log, logCut, onAllLog, allow, vault, onRunAgain, onCompare, actions, jobs }: {
   job: Job; record: RunRecord | null; recordError?: string; log: string | undefined; allow: string[]; vault: string | null
+  /** Where the log shown starts, when it is its tail only (R12a), and reading all of it. */
+  logCut?: { from: number; size: number }; onAllLog?: () => void
   onRunAgain: (r: RunRecord) => void; onCompare: () => void; actions?: React.ReactNode
+  /** The jobs to pick from in compare with… (R13). */
+  jobs?: Job[]
 }) {
-  const [sending, setSending] = React.useState(false), [figures] = React.useState(() => new Map<string, PageFigure>())
+  const [sending, setSending] = React.useState(false), [figures] = React.useState(() => new Map<string, PageFigure>()), [diffing, setDiffing] = React.useState(false)
   const sendButton = React.useRef<HTMLButtonElement>(null), logRef = React.useRef<HTMLDivElement>(null)
   React.useEffect(() => { const el = logRef.current?.querySelector('pre'); if (el) el.scrollTop = el.scrollHeight }, [log])
   const done = job.status === 'done' && !!rec, live = job.status === 'running' && !job.unfollowed
@@ -512,11 +579,13 @@ export function ResultView({ job, record: rec, recordError, log, allow, vault, o
         actions={<>
           {actions}
           {job.status === 'done' && <Button onClick={onCompare}>compare</Button>}
+          {rec && jobs && <Button variant="outline" aria-expanded={diffing} onClick={() => setDiffing(x => !x)} title="what differs between this job's record and another job's, or a record on disk: options, inputs, groups, gmx, environment, frames">compare with…</Button>}
           {done && vault && <Button ref={sendButton} variant="outline" onClick={() => setSending(true)}>send to vault…</Button>}
           {rec && <Button variant="outline" onClick={() => onRunAgain(rec)}>open in set-up</Button>}
           {done && <ExportAll figures={figures} file={stem} fields={{ ...job.fields, command: job.kind }} />}
           <span className="text-caption text-muted-foreground">{done && !vault ? 'set a Matrix vault in settings to send this result · ' : ''}{rec ? 'open in set-up fills the steps with this job\'s inputs, groups and options; a new job gets new names' : recordError ? 'no job record: ' + recordError : ''}</span>
         </>}
+        panel={diffing && rec && jobs ? <CompareWith job={job} jobs={jobs} onClose={() => setDiffing(false)} /> : undefined}
         charts={done ? <Charts job={job} record={rec} /> : undefined}
         settings={rec ? <>
           <p className="m-0 text-caption text-muted-foreground">{job.kind === 'rdf' ? optionsLine(rec) + ' · reference ' + rec.groups[0]?.name : flagsLine(rec)}</p>
@@ -525,7 +594,7 @@ export function ResultView({ job, record: rec, recordError, log, allow, vault, o
               <tr key={g.index}>
                 <td className="py-0.5 pr-4 text-muted-foreground">group {g.index}</td>
                 <td className={cn('pr-4 font-bold', groupText(g))}>{g.name}</td>
-                <td className="pr-4"><Input className="h-6 w-40 text-caption" defaultValue={labels[g.name] ?? ''} placeholder="label" aria-label={'label for ' + g.name} title="shown in place of the name, here, in compare and in exports; the record keeps gmx's name" onChange={e => setLabel('job:' + job.id, g.name, e.target.value)} /></td>
+                <td className="pr-4"><LabelInput className="h-6 w-40 text-caption" name={g.name} label={labels[g.name] ?? ''} placeholder="label" title="shown in place of the name, here, in compare and in exports; the record keeps gmx's name" onLabel={t => setLabel('job:' + job.id, g.name, t)} /></td>
                 <td className="pr-4 text-right">{g.count} atoms</td>
                 <td className="text-caption text-muted-foreground"> {g.gmxCount === g.count ? <Status inline level="ok" word="gmx agrees" /> : <Status inline level="warning" word={'gmx: ' + g.gmxCount} />} · {g.atoms.length > 40 ? g.atoms.slice(0, 40) + '…' : g.atoms}</td>
               </tr>
@@ -540,7 +609,8 @@ export function ResultView({ job, record: rec, recordError, log, allow, vault, o
           </tbody></table></>}
           <Section label="Command" />
           <Code label="command line" text={commandText(job)} />
-          <Section label="Log"><span className="text-caption text-muted-foreground">{live ? 'live · stdout and stderr' : 'stdout and stderr'}</span></Section>
+          <Section label="Log"><span className="text-caption text-muted-foreground">{live ? 'live · stdout and stderr' : 'stdout and stderr'}{logCut ? ' · its last ' + size(logCut.size - logCut.from) + ' of ' + size(logCut.size) : ''}</span>
+            {logCut && onAllLog && <Button variant="ghost" size="sm" onClick={onAllLog}>show all</Button>}</Section>
           <div ref={logRef}><Code label="log" text={asTerminal(log ?? '')} className="max-h-80 text-muted-foreground" /></div>
         </>} />
       {vault && <SendDialog job={job} open={sending} onOpenChange={setSending} returnFocus={sendButton} />}
