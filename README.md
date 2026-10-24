@@ -16,15 +16,18 @@ How it looks and behaves (words, colours, keys, the order of a result page) is f
 
 You need Node.js 22.18 or newer, and GROMACS (`gmx_mpi` or `gmx`).
 
+gmx-cypher is checked out inside [the-matrix](https://github.com/Kikoun18/the-matrix), as its `cypher/` folder, beside
+the Matrix (`matrix/`), whose own code it reads vaults with; see *The Matrix* below.
+
 ```sh
-git clone --recurse-submodules https://github.com/Kikoun18/gmx-cypher
-cd gmx-cypher/runner
+git clone --recurse-submodules https://github.com/Kikoun18/the-matrix
+cd the-matrix/cypher
 npm install
 npm start                       # builds the page, then starts the server
 ```
 
-In a clone you already have, `git submodule update --init` fetches `matrix/` (do it once, and again after a pull that
-moves it). `matrix/` is the Matrix, whose own code gmx-cypher reads vaults with; see *The Matrix* below.
+In a clone of the-matrix you already have, `git submodule update --init` fetches `cypher/` (do it once, and again after
+a pull that moves it).
 
 It prints an address with a one-time token. Open it in Chrome:
 
@@ -313,7 +316,7 @@ running jobs first.
 
 ```sh
 npm run dev        # server and page with hot reload
-npm test           # checks that matrix/ is the pinned Matrix, unchanged, then the tests (fake gmx)
+npm test           # checks that ../matrix is the Matrix of the-matrix, unchanged, then the tests (fake gmx)
 npm run lint
 npm run build
 npm run e2e        # the browser tests (Playwright, Chromium): smoke, compare, the cluster tab
@@ -326,21 +329,27 @@ each came from). The decisions are in [`docs/decisions.md`](docs/decisions.md), 
 [`docs/batch-3.md`](docs/batch-3.md), [`docs/batch-3-phase0.md`](docs/batch-3-phase0.md),
 [`docs/batch-3-report.md`](docs/batch-3-report.md)).
 
-## The Matrix (`matrix/`)
+## The Matrix (`../matrix`)
 
-`matrix/` is a git submodule: the Matrix, [github.com/Kikoun18/the-matrix](https://github.com/Kikoun18/the-matrix), at the
-commit this repository pins. gmx-cypher takes the vault format, the file parsers, the batch planner, the figure exports
-and the export preferences from its code, and never changes it. `npm test` fails when `matrix/` is not at the pinned
-commit or has changes (`scripts/matrix-pinned.mjs`). `matrix/` needs no `npm install` of its own.
+gmx-cypher lives in [the-matrix](https://github.com/Kikoun18/the-matrix) as the `cypher/` submodule, and the Matrix is
+that repository's own `matrix/` folder, beside it: imports such as `../../matrix/src/lib/seq` reach it. the-matrix's
+commit pins gmx-cypher and holds the Matrix it is tested with. gmx-cypher takes the vault format, the file parsers, the
+batch planner, the figure exports and the export preferences from its code, and never changes it. `npm test` fails when
+gmx-cypher is not checked out inside the-matrix or `matrix/` has uncommitted changes (`scripts/matrix-pinned.mjs`).
+gmx-cypher needs no `npm install` in `matrix/`.
 
 To use a newer Matrix, on purpose:
 
 ```sh
-git -C matrix fetch && git -C matrix checkout <commit>
-cd runner && npm test           # the tests say whether the runner still agrees with it
-git add matrix && git commit    # the commit is the decision
+cd the-matrix
+git pull                        # or commit the change in matrix/
+cd cypher && npm test           # the tests say whether gmx-cypher still agrees with it
+cd .. && git add cypher && git commit   # pins this gmx-cypher with that Matrix: the commit is the decision
 ```
 
 The Matrix was called PMF Sequences, and lived in this repository's `app/` folder, until October 2026. The documents in
 `docs/` are the record of the work done then: they keep the old name, the `app/` paths and the numbers (T…, R…) of their
 time. What the Matrix *stores* keeps its old name too (a vault's manifest says `"app": "pmf-sequences"`).
+
+Until gmx-cypher moved into the-matrix (October 2026), this code was in a `runner/` folder of this repository, beside
+a `matrix/` submodule of its own; the documents in `docs/` keep those `runner/…` and `matrix/…` paths.
