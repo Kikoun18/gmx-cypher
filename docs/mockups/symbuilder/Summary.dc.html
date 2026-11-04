@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Summary</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ds/morpheus/tokens.css">
+<link rel="stylesheet" href="ds/morpheus/components/bundle.css">
+<script src="ds/morpheus/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:inherit}
+button{font-family:inherit}
+button:focus-visible,a:focus-visible{outline:2px solid var(--ring);outline-offset:2px}
+pre{margin:0}
+textarea{font-family:var(--font-mono)}
+</style>
+</helmet>
+<div data-theme="{{theme}}" style="min-height: 1480px; box-sizing: border-box; display: flex; flex-direction: column; background: var(--background); color: var(--foreground); font-family: var(--font-mono); font-size: 13px; line-height: 1.5;">
+
+  <header style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px 24px; padding: 12px 24px; border-bottom: 1px solid var(--border);">
+    <div style="display: flex; align-items: baseline; gap: 10px;">
+      <span style="font-size: 15px; font-weight: 700;">gmx-cypher</span>
+      <span style="font-size: 10px; line-height: 14px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground);">generate</span>
+    </div>
+    <nav aria-label="generator views" style="display: flex; gap: 4px;">
+      <a href="Main.dc.html" style="padding: 6px 10px; font-size: 12px; line-height: 16px; text-decoration: none; border-bottom: 2px solid transparent; color: var(--muted-foreground);">build</a>
+      <a href="Run.dc.html" style="padding: 6px 10px; font-size: 12px; line-height: 16px; text-decoration: none; border-bottom: 2px solid transparent; color: var(--muted-foreground);">run</a>
+      <a href="Dashboard.dc.html" style="padding: 6px 10px; font-size: 12px; line-height: 16px; text-decoration: none; border-bottom: 2px solid transparent; color: var(--muted-foreground);">dashboard</a>
+      <a href="Summary.dc.html" aria-current="page" style="padding: 6px 10px; font-size: 12px; line-height: 16px; font-weight: 700; text-decoration: none; border-bottom: 2px solid var(--coral-strong);">summary</a>
+      <a href="Library.dc.html" style="padding: 6px 10px; font-size: 12px; line-height: 16px; text-decoration: none; border-bottom: 2px solid transparent; color: var(--muted-foreground);">library</a>
+      <a href="MDP.dc.html" style="padding: 6px 10px; font-size: 12px; line-height: 16px; text-decoration: none; border-bottom: 2px solid transparent; color: var(--muted-foreground);">mdp</a>
+      <a href="Files.dc.html" style="padding: 6px 10px; font-size: 12px; line-height: 16px; text-decoration: none; border-bottom: 2px solid transparent; color: var(--muted-foreground);">files</a>
+      <a href="Cluster.dc.html" style="padding: 6px 10px; font-size: 12px; line-height: 16px; text-decoration: none; border-bottom: 2px solid transparent; color: var(--muted-foreground);">cluster</a>
+      <a href="Warnings.dc.html" style="padding: 6px 10px; font-size: 12px; line-height: 16px; text-decoration: none; border-bottom: 2px solid transparent; color: var(--muted-foreground);">warnings</a>
+      <a href="Settings.dc.html" style="padding: 6px 10px; font-size: 12px; line-height: 16px; text-decoration: none; border-bottom: 2px solid transparent; color: var(--muted-foreground);">settings</a>
+    </nav>
+    <span style="flex: 1 1 0;"></span>
+    <a href="Warnings.dc.html" style="font-size: 11px; line-height: 16px; text-decoration: none; color: var(--butter-strong);">3 open · 2 ignored</a>
+    <span style="font-size: 11px; line-height: 16px; color: var(--muted-foreground);">gmx_mpi 2025.4 · <span style="color: var(--mint-strong);">ready</span></span>
+    <span style="font-size: 11px; line-height: 16px; color: var(--muted-foreground);">qq · <span style="color: var(--mint-strong);">ready</span></span>
+  </header>
+
+  <div style="display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px 20px; padding: 20px 24px 0;">
+    <div style="display: flex; flex-direction: column; gap: 4px;">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <h1 style="margin: 0; font-size: 18px; line-height: 24px; font-weight: 700;">build summary</h1>
+        <x-import component-from-global-scope="Morpheus.Badge" tone="butter">sample data</x-import>
+      </div>
+      <p style="margin: 0; font-size: 12px; line-height: 16px; color: var(--muted-foreground);">what the last run did to every system, the termini pdb2gmx built, and the PMF numbers from AWH · live progress and the pull and walker reports are on the <a href="Dashboard.dc.html" style="color: var(--coral-strong);">dashboard</a></p>
+    </div>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 24px; padding: 20px 24px 24px;">
+
+    <section aria-label="build summary" style="display: flex; flex-direction: column; gap: 10px;">
+      <x-import component-from-global-scope="Morpheus.Section" label="Systems">{{ head.stamp }}</x-import>
+      <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; font-size: 12px; line-height: 16px;">
+        <span style="font-weight: 700;">{{ head.total }}</span>
+        <sc-for list="{{ counts }}" as="c" hint-placeholder-count="4">
+          <button type="button" onClick="{{ c.pick }}" aria-pressed="{{ c.on }}" style="display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px; border: 1px solid {{ c.edge }}; border-radius: var(--radius-full); background: transparent; color: {{ c.ink }}; font-size: 12px; line-height: 16px; cursor: pointer;"><span aria-hidden="true" style="width: 8px; height: 8px; border-radius: var(--radius-full); background: {{ c.ink }};"></span>{{ c.label }}</button>
+        </sc-for>
+        <span style="flex: 1 1 0;"></span>
+        <span style="color: var(--muted-foreground);">{{ head.gmx }}</span>
+      </div>
+      <div style="border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--card); overflow: hidden;">
+        <div style="display: grid; grid-template-columns: minmax(0, 1fr) 70px 70px 54px 76px 80px minmax(0, 1.1fr); gap: 12px; padding: 8px 14px; border-bottom: 1px solid var(--border); font-size: 10px; line-height: 14px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground);">
+          <span>system</span><span style="text-align: right;" title="net charge from the pre-salt grompp">charge</span><span style="text-align: right;">ions +/−</span><span style="text-align: right;">min</span><span style="text-align: right;">time</span><span>status</span><span>warnings per stage</span>
+        </div>
+        <sc-for list="{{ rows }}" as="r" hint-placeholder-count="8">
+          <div style="display: flex; flex-direction: column; padding: 6px 14px; border-bottom: 1px solid var(--border); font-size: 12px; line-height: 16px; opacity: {{ r.opacity }};">
+            <div style="display: grid; grid-template-columns: minmax(0, 1fr) 70px 70px 54px 76px 80px minmax(0, 1.1fr); align-items: center; gap: 12px;">
+              <span style="min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"><span style="color: var(--muted-foreground);">{{ r.ms }}</span><span style="font-weight: 700;">{{ r.q }}</span></span>
+              <span style="text-align: right;">{{ r.charge }}</span>
+              <span style="text-align: right;">{{ r.ions }}</span>
+              <span style="text-align: right;">{{ r.min }}</span>
+              <span style="text-align: right; color: var(--muted-foreground);">{{ r.time }}</span>
+              <span style="display: inline-flex; align-items: center; gap: 6px; color: {{ r.ink }}; font-weight: 700;"><span aria-hidden="true" style="width: 8px; height: 8px; border-radius: var(--radius-full); background: {{ r.ink }};"></span>{{ r.status }}</span>
+              <span style="color: var(--butter-strong);">{{ r.warn }}</span>
+            </div>
+            <sc-if value="{{ r.hasNote }}" hint-placeholder-val="{{ false }}">
+              <span style="padding: 2px 0 0; color: {{ r.noteInk }}; word-break: break-word;">! {{ r.note }}</span>
+            </sc-if>
+          </div>
+        </sc-for>
+      </div>
+      <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px;">
+        <x-import component-from-global-scope="Morpheus.Button" variant="outline" size="sm">retry failed · resume at the stage</x-import>
+        <x-import component-from-global-scope="Morpheus.Button" variant="ghost" size="sm">rebuild failed from scratch</x-import>
+        <x-import component-from-global-scope="Morpheus.Button" variant="ghost" size="sm">copy the table</x-import>
+        <span style="flex: 1 1 0;"></span>
+        <span style="font-size: 11px; line-height: 16px; color: var(--muted-foreground);">{{ head.written }}</span>
+      </div>
+      <p style="margin: 0; font-size: 11px; line-height: 16px; color: var(--muted-foreground);">charge is the solute before the salt (from 3.pre_salted.tpr) · ions are the -np / -nn given to genion · min is the shortest pull distance · warnings are counted per stage: SB solution builder, MIN, NVT, NPT, AWH, PULL · a retried system keeps its old record as RETRIED</p>
+    </section>
+
+    <div style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; align-items: start;">
+
+      <section aria-label="termini" style="display: flex; flex-direction: column; gap: 10px; min-width: 0;">
+        <x-import component-from-global-scope="Morpheus.Section" label="Termini">{{ term.count }}</x-import>
+        <p style="margin: 0; font-size: 11px; line-height: 16px; color: var(--muted-foreground);">check_termini(): what pdb2gmx actually built, read from the Protein moleculetype in {sequence}.top · red is not NH3+ / COO-, or a peptide charge that is not a whole number of 0.75 e</p>
+        <div style="border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--card); overflow: hidden;">
+          <div style="display: grid; grid-template-columns: minmax(0, 1fr) 40px 56px 40px 52px 50px 50px 58px; gap: 8px; padding: 8px 14px; border-bottom: 1px solid var(--border); font-size: 10px; line-height: 14px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground);">
+            <span>system</span><span>1st</span><span>N-term</span><span>last</span><span>C-term</span><span style="text-align: right;">q1</span><span style="text-align: right;">qN</span><span style="text-align: right;">qTOT</span>
+          </div>
+          <sc-for list="{{ term.rows }}" as="t" hint-placeholder-count="8">
+            <div style="display: grid; grid-template-columns: minmax(0, 1fr) 40px 56px 40px 52px 50px 50px 58px; align-items: center; gap: 8px; padding: 5px 14px; border-bottom: 1px solid var(--border); font-size: 12px; line-height: 16px;">
+              <span style="min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"><span style="color: var(--muted-foreground);">{{ t.ms }}</span><span style="font-weight: 700;">{{ t.q }}</span></span>
+              <span>{{ t.first }}</span>
+              <span style="color: {{ t.ink }};">{{ t.nt }}</span>
+              <span>{{ t.last }}</span>
+              <span style="color: {{ t.ink }};">{{ t.ct }}</span>
+              <span style="text-align: right;">{{ t.q1 }}</span>
+              <span style="text-align: right;">{{ t.qN }}</span>
+              <span style="text-align: right; color: {{ t.qInk }};">{{ t.qTot }}</span>
+            </div>
+          </sc-for>
+        </div>
+        <p style="margin: 0; font-size: 12px; line-height: 16px; color: {{ term.ink }};">{{ term.verdict }}</p>
+      </section>
+
+      <section aria-label="pmf" style="display: flex; flex-direction: column; gap: 10px; min-width: 0;">
+        <x-import component-from-global-scope="Morpheus.Section" label="PMF from AWH">{{ pmf.count }}</x-import>
+        <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px;">
+          <div style="display: flex; flex-direction: column; gap: 5px;">
+            <span style="font-size: 10px; line-height: 14px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground);">temperature (K)</span>
+            <x-import component-from-global-scope="Morpheus.Input" size="sm" value="{{ pmf.T }}" on-change="{{ onT }}" aria-label="temperature"></x-import>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 5px;">
+            <span style="font-size: 10px; line-height: 14px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground);">profile at · microseconds</span>
+            <x-import component-from-global-scope="Morpheus.Input" size="sm" value="{{ pmf.time }}" on-change="{{ onTime }}" aria-label="simulation time"></x-import>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 5px;">
+            <span style="font-size: 10px; line-height: 14px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground);">gmx awh -skip</span>
+            <x-import component-from-global-scope="Morpheus.Input" size="sm" value="{{ pmf.skip }}" on-change="{{ onSkip }}" aria-label="skip"></x-import>
+          </div>
+        </div>
+        <pre style="margin: 0; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--field); font-family: var(--font-mono); font-size: 11px; line-height: 18px; white-space: pre-wrap; word-break: break-all;">{{ pmf.cmd }}</pre>
+        <div style="border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--card); overflow: hidden;">
+          <div style="display: grid; grid-template-columns: minmax(0, 1fr) 62px 62px 62px 74px; gap: 8px; padding: 8px 14px; border-bottom: 1px solid var(--border); font-size: 10px; line-height: 14px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground);">
+            <span>system</span><span style="text-align: right;">min</span><span style="text-align: right;">at r</span><span style="text-align: right;">range</span><span style="text-align: right;">area &lt; 0</span>
+          </div>
+          <sc-for list="{{ pmf.rows }}" as="p" hint-placeholder-count="8">
+            <div style="display: grid; grid-template-columns: minmax(0, 1fr) 62px 62px 62px 74px; align-items: center; gap: 8px; padding: 5px 14px; border-bottom: 1px solid var(--border); font-size: 12px; line-height: 16px; color: {{ p.ink }};">
+              <span style="min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"><span style="color: var(--muted-foreground);">{{ p.ms }}</span><span style="font-weight: 700;">{{ p.q }}</span></span>
+              <span style="text-align: right;">{{ p.min }}</span>
+              <span style="text-align: right;">{{ p.at }}</span>
+              <span style="text-align: right;">{{ p.range }}</span>
+              <span style="text-align: right; font-weight: 700;">{{ p.area }}</span>
+            </div>
+          </sc-for>
+        </div>
+        <p style="margin: 0; font-size: 11px; line-height: 16px; color: var(--muted-foreground);">{{ pmf.note }}</p>
+      </section>
+    </div>
+  </div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["light","dark"],"default":"dark"},"$preview":{"width":1440,"height":1480}}'>
+// the notebook's build_summary(), check_termini() and the AWH analysis, without the plots
+const KB = 0.008314463;
+// method, saccharide, sequence, charge before salt, -np, -nn, min pull distance, seconds, status, warnings per stage, note
+const BUILD = [
+  ['hmr+fast+6', 'HA', 'WRWYCR', -3.75, 33, 28, 0.42, 2471, 'OK', 'SB 2 NPT 1 AWH 1', ''],
+  ['hmr+fast+6', 'HA', 'WRWACR', -3.75, 33, 28, 0.45, 2390, 'OK', 'SB 2 NPT 1', ''],
+  ['hmr+fast+6', 'PG', 'WRWYCR', -1.5, 30, 28, 0.48, 2412, 'OK', 'SB 1 NPT 1', ''],
+  ['hmr+fast+6', 'PG', 'WRWACR', -1.55, 30, 28, 0.51, 2403, 'OK', 'SB 2 NPT 1', 'residual −0.050 e · the net charge is not a whole number of 0.75 e'],
+  ['hmr+fast+6', 'O26', 'WRWYCR', -0.75, 29, 28, 0.42, 2320, 'OK', 'SB 1', ''],
+  ['hmr+fast+6', 'O26', 'WRWACR', -0.75, 29, 28, null, 2288, 'RETRIED', 'SB 1 PULL 1', 'PULL: RuntimeError: GROMACS fatal error: gmx_mpi grompp … distance of pull group 1 is larger than 0.49 times the box size (0.5 times half the box) · hint: pull-pbc-ref-prev-step-com = yes, or grow the box'],
+  ['hmr+fast+6', 'O26', 'WRWACR', -0.75, 29, 28, null, 751, 'OK', 'PULL 1', 'resumed at PULL · tpr ready, qq submit printed'],
+  ['hmr+slow+6', 'HA', 'WRWYCR', -3.75, 33, 28, 0.48, 3, 'SKIPPED', '', 'every stage already on disk · nothing to run'],
+  ['hmr+slow+6', 'HA', 'WRWACR', -3.75, 33, 28, 0.51, 3104, 'OK', 'SB 2 NPT 1', ''],
+  ['hmr+slow+6', 'PG', 'WRWYCR', -1.5, 30, 28, 0.42, 3011, 'OK', 'SB 1 NPT 1', ''],
+  ['hmr+slow+6', 'PG', 'WRWACR', -1.55, 30, 28, null, 1840, 'FAILED', 'SB 2 NPT 1', 'NPT: RuntimeError: GROMACS fatal error: gmx_mpi grompp -f inputs/eq_npt.mdp … ERROR 1 [file eq_npt.mdp]: Invalid T coupling input: 1 groups, 2 ref-t values'],
+  ['hmr+slow+6', 'O26', 'WRWYCR', -0.75, 29, 28, 0.48, 2987, 'OK', 'SB 1', ''],
+  ['hmr+slow+6', 'O26', 'WRWACR', -0.75, 29, 28, 0.51, 3050, 'OK', 'SB 1 AWH 1', '']
+];
+const HUE = { OK: 'var(--mint-strong)', FAILED: 'var(--destructive)', SKIPPED: 'var(--butter-strong)', RETRIED: 'var(--butter-strong)' };
+const AA3 = { W: 'TRP', R: 'ARG', Y: 'TYR', C: 'CYS', A: 'ALA' };
+const hms = (t) => Math.floor(t / 3600) + ':' + String(Math.floor(t / 60) % 60).padStart(2, '0') + ':' + String(t % 60).padStart(2, '0');
+const sg = (x, d) => (x > 0 ? '+' : x < 0 ? '−' : '') + Math.abs(x).toFixed(d);
+const ms = (r) => r[0] + ' / ' + r[1] + ' / ';
+const tsuf = (us) => {
+  const v = Math.round(us * 1e6);
+  if (!v) return '0';
+  const e = Math.floor(Math.log10(v)), m = v / Math.pow(10, e);
+  return e >= 6 && Number.isInteger(m) ? m + 'e+' + String(e).padStart(2, '0') : String(v);
+};
+
+// one synthetic AWH profile per system: a binding well plus the -2kT ln r a distance coordinate carries
+function pmfOf(i, T) {
+  const kT0 = KB * 310.15, kT = KB * T;
+  const D = -(8 + (i * 37) % 9), r0 = 0.55 + ((i * 13) % 7) * 0.02, w = 0.22 + ((i * 7) % 5) * 0.02;
+  const cv = [], raw = [];
+  for (let r = 0.3; r <= 3.0001; r += 0.02) { cv.push(r); raw.push(D * Math.exp(-Math.pow((r - r0) / w, 2)) - 2 * kT0 * Math.log(r)); }
+  const n = cv.length;
+  const orig = raw.map((v) => v - raw[n - 1]);
+  const c0 = orig.map((v, k) => v + 2 * kT * Math.log(cv[k]));
+  const corr = c0.map((v) => v - c0[n - 1]);
+  let lo = 0, hi = 0, area = 0;
+  corr.forEach((v, k) => {
+    if (v < corr[lo]) lo = k;
+    if (v > corr[hi]) hi = k;
+    if (k) area += (Math.min(corr[k - 1], 0) + Math.min(v, 0)) / 2 * (cv[k] - cv[k - 1]);
+  });
+  return { n: n, min: corr[lo], at: cv[lo], max: corr[hi], range: corr[hi] - corr[lo], area: area };
+}
+
+class Component extends DCLogic {
+  renderVals() {
+    const st = this.state;
+    const f = st.f || 'all';
+    const T = st.T === undefined ? '310.15' : st.T;
+    const time = st.time === undefined ? '2' : st.time;
+    const skip = st.skip === undefined ? '125' : st.skip;
+    const Tn = parseFloat(T) || 310.15;
+
+    const count = (s) => BUILD.filter((r) => r[8] === s).length;
+    const counts = [['all', BUILD.length - count('RETRIED') + ' systems'], ['OK', count('OK') + ' ok'], ['FAILED', count('FAILED') + ' failed'], ['SKIPPED', count('SKIPPED') + ' skipped'], ['RETRIED', count('RETRIED') + ' retried']].slice(1).map((c) => ({
+      label: c[1],
+      on: f === c[0],
+      ink: HUE[c[0]],
+      edge: f === c[0] ? HUE[c[0]] : 'var(--input)',
+      pick: () => this.setState({ f: f === c[0] ? 'all' : c[0] })
+    }));
+    const rows = BUILD.filter((r) => f === 'all' || r[8] === f).map((r) => ({
+      ms: ms(r), q: r[2],
+      charge: sg(r[3], 2),
+      ions: r[4] + ' / ' + r[5],
+      min: r[6] === null ? '' : r[6].toFixed(2),
+      time: hms(r[7]),
+      status: r[8],
+      ink: HUE[r[8]],
+      warn: r[9],
+      hasNote: !!r[10],
+      note: r[10],
+      noteInk: r[8] === 'OK' || r[8] === 'SKIPPED' ? (r[10].indexOf('residual') === 0 ? 'var(--butter-strong)' : 'var(--muted-foreground)') : 'var(--destructive)',
+      opacity: r[8] === 'RETRIED' ? '0.7' : '1'
+    }));
+
+    // termini: one row per system, from its own .top
+    const sys = BUILD.filter((r) => r[8] !== 'RETRIED');
+    const tRows = sys.map((r) => {
+      const bad = r[0] === 'hmr+slow+6' && r[1] === 'PG' && r[2] === 'WRWACR';
+      const qN = bad ? 0.75 : 0;
+      const qTot = 0.75 + 1.5 - 0.75 + qN;
+      return {
+        ms: ms(r), q: r[2],
+        first: AA3[r[2][0]], last: AA3[r[2][r[2].length - 1]],
+        nt: 'NH3+', ct: bad ? 'COOH' : 'COO-',
+        ink: bad ? 'var(--destructive)' : 'var(--mint-strong)',
+        q1: sg(0.75, 2), qN: sg(qN, 2), qTot: sg(qTot, 3),
+        qInk: bad ? 'var(--destructive)' : 'var(--foreground)',
+        bad: bad
+      };
+    });
+    const odd = tRows.filter((t) => t.bad).map((t) => t.ms + t.q);
+
+    // PMF
+    const kT = KB * Tn;
+    const missing = (r) => r[8] === 'FAILED' || r[2] === 'WRWACR' && r[1] === 'O26' && r[0] === 'hmr+fast+6';
+    const pRows = sys.map((r, i) => {
+      if (missing(r)) return { ms: ms(r), q: r[2], min: '[skip]', at: '', range: '', area: 'no file', ink: 'var(--muted-foreground)' };
+      const p = pmfOf(i, Tn);
+      return { ms: ms(r), q: r[2], min: p.min.toFixed(2), at: p.at.toFixed(2), range: p.range.toFixed(2), area: p.area.toFixed(3), ink: 'var(--foreground)' };
+    });
+    const nDone = pRows.filter((p) => p.area !== 'no file').length;
+    const suf = tsuf(parseFloat(time) || 0);
+
+    return {
+      theme: this.props.theme ?? 'dark',
+      head: {
+        stamp: '2026-11-04 18:15',
+        total: BUILD.length - count('RETRIED') + ' systems',
+        gmx: 'GROMACS 2025.4 · total run time 7:52:10',
+        written: 'written: logs/build_summary_20261104_1815.log · logs/build_summary_latest.log'
+      },
+      counts: counts,
+      rows: rows,
+      term: {
+        count: String(tRows.length).padStart(2, '0'),
+        rows: tRows,
+        verdict: 'expected NH3+ / COO-: ' + (odd.length ? odd.length + ' mismatched · ' + odd.join(', ') + ' · the C-terminus kept its H, so -ter was answered with 1 instead of 0' : 'all match'),
+        ink: odd.length ? 'var(--destructive)' : 'var(--mint-strong)'
+      },
+      pmf: {
+        count: String(nDone).padStart(2, '0') + ' / ' + String(pRows.length).padStart(2, '0'),
+        T: T, time: time, skip: skip,
+        cmd: '# in 7.awh/ of every system\ngmx_mpi awh -s 7.awh.tpr -f 7.awh.edr -o 7.awh.xvg -skip ' + skip + ' -quiet\ncp 7_t' + suf + '.xvg pmf/{method}_{saccharide}_{sequence}_awh_t' + suf + '.xvg\n# PMF minus its last point · + 2kT·ln r, kT = ' + kT.toFixed(3) + ' kJ/mol at ' + Tn + ' K · minus its last point again\n# area < 0 = ∫ min(PMF, 0) dr → pmf/{method}/{saccharide}/{method}_{saccharide}_{sequence}_corrected.dat',
+        rows: pRows,
+        note: 'kJ/mol, r in nm, area in kJ/mol·nm · 136 points from 0.30 to 3.00 nm each · the .dat holds CV, the corrected PMF and the entropy term, with T, the time and the area in its header · plots are left out · a system without its _awh_t' + suf + '.xvg is listed as [skip]'
+      },
+      onT: (e) => this.setState({ T: e.target.value }),
+      onTime: (e) => this.setState({ time: e.target.value }),
+      onSkip: (e) => this.setState({ skip: e.target.value })
+    };
+  }
+}
+</script>
+</body>
+</html>

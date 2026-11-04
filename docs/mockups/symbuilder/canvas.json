@@ -1,0 +1,136 @@
+{
+  "v": 3,
+  "attachments": {},
+  "boards": {
+    "Main.dc.html": {
+      "expand": "fill",
+      "h": 2690,
+      "is_interactive": true,
+      "title": "Build",
+      "w": 1440,
+      "x": 0,
+      "y": 0
+    },
+    "Run.dc.html": {
+      "expand": "fill",
+      "h": 1360,
+      "is_interactive": true,
+      "title": "Run",
+      "w": 1440,
+      "x": 1520,
+      "y": 0
+    },
+    "Dashboard.dc.html": {
+      "expand": "fill",
+      "h": 1720,
+      "is_interactive": true,
+      "title": "Dashboard",
+      "w": 1440,
+      "x": 3040,
+      "y": 0
+    },
+    "Summary.dc.html": {
+      "expand": "fill",
+      "h": 1480,
+      "is_interactive": true,
+      "title": "Summary",
+      "w": 1440,
+      "x": 4560,
+      "y": 0
+    },
+    "Library.dc.html": {
+      "expand": "fill",
+      "h": 982,
+      "is_interactive": true,
+      "title": "Library",
+      "w": 1440,
+      "x": 6080,
+      "y": 0
+    },
+    "MDP.dc.html": {
+      "expand": "fill",
+      "h": 2080,
+      "is_interactive": true,
+      "title": "MDP library",
+      "w": 1440,
+      "x": 7600,
+      "y": 0
+    },
+    "Files.dc.html": {
+      "expand": "fill",
+      "h": 1240,
+      "is_interactive": true,
+      "title": "Files",
+      "w": 1440,
+      "x": 9120,
+      "y": 0
+    },
+    "Cluster.dc.html": {
+      "expand": "fill",
+      "h": 1160,
+      "is_interactive": true,
+      "title": "Cluster scripts",
+      "w": 1440,
+      "x": 10640,
+      "y": 0
+    },
+    "Warnings.dc.html": {
+      "expand": "fill",
+      "h": 1000,
+      "is_interactive": true,
+      "title": "Warnings",
+      "w": 1440,
+      "x": 12160,
+      "y": 0
+    },
+    "Settings.dc.html": {
+      "expand": "fill",
+      "h": 2560,
+      "is_interactive": true,
+      "title": "Settings",
+      "w": 1440,
+      "x": 13680,
+      "y": 0
+    }
+  },
+  "createdOnFiles": {
+    "at": "2026-10-23T00:24:44Z",
+    "v": 1
+  },
+  "designSystems": [
+    {
+      "artifact": "https://claude.ai/code/artifact/6c48e254-7f5d-42af-9f6e-eb9abd458fd0",
+      "copiedAt": "2026-10-23T00:24:44Z",
+      "namespace": "morpheus",
+      "title": "Morpheus",
+      "version": "1792490315-959b"
+    }
+  ],
+  "launch": {
+    "view": "canvas"
+  },
+  "notes": {
+    "title": {
+      "kind": "title1",
+      "maxW": 6000,
+      "text": "gmx-cypher \u00b7 system generator",
+      "w": 240,
+      "x": 0,
+      "y": -300
+    }
+  },
+  "order": [
+    "Main.dc.html",
+    "Run.dc.html",
+    "Dashboard.dc.html",
+    "Summary.dc.html",
+    "Library.dc.html",
+    "MDP.dc.html",
+    "Files.dc.html",
+    "Cluster.dc.html",
+    "Warnings.dc.html",
+    "Settings.dc.html"
+  ],
+  "pages": [],
+  "title": "System generator"
+}

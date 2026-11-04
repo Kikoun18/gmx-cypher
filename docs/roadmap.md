@@ -232,3 +232,60 @@ From [`batch-3.md`](batch-3.md) §5: one coherent app, (de)Cypher for every anal
 - Trajectory preparation (`trjconv`), still only a candidate.
 - Found in Phase 0, not on lines this batch changes: none yet.
 - From the final report (§11): load the Matrix's export pipeline on demand (the main bundle grew 66 kB gzip); vault types other than RDF in compare (needs a type map from the Matrix); several AWH biases and AWH's second dimension; a GROMACS 2021 dump for R7c; a membrane run for `gmx order` and a real electron file for `gmx density`; a `qq jobs -a -e` sample with a finished job; real-gmx tests that also run against 2023.3; `vault-read`'s listing still differs now and then under a loaded parallel run (the Matrix's own setup writing late; gmx-cypher's reads go through a backend that refuses writes).
+
+## Batch 4
+
+From [`batch-4.md`](batch-4.md) §6: SymBuilder inside gmx-cypher, four tabs (home · symbuilder · analysis · cluster), working with the Matrix. Baseline `6de6a96` (gmx-cypher), the-matrix `7ae82be`. The Phase 0 report is [`batch-4-phase0.md`](batch-4-phase0.md); its §8 proposes the cut into two batches (question 21) and two changes of order.
+
+**Why this order:**
+- **The shell comes first:** small, and every later screen lives in it.
+- **The plan comes before anything runs.** Every command is computed and tested against the notebook before a single file is written.
+- **The Matrix's names come before the first build,** so the first folders a build writes already land in the right rows, columns and runs.
+- **Running comes after the decisions about programs and writes** (questions 5–11), and the cluster after running here.
+- **PMFs into the vault and the reports come last,** when real systems exist to test them on.
+
+### Phase 0: Plan and design
+- [x] Baseline recorded; sections 3 and 4 confirmed or corrected (report §1–§2; Playwright needs the page to have an icon with this Chromium, §1)
+- [x] The notebook-to-request table; the board-to-place map; design pass with screenshots (report §3–§4, `docs/img/batch-4/`)
+- [x] Phase 0 report for R1–R10; samples asked for (report §5–§7)
+- [ ] Questions answered; decisions recorded; order and cut confirmed
+
+### Phase 1: The shell (R1, R2)
+- [ ] R1a Contract amended for the new words (question 1, 2)
+- [ ] R1b Four tabs, routes, every old address
+- [ ] R2 home
+
+### Phase 2: The plan, with nothing run (R3, R4)
+- [ ] R3a The build model, saved build plans (frozen format fixture first)
+- [ ] R3b The planners: every step's argv, stdin and files, golden against the notebook
+- [ ] R3c Build and systems views; the preview
+- [ ] R4 Files, mdp files, force field check, settings
+
+### Phase 3: The Matrix's names (R8a, R8b)
+- [ ] R8a Systems from a project
+- [ ] R8b Folders and names the project reads, checked with the Matrix's code
+
+### Phase 4: Building here (R5, R6)
+- [ ] R5a Folders and the writing rule; the build record
+- [ ] R5b The steps, with fake tools from real output
+- [ ] R5c Progress, waiting for outputs, cancel
+- [ ] R6 Failures, retries, repeats, resume
+
+### Phase 5: The cluster (R7)
+- [ ] R7a qq scripts and profiles
+- [ ] R7b The cluster tab: scripts, and SymBuilder's systems among the jobs
+
+### Phase 6: Results (R8c–R8e, R9, R10)
+- [ ] R8c PMFs into the vault; R8d PMF numbers with the Matrix's code
+- [ ] R9 Reports
+- [ ] R10 From a built system to analysis
+
+### Phase 7: Finish
+- [ ] README, contract, fresh-context review, report
+
+### Backlog (Batch 4: add to it, don't do it)
+- Job submission and killing jobs (unless question 6 says otherwise).
+- Python scripts as tiles (the mock-up's library board), unless question 7 says otherwise.
+- The notebook's plots; the production tile (the notebook has none).
+- Requests for the Matrix and for Morpheus (section 23).
+- Found in Phase 0, not on lines this batch changes: the page has no icon, so Chromium 1243 (the one installed here; Playwright 1.56.1 is pinned) logs a 404 for `/favicon.ico` and 12 of the 14 e2e tests fail on their "no console errors" check (report §1).

@@ -1,0 +1,391 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Library</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ds/morpheus/tokens.css">
+<link rel="stylesheet" href="ds/morpheus/components/bundle.css">
+<script src="ds/morpheus/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:inherit}
+button{font-family:inherit}
+button:focus-visible,a:focus-visible{outline:2px solid var(--ring);outline-offset:2px}
+</style>
+</helmet>
+<div data-theme="{{theme}}" style="min-height: 982px; box-sizing: border-box; display: flex; flex-direction: column; background: var(--background); color: var(--foreground); font-family: var(--font-mono); font-size: 13px; line-height: 1.5;">
+
+  <header style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px 24px; padding: 12px 24px; border-bottom: 1px solid var(--border);">
+    <div style="display: flex; align-items: baseline; gap: 10px;">
+      <span style="font-size: 15px; font-weight: 700;">gmx-cypher</span>
+      <span style="font-size: 10px; line-height: 14px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground);">generate</span>
+    </div>
+    <nav aria-label="generator views" style="display: flex; gap: 4px;">
+      <a href="Main.dc.html" style="padding: 6px 10px; font-size: 12px; line-height: 16px; text-decoration: none; border-bottom: 2px solid transparent; color: var(--muted-foreground);">build</a>
+      <a href="Run.dc.html" style="padding: 6px 10px; font-size: 12px; line-height: 16px; text-decoration: none; border-bottom: 2px solid transparent; color: var(--muted-foreground);">run</a>
+      <a href="Dashboard.dc.html" style="padding: 6px 10px; font-size: 12px; line-height: 16px; text-decoration: none; border-bottom: 2px solid transparent; color: var(--muted-foreground);">dashboard</a>
+      <a href="Summary.dc.html" style="padding: 6px 10px; font-size: 12px; line-height: 16px; text-decoration: none; border-bottom: 2px solid transparent; color: var(--muted-foreground);">summary</a>
+      <a href="Library.dc.html" aria-current="page" style="padding: 6px 10px; font-size: 12px; line-height: 16px; font-weight: 700; text-decoration: none; border-bottom: 2px solid var(--coral-strong);">library</a>
+      <a href="MDP.dc.html" style="padding: 6px 10px; font-size: 12px; line-height: 16px; text-decoration: none; border-bottom: 2px solid transparent; color: var(--muted-foreground);">mdp</a>
+      <a href="Files.dc.html" style="padding: 6px 10px; font-size: 12px; line-height: 16px; text-decoration: none; border-bottom: 2px solid transparent; color: var(--muted-foreground);">files</a>
+      <a href="Cluster.dc.html" style="padding: 6px 10px; font-size: 12px; line-height: 16px; text-decoration: none; border-bottom: 2px solid transparent; color: var(--muted-foreground);">cluster</a>
+      <a href="Warnings.dc.html" style="padding: 6px 10px; font-size: 12px; line-height: 16px; text-decoration: none; border-bottom: 2px solid transparent; color: var(--muted-foreground);">warnings</a>
+      <a href="Settings.dc.html" style="padding: 6px 10px; font-size: 12px; line-height: 16px; text-decoration: none; border-bottom: 2px solid transparent; color: var(--muted-foreground);">settings</a>
+    </nav>
+    <span style="flex: 1 1 0;"></span>
+    <a href="Warnings.dc.html" style="font-size: 11px; line-height: 16px; text-decoration: none; color: var(--butter-strong);">3 open · 2 ignored</a>
+    <span style="font-size: 11px; line-height: 16px; color: var(--muted-foreground);">gmx_mpi 2025.4 · <span style="color: var(--mint-strong);">ready</span></span>
+    <span style="font-size: 11px; line-height: 16px; color: var(--muted-foreground);">qq · <span style="color: var(--mint-strong);">ready</span></span>
+  </header>
+
+  <div style="display: grid; grid-template-columns: 340px minmax(0, 1fr) 420px; gap: 20px; align-items: start; padding: 20px 24px;">
+
+    <aside aria-label="your python scripts" style="display: flex; flex-direction: column; gap: 10px; min-width: 0;">
+      <x-import component-from-global-scope="Morpheus.Section" label="Your scripts">{{ fileCount }}</x-import>
+      <x-import component-from-global-scope="Morpheus.Dropzone" title="Drop a .py file here" description="every public function in it can become a tile · nothing runs when you upload" on-files="{{ onFiles }}"></x-import>
+      <sc-if value="{{ hasDrop }}" hint-placeholder-val="{{ false }}">
+        <p style="margin: 0; font-size: 11px; line-height: 16px; color: var(--butter-strong);">{{ dropNote }}</p>
+      </sc-if>
+      <div style="display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--card); overflow: hidden;">
+        <sc-for list="{{ files }}" as="f" hint-placeholder-count="2">
+          <button type="button" onClick="{{ f.pick }}" aria-pressed="{{ f.isSel }}" aria-label="show the functions in {{ f.name }}" style="display: flex; align-items: center; gap: 10px; width: 100%; box-sizing: border-box; padding: 9px 14px 9px 12px; border: 0; border-left: 2px solid {{ f.edge }}; border-bottom: 1px solid var(--border); background: {{ f.bg }}; color: var(--foreground); font-size: 12px; line-height: 16px; text-align: left; cursor: pointer;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: 0 0 auto; color: var(--rose-strong);"><path d="M16 18l6-6-6-6M8 6l-6 6 6 6"></path></svg>
+            <span style="flex: 1 1 0; min-width: 0; display: flex; flex-direction: column;">
+              <span style="font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ f.name }}</span>
+              <span style="color: var(--muted-foreground);">{{ f.meta }}</span>
+            </span>
+            <span style="flex: 0 0 auto; color: var(--muted-foreground);">{{ f.used }}</span>
+          </button>
+        </sc-for>
+      </div>
+      <ul style="margin: 0; padding-left: 16px; list-style: disc; display: flex; flex-direction: column; gap: 4px; font-size: 11px; line-height: 16px; color: var(--muted-foreground);">
+        <li>the signature becomes the tile's options: a folder argument gets the system folder, the rest become fields</li>
+        <li>functions that start with an underscore are left out</li>
+        <li>the script is copied beside your recipe · the original is never changed</li>
+      </ul>
+
+      <div style="margin-top: 10px;">
+        <x-import component-from-global-scope="Morpheus.Section" label="Start from a template"></x-import>
+      </div>
+      <x-import component-from-global-scope="Morpheus.ToggleGroup" type="single" size="sm" value="{{ tpl }}" on-value-change="{{ setTpl }}">
+        <x-import component-from-global-scope="Morpheus.ToggleGroupItem" value="gml">gromologist</x-import>
+        <x-import component-from-global-scope="Morpheus.ToggleGroupItem" value="mda">MDAnalysis</x-import>
+        <x-import component-from-global-scope="Morpheus.ToggleGroupItem" value="pml">PyMOL</x-import>
+      </x-import>
+      <p style="margin: 0; font-size: 11px; line-height: 16px; color: var(--muted-foreground);">{{ tplNote }}</p>
+      <pre style="margin: 0; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--field); font-family: var(--font-mono); font-size: 11px; line-height: 18px; white-space: pre-wrap;">{{ tplCode }}</pre>
+      <x-import component-from-global-scope="Morpheus.Button" variant="outline" size="sm">add as a python tile</x-import>
+      <p style="margin: 0; font-size: 11px; line-height: 16px; color: var(--muted-foreground);">all three libraries are switched on in <a href="Settings.dc.html" style="color: var(--coral-strong);">general settings</a> · a tile that needs one that is off stays greyed out</p>
+    </aside>
+
+    <main aria-label="functions and tiles" style="display: flex; flex-direction: column; gap: 10px; min-width: 0;">
+      <x-import component-from-global-scope="Morpheus.Section" label="Functions found">{{ fnCount }}</x-import>
+      <p style="margin: 0; font-size: 11px; line-height: 16px; color: var(--muted-foreground);">{{ fileName }} · pick what each function becomes, then add them to the palette</p>
+      <div style="display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--card); overflow: hidden;">
+        <sc-for list="{{ fns }}" as="g" hint-placeholder-count="3">
+          <button type="button" onClick="{{ g.pick }}" aria-pressed="{{ g.isSel }}" aria-label="show {{ g.name }}" style="display: grid; grid-template-columns: minmax(0, 1fr) 118px; align-items: center; gap: 12px; width: 100%; box-sizing: border-box; padding: 10px 14px 10px 12px; border: 0; border-left: 2px solid {{ g.edge }}; border-bottom: 1px solid var(--border); background: {{ g.bg }}; color: var(--foreground); font-size: 12px; line-height: 16px; text-align: left; cursor: pointer;">
+            <span style="min-width: 0; display: flex; flex-direction: column; gap: 2px;">
+              <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"><span style="font-weight: 700;">{{ g.name }}</span><span style="color: var(--muted-foreground);">{{ g.sig }}</span></span>
+              <span style="color: var(--muted-foreground); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ g.doc }}</span>
+            </span>
+            <span style="justify-self: end; padding: 1px 10px; border-radius: var(--radius-full); border: 1px solid {{ g.ink }}; background: {{ g.soft }}; color: {{ g.ink }}; font-size: 11px; line-height: 16px; font-weight: 700;">{{ g.useWord }}</span>
+          </button>
+        </sc-for>
+      </div>
+      <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px;">
+        <span style="flex: 1 1 280px; font-size: 12px; line-height: 16px;">{{ summary }}</span>
+        <x-import component-from-global-scope="Morpheus.Button" variant="default">add to the library</x-import>
+      </div>
+
+      <div style="margin-top: 14px;">
+        <x-import component-from-global-scope="Morpheus.Section" label="Every tile you have">{{ tileCount }}</x-import>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px;">
+        <sc-for list="{{ catalog }}" as="c" hint-placeholder-count="4">
+          <div style="display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--card);">
+            <span style="display: flex; align-items: center; gap: 8px; font-size: 10px; line-height: 14px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground);">
+              <span aria-hidden="true" style="width: 8px; height: 8px; border-radius: var(--radius-full); background: {{ c.ink }};"></span>
+              <span style="flex: 1 1 0;">{{ c.name }}</span>
+              <span>{{ c.count }}</span>
+            </span>
+            <sc-for list="{{ c.items }}" as="it" hint-placeholder-count="2">
+              <span style="display: flex; align-items: baseline; gap: 8px; font-size: 12px; line-height: 16px;">
+                <span style="font-weight: 700; flex: 0 0 auto;">{{ it.label }}</span>
+                <span style="flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted-foreground);">{{ it.gmx }}</span>
+                <span style="flex: 0 0 auto; font-size: 10px; letter-spacing: 0.08em; color: {{ it.tagInk }};">{{ it.tag }}</span>
+              </span>
+            </sc-for>
+          </div>
+        </sc-for>
+      </div>
+    </main>
+
+    <aside aria-label="selected function" style="display: flex; flex-direction: column; gap: 10px; min-width: 0; padding: 14px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--card);">
+      <x-import component-from-global-scope="Morpheus.Section" label="Preview">{{ cur.name }}</x-import>
+      <div style="display: flex; align-items: center; gap: 10px; padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--background); opacity: {{ cur.opacity }};">
+        <span style="flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: var(--radius-sm); background: {{ cur.soft }}; color: {{ cur.ink }};">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{ cur.icon }}"></path></svg>
+        </span>
+        <span style="flex: 1 1 0; min-width: 0; display: flex; flex-direction: column;">
+          <span style="font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ cur.label }}</span>
+          <span style="font-size: 11px; line-height: 16px; color: var(--muted-foreground);">python · {{ cur.file }}</span>
+        </span>
+        <span style="flex: 0 0 auto; padding: 1px 8px; border: 1px solid var(--input); border-radius: var(--radius-full); background: var(--field); font-size: 10px; line-height: 16px; letter-spacing: 0.08em;">{{ cur.chip }}</span>
+      </div>
+      <p style="margin: 0; font-size: 11px; line-height: 16px; color: var(--muted-foreground);">{{ cur.where }}</p>
+
+      <x-import component-from-global-scope="Morpheus.Section" label="Use as"></x-import>
+      <x-import component-from-global-scope="Morpheus.ToggleGroup" type="single" size="sm" value="{{ cur.use }}" on-value-change="{{ setUse }}">
+        <x-import component-from-global-scope="Morpheus.ToggleGroupItem" value="tile">tile</x-import>
+        <x-import component-from-global-scope="Morpheus.ToggleGroupItem" value="card">dashboard card</x-import>
+        <x-import component-from-global-scope="Morpheus.ToggleGroupItem" value="skip">skip</x-import>
+      </x-import>
+      <p style="margin: 0; font-size: 11px; line-height: 16px; color: var(--muted-foreground);">{{ cur.hint }}</p>
+
+      <sc-if value="{{ cur.isTile }}" hint-placeholder-val="{{ true }}">
+        <x-import component-from-global-scope="Morpheus.Section" label="Tile"></x-import>
+        <div style="display: flex; flex-direction: column; gap: 5px;">
+          <span style="font-size: 10px; line-height: 14px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground);">name in the palette</span>
+          <x-import component-from-global-scope="Morpheus.Input" size="sm" value="{{ cur.label }}" on-change="{{ onName }}"></x-import>
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span style="font-size: 10px; line-height: 14px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground);">runs</span>
+          <x-import component-from-global-scope="Morpheus.ToggleGroup" type="single" size="sm" value="{{ cur.runs }}" on-value-change="{{ setRuns }}">
+            <x-import component-from-global-scope="Morpheus.ToggleGroupItem" value="local">local</x-import>
+            <x-import component-from-global-scope="Morpheus.ToggleGroupItem" value="cluster">cluster</x-import>
+          </x-import>
+        </div>
+        <p style="margin: 0; font-size: 11px; line-height: 16px; color: var(--muted-foreground);">{{ cur.runsHint }}</p>
+      </sc-if>
+
+      <x-import component-from-global-scope="Morpheus.Section" label="Arguments">{{ cur.argCount }}</x-import>
+      <div style="border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--background); overflow: hidden;">
+        <div style="display: grid; grid-template-columns: 96px minmax(0, 1fr) 96px; gap: 10px; padding: 6px 10px; border-bottom: 1px solid var(--border); font-size: 10px; line-height: 14px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground);">
+          <span>python</span>
+          <span>becomes</span>
+          <span>default</span>
+        </div>
+        <sc-for list="{{ cur.params }}" as="p" hint-placeholder-count="2">
+          <div style="display: grid; grid-template-columns: 96px minmax(0, 1fr) 96px; gap: 10px; padding: 6px 10px; border-bottom: 1px solid var(--border); font-size: 12px; line-height: 16px;">
+            <span style="font-weight: 700;">{{ p.n }}</span>
+            <span style="color: var(--muted-foreground);">{{ p.becomes }}</span>
+            <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ p.dflt }}</span>
+          </div>
+        </sc-for>
+      </div>
+
+      <x-import component-from-global-scope="Morpheus.Section" label="What it runs"></x-import>
+      <pre style="margin: 0; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--field); font-family: var(--font-mono); font-size: 12px; line-height: 18px; white-space: pre-wrap; word-break: break-all;">{{ cur.cmd }}</pre>
+      <p style="margin: 0; font-size: 11px; line-height: 16px; color: var(--muted-foreground);">reads · {{ cur.reads }}</p>
+    </aside>
+
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;light&quot;,&quot;dark&quot;],&quot;default&quot;:&quot;dark&quot;},&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:982}}">
+const ICON = {
+  code: 'M16 18l6-6-6-6M8 6l-6 6 6 6',
+  card: 'M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z'
+};
+const FOLDER = 'the system folder';
+
+const FILES = [
+  { name: 'checks.py', size: '4.2 KB', funcs: [
+    { key: 'gmx_charge', sig: '(proa_dir)', label0: 'gmx charge', use0: 'tile', hue: 'mint', cat: 'Checks',
+      doc: 'grompp on {name}.top and 6.eqnpt/6.eqnpt.gro · prints the net charge · removes its scratch files',
+      params: [{ n: 'proa_dir', becomes: FOLDER, dflt: '{system folder}', call: 'proa_dir="{system folder}"' }],
+      reads: '{sequence}.top, 6.eqnpt/6.eqnpt.gro' },
+    { key: 'pull_report', sig: '(summary=False)', label0: 'pull report', use0: 'card', hue: 'butter', cat: 'Python',
+      doc: 'reads 8.pull/pullx.xvg in every system · green, yellow or red',
+      params: [{ n: 'summary', becomes: 'a switch', dflt: 'off', call: 'summary=False' }],
+      reads: '8.pull/pullx.xvg in every system' },
+    { key: 'walker_report', sig: '(n=None)', label0: 'walker report', use0: 'card', hue: 'butter', cat: 'Python',
+      doc: 'reads 9.multiwalker/{i}/ · x has output, o tpr ready, - missing · lists what is missing',
+      params: [{ n: 'n', becomes: 'a number · empty = all', dflt: 'all', call: 'n=None' }],
+      reads: '9.multiwalker/{i}/9.multiwalker.tpr, *.xvg in every system' }
+  ] },
+  { name: 'rename_atoms.py', size: '1.1 KB', funcs: [
+    { key: 'rename', sig: '(system_dir, ff="charmm36s")', label0: 'rename_atoms.py', use0: 'tile', hue: 'rose', cat: 'Python',
+      doc: 'renames atoms in the system folder so they match the force field',
+      params: [
+        { n: 'system_dir', becomes: FOLDER, dflt: '{system folder}', call: 'system_dir="{system folder}"' },
+        { n: 'ff', becomes: 'a text field', dflt: 'charmm36s', call: 'ff="charmm36s"' }
+      ],
+      reads: 'the last .gro in the system folder' }
+  ] }
+];
+FILES.splice(1, 0, { name: 'build_peptide.py', size: '0.6 KB', funcs: [
+  { key: 'build', sig: '(sequence, ss=0, out_dir=".")', label0: 'build peptide', use0: 'tile', hue: 'stone', cat: 'Structure',
+    doc: 'builds the peptide from its one-letter code with PyMOL cmd.fab and saves a .pdb in the step folder',
+    params: [
+      { n: 'sequence', becomes: 'the sequence of the system', dflt: '{sequence}', call: 'sequence="{sequence}"' },
+      { n: 'ss', becomes: 'a number · 0 extended, 1 helix, 2 sheet', dflt: '0', call: 'ss=0' },
+      { n: 'out_dir', becomes: FOLDER, dflt: '{system folder}', call: 'out_dir="{system folder}"' }
+    ],
+    reads: 'nothing · it writes {sequence}.pdb in its step folder' }
+] });
+FILES.forEach((f, fi) => f.funcs.forEach((g) => { g.file = f.name; g.fi = fi; }));
+
+const BUILT = [
+  { name: 'Structure', hue: 'stone', items: [['build sequence', 'PyMOL · peptide from one-letter code', 0], ['saccharide', 'copy the assigned .gro', 0]] },
+  { name: 'Topology', hue: 'sky', items: [['pdb2gmx', 'topology · your force field', 0], ['write topology', '#include list + [ molecules ]', 0], ['hmr · gromologist', 'repartition hydrogen masses', 0]] },
+  { name: 'Place · box', hue: 'lilac', items: [['trjconv', 'centre in a small box, or make whole', 0], ['editconf', 'shift and align, or make the box', 0], ['merge', 'saccharide + peptide in one box', 0]] },
+  { name: 'Water, salt, solutes', hue: 'aqua', items: [['add water', 'gmx solvate', 0], ['add salt', 'prosECCo75 ions · counted', 0], ['add glucose', 'gmx insert-molecules', 0]] },
+  { name: 'Min · eq · prod', hue: 'coral', items: [['minimise', 'grompp + mdrun · steep', 1], ['equilibrate nvt', 'restraints', 1], ['equilibrate npt', 'restraints', 1], ['production', 'grompp + mdrun', 1]] },
+  { name: 'Pull · AWH · windows', hue: 'butter', items: [['pull', 'steered pull', 1], ['awh', 'adaptive biasing', 1], ['multiwalker windows', 'one folder per walker', 1]] },
+  { name: 'Checks', hue: 'mint', items: [['charge check', 'net charge via grompp', 0], ['termini check', 'N- and C-termini, peptide charge', 0]] },
+  { name: 'Python', hue: 'rose', items: [] }
+];
+
+const pad2 = (n) => (n < 10 ? '0' : '') + n;
+
+const TPL = {
+  gml: {
+    note: 'edit a topology: rename atoms, fix charges, merge parameters, then hand the edited .top to the next tile',
+    code: 'import gromologist as gml\n\ndef run(ctx):\n    top = gml.Top(ctx.top)\n    # edit the topology here\n    top.save_top(ctx.step_dir + "/edited.top")'
+  },
+  pml: {
+    note: 'build the peptide of a system from its one-letter sequence with cmd.fab, or open a structure and save an image',
+    code: 'from pymol import cmd\n\ndef run(ctx):\n    # ctx.sequence is the one-letter code of the system, e.g. WRWYCR\n    cmd.fab(ctx.sequence, "pep", ss=0)   # 0 extended · 1 helix · 2 sheet\n    cmd.save(ctx.step_dir + "/" + ctx.sequence + ".pdb", "pep")'
+  },
+  mda: {
+    note: 'read a trajectory and write a table from it: distances, contacts, radius of gyration, RMSD',
+    code: 'import MDAnalysis as mda\n\ndef run(ctx):\n    u = mda.Universe(ctx.gro, ctx.xtc)\n    sel = u.select_atoms("protein")\n    with open(ctx.step_dir + "/rg.dat", "w") as out:\n        for ts in u.trajectory:\n            out.write(f"{ts.time} {sel.radius_of_gyration()}\\n")'
+  }
+};
+const plural = (n, w) => n + ' ' + w + (n === 1 ? '' : 's');
+
+class Component extends DCLogic {
+  renderVals() {
+    const st = this.state;
+    const useMap = st.use || {};
+    const nameMap = st.names || {};
+    const runMap = st.runs || {};
+    const fiSel = st.file === undefined ? 0 : st.file;
+    const keySel = st.fn || 'gmx_charge';
+
+    const all = [];
+    FILES.forEach((f) => f.funcs.forEach((g) => all.push(g)));
+    const useOf = (g) => useMap[g.key] || g.use0;
+    const labelOf = (g) => (nameMap[g.key] === undefined ? g.label0 : nameMap[g.key]);
+    const look = (g) => {
+      const u = useOf(g);
+      if (u === 'tile') return { ink: 'var(--' + g.hue + '-strong)', soft: 'var(--' + g.hue + '-soft)', word: 'tile' };
+      if (u === 'card') return { ink: 'var(--sky-strong)', soft: 'var(--sky-soft)', word: 'dashboard card' };
+      return { ink: 'var(--muted-foreground)', soft: 'transparent', word: 'skip' };
+    };
+
+    const files = FILES.map((f, i) => {
+      const skipped = f.funcs.filter((g) => useOf(g) === 'skip').length;
+      const sel = i === fiSel;
+      return {
+        name: f.name,
+        meta: f.size + ' · ' + plural(f.funcs.length, 'function'),
+        used: (f.funcs.length - skipped) + ' of ' + f.funcs.length,
+        isSel: sel,
+        edge: sel ? 'var(--coral-strong)' : 'transparent',
+        bg: sel ? 'var(--background)' : 'transparent',
+        pick: () => this.setState({ file: i, fn: f.funcs[0].key })
+      };
+    });
+
+    const fileObj = FILES[fiSel] || FILES[0];
+    let g0 = fileObj.funcs.filter((g) => g.key === keySel)[0] || fileObj.funcs[0];
+    const fns = fileObj.funcs.map((g) => {
+      const lk = look(g);
+      const sel = g.key === g0.key;
+      return {
+        name: g.key, sig: g.sig, doc: g.doc,
+        useWord: lk.word, ink: lk.ink, soft: lk.soft,
+        isSel: sel,
+        edge: sel ? 'var(--coral-strong)' : 'transparent',
+        bg: sel ? 'var(--background)' : 'transparent',
+        pick: () => this.setState({ fn: g.key })
+      };
+    });
+
+    const nTile = all.filter((g) => useOf(g) === 'tile').length;
+    const nCard = all.filter((g) => useOf(g) === 'card').length;
+    const nSkip = all.filter((g) => useOf(g) === 'skip').length;
+    const summary = plural(nTile, 'tile') + ' for the palette · ' + plural(nCard, 'card') + ' for the dashboard' + (nSkip ? ' · ' + nSkip + ' left out' : '');
+
+    // the selected function
+    const u = useOf(g0);
+    const lk0 = look(g0);
+    const runs = runMap[g0.key] || 'local';
+    const scope = u === 'card' ? 'solutions' : '{system folder}';
+    const args = g0.params.map((p) => p.call).join(', ');
+    const cmd = u === 'skip'
+      ? '# left out · ' + g0.key + ' stays in ' + g0.file
+      : 'python ' + g0.file + '::' + g0.key + '(' + args + ')   # cwd = ' + scope;
+    const cur = {
+      name: g0.key,
+      label: labelOf(g0),
+      file: g0.file,
+      use: u,
+      isTile: u === 'tile',
+      ink: lk0.ink,
+      soft: lk0.soft,
+      icon: u === 'card' ? ICON.card : ICON.code,
+      opacity: u === 'skip' ? '0.5' : '1',
+      chip: u === 'tile' ? runs : u === 'card' ? 'read-only' : 'skipped',
+      where: u === 'tile' ? 'appears in the palette under ' + g0.cat + ' · it runs inside each system folder, in order with the other tiles'
+        : u === 'card' ? 'appears on the dashboard as a card · it scans every system and never writes'
+        : 'not added · the function stays in the script and you can add it later',
+      hint: g0.params.some((p) => p.becomes === FOLDER)
+        ? 'it takes a system folder, so it fits as a tile · it can also be a dashboard card'
+        : 'it takes no system folder and scans the whole solutions folder, so it fits as a dashboard card',
+      runs: runs,
+      runsHint: runs === 'cluster'
+        ? 'submitted with qq · follows wait or move on from the run tab'
+        : 'runs here, right after the tile before it · fast scripts belong here',
+      argCount: pad2(g0.params.length),
+      params: g0.params.map((p) => ({ n: p.n, becomes: p.becomes, dflt: p.dflt })),
+      cmd: cmd,
+      reads: g0.reads
+    };
+
+    // catalog: built-in tiles plus the scripts set to tile
+    const customs = all.filter((g) => useOf(g) === 'tile');
+    let tileTotal = 0;
+    const catalog = BUILT.map((c) => {
+      const items = c.items.map((it) => ({ label: it[0], gmx: it[1], tag: it[2] ? 'heavy' : '', tagInk: 'var(--coral-strong)' }));
+      customs.filter((g) => g.cat === c.name).forEach((g) => items.push({ label: labelOf(g), gmx: 'python · ' + g.file, tag: 'py', tagInk: 'var(--rose-strong)' }));
+      tileTotal += items.length;
+      return { name: c.name, ink: 'var(--' + c.hue + '-strong)', count: pad2(items.length), items: items };
+    }).filter((c) => c.items.length > 0);
+
+    const tplKey = st.tpl || 'gml';
+    const drop = st.dropped || [];
+    return {
+      theme: this.props.theme ?? 'dark',
+      tpl: tplKey,
+      setTpl: (v) => { if (v) this.setState({ tpl: v }); },
+      tplNote: TPL[tplKey].note,
+      tplCode: TPL[tplKey].code,
+      fileCount: pad2(FILES.length),
+      files: files,
+      hasDrop: drop.length > 0,
+      dropNote: 'got ' + drop.join(', ') + ' · reading the file is not wired in this mockup',
+      onFiles: (list) => this.setState({ dropped: (list || []).map((f) => f.name) }),
+      fileName: fileObj.name,
+      fnCount: pad2(fns.length),
+      fns: fns,
+      summary: summary,
+      cur: cur,
+      setUse: (v) => { if (v) { const m = Object.assign({}, useMap); m[g0.key] = v; this.setState({ use: m }); } },
+      onName: (e) => { const m = Object.assign({}, nameMap); m[g0.key] = e.target.value; this.setState({ names: m }); },
+      setRuns: (v) => { if (v) { const m = Object.assign({}, runMap); m[g0.key] = v; this.setState({ runs: m }); } },
+      tileCount: pad2(tileTotal),
+      catalog: catalog
+    };
+  }
+}
+</script>
+</body>
+</html>

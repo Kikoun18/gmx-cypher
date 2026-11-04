@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Cluster</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ds/morpheus/tokens.css">
+<link rel="stylesheet" href="ds/morpheus/components/bundle.css">
+<script src="ds/morpheus/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:inherit}
+button{font-family:inherit}
+button:focus-visible,a:focus-visible{outline:2px solid var(--ring);outline-offset:2px}
+pre{margin:0}
+textarea{font-family:var(--font-mono)}
+</style>
+</helmet>
+<div data-theme="{{theme}}" style="min-height: 1160px; box-sizing: border-box; display: flex; flex-direction: column; background: var(--background); color: var(--foreground); font-family: var(--font-mono); font-size: 13px; line-height: 1.5;">
+
+  <header style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px 24px; padding: 12px 24px; border-bottom: 1px solid var(--border);">
+    <div style="display: flex; align-items: baseline; gap: 10px;">
+      <span style="font-size: 15px; font-weight: 700;">gmx-cypher</span>
+      <span style="font-size: 10px; line-height: 14px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground);">generate</span>
+    </div>
+    <nav aria-label="generator views" style="display: flex; gap: 4px;">
+      <a href="Main.dc.html" style="padding: 6px 10px; font-size: 12px; line-height: 16px; text-decoration: none; border-bottom: 2px solid transparent; color: var(--muted-foreground);">build</a>
+      <a href="Run.dc.html" style="padding: 6px 10px; font-size: 12px; line-height: 16px; text-decoration: none; border-bottom: 2px solid transparent; color: var(--muted-foreground);">run</a>
+      <a href="Dashboard.dc.html" style="padding: 6px 10px; font-size: 12px; line-height: 16px; text-decoration: none; border-bottom: 2px solid transparent; color: var(--muted-foreground);">dashboard</a>
+      <a href="Summary.dc.html" style="padding: 6px 10px; font-size: 12px; line-height: 16px; text-decoration: none; border-bottom: 2px solid transparent; color: var(--muted-foreground);">summary</a>
+      <a href="Library.dc.html" style="padding: 6px 10px; font-size: 12px; line-height: 16px; text-decoration: none; border-bottom: 2px solid transparent; color: var(--muted-foreground);">library</a>
+      <a href="MDP.dc.html" style="padding: 6px 10px; font-size: 12px; line-height: 16px; text-decoration: none; border-bottom: 2px solid transparent; color: var(--muted-foreground);">mdp</a>
+      <a href="Files.dc.html" style="padding: 6px 10px; font-size: 12px; line-height: 16px; text-decoration: none; border-bottom: 2px solid transparent; color: var(--muted-foreground);">files</a>
+      <a href="Cluster.dc.html" aria-current="page" style="padding: 6px 10px; font-size: 12px; line-height: 16px; font-weight: 700; text-decoration: none; border-bottom: 2px solid var(--coral-strong);">cluster</a>
+      <a href="Warnings.dc.html" style="padding: 6px 10px; font-size: 12px; line-height: 16px; text-decoration: none; border-bottom: 2px solid transparent; color: var(--muted-foreground);">warnings</a>
+      <a href="Settings.dc.html" style="padding: 6px 10px; font-size: 12px; line-height: 16px; text-decoration: none; border-bottom: 2px solid transparent; color: var(--muted-foreground);">settings</a>
+    </nav>
+    <span style="flex: 1 1 0;"></span>
+    <a href="Warnings.dc.html" style="font-size: 11px; line-height: 16px; text-decoration: none; color: var(--butter-strong);">3 open · 2 ignored</a>
+    <span style="font-size: 11px; line-height: 16px; color: var(--muted-foreground);">gmx_mpi 2025.4 · <span style="color: var(--mint-strong);">ready</span></span>
+    <span style="font-size: 11px; line-height: 16px; color: var(--muted-foreground);">qq · <span style="color: var(--mint-strong);">ready</span></span>
+  </header>
+
+  <div style="display: flex; flex-direction: column; gap: 4px; padding: 20px 24px 0;">
+    <h1 style="margin: 0; font-size: 18px; line-height: 24px; font-weight: 700;">cluster scripts</h1>
+    <p style="margin: 0; font-size: 12px; line-height: 16px; color: var(--muted-foreground);">the qq job script of every heavy step · written once to <span style="color: var(--foreground);">scripts/{stage}/{method}_{stage}_{sequence}.sh</span>, kept when it already exists, and copied into the step folder</p>
+  </div>
+
+  <div style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; align-items: start; padding: 20px 24px 24px;">
+
+    <div style="display: flex; flex-direction: column; gap: 20px; min-width: 0;">
+      <section aria-label="profiles" style="display: flex; flex-direction: column; gap: 10px;">
+        <x-import component-from-global-scope="Morpheus.Section" label="Profiles">{{ profCount }}</x-import>
+        <div style="display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--card); overflow: hidden;">
+          <sc-for list="{{ profiles }}" as="p" hint-placeholder-count="3">
+            <button type="button" onClick="{{ p.pick }}" aria-pressed="{{ p.isSel }}" style="display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; width: 100%; box-sizing: border-box; padding: 8px 14px 8px 12px; border: 0; border-left: 2px solid {{ p.edge }}; border-bottom: 1px solid var(--border); background: {{ p.bg }}; color: var(--foreground); text-align: left; cursor: pointer;">
+              <span style="min-width: 0; display: flex; flex-direction: column;">
+                <span style="font-size: 13px; line-height: 18px; font-weight: 700;">{{ p.name }}</span>
+                <span style="font-size: 11px; line-height: 16px; color: var(--muted-foreground);">{{ p.sub }}</span>
+              </span>
+              <span style="font-size: 10px; line-height: 14px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted-foreground);">{{ p.used }}</span>
+            </button>
+          </sc-for>
+        </div>
+      </section>
+
+      <section aria-label="selected profile" style="display: flex; flex-direction: column; gap: 10px; padding: 16px; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-xl);">
+        <x-import component-from-global-scope="Morpheus.Section" label="{{ cur.title }}"></x-import>
+        <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px;">
+          <div style="display: flex; flex-direction: column; gap: 5px;">
+            <span style="font-size: 10px; line-height: 14px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground);">gromacs binary</span>
+            <x-import component-from-global-scope="Morpheus.Input" size="sm" value="{{ cur.gmx }}" on-change="{{ on.gmx }}" aria-label="gromacs binary"></x-import>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 5px;">
+            <span style="font-size: 10px; line-height: 14px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground);"># qq job-type</span>
+            <x-import component-from-global-scope="Morpheus.Input" size="sm" value="{{ cur.jobType }}" on-change="{{ on.jobType }}" placeholder="empty = leave out" aria-label="job type"></x-import>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 5px;">
+            <span style="font-size: 10px; line-height: 14px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground);"># qq props</span>
+            <x-import component-from-global-scope="Morpheus.Input" size="sm" value="{{ cur.props }}" on-change="{{ on.props }}" placeholder="empty = leave out" aria-label="props"></x-import>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 5px;">
+            <span style="font-size: 10px; line-height: 14px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground);"># qq mem</span>
+            <x-import component-from-global-scope="Morpheus.Input" size="sm" value="{{ cur.mem }}" on-change="{{ on.mem }}" aria-label="memory"></x-import>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 5px;">
+            <span style="font-size: 10px; line-height: 14px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground);"># qq ncpus</span>
+            <x-import component-from-global-scope="Morpheus.Input" size="sm" value="{{ cur.ncpus }}" on-change="{{ on.ncpus }}" aria-label="cpus"></x-import>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 5px;">
+            <span style="font-size: 10px; line-height: 14px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground);"># qq ngpus</span>
+            <x-import component-from-global-scope="Morpheus.Input" size="sm" value="{{ cur.ngpus }}" on-change="{{ on.ngpus }}" aria-label="gpus"></x-import>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 5px;">
+            <span style="font-size: 10px; line-height: 14px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground);"># qq walltime</span>
+            <x-import component-from-global-scope="Morpheus.Input" size="sm" value="{{ cur.walltime }}" on-change="{{ on.walltime }}" aria-label="walltime"></x-import>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 5px;">
+            <span style="font-size: 10px; line-height: 14px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground);"># qq loop-end</span>
+            <x-import component-from-global-scope="Morpheus.Input" size="sm" value="{{ cur.loopEnd }}" on-change="{{ on.loopEnd }}" aria-label="loop end"></x-import>
+          </div>
+        </div>
+        <p style="margin: 0; font-size: 11px; line-height: 16px; color: var(--muted-foreground);">{{ cur.perWalker }}</p>
+        <div style="display: flex; flex-direction: column; gap: 5px;">
+          <span style="font-size: 10px; line-height: 14px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground);">modules and environment</span>
+          <x-import component-from-global-scope="Morpheus.Textarea" value="{{ cur.modules }}" on-change="{{ on.modules }}" aria-label="module block" style="font-family: var(--font-mono); font-size: 12px; line-height: 18px;"></x-import>
+        </div>
+        <div style="display: grid; grid-template-columns: minmax(0, 1fr) 110px; gap: 8px;">
+          <div style="display: flex; flex-direction: column; gap: 5px;">
+            <span style="font-size: 10px; line-height: 14px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground);">mdrun flags</span>
+            <x-import component-from-global-scope="Morpheus.Input" size="sm" value="{{ cur.flags }}" on-change="{{ on.flags }}" aria-label="mdrun flags"></x-import>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 5px;">
+            <span style="font-size: 10px; line-height: 14px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground);">-maxh</span>
+            <x-import component-from-global-scope="Morpheus.Input" size="sm" value="{{ cur.maxh }}" on-change="{{ on.maxh }}" aria-label="max hours"></x-import>
+          </div>
+        </div>
+        <p style="margin: 0; font-size: 11px; line-height: 16px; color: var(--muted-foreground);">-deffnm, -cpi, -px and -pf are added for each step · -cpi lets a resubmitted job carry on from its checkpoint</p>
+      </section>
+
+      <section aria-label="submitting" style="display: flex; flex-direction: column; gap: 10px;">
+        <x-import component-from-global-scope="Morpheus.Section" label="Submitting"></x-import>
+        <x-import component-from-global-scope="Morpheus.ToggleGroup" type="single" size="sm" value="{{ submit }}" on-value-change="{{ setSubmit }}">
+          <x-import component-from-global-scope="Morpheus.ToggleGroupItem" value="print">print the qq submit command</x-import>
+          <x-import component-from-global-scope="Morpheus.ToggleGroupItem" value="submit">submit with qq</x-import>
+        </x-import>
+        <div style="display: grid; grid-template-columns: 160px 120px; align-items: center; gap: 8px 12px;">
+          <span style="font-size: 12px;">queue (-q)</span>
+          <x-import component-from-global-scope="Morpheus.Input" size="sm" value="{{ queue }}" on-change="{{ onQueue }}" aria-label="queue"></x-import>
+        </div>
+        <pre style="margin: 0; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--field); font-family: var(--font-mono); font-size: 11px; line-height: 18px; white-space: pre-wrap; word-break: break-all;">{{ submitLine }}</pre>
+        <p style="margin: 0; font-size: 11px; line-height: 16px; color: var(--muted-foreground);">{{ submitText }}</p>
+      </section>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 20px; min-width: 0;">
+      <section aria-label="steps" style="display: flex; flex-direction: column; gap: 10px;">
+        <x-import component-from-global-scope="Morpheus.Section" label="Steps">{{ stepCount }}</x-import>
+        <div style="border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--card); overflow: hidden;">
+          <div style="display: grid; grid-template-columns: 110px minmax(0, 1fr) 150px; gap: 10px; padding: 8px 14px; border-bottom: 1px solid var(--border); font-size: 10px; line-height: 14px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground);">
+            <span>step</span><span>resubmit until</span><span>profile</span>
+          </div>
+          <sc-for list="{{ steps }}" as="r" hint-placeholder-count="6">
+            <div style="display: grid; grid-template-columns: 110px minmax(0, 1fr) 150px; align-items: center; gap: 10px; padding: 4px 14px; border-bottom: 1px solid var(--border); background: {{ r.bg }};">
+              <button type="button" onClick="{{ r.pick }}" aria-pressed="{{ r.isSel }}" style="padding: 4px 0; border: 0; background: transparent; color: var(--foreground); font-size: 12px; line-height: 16px; font-weight: 700; text-align: left; cursor: pointer;">{{ r.name }}</button>
+              <span style="font-size: 11px; line-height: 16px; color: var(--muted-foreground);">{{ r.until }}</span>
+              <button type="button" onClick="{{ r.cycle }}" title="click to use the next profile" style="padding: 3px 10px; border: 1px solid var(--input); border-radius: var(--radius-full); background: var(--field); color: var(--foreground); font-size: 11px; line-height: 16px; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer;">{{ r.profile }}</button>
+            </div>
+          </sc-for>
+        </div>
+        <p style="margin: 0; font-size: 11px; line-height: 16px; color: var(--muted-foreground);">click a profile to switch it · min, nvt and npt run here by default, so their scripts are written but not submitted · the notebook's write_script() put the 7.awh mdrun line into those three, here each gets its own</p>
+      </section>
+
+      <section aria-label="script preview" style="display: flex; flex-direction: column; gap: 10px; padding: 16px; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-xl);">
+        <div style="display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px;">
+          <span style="font-size: 15px; line-height: 20px; font-weight: 700;">{{ preview.name }}</span>
+          <span style="font-size: 11px; line-height: 16px; color: var(--muted-foreground);">{{ preview.path }}</span>
+        </div>
+        <pre style="margin: 0; padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--field); font-family: var(--font-mono); font-size: 12px; line-height: 18px; white-space: pre-wrap; word-break: break-all;">{{ preview.text }}</pre>
+        <p style="margin: 0; font-size: 11px; line-height: 16px; color: var(--muted-foreground);">{{ preview.note }}</p>
+      </section>
+    </div>
+  </div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["light","dark"],"default":"dark"},"$preview":{"width":1440,"height":1160}}'>
+// the notebook's render_qq_script(), write_script(), write_pull_script() and write_multidir_script()
+const PROFILES0 = [
+  { id: 'meta25', short: 'MetaCentrum 2025', name: 'MetaCentrum · GROMACS 2025.4 cuda', gmx: 'gmx_mpi', jobType: 'continuous', props: 'cl_zero', ncpus: '8', ngpus: '1', mem: '30gb', walltime: '23h', loopEnd: '10',
+    modules: 'export OMP_NUM_THREADS=8\n\nmetamodule add gromacs/2025.4-cuda', flags: '-ntomp 8 -update gpu -nb gpu -pme gpu -bonded gpu -dlb yes', maxh: '22' },
+  { id: 'meta22', short: 'MetaCentrum 2022', name: 'MetaCentrum · GROMACS 2022.3 plumed', gmx: 'gmx', jobType: 'continuous', props: 'cl_zero', ncpus: '8', ngpus: '1', mem: '30gb', walltime: '23h', loopEnd: '10',
+    modules: 'module add gromacs:2022.3-plumed', flags: '', maxh: '22' },
+  { id: 'lumi', short: 'LUMI multidir', name: 'LUMI · multidir', gmx: 'gmx_mpi', jobType: 'continuous', props: '', ncpus: '8 per walker', ngpus: '1 per walker', mem: '60gb', walltime: '23h', loopEnd: '10',
+    modules: 'export OMP_NUM_THREADS=8\n\nmodule load LUMI/24.03 partition/G\nmodule load GROMACS', flags: '-ntomp 7 -update gpu -nb gpu -bonded gpu -dlb yes', maxh: '22' }
+];
+const WALKERS = 8;
+const STEPS = [
+  { id: 'minim', name: 'minimise', deffnm: '4.minim', dir: '4.minim', px: '', resub: 'gro', local: true },
+  { id: 'nvt', name: 'nvt', deffnm: '5.eqnvt', dir: '5.eqnvt', px: '', resub: 'gro', local: true },
+  { id: 'npt', name: 'npt', deffnm: '6.eqnpt', dir: '6.eqnpt', px: '', resub: 'gro', local: true },
+  { id: 'awh', name: 'awh', deffnm: '7.awh', dir: '7.awh', px: '7.awh_', resub: 'gro' },
+  { id: 'pull', name: 'pull', deffnm: '8.pull', dir: '8.pull', px: '', resub: 'none', jobType: '' },
+  { id: 'awh_multi', name: 'multiwalker', deffnm: '9.multiwalker', dir: '9.multiwalker', px: '9.multiwalker_', resub: 'walkers', multi: true }
+];
+const MAP0 = { minim: 'meta25', nvt: 'meta25', npt: 'meta25', awh: 'meta25', pull: 'meta25', awh_multi: 'lumi' };
+const SYS = { method: 'hmr+slow+6', saccharide: 'HA', sequence: 'WRWYCR' };
+const ROOT = 'solutions/' + SYS.method + '/' + SYS.saccharide + '/' + SYS.sequence;
+
+const num = (v, per) => {
+  const m = String(v).match(/^(\d+)/);
+  if (!m) return String(v);
+  return /per walker/.test(String(v)) ? String(parseInt(m[1], 10) * per) : m[1];
+};
+
+function render(p, step) {
+  const head = ['#!/usr/bin/env -S qq run', ''];
+  const jt = step.jobType !== undefined ? step.jobType : p.jobType;
+  if (jt) head.push('# qq job-type ' + jt, '');
+  if (p.props) head.push('# qq props ' + p.props, '');
+  const per = step.multi ? WALKERS : 1;
+  head.push('# qq ncpus ' + num(p.ncpus, per), '# qq ngpus ' + num(p.ngpus, per), '# qq mem ' + p.mem, '', '# qq walltime ' + p.walltime, '# qq loop-end ' + p.loopEnd);
+  const d = step.deffnm;
+  const dirs = step.multi ? ' -multidir ' + Array.from({ length: WALKERS }, (x, i) => i + 1).join(' ') : '';
+  const pull = step.id === 'pull' ? ' -px pullx.xvg -pf pullf.xvg' : step.px ? ' -px ' + step.px + 'pullx.xvg -pf ' + step.px + 'pullf.xvg' : '';
+  const mdrun = p.gmx + ' mdrun' + dirs + (p.flags ? ' ' + p.flags : '') + ' -deffnm ' + d + ' -cpi ' + d + '.cpt' + pull + ' -v -quiet -maxh ' + p.maxh;
+  let resub;
+  if (step.resub === 'walkers') {
+    const check = Array.from({ length: WALKERS }, (x, i) => '[ -f "' + (i + 1) + '/' + d + '.gro" ]').join(' && ');
+    resub = 'if ' + check + '; then\n    exit "${QQ_NO_RESUBMIT}"\nfi\n\nexit 0';
+  } else if (step.resub === 'gro') {
+    resub = 'if [ -f "' + d + '.gro" ]; then\n    exit "${QQ_NO_RESUBMIT}"\nfi\n\nexit 0';
+  } else resub = 'exit 0';
+  return head.join('\n') + '\n\n\n' + p.modules + '\n\n' + mdrun + '\n\n\n' + resub + '\n';
+}
+
+class Component extends DCLogic {
+  profiles() {
+    const ed = this.state.edits || {};
+    return PROFILES0.map((p) => Object.assign({}, p, ed[p.id] || {}));
+  }
+  map() { return Object.assign({}, MAP0, this.state.map || {}); }
+  renderVals() {
+    const st = this.state;
+    const profs = this.profiles();
+    const map = this.map();
+    const pid = st.prof || 'meta25';
+    const cur = profs.find((p) => p.id === pid);
+    const stepId = st.step || 'awh';
+    const step = STEPS.find((s) => s.id === stepId);
+    const sp = profs.find((p) => p.id === map[stepId]);
+    const submit = st.submit || 'print';
+    const queue = st.queue === undefined ? 'gpu' : st.queue;
+    const set = (k) => (e) => {
+      const ed = Object.assign({}, st.edits || {});
+      ed[pid] = Object.assign({}, ed[pid] || {}, { [k]: e.target.value });
+      this.setState({ edits: ed });
+    };
+    const on = {};
+    ['gmx', 'jobType', 'props', 'mem', 'ncpus', 'ngpus', 'walltime', 'loopEnd', 'modules', 'flags', 'maxh'].forEach((k) => { on[k] = set(k); });
+
+    const profiles = profs.map((p) => {
+      const n = STEPS.filter((s) => map[s.id] === p.id).length;
+      return {
+        name: p.name,
+        sub: p.gmx + ' · ' + p.modules.split('\n').filter((l) => /module/.test(l)).map((l) => l.replace(/^(meta)?module (add|load) /, '')).join(', '),
+        used: n ? n + (n === 1 ? ' step' : ' steps') : 'unused',
+        isSel: p.id === pid,
+        edge: p.id === pid ? 'var(--coral-strong)' : 'transparent',
+        bg: p.id === pid ? 'var(--accent)' : 'transparent',
+        pick: () => this.setState({ prof: p.id })
+      };
+    });
+
+    const steps = STEPS.map((s) => {
+      const p = profs.find((x) => x.id === map[s.id]);
+      return {
+        name: s.name,
+        until: (s.resub === 'gro' ? s.deffnm + '.gro exists' : s.resub === 'walkers' ? 'every walker has ' + s.deffnm + '.gro' : 'runs once · exit 0') + (s.local ? ' · runs here by default' : ''),
+        profile: p.short,
+        isSel: s.id === stepId,
+        bg: s.id === stepId ? 'var(--accent)' : 'transparent',
+        pick: () => this.setState({ step: s.id }),
+        cycle: () => {
+          const i = PROFILES0.findIndex((x) => x.id === map[s.id]);
+          const m = Object.assign({}, st.map || {});
+          m[s.id] = PROFILES0[(i + 1) % PROFILES0.length].id;
+          this.setState({ map: m, step: s.id });
+        }
+      };
+    });
+
+    const fname = SYS.method + '_' + step.id + '_' + SYS.sequence + '.sh';
+    const submitLine = 'qq submit -q ' + queue + ' ' + ROOT + '/' + step.dir + '/' + fname;
+    return {
+      theme: this.props.theme ?? 'dark',
+      profCount: String(profs.length).padStart(2, '0'),
+      profiles: profiles,
+      cur: Object.assign({ title: cur.name, perWalker: cur.id === 'lumi' ? 'per walker: 8 walkers make ncpus ' + num(cur.ncpus, WALKERS) + ' and ngpus ' + num(cur.ngpus, WALKERS) + ' · used for 9.multiwalker, all walkers in one job' : 'empty job-type or props lines are left out of the header · the pull script has no job-type, as in the notebook' }, cur),
+      on: on,
+      submit: submit,
+      setSubmit: (v) => { if (v) this.setState({ submit: v }); },
+      queue: queue,
+      onQueue: (e) => this.setState({ queue: e.target.value }),
+      submitLine: (submit === 'print' ? '# printed after the tpr is ready, not run:\n' : '') + submitLine,
+      submitText: submit === 'print'
+        ? 'as the notebook: the tpr and the script are prepared and the command is printed in the log and on the dashboard · you submit it yourself'
+        : 'the tool runs the command as soon as the script is copied · wait or move on from the run tab decides what the system does next',
+      stepCount: String(STEPS.length).padStart(2, '0'),
+      steps: steps,
+      preview: {
+        name: fname,
+        path: 'scripts/' + step.id + '/' + fname + ' → ' + ROOT + '/' + step.dir + '/',
+        text: render(sp, step),
+        note: 'profile ' + sp.name + ' · for ' + SYS.method + ' / ' + SYS.saccharide + ' / ' + SYS.sequence + ' · if scripts/' + step.id + '/' + fname + ' already exists it is kept and shown in the log instead of being written again'
+      }
+    };
+  }
+}
+</script>
+</body>
+</html>
