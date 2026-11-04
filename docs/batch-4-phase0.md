@@ -1,6 +1,6 @@
 # Batch 4 — Phase 0 report
 
-The plan for [`batch-4.md`](batch-4.md): the baseline, the spec checked against the code, the notebook and the mock-up side by side, the design pass, a plan for each request, the samples I need, size and order, and **one numbered list of questions (§9)**. Nothing in `src/`, `server/`, `test/` or `e2e/` changed. This commit adds this report, the spec, the roadmap's Batch 4 section, the mock-up in [`mockups/symbuilder/`](mockups/symbuilder/) and 24 screenshots in [`img/batch-4/`](img/batch-4/).
+The plan for [`batch-4.md`](batch-4.md): the baseline, the spec checked against the code, the notebook and the mock-up side by side, the design pass, a plan for each request, the samples I need, size and order, and **one numbered list of questions (§9)**. Nothing in `src/`, `server/`, `test/` or `e2e/` changed. This commit adds this report, the spec, the roadmap's Batch 4 section, the mock-up in [`mockups/symbuilder/`](mockups/symbuilder/), and in [`img/batch-4/`](img/batch-4/) 36 screenshots of the planned screens and renders of the mock-up's ten boards.
 
 **Branch.** `cypher-batch-4`, made from gmx-cypher's default branch `claude/quirky-cray-q845sa` at **`6de6a96`** ("Pin check and README for the-matrix layout"), which is the commit the-matrix pins. the-matrix is at **`7ae82be`** ("Pin Tank at main: batch 2 and the Mac fix"). Nothing is pushed.
 
@@ -169,6 +169,8 @@ The mock-up's other contradictions are between its own boards (the same system F
 
 ## 4. Design pass
 
+**Your decision (2026-11-04): SymBuilder looks like the mock-up.** After the first set of screenshots you asked for the mock-up's own design: its colours, its icons and its clarity, with its drag and drop and the Run board's checkable stages. The screens below are redrawn that way: tiles tinted by their category's tone (structure stone, topology sky, place · box lilac, water and salt aqua, min · eq coral, pull · awh butter, checks mint), each with its icon in a tone square; coral for the selection, the primary action and the active tab; status as a coloured dot and its word; amber panels for what needs a look. To match it exactly I rendered your boards locally (the design tool's runtime isn't in the zip, so a 120-line stand-in reads their `<sc-for>`, `<sc-if>`, `{{ … }}` and Morpheus components, with React 18 and the Morpheus bundle from the design system), and rebuilt each screen beside its board with gmx-cypher's own kit and Morpheus's tones. This changes three rules of the design contract and one decision (T159); they are question 38. Doing it also showed that gmx-cypher's copy of Morpheus's tokens is out of date: Morpheus's coral is now `#ff5429` (was `#ffb09c`), with new soft and strong corals and heat scale; question 39.
+
 ### 4.1 Plan: where each board goes
 
 **The four tabs.** One bar, in this order; each tab opens where it was left. analysis keeps today's set-up and results, compare stays inside results (selecting two or more results opens it, as today), so analysis's second level has two entries, not three.
@@ -177,11 +179,11 @@ The mock-up's other contradictions are between its own boards (the same system F
 gmx-cypher  gmx 2025.4 · ready                         settings  [☀ ☾ auto]
 home   symbuilder 1 building   analysis 04   cluster
 ────────────────────────────────────────────────────────────────────────────
-[ set-up | results 04 ]                     ← analysis's second level
+ set-up   results 04                        ← analysis's second level (coral underline)
 1 inputs › 2 groups › 3 command          [ one trajectory | batch ]
 ```
 
-Each tab with views has the same second level: a small segmented bar on its own row (`TabsList variant="segmented"`, already in the kit). symbuilder: `build · systems · files · progress · summary`; analysis: `set-up · results`; cluster: `jobs · scripts`. home has none.
+Each tab with views has the same second level: a second line of tabs under the first, with the coral underline of the mock-up's own nav; on the right of symbuilder's, the status words of the mock-up's header (checks open, python and its libraries) and, on *build* only, the primary *build N systems*. symbuilder: `build · systems · files · progress · summary`; analysis: `set-up · results`; cluster: `jobs · scripts`. home has none.
 
 | Board | Goes to | In one sentence |
 |---|---|---|
@@ -268,14 +270,14 @@ SCRIPTS · 3 SYSTEMS ──────────────       │ if [ -
 
 ### 4.2 Review against the brief: where the mock-up and the contract disagree
 
-The contract wins in each case unless you decide otherwise.
+Rows 1–4 follow your decision for the mock-up's look (question 38); the words, rows 5–15, still follow the contract.
 
 | # | Mock-up | Contract | Plan |
 |---|---|---|---|
-| 1 | status words *warning*, *runs*, *ready*, *done/short/missing* in tone colours (mint, butter, sky, lilac) | four levels, icon + word in ink, red only for error (§4); group tones are never UI state (§2) | `Status` with ok / note / check / error; tones only for groups |
-| 2 | ✓ badges on the force-field files (Build) | no ✓/✗/⚠ captions (§7) | `Status` lines |
-| 3 | the selected tile, profile and row outlined in ink | ink outline is the **reference** only (§2) | an ink bar on the left (the active tab's underline turned on its side) on a muted fill; first try with an outline was wrong, fixed in the screenshots |
-| 4 | per-stage *runs / skipped this run* buttons | one primary action per view; noise | a checkbox in the stage's header, the stage's tiles dimmed when it is left out |
+| 1 | status words *warning*, *runs*, *ready*, *done/short/missing* in tone colours (mint, butter, sky, lilac) | four levels, icon + word in ink, red only for error (§4); group tones are never UI state (§2) | **the mock-up's**: a dot and its word in the tone: mint ok / ready / done, butter check / short / skipped, sky note / building, red error / failed / missing. The word is always there (colour is never the only signal) and the dots use the `-strong` tones (3:1 in both themes) |
+| 2 | ✓ badges on the force-field files (Build) | no ✓/✗/⚠ captions (§7) | mint dots before each file name (no glyph captions) |
+| 3 | the selected tile ringed in coral, the selected row and profile with a coral bar | UI state is ink; ink outline is the reference (§2) | **the mock-up's**: coral is the UI-state colour (selection, primary, active tab, focus), so the reference keeps ink to itself |
+| 4 | per-stage *runs / skipped this run* buttons; checkable stage chips on Run | one primary action per view | **the mock-up's**: an *in this build* pill on each stage of the stack (mint, struck out when left out) and the checkable stage chips in systems; one coral button per view |
 | 5 | 24 phrases `NEVER_SHOWN` refuses (the table below) | §1 | reworded, question 2 |
 | 6 | *recipe* for a saved stack | *recipe* is an analysis recipe (T-series) | *build plan* |
 | 7 | *job* for a qq submission ("Cluster jobs", "all walkers run as one job") | *job* = one gmx execution by gmx-cypher | "qq job" where it is qq's (the cluster tab already calls them jobs: "your cluster jobs", its *job* column), *step* for gmx-cypher's own |
@@ -320,18 +322,22 @@ The mock-up's nav word *run* (the board) becomes **systems**; its button "Run 12
 
 ### 4.3 Screenshots
 
-Throwaway mock-ups in a scratch copy of gmx-cypher, built with its own `src/ui/` kit and tokens (deleted after; only the images are committed), the server running with the fake gmx and four sample jobs. Light and dark, 1280 and 1024 px, 1× (small files: 1.9 MB for 24). No console errors or warnings, other than the favicon 404 of §1.
+Throwaway mock-ups in a scratch copy of gmx-cypher (deleted after; only the images are committed): its own `src/ui/` kit, Morpheus's current tokens with the accent set to coral, the server running with the fake gmx and four sample jobs, sample data from the notebook's saved outputs. Light and dark, 1280 and 1024 px, 1×, reduced to 256 colours (3.2 MB for all 46 images). No console errors or warnings, other than the favicon 404 of §1.
 
-| What | Files in `docs/img/batch-4/` |
-|---|---|
-| the tab bar | `mock-tabs-{1280,1024}-{light,dark}.png` |
-| analysis's second level above set-up's steps | `mock-analysis-…` |
-| home | `mock-home-…` |
-| symbuilder · build, *add water* selected | `mock-build-…` |
-| symbuilder · systems with the preview | `mock-systems-…` |
-| cluster · scripts with the awh script | `mock-cluster-…` |
+| What | Files in `docs/img/batch-4/` | Beside the board |
+|---|---|---|
+| the tab bar | `mock-tabs-{1280,1024}-{light,dark}.png` | — |
+| analysis's second level above set-up's steps | `mock-analysis-…` | — |
+| home | `mock-home-…` | — |
+| symbuilder · build, *pdb2gmx* selected | `mock-build-…` | `board-main-dark.png` |
+| symbuilder · systems with the preview | `mock-systems-…` | `board-run-dark.png` |
+| symbuilder · files (files, mdp, force field) | `mock-files-…` | `board-files-dark.png`, `board-mdp-dark.png` |
+| symbuilder · progress | `mock-progress-…` | `board-dashboard-dark.png` |
+| symbuilder · summary | `mock-summary-…` | `board-summary-dark.png` |
+| cluster · scripts with the awh script | `mock-cluster-…` | `board-cluster-dark.png` |
+| the other boards, for reference | — | `board-warnings-dark.png`, `board-settings-dark.png`, `board-library-dark.png` |
 
-What I took out after looking at the first set: the ink outline on the selected tile and profile (contract §2), seven ink-filled run/skip toggles (row 4 above), and the systems table's folder column, which repeated the system's name (the root is said once in the line above the table). The ↑ ↓ buttons show on hover and focus and on the selected tile only, so the keyboard still reaches them.
+What I changed after looking at them beside your boards: one coral button per view (systems had two); system names that were cut off in the systems preview; status dots that were the pastel tone and too faint on the light theme (now the strong tone).
 
 ---
 
@@ -480,7 +486,7 @@ Numbers 1–21 are the spec's §7 with my recommendation (the spec's unless I sa
 1. **The word *analysis*.** (a) Amend the contract: the tab is *analysis*, the step stays *command*, the Matrix's sense stays in charts and sends; (b) another tab name. *Recommendation: (a).* `contract.ts` needs no change for it.
 2. **SymBuilder's words** (system, build, stage, step, build plan, build record, repeat). *Recommendation: approve them and the rewording in §4.2* (24 phrases, not 21; *job* for qq's own jobs only as "qq job").
 3. **Settings.** *Recommendation: in the settings dialog: python, the base folder, the wait (10 s / 10 min), builds at a time. In the build plan: force field, the methods' switches, charges and ions, salt and water molarity, box, saccharide shift, walker distances, maxwarn and strict mode* (each changes what is built, so a plan carries it; question 35).
-4. **Where the boards go.** *Recommendation: as in §4.1, with one change: Files and MDP are one view, files* (both are "what a build reads"; 5 views instead of 6); Warnings as status lines and the summary's per-stage counts, never stopping a build.
+4. **Where the boards go.** *Recommendation: as in §4.1 and the screenshots, with one change: Files and MDP are one view, files* (both are "what a build reads"; 5 views instead of 6); Warnings as status lines and the summary's per-stage counts, never stopping a build.
 5. **Programs and writes.** *Recommendation: yes, each from a fixed list (§7), with the rule "a build may replace only what it wrote itself, in a system folder it created; nothing else is changed, moved or deleted", recorded per file.* Also: may settings run `python -I -c "import pymol, gromologist"` (fixed arguments) to say whether the python can build? *Recommendation: yes.*
 6. **`qq submit`.** *Recommendation: no; write the script, keep it if it exists, print the submit line.* (The older notebook shows you submitting from cells; a sample is there if you want it later.)
 7. **Python scripts as tiles.** *Recommendation: backlog.*
@@ -504,7 +510,7 @@ Numbers 1–21 are the spec's §7 with my recommendation (the spec's unless I sa
 25. **The pull and LUMI scripts** (N9, N10). (a) Golden as the notebook writes them; (b) the pull script resubmits like awh (`job-type continuous`, until `8.pull.gro`), LUMI's `ncpus` matched to `-ntomp`. *Recommendation: (b), each a recorded difference.*
 26. **The running count.** The spec says "the header keeps it"; today it is on the results trigger. (a) Each tab's trigger shows its own: analysis "N running" or its job count, symbuilder "N building"; (b) one count in the header for both. *Recommendation: (a)* (as the screenshots).
 27. **`#analysis`.** Today it opens set-up's command step. (a) Keep that (every old address opens the same view); the analysis tab has no address of its own, its views keep theirs; (b) make it the tab, where it was left. *Recommendation: (a).*
-28. **The second level's look.** (a) A segmented bar on its own row, in every tab with views (screenshots); (b) analysis's in the same row as set-up's steps. *Recommendation: (a), for one rule in all tabs.*
+28. **The second level's look.** (a) A second line of tabs under the first, coral underline, in every tab with views (screenshots); (b) analysis's in the same row as set-up's steps. *Recommendation: (a), one rule in all tabs.*
 29. **Compare's place.** (a) Inside results, as today (picking two or more opens it); (b) a third entry, *compare*, in analysis's second level. *Recommendation: (a).*
 30. **Build steps and the results list.** (a) A second `Jobs` folder for build steps, shown only in symbuilder · progress; (b) in analysis's results with a filter. *Recommendation: (a)*: about 20 steps per system would bury your analyses.
 31. **GROMACS backups** (`#aaaaaaaa.top.1#` from solvate and genion). (a) Keep them (gmx's default, as the notebook), listed in the build record; (b) `GMX_MAXBACKUP=-1`, none made. *Recommendation: (a).*
@@ -514,3 +520,6 @@ Numbers 1–21 are the spec's §7 with my recommendation (the spec's unless I sa
 35. **Strict mode and maxwarn.** *Recommendation: both in the build plan* (they decide what passes), maxwarn 6 by default, strict off (as the notebook).
 36. **A walker whose target the pull never reached.** (a) Warn and use the nearest frame (the notebook; two walkers may share a frame); (b) refuse that walker. *Recommendation: (a)*, with the frame and its distance shown per walker.
 37. **Rows named differently from their sequence** (§2.2). A built system's PMF would create a new row. (a) R8b flags it in the preview and says to add `{name}` to the folder pattern or rename the row; (b) gmx-cypher names sent files with the row's name. *Recommendation: (a)* now; (b) needs a name in the folder or a lookup the Matrix doesn't do.
+38. **The mock-up's look, app-wide or in SymBuilder only.** Your decision for the mock-up's design changes three contract rules: UI state becomes coral, not ink (§2, T159); status shows as a dot and a word in the tones, not an icon and a word in ink (§4); tones are used for status and for tile categories, not only for groups (§2). (a) App-wide: R1a amends the contract and `roles.json` once, and analysis, results and compare take the coral accent too (their charts keep the group tones); (b) SymBuilder, home and the cluster tab only. *Recommendation: (a)*, because the spec asks for one app, and the screenshots already show the tab bar and set-up with coral. The contrast and "never colour alone" rules stay, and their tests are extended to the new pairs.
+39. **Morpheus's tokens.** gmx-cypher's verbatim copy (`src/tokens.json`) is older than the design system the mock-up uses: coral `#ffb09c` → `#ff5429`, coral-soft and coral-strong changed, and the heat scale. (a) Update the copy in R1a, checking the group-tone and destructive-distance tests (coral is the first group tone, so every coral curve in analysis changes too); (b) keep the old copy. *Recommendation: (a)*, because the mock-up's look depends on it.
+
