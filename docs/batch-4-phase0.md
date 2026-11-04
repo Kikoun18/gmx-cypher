@@ -115,7 +115,7 @@ Measured here on 2026-11-04: Node 22.23.4, npm 10.9.9, `npm ci` in both apps, th
 | `neutralizing_counts`, `parse_net_charge`, `count_water` | R3b | L `ionCounts`, `netCharge`, `waters` (golden: −3.75 e/10 412 → 33/28; the saved 30/30, 38/30, 30/38) | |
 | `write_pull_script` | R7a | as above | |
 | `quarantine`, `run_system`, `retry_failed` | R6 | L `retryPlan`, `quarantineName`; S moves | `retry_failed` is marked "DOESNT WORK" in the notebook: rebuilt from the spec, not copied |
-| `retry_failed_walkers` | R6 | L `nearestWalker` (golden: the saved "8 (3.0 nm) ← walker 7 (2.5 nm)") | |
+| `retry_failed_walkers` | R6 | L `nearestWalker` (golden: the saved "8 (3.0 nm) ← walker 7 (2.5 nm)") | run once, automatically, right after the walkers are prepared, as your cell does (question 40) |
 | `sol_creation` | R3b, R5b | 13 tiles (§4.1 build view) | differences: questions 22–24 |
 | `minimization`, `eq_nvt`, `eq_npt` | R3b, R5 | one "md stage" tile type, three instances | |
 | `awh`, `pull` | R3b, R7 | tiles; the submit line printed | |
@@ -337,7 +337,7 @@ Throwaway mock-ups in a scratch copy of gmx-cypher (deleted after; only the imag
 | cluster · scripts with the awh script | `mock-cluster-…` | `board-cluster-dark.png` |
 | the other boards, for reference | — | `board-warnings-dark.png`, `board-settings-dark.png`, `board-library-dark.png` |
 
-What I changed after looking at them beside your boards: one coral button per view (systems had two); system names that were cut off in the systems preview; status dots that were the pastel tone and too faint on the light theme (now the strong tone).
+What I changed after looking at them beside your boards: one coral button per view (systems had two); system names that were cut off in the systems preview; status dots that were the pastel tone and too faint on the light theme (now the strong tone). After your review (2026-11-04): page headings and card titles in Archivo (`text-title`, `text-heading`, as the rest of gmx-cypher; data names such as systems and file names stay in mononoki); the lanes drawn as the Run board draws them (separate rounded blocks, staggered, the legend in the same pastel tones); progress gains the pull **trace** beside the pull report, drawn with gmx-cypher's own `SeriesChart` (the target as its dashed rule, start, last, target and frames under it); the walker distances as one pill each, so they wrap instead of overflowing.
 
 ---
 
@@ -396,6 +396,7 @@ Budgets are lines of code (src + server), then lines of tests. "Writes" and "pro
 
 ### R6 Failures, retries, repeats and resume (batch 5)
 
+- **Walkers, as your notebook does them.** Your multiwalker cell prepares every walker, keeps going past one that fails, then calls `retry_failed_walkers()` once in the same cell: each walker without a `.tpr` is moved to `9.multiwalker/failed/{i}_<stamp>/` and prepared again from the `start.gro` of the nearest working walker by distance. The plan does the same automatically, once, as the last part of the walker step (question 40), records for each rebuilt walker its donor and the distance it now starts at (the saved case: walker 8, meant for 3.0 nm, starts from walker 7 at 2.5 nm), and shows it in progress's walker report. A system with no working walker (no `pullx.xvg`, or every walker failed) is not rebuilt; a button tries again.
 - **Change.** L `retryPlan`, `quarantineName`, `nearestWalker`, `hint(text)` (matching "larger than 0.49 times the box size" and "0.5 times half the box size … pbcatom", both real); S moves a failed system folder (only one this gmx-cypher's build record says it created) to `{method}/{carb}/failed/{seq}_<stamp>/` with `FAILED.txt`, and a failed walker to `9.multiwalker/failed/{i}_<stamp>/`; continue / skip / repeat for an existing folder; stages chosen; strict mode.
 - **Budget:** +350, tests +350.
 - **Writes:** `failed/` folders and `FAILED.txt`; **moves** of folders the build created (never deletes).
@@ -522,4 +523,5 @@ Numbers 1–21 are the spec's §7 with my recommendation (the spec's unless I sa
 37. **Rows named differently from their sequence** (§2.2). A built system's PMF would create a new row. (a) R8b flags it in the preview and says to add `{name}` to the folder pattern or rename the row; (b) gmx-cypher names sent files with the row's name. *Recommendation: (a)* now; (b) needs a name in the folder or a lookup the Matrix doesn't do.
 38. **The mock-up's look, app-wide or in SymBuilder only.** Your decision for the mock-up's design changes three contract rules: UI state becomes coral, not ink (§2, T159); status shows as a dot and a word in the tones, not an icon and a word in ink (§4); tones are used for status and for tile categories, not only for groups (§2). (a) App-wide: R1a amends the contract and `roles.json` once, and analysis, results and compare take the coral accent too (their charts keep the group tones); (b) SymBuilder, home and the cluster tab only. *Recommendation: (a)*, because the spec asks for one app, and the screenshots already show the tab bar and set-up with coral. The contrast and "never colour alone" rules stay, and their tests are extended to the new pairs.
 39. **Morpheus's tokens.** gmx-cypher's verbatim copy (`src/tokens.json`) is older than the design system the mock-up uses: coral `#ffb09c` → `#ff5429`, coral-soft and coral-strong changed, and the heat scale. (a) Update the copy in R1a, checking the group-tone and destructive-distance tests (coral is the first group tone, so every coral curve in analysis changes too); (b) keep the old copy. *Recommendation: (a)*, because the mock-up's look depends on it.
+40. **Failed walkers: rebuilt automatically?** Your cell prepares all the walkers, then calls `retry_failed_walkers()` once, then reports. (a) The same, automatically, once, as the last part of the walker step, each rebuilt walker recorded with its donor and the distance it now starts at; a button for another try; (b) only on a button (the mock-up's *rebuild from the nearest walker*). *Recommendation: (a)*, as your notebook does it. It moves the failed walker's folder (question 5's rule: only folders this build made), and the rebuilt walker starts at its donor's distance, which progress and the summary say.
 
