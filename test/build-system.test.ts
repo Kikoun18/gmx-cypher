@@ -56,7 +56,15 @@ describe('one system, end to end', () => {
     expect(readFileSync(join(base, S, '7.awh/index.ndx'), 'utf8')).toMatch(/\n\[ CARB \]\n1 2 3 4 5 6 7 8 9 10 11 12 13 14 15\n[\s\S]*\n106 107 108 109 110\n$/);
     // Nothing outside the system's folder changed; the scripts are new in scripts/.
     const after = listing(base);
-    expect(Object.fromEntries(Object.entries(after).filter(([k]) => !k.startsWith(S + '/') && !k.startsWith('scripts/')))).toEqual(before);
+    expect(Object.fromEntries(Object.entries(after).filter(([k]) => !k.startsWith(S + '/') && !k.startsWith('scripts/') && !k.startsWith('logs/')))).toEqual(before);
+    // The build summary (R9): the notebook's own line for this system, its warnings per stage counted from the real
+    // output (the time is this run's).
+    const [log] = Object.keys(after).filter(k => k.startsWith('logs/'));
+    expect(log).toMatch(/^logs\/build_summary_\d{8}_\d{4}\.log$/);
+    const notebook = readFileSync(new URL('./fixtures/build/notebook/build-summary.txt', import.meta.url), 'utf8').split('\n').at(-3)!;
+    const ours = readFileSync(join(base, log), 'utf8').split('\n').find(l => l.startsWith('hmr+fast+6/o111/hhhhhhhh'))!;
+    expect(ours.replace(/\d:\d\d:\d\d/, 'T')).toBe(notebook.replace(/\d:\d\d:\d\d/, 'T'));
+    expect(JSON.parse(readFileSync(join(base, S, 'build.json'), 'utf8')).warnings).toEqual({ SB: 7, MIN: 4, NVT: 4, NPT: 4, AWH: 4, PULL: 3 });
     expect(Object.keys(after).filter(k => k.startsWith('scripts/')).sort()).toEqual(['scripts/awh/hmr+fast+6_awh_hhhhhhhh.sh', 'scripts/minim/hmr+fast+6_minim_hhhhhhhh.sh', 'scripts/npt/hmr+fast+6_npt_hhhhhhhh.sh', 'scripts/nvt/hmr+fast+6_nvt_hhhhhhhh.sh', 'scripts/pull/hmr+fast+6_pull_hhhhhhhh.sh']);
     // The record: every step done, every file there in it with its hash, GROMACS's backups (the saccharide, twice the topology).
     const rec: BuildRecord = JSON.parse(readFileSync(join(base, S, 'build.json'), 'utf8'));

@@ -66,7 +66,8 @@ describe('a system\'s folder, its steps and its record', () => {
     expect(rec.files[S + '/o111.gro']).toEqual({ size: statSync(gro).size, sha256: createHash('sha256').update(readFileSync(gro)).digest('hex'), step: 3 });
     // Nothing outside the system's folder changed.
     const after = listing(base);
-    expect(Object.fromEntries(Object.entries(after).filter(([k]) => !k.startsWith(S + '/')))).toEqual(before);
+    expect(Object.fromEntries(Object.entries(after).filter(([k]) => !k.startsWith(S + '/') && !k.startsWith('logs/')))).toEqual(before);
+    expect(Object.keys(after).filter(k => k.startsWith('logs/'))).toEqual([run.log]);
   });
 
   it('refuses to overwrite a file it did not write, and says which', async () => {

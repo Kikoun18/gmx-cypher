@@ -278,7 +278,7 @@ From [`batch-4.md`](batch-4.md) §6: SymBuilder inside gmx-cypher, four tabs (ho
 
 ### Phase 6: Results (R8c–R8e, R9, R10)
 - [ ] R8c PMFs into the vault; R8d PMF numbers with the Matrix's code
-- [ ] R9 Reports
+- [x] R9 Reports (`src/lib/build/report.ts`, golden against the notebook's saved summary of 42 systems, pull and walker reports and termini; a build's warnings by stage reproduce the notebook's row for hhhhhhhh; symbuilder · summary; `logs/build_summary_<stamp>.log`)
 - [ ] R10 From a built system to analysis
 
 ### Phase 7: Finish

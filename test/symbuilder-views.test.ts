@@ -11,6 +11,7 @@ import type { FolderLanding } from '../src/lib/build/landing';
 import { BuildFilesView } from '../src/views/BuildFiles';
 import { ProgressView } from '../src/views/Progress';
 import { ClusterScriptsView } from '../src/views/ClusterScripts';
+import { SummaryReport, SummaryView } from '../src/views/Summary';
 import type { Step } from '../src/lib/build/steps';
 
 const draft: BuildDraft = { ...EMPTY_BUILD, systems: { methods: ['hmr+fast+6'], saccharides: ['o111', 'pg'], sequences: ['aaaaaaaa', 'pppppppp'], repeats: 1 } };
@@ -185,5 +186,30 @@ describe('cluster · scripts (R7b)', () => {
     expect(html).toContain('a build prints this line; you submit it');
     const on = renderToStaticMarkup(createElement(ClusterScriptsView, { config: { qqBuild: { profiles: {}, submit: true, queue: 'gpu' } } as never }));
     expect(on).toContain('a build submits it for you (settings: submit them for me, queue gpu)');
+  });
+});
+
+describe('symbuilder · summary (R9)', () => {
+  const report = {
+    summary: ' AWH BUILD SUMMARY\n', log: 'logs/build_summary_20261106_1000.log',
+    rows: [{ name: 'hmr+fast+6/o111/hhhhhhhh', charge: 0, ions: [30, 30] as [number, number], min: null, elapsed: 117, status: 'OK' as const, warn: [['SB', 7], ['MIN', 4]] as [string, number][], note: '' },
+      { name: 'hmr+fast+6/o111/rrrrrrrr', charge: 6, ions: [30, 38] as [number, number], min: 0.43, elapsed: 120, status: 'FAILED' as const, warn: [], note: 'AWH · grompp 7.awh: Fatal error:' }],
+    pull: '', pullRows: [{ name: 'hmr+fast+6/o111/rrrrrrrr', charge: 6, min: 0.43, max: 3.27 }],
+    walkers: '', walkerRows: [{ name: 'hmr+fast+6/o111/rrrrrrrr', marks: ['x', 'o', '-'] as ('x' | 'o' | '-')[] }],
+    termini: 'SYSTEM …\n', terminiRows: [{ name: 'hmr+fast+6/pg/pppppppp', line: '…', odd: true }],
+  };
+  it('the summary\'s rows, their warnings by stage, a failed one\'s note; the pull and walker reports; the termini check', () => {
+    const html = renderToStaticMarkup(createElement(SummaryReport, { report }));
+    expect(html).toContain('<b>hmr+fast+6/o111/hhhhhhhh</b>');
+    expect(html).toContain('SB 7 · MIN 4');
+    expect(html).toContain('0:01:57');
+    expect(html).toContain('>failed<');
+    expect(html).toContain('AWH · grompp 7.awh: Fatal error:');
+    expect(html).toContain('written to logs/build_summary_20261106_1000.log in the base folder');
+    expect(html).toContain('aria-label="walker 2: tpr ready"');
+    expect(html).toContain('1 not NH3+/COO-');
+  });
+  it('no build yet', () => {
+    expect(renderToStaticMarkup(createElement(SummaryView, { runs: [] }))).toContain('no build yet');
   });
 });

@@ -1,0 +1,3 @@
+SYSTEM                               CHARGE     MIN     MAX
+hmr+fast+6/pg/mmmmmmmm                +0.00    0.67    3.27
+hmr+fast+6r/pg/mmmmmmmm               +0.00    0.74    3.27

@@ -22,6 +22,7 @@ import { listRecipes, readRecipe, saveRecipe } from './recipes';
 import { listPlans, readPlan, savePlan } from './builds';
 import { baseFolder, checkBuild, checkInputs as checkBuildInputs, checkLanding, readText } from './build-check';
 import { Builder, jobsExec } from './build-run';
+import { reportOf } from './build-report';
 import { DEFAULT_PROFILES, profileOf, profileProblem, SCRIPTED_STAGES } from '../src/lib/build/qq';
 import type { Systems } from '../src/lib/build/plan';
 import { recipeFileProblems, type Recipe } from '../src/lib/recipe';
@@ -283,6 +284,13 @@ export function makeApi(ctx: Ctx): Api {
       try { return { body: builder.goOn(String(b.run ?? ''), String(b.dir ?? '')).run }; } catch (e) { throw new HttpError(409, (e as Error).message); }
     }
     if (is(req, 'GET', url, '/api/build/runs')) return { body: builder.list() };
+    // A build's reports (R9): the summary, the pull and walker reports, the termini check, read from what it left.
+    const buildReport = /^\/api\/build\/runs\/([\w-]+)\/report$/.exec(url.pathname);
+    if (buildReport && req.method === 'GET') {
+      const r = builder.get(buildReport[1]);
+      if (!r) throw new HttpError(404, 'no build ' + buildReport[1]);
+      return { body: reportOf(r, ctx.gmx.version ?? 'unknown') };
+    }
     const buildRun = /^\/api\/build\/runs\/([\w-]+)\/cancel$/.exec(url.pathname);
     if (buildRun && req.method === 'POST') { try { builder.cancel(buildRun[1]); } catch (e) { throw new HttpError(409, (e as Error).message); } return { body: builder.get(buildRun[1]) }; }
     const buildLog = /^\/api\/build\/jobs\/([\w-]+)\/log$/.exec(url.pathname);
@@ -437,6 +445,7 @@ export function newBuilder(ctx: Ctx, buildJobs: Jobs): Builder {
   return new Builder({
     home: ctx.home, version: ctx.version, ...jobsExec(buildJobs),
     tools: () => ({ gmx: ctx.gmx.ok ? ctx.gmx.path ?? null : null, python: ctx.config.python }),
+    gmxVersion: () => ctx.gmx.version ?? 'unknown',
     profiles: () => Object.fromEntries(SCRIPTED_STAGES.map(st => [st, profileOf(ctx.config.qqBuild?.profiles?.[st] ?? DEFAULT_PROFILES[st])!])),
     submit: () => (ctx.config.qqBuild?.submit ? { qq: ctx.config.qq ?? 'qq', queue: ctx.config.qqBuild.queue } : null),
     wait: { every: (ctx.config.buildWait?.every ?? 10) * 1000, max: (ctx.config.buildWait?.max ?? 600) * 1000 },

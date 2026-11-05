@@ -46,9 +46,9 @@ export async function build(tool, argv) {
       say('pdb2gmx');
       const gro = readFileSync(one('-f'), 'utf8'), n = Number(gro.split('\n')[1].trim());
       writeFileSync(one('-i'), '; fake: pdb2gmx\'s position restraints, of the right shape only\n[ position_restraints ]\n');
-      writeFileSync(top, '; fake: pdb2gmx\'s topology, of the right shape only\n#include "./charmm36s-jul2022-prosECCo75.ff/forcefield.itp"\n\n[ moleculetype ]\n; Name            nrexcl\nProtein_chain_A     3\n\n[ atoms ]\n'
+      writeFileSync(top, '; fake: pdb2gmx\'s topology, of the right shape only\n#include "./charmm36s-jul2022-prosECCo75.ff/forcefield.itp"\n\n[ moleculetype ]\n; Name            nrexcl\nProtein             3\n\n[ atoms ]\n'
         + Array.from({ length: n }, (_, i) => '  ' + (i + 1) + '  X  1  MET  A' + (i + 1) + '  ' + (i + 1) + '  0.0  1.008').join('\n')
-        + '\n\n; Include water topology\n#include "./charmm36s-jul2022-prosECCo75.ff/tip3p.itp"\n\n[ system ]\nProtein\n\n[ molecules ]\n; Compound        #mols\nProtein_chain_A     1\n');
+        + '\n\n; Include water topology\n#include "./charmm36s-jul2022-prosECCo75.ff/tip3p.itp"\n\n[ system ]\nProtein\n\n[ molecules ]\n; Compound        #mols\nProtein             1\n');
       copyFileSync(one('-f'), one('-o'));
       return;
     }

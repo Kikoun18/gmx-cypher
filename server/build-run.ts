@@ -12,6 +12,7 @@ import { constants, copyFileSync, createReadStream, existsSync, mkdirSync, mkdte
 import { tmpdir } from 'node:os';
 import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 import { fatalText } from '../src/lib/build/fatal';
+import { writeSummary } from './build-report';
 import { BASE, NAMES, systemsOf, type BuildPlan, type Systems, type System } from '../src/lib/build/plan';
 import { freeRepeat, hint, quarantineName, resumeAt } from '../src/lib/build/retry';
 import { PROFILES, qqScript, type Profile } from '../src/lib/build/qq';
@@ -50,6 +51,8 @@ export interface SystemRun {
 
 export interface BuildRun {
   id: string; created: string; ended?: string;
+  /** Its build summary in the base folder (R9), logs/build_summary_<stamp>.log, once it ended. */
+  log?: string;
   status: 'running' | 'done' | 'failed' | 'cancelled' | 'interrupted';
   plan: string; base: string; ifExists: IfExists; onFailure: 'next' | 'stop';
   systems: SystemRun[];
@@ -78,6 +81,8 @@ export interface BuildRecord {
   values?: Record<string, string>;
   /** Folders moved aside, never deleted (R6): a walker's that failed, with the walker it was rebuilt from. */
   moved?: { from: string; to: string; walker?: number; donor?: number }[];
+  /** GROMACS's WARNING and NOTE lines per stage (R9), as the notebook's summary counts them: { SB: 7, MIN: 4, … }. */
+  warnings?: Record<string, number>;
 }
 
 /** How a gmx or python step runs: the build's job list, or a test's stand-in. Its id is known at once, its end later. */
@@ -93,6 +98,8 @@ export interface BuilderOptions {
   wait?: { every: number; max: number };
   /** The qq profile each stage's script is written for (R7a); a stage not named takes MetaCentrum 2025's. */
   profiles?: () => Partial<Record<StageId, Profile>>;
+  /** The GROMACS version for the build summary's header (R9). */
+  gmxVersion?: () => string;
   /** qq, and the queue, when the settings say gmx-cypher submits the cluster stages' scripts (T206); null: it doesn't. */
   submit?: () => { qq: string; queue: string } | null;
 }
@@ -109,6 +116,8 @@ export function sha256File(path: string): Promise<string> {
 }
 
 const CLUSTER = ['awh', 'pull', 'walkers'];
+/** The notebook's stage tags in its summary. */
+export const TAG: Record<string, string> = { sb: 'SB', min: 'MIN', nvt: 'NVT', npt: 'NPT', awh: 'AWH', pull: 'PULL', walkers: 'WALKERS' };
 
 class Stop extends Error {
   readonly status: 'failed' | 'cancelled' | 'cluster';
@@ -170,6 +179,8 @@ export class Builder extends EventEmitter {
       }
       run.ended = now();
       run.status = this.current?.cancelled ? 'cancelled' : run.systems.some(s => s.status === 'failed') ? 'failed' : 'done';
+      // The build summary in the base folder (R9, question 11: dated, never replaced).
+      try { run.log = writeSummary(run, this.o.gmxVersion?.() ?? 'unknown'); } catch (e) { run.systems[0]?.notes.push('the build summary was not written: ' + (e as Error).message); }
       this.current = null;
       this.save(run);
       return run;
@@ -417,6 +428,9 @@ export class Builder extends EventEmitter {
           throw stop('failed', (last ? last + ' (exit ' + r.code + ')' : r.error) ?? 'exit ' + r.code);
         }
         if (step.label === 'grompp before the salt') net = netCharge(r.log);
+        // The summary's warnings per stage, as the notebook counts them; the charge check is not a stage's build.
+        const warned = (r.log.match(/^(WARNING|NOTE)\b/gm) ?? []).length;
+        if (warned && step.tile !== 'charge') { const w = (record.warnings ??= {}), tag = TAG[step.stage]; w[tag] = (w[tag] ?? 0) + warned; }
         if (step.tile === 'charge') record.notes.push('net charge after npt: ' + netCharge(r.log).toFixed(2) + ' e');
         break;
       }

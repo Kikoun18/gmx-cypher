@@ -102,7 +102,11 @@ walkers are prepared and get their qq script and `qq submit` line (nothing is su
   exists is continued if a gmx-cypher build made it, skipped, or built beside as the next repeat, as you choose. A
   walker whose preparation fails is moved to `9.multiwalker/failed/` and prepared again, once, from the start of the
   nearest working walker, as your notebook's retry does.
-- The build being planned is kept in this browser; *summary* fills with R9.
+- **summary**: the last build's summary (each system's charge before the salt, its ions, the pull's shortest
+  distance, its time, its status and GROMACS's warnings by stage, as your notebook counts them), the pull report, the
+  walker report (x output, o run input ready, – missing) and the termini check; the summary is also written, once per
+  build, to `<base>/logs/build_summary_<date>_<time>.log`.
+- The build being planned is kept in this browser.
 
 Methods switch on what their name says: `hmr` hydrogen masses (gromologist), `fast` TIP3PF water; awh, the pull and the
 walkers get a qq script and its `qq submit` line. *Settings → SymBuilder · qq scripts* chooses each stage's profile
@@ -310,6 +314,7 @@ words when it needs more than its walltime left.
 | Its qq scripts | `<base>/scripts/<stage>/<method>_<stage>_<sequence>.sh` (kept if it exists), copied into the step's folder |
 | A system rebuilt, a walker rebuilt | its old folder moved to `<base>/solutions/<method>/<saccharide>/failed/<sequence>_<stamp>/` with `FAILED.txt`; a walker's to `9.multiwalker/failed/<n>_<stamp>/` |
 | Builds and their steps' logs | `~/.gmx-cypher/builds/runs/<id>.json`, `~/.gmx-cypher/builds/jobs/<id>.ndjson` |
+| A build's summary | `<base>/logs/build_summary_<YYYYMMDD_HHMM>.log`, a new file each build (`_2` if the minute's is taken) |
 | A sent result | `<vault>/<project folder>/_inbox/<name>` |
 | Its record's copy | `<vault>/gmx-cypher/records/<sha256 of the sent file>.run.json` |
 | Saved compare views | `<vault>/gmx-cypher/projects/<project id>/views/<name>.json` |

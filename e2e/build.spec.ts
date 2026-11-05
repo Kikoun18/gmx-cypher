@@ -24,7 +24,7 @@ test.beforeAll(async () => {
 })
 test.afterAll(() => { runner?.kill() })
 
-test('build a system from systems, and follow it on progress until it waits for the cluster (R5c)', async ({ page }) => {
+test('build a system from systems, follow it on progress until it waits for the cluster (R5c), read its summary (R9)', async ({ page }) => {
   const errors: string[] = []
   page.on('console', m => { if (m.type() === 'error') errors.push(m.text()) })
   page.on('pageerror', e => errors.push(e.message))
@@ -41,5 +41,10 @@ test('build a system from systems, and follow it on progress until it waits for 
   await expect(page.getByText('net charge 0.00 e: 30 NA_s and 30 CL_2s')).toBeVisible()
   const axe = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).disableRules(['region']).analyze()
   expect(axe.violations.filter(v => v.impact === 'serious' || v.impact === 'critical').map(v => v.id + ' ' + v.nodes[0].target.join(' '))).toEqual([])
+  // Its summary (R9): the warnings by stage as the notebook counted them for this system.
+  await page.getByRole('tab', { name: 'summary' }).click()
+  await expect(page.getByRole('region', { name: 'build summary' }).getByText('SB 7 · MIN 4 · NVT 4 · NPT 4 · AWH 4 · PULL 3')).toBeVisible()
+  const axe2 = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).disableRules(['region']).analyze()
+  expect(axe2.violations.filter(v => v.impact === 'serious' || v.impact === 'critical').map(v => v.id + ' ' + v.nodes[0].target.join(' '))).toEqual([])
   expect(errors).toEqual([])
 })

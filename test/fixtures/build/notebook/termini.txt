@@ -1,0 +1,20 @@
+SYSTEM                              1st  N-TERM       last C-TERM     q1     qN     qTOT
+hmr+fast+6/pg/dddddddd              ASP  NH3+         ASP  COO-    +0.00  -1.50   -6.000
+hmr+fast+6/pg/ffffffff              PHE  NH3+         PHE  COO-    +0.75  -0.75   +0.000
+hmr+fast+6/pg/gggggggg              GLY  NH3+         GLY  COO-    +0.75  -0.75   +0.000
+hmr+fast+6/pg/hhhhhhhh              HIS  NH3+         HIS  COO-    +0.75  -0.75   +0.000
+hmr+fast+6/pg/llllllll              LEU  NH3+         LEU  COO-    +0.75  -0.75   -0.000
+hmr+fast+6/pg/pppppppp              PRO  PRO-NH2+     PRO  COO-    +0.75  -0.75   +0.000
+hmr+fast+6/pg/qqqqqqqq              GLN  NH3+         GLN  COO-    +0.75  -0.75   +0.000
+hmr+fast+6/pg/ssssssss              SER  NH3+         SER  COO-    +0.75  -0.75   -0.000
+hmr+fast+6r/pg/dddddddd             ASP  NH3+         ASP  COO-    +0.00  -1.50   -6.000
+hmr+fast+6r/pg/ffffffff             PHE  NH3+         PHE  COO-    +0.75  -0.75   +0.000
+hmr+fast+6r/pg/gggggggg             GLY  NH3+         GLY  COO-    +0.75  -0.75   +0.000
+hmr+fast+6r/pg/hhhhhhhh             HIS  NH3+         HIS  COO-    +0.75  -0.75   +0.000
+hmr+fast+6r/pg/llllllll             LEU  NH3+         LEU  COO-    +0.75  -0.75   -0.000
+hmr+fast+6r/pg/pppppppp             PRO  PRO-NH2+     PRO  COO-    +0.75  -0.75   +0.000
+hmr+fast+6r/pg/qqqqqqqq             GLN  NH3+         GLN  COO-    +0.75  -0.75   +0.000
+hmr+fast+6r/pg/ssssssss             SER  NH3+         SER  COO-    +0.75  -0.75   -0.000
+
+expected NH3+/COO-: 2 mismatched: hmr+fast+6/pg/pppppppp, hmr+fast+6r/pg/pppppppp
+

@@ -1,0 +1,60 @@
+══════════════════════════════════════════════════════════════════════════════
+ AWH BUILD SUMMARY   2026-09-25 22:00   GROMACS 2025.4-PLUMED_spack
+ 42 systems    ● 41 ok    ● 1 failed    ● 0 skipped    ● 0 retried
+══════════════════════════════════════════════════════════════════════════════
+SYSTEM                          CHARGE     IONS    MIN      TIME  STATUS   STEPS
+──────────────────────────────────────────────────────────────────────────────
+hmr+fast+6/o111/aaaaaaaa          +0.0            0.64   0:00:00  OK       SB 1
+hmr+fast+6/o111/aaaaaaaa          +0.0    30/30          0:02:03  OK       SB 7 MIN 4 NVT 4 NPT 4 AWH 4 PULL 3
+hmr+fast+6/o111/cccccccc          +0.0    30/30   0.53   0:02:00  OK       SB 7 MIN 4 NVT 4 NPT 4 AWH 4 PULL 3
+hmr+fast+6/o111/dddddddd          -6.0    38/30   0.81   0:02:02  OK       SB 9 MIN 4 NVT 4 NPT 4 AWH 4 PULL 3
+hmr+fast+6/o111/eeeeeeee          -6.0    38/30   0.93   0:01:59  OK       SB 9 MIN 4 NVT 4 NPT 4 AWH 4 PULL 3
+hmr+fast+6/o111/ffffffff          +0.0    30/30   0.47   0:01:58  OK       SB 7 MIN 4 NVT 4 NPT 4 AWH 4 PULL 3
+hmr+fast+6/o111/gggggggg          +0.0    30/30   0.51   0:01:59  OK       SB 7 MIN 4 NVT 4 NPT 4 AWH 4 PULL 3
+hmr+fast+6/o111/hhhhhhhh          +0.0    30/30          0:02:10  FAILED   SB 7 MIN 4 NVT 4 NPT 4 AWH 5
+                                ! AWH: RuntimeError: GROMACS fatal error
+Fatal error:
+Distance between pull groups 1 and 2 (3.657996 nm) is larger than 0.49 times
+the box size (3.406945).
+
+For more information and tips for troubleshooting, please check the GROMACS
+website at https://manual.gromacs.org/current/user-guide/run-time-errors.html
+-------------------------------------------------------
+Setting the LD random seed to -741941
+
+Generated 174936 of the 174936 non-
+hmr+fast+6/o111/iiiiiiii          +0.0    30/30   0.66   0:02:03  OK       SB 7 MIN 4 NVT 4 NPT 4 AWH 4 PULL 3
+hmr+fast+6/o111/kkkkkkkk          +6.0    30/38   0.84   0:02:02  OK       SB 9 MIN 4 NVT 4 NPT 4 AWH 4 PULL 3
+hmr+fast+6/o111/llllllll          +0.0    30/30   0.63   0:01:59  OK       SB 7 MIN 4 NVT 4 NPT 4 AWH 4 PULL 3
+hmr+fast+6/o111/nnnnnnnn          +0.0    30/30          0:02:00  OK       SB 7 MIN 4 NVT 4 NPT 4 AWH 4 PULL 3
+hmr+fast+6/o111/pppppppp          +0.0    30/30          0:02:01  OK       SB 7 MIN 4 NVT 4 NPT 4 AWH 4 PULL 3
+hmr+fast+6/o111/qqqqqqqq          +0.0    30/30          0:01:58  OK       SB 7 MIN 4 NVT 4 NPT 4 AWH 4 PULL 3
+hmr+fast+6/o111/rrrrrrrr          +6.0    30/38          0:02:00  OK       SB 9 MIN 4 NVT 4 NPT 4 AWH 4 PULL 3
+hmr+fast+6/o111/ssssssss          +0.0    30/30          0:01:59  OK       SB 7 MIN 4 NVT 4 NPT 4 AWH 4 PULL 3
+hmr+fast+6/o111/tttttttt          +0.0    30/30          0:01:59  OK       SB 7 MIN 4 NVT 4 NPT 4 AWH 4 PULL 3
+hmr+fast+6/o111/vvvvvvvv          +0.0    30/30          0:02:02  OK       SB 7 MIN 4 NVT 4 NPT 4 AWH 4 PULL 3
+hmr+fast+6/o111/wwwwwwww          +0.0    30/30          0:01:59  OK       SB 7 MIN 4 NVT 4 NPT 4 AWH 4 PULL 3
+hmr+fast+6/o111/yyyyyyyy          +0.0    30/30          0:01:58  OK       SB 7 MIN 4 NVT 4 NPT 4 AWH 4 PULL 3
+hmr+fast+6r/o111/aaaaaaaa         +0.0    30/30          0:01:58  OK       SB 7 MIN 4 NVT 4 NPT 4 AWH 4 PULL 3
+hmr+fast+6r/o111/cccccccc         +0.0    30/30          0:01:59  OK       SB 7 MIN 4 NVT 4 NPT 4 AWH 4 PULL 3
+hmr+fast+6r/o111/dddddddd         -6.0    38/30          0:01:58  OK       SB 9 MIN 4 NVT 4 NPT 4 AWH 4 PULL 3
+hmr+fast+6r/o111/eeeeeeee         -6.0    38/30          0:02:00  OK       SB 9 MIN 4 NVT 4 NPT 4 AWH 4 PULL 3
+hmr+fast+6r/o111/ffffffff         +0.0    30/30          0:01:57  OK       SB 7 MIN 4 NVT 4 NPT 4 AWH 4 PULL 3
+hmr+fast+6r/o111/gggggggg         +0.0    30/30          0:01:58  OK       SB 7 MIN 4 NVT 4 NPT 4 AWH 4 PULL 3
+hmr+fast+6r/o111/hhhhhhhh         +0.0    30/30          0:01:57  OK       SB 7 MIN 4 NVT 4 NPT 4 AWH 4 PULL 3
+hmr+fast+6r/o111/iiiiiiii         +0.0    30/30          0:01:59  OK       SB 7 MIN 4 NVT 4 NPT 4 AWH 4 PULL 3
+hmr+fast+6r/o111/kkkkkkkk         +6.0    30/38          0:01:58  OK       SB 9 MIN 4 NVT 4 NPT 4 AWH 4 PULL 3
+hmr+fast+6r/o111/llllllll         +0.0    30/30          0:01:59  OK       SB 7 MIN 4 NVT 4 NPT 4 AWH 4 PULL 3
+hmr+fast+6r/o111/nnnnnnnn         +0.0    30/30          0:01:59  OK       SB 7 MIN 4 NVT 4 NPT 4 AWH 4 PULL 3
+hmr+fast+6r/o111/pppppppp         +0.0    30/30          0:01:59  OK       SB 7 MIN 4 NVT 4 NPT 4 AWH 4 PULL 3
+hmr+fast+6r/o111/qqqqqqqq         +0.0    30/30          0:01:58  OK       SB 7 MIN 4 NVT 4 NPT 4 AWH 4 PULL 3
+hmr+fast+6r/o111/rrrrrrrr         +6.0    30/38          0:01:58  OK       SB 9 MIN 4 NVT 4 NPT 4 AWH 4 PULL 3
+hmr+fast+6r/o111/ssssssss         +0.0    30/30          0:01:59  OK       SB 7 MIN 4 NVT 4 NPT 4 AWH 4 PULL 3
+hmr+fast+6r/o111/tttttttt         +0.0    30/30          0:02:00  OK       SB 7 MIN 4 NVT 4 NPT 4 AWH 4 PULL 3
+hmr+fast+6r/o111/vvvvvvvv         +0.0    30/30          0:01:57  OK       SB 7 MIN 4 NVT 4 NPT 4 AWH 4 PULL 3
+hmr+fast+6r/o111/wwwwwwww         +0.0    30/30          0:01:58  OK       SB 7 MIN 4 NVT 4 NPT 4 AWH 4 PULL 3
+hmr+fast+6r/o111/yyyyyyyy         +0.0    30/30          0:01:59  OK       SB 7 MIN 4 NVT 4 NPT 4 AWH 4 PULL 3
+hmr+fast+6/o111/mmmmmmmm          +0.0    30/30          0:01:56  OK       SB 7 MIN 4 NVT 4 NPT 4 AWH 4 PULL 3
+hmr+fast+6r/o111/mmmmmmmm         +0.0    30/30          0:01:55  OK       SB 7 MIN 4 NVT 4 NPT 4 AWH 4 PULL 3
+hmr+fast+6/o111/hhhhhhhh          +0.0    30/30          0:01:57  OK       SB 7 MIN 4 NVT 4 NPT 4 AWH 4 PULL 3
+══════════════════════════════════════════════════════════════════════════════
