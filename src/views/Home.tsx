@@ -1,7 +1,8 @@
 import * as React from 'react'
-import { getJson, type AppState } from '../api'
+import type { AppState } from '../api'
 import { statusOf, type Job } from '../jobs'
 import { formatRoute } from '../lib/route'
+import { useProject } from '../project'
 import { toneDot, toneText, type Tone } from '../lib/tones'
 import { cn } from '../lib/utils'
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle, Stat } from '../ui/card'
@@ -80,13 +81,6 @@ export function HomeView({ gmx, vault, project, jobs, cluster }: {
 
 /** home with what it reads: the connected project, once when it opens. */
 export function Home({ state, jobs, cluster }: { state: AppState; jobs: Job[]; cluster: ClusterSummary | null }) {
-  const [project, setProject] = React.useState<ProjectSummary | null>(null)
-  const id = state.config.project
-  React.useEffect(() => {
-    if (!state.config.vault || !id) return
-    let alive = true
-    getJson<ProjectSummary>('/api/vault/project?id=' + encodeURIComponent(id)).then(p => alive && setProject(p), () => {})
-    return () => { alive = false }
-  }, [state.config.vault, id])
+  const project = useProject<ProjectSummary>(state.config.vault, state.config.project)
   return <HomeView gmx={state.gmx} vault={state.config.vault} project={project} jobs={jobs} cluster={cluster} />
 }

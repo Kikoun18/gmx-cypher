@@ -89,7 +89,13 @@ export const NAMES = {
 /** The base folder's layout, as the notebook's (its BASE_DIR). */
 export const BASE = { solutions: 'solutions', ff: 'ff', inputs: 'inputs', saccharides: 'molecules/saccharides', molecules: 'molecules', scripts: 'scripts', logs: 'logs' } as const
 
-export interface Systems { methods: string[]; saccharides: string[]; sequences: string[]; repeats: number }
+export interface Systems {
+  methods: string[]; saccharides: string[]; sequences: string[]; repeats: number
+  /** Only these cells (`cellKey`, by the method as listed: a cell's repeats are built with it), when set: the cells a project lacks (R8a). */
+  only?: string[]
+}
+/** One cell of a build, as `Systems.only` lists it. */
+export const cellKey = (method: string, saccharide: string, sequence: string) => method + '/' + saccharide + '/' + sequence
 export interface System { method: string; saccharide: string; sequence: string; /** for PyMOL */ SEQUENCE: string; repeat: number; /** relative to the base folder */ dir: string }
 
 const NAME = { method: /^[A-Za-z0-9][A-Za-z0-9+._-]{0,63}$/, saccharide: /^[A-Za-z0-9][A-Za-z0-9_-]{0,31}$/, sequence: /^[A-Za-z]{1,64}$/ }
@@ -100,11 +106,12 @@ export function nameProblem(kind: keyof typeof NAME, name: string): string | nul
     : 'a ' + kind + ' is letters, digits and ' + (kind === 'method' ? '+ . _ -' : '_ -') + ', starting with a letter or digit: ' + JSON.stringify(name)
 }
 
-/** Every system of a build, each repeat its own (methods × saccharides × sequences × (1 + repeats)), in that order. */
+/** Every system of a build, each repeat its own (methods × saccharides × sequences × (1 + repeats)), in that order; with `only`, those cells. */
 export function systemsOf(s: Systems): System[] {
-  const out: System[] = []
+  const out: System[] = [], only = Array.isArray(s.only) ? new Set(s.only) : null
   for (const m of s.methods) for (let r = 0; r <= s.repeats; r++) for (const c of s.saccharides) for (const q of s.sequences) {
     const method = repeatName(m, r)
+    if (only && !only.has(cellKey(m, c, q))) continue
     out.push({ method, saccharide: c, sequence: q, SEQUENCE: q.toUpperCase(), repeat: r, dir: [BASE.solutions, method, c, q].join('/') })
   }
   return out

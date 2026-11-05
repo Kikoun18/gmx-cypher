@@ -263,7 +263,7 @@ From [`batch-4.md`](batch-4.md) §6: SymBuilder inside gmx-cypher, four tabs (ho
 - [x] R4 Files, mdp files, force field check, settings (base folder and python; stat and read only, nothing written; settings' python import check left for batch 5, with the first python run)
 
 ### Phase 3: The Matrix's names (R8a, R8b)
-- [ ] R8a Systems from a project
+- [x] R8a Systems from a project: the groups, column labels and sequences, or only the cells with no runs (`Systems.only`, each cell with its repeats)
 - [ ] R8b Folders and names the project reads, checked with the Matrix's code
 
 ### Phase 4: Building here (R5, R6)

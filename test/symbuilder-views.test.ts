@@ -52,6 +52,29 @@ describe('symbuilder · systems', () => {
   });
 });
 
+describe('symbuilder · systems from the project (R8a)', () => {
+  const project = {
+    name: 'innit', columns: [{ k: 'c1', label: 'O111' }, { k: 'c2', label: 'PG' }],
+    rows: [{ name: 'AAAAAAAA', seq: 'AAAAAAAA', group: 'hmr+fast+6', runs: { c1: ['a'] } }], settings: { pattern: '', pathPattern: '' },
+  };
+  it('with no project, says where to connect one', () => {
+    expect(renderToStaticMarkup(createElement(SystemsView, { draft, setDraft: noop }))).toContain('connect a project in settings → vault');
+  });
+  it('names the project and what it lacks, and offers both', () => {
+    const html = renderToStaticMarkup(createElement(SystemsView, { draft, setDraft: noop, project }));
+    expect(html).toContain('<b>innit</b> · 1 group × 2 columns × 1 sequence · 1 of 2 cells with no runs');
+    expect(html).toContain('take all from the project');
+    expect(html).toContain('build what the project lacks · 1');
+  });
+  it('a build of the cells the project lacks says so, and counts only those', () => {
+    const only: BuildDraft = { ...draft, systems: { methods: ['hmr+fast+6'], saccharides: ['o111', 'pg'], sequences: ['aaaaaaaa'], repeats: 0, only: ['hmr+fast+6/pg/aaaaaaaa'] } };
+    const html = renderToStaticMarkup(createElement(SystemsView, { draft: only, setDraft: noop, project }));
+    expect(html).toContain('only 1 cell of these lists, the ones the project lacks');
+    expect(html).toContain('1 cell the project lacks');
+    expect(html).toMatch(/>build 1 system<\/button>/);
+  });
+});
+
 describe('a step as a line', () => {
   const s = (program: Step['program'], argv: string[]): Step => ({ stage: 'sb', tile: 'merge', label: '', program, argv, cwd: '', reads: [], writes: [], replaces: [], where: 'here' });
   it.each([

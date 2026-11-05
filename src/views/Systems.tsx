@@ -2,6 +2,7 @@ import * as React from 'react'
 import { X } from 'lucide-react'
 import type { BuildDraft, IfExists } from '../buildDraft'
 import { nameProblem, repeatName, STAGES, switches, systemsOf, type Systems } from '../lib/build/plan'
+import { systemsFromProject, type ProjectLike } from '../lib/build/project'
 import { orderProblems, planSystem } from '../lib/build/steps'
 import { toneSolid, toneSoft, toneText, type Tone } from '../lib/tones'
 import { TONES } from '../core'
@@ -38,9 +39,33 @@ function Chips({ label, kind, items, tones, onChange }: { label: string; kind: '
   )
 }
 
+/** The connected project's groups, columns and sequences (R8a): all of them, or only the cells with no runs. */
+function FromProject({ project, systems, set }: { project: ProjectLike | null; systems: Systems; set: (s: Systems) => void }) {
+  const from = React.useMemo(() => (project ? systemsFromProject(project) : null), [project])
+  if (!project || !from) return <span className="text-caption text-muted-foreground">connect a project in settings → vault, and its groups, columns and sequences can be taken from it</span>
+  const lacking = from.lacking.only.length, s = from.systems
+  return (
+    <div className="flex flex-col gap-2 rounded-xl border border-border bg-background p-3">
+      <span className="text-caption"><b>{project.name}</b> · {s.methods.length} {s.methods.length === 1 ? 'group' : 'groups'} × {s.saccharides.length} {s.saccharides.length === 1 ? 'column' : 'columns'} × {s.sequences.length} {s.sequences.length === 1 ? 'sequence' : 'sequences'} · {lacking} of {from.cells} cells with no runs</span>
+      <div className="flex flex-wrap gap-2">
+        <Button size="sm" variant="outline" disabled={!from.cells} onClick={() => set(from.systems)}>take all from the project</Button>
+        <Button size="sm" disabled={!lacking} onClick={() => set(from.lacking)}>build what the project lacks · {lacking}</Button>
+      </div>
+      {systems.only && <Status inline level="info" word="note">only {systems.only.length} {systems.only.length === 1 ? 'cell' : 'cells'} of these lists, the ones the project lacks · a name added here builds every combination again</Status>}
+      {from.skipped.length > 0 && <Status inline level="warning" word="check">left out: {from.skipped.slice(0, 3).join(' · ')}{from.skipped.length > 3 ? ' · and ' + (from.skipped.length - 3) + ' more' : ''}</Status>}
+    </div>
+  )
+}
+
 /** symbuilder · systems (R3c): methods × saccharides × sequences, repeats, and a preview of every system before anything runs. */
-export function SystemsView({ draft, setDraft, missing = null }: { draft: BuildDraft; setDraft: React.Dispatch<React.SetStateAction<BuildDraft>>; missing?: Record<string, string[]> | null }) {
-  const s = draft.systems, all = systemsOf(s), set = (patch: Partial<Systems>) => setDraft(d => ({ ...d, systems: { ...d.systems, ...patch } }))
+export function SystemsView({ draft, setDraft, missing = null, project = null }: { draft: BuildDraft; setDraft: React.Dispatch<React.SetStateAction<BuildDraft>>; missing?: Record<string, string[]> | null; project?: ProjectLike | null }) {
+  // A name added to a list drops `only` (the cells the project lacks): the new name has no cell listed.
+  const grows = (o: Systems, patch: Partial<Systems>) => (['methods', 'saccharides', 'sequences'] as const).some(k => patch[k]?.some(v => !o[k].includes(v)))
+  const s = draft.systems, all = systemsOf(s), set = (patch: Partial<Systems>) => setDraft(d => {
+    const next = { ...d.systems, ...patch }
+    if (!('only' in patch) && grows(d.systems, patch)) delete next.only
+    return { ...d, systems: next }
+  })
   const sacTone = (c: string) => TONES[Math.max(0, s.saccharides.indexOf(c)) % TONES.length]
   const plan = draft.plan, scripted = plan.stages.filter(x => x.on && x.tiles.some(t => t.on) && x.id !== 'sb').length
   const rows = React.useMemo(() => all.map(sys => { const steps = planSystem(plan, sys, { base: '{base}' }); return { sys, steps, problems: orderProblems(steps) } }), [all, plan])
@@ -67,6 +92,8 @@ export function SystemsView({ draft, setDraft, missing = null }: { draft: BuildD
       </Panel>
       <Panel aria-label="systems">
         <Head label="systems" n={all.length} />
+        <Head label="from the project" />
+        <FromProject project={project} systems={s} set={v => setDraft(d => ({ ...d, systems: v }))} />
         <Chips label="{method}" kind="method" items={s.methods} tones={() => 'coral'} onChange={v => set({ methods: v })} />
         <Chips label="{saccharide}" kind="saccharide" items={s.saccharides} tones={i => TONES[i % TONES.length]} onChange={v => set({ saccharides: v })} />
         <Chips label="{sequence}" kind="sequence" items={s.sequences} tones={() => 'coral'} onChange={v => set({ sequences: v })} />
@@ -90,11 +117,11 @@ export function SystemsView({ draft, setDraft, missing = null }: { draft: BuildD
       <Panel aria-label="preview" className="max-[1180px]:col-span-2">
         <Head label="preview" n={all.length} />
         <div className="grid grid-cols-3 gap-2">
-          <Stat label="systems" value={all.length} hint={s.methods.length + ' × ' + s.saccharides.length + ' × ' + s.sequences.length + (s.repeats ? ' × ' + (s.repeats + 1) : '')} />
+          <Stat label="systems" value={all.length} hint={s.only ? s.only.length + (s.only.length === 1 ? ' cell' : ' cells') + ' the project lacks' + (s.repeats ? ' × ' + (s.repeats + 1) : '') : s.methods.length + ' × ' + s.saccharides.length + ' × ' + s.sequences.length + (s.repeats ? ' × ' + (s.repeats + 1) : '')} />
           <Stat label="qq scripts" value={all.length * plan.stages.filter(x => x.on && ['min', 'nvt', 'npt', 'awh', 'pull', 'walkers'].includes(x.id)).length} hint={scripted + ' per system'} />
           <Stat label="steps here" value={all.length * here} hint={here + ' per system'} />
         </div>
-        {!all.length && <p className="m-0 text-control text-muted-foreground">add a method, a saccharide and a sequence: every combination is a system</p>}
+        {!all.length && <p className="m-0 text-control text-muted-foreground">{s.only ? 'none of the cells the project lacks is in these lists' : 'add a method, a saccharide and a sequence: every combination is a system'}</p>}
         {all.length > 0 && (
           <div className="overflow-hidden rounded-xl border border-border">
             <div className="grid grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] gap-2 border-b border-border px-3 py-1.5 text-label uppercase text-muted-foreground"><span>system</span><span>check</span></div>
