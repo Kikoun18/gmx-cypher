@@ -32,7 +32,7 @@ Vitest is the check run before each commit (lint, build and every test; each com
 | R8c, R8d PMFs into the vault, their numbers | — | | | | waits for question 12 |
 | R9 reports | `2c6dfaa` | +326/−5 | +199/−5 | 1344 | |
 | R10 from a built system to analysis | `51f7fe1` | +34/−7 | +28/−1 | 1349 | |
-| review's fixes | A fresh-context review of the batch 5 diff (`af1c154..51f7fe1`) is running as this is written: the writing promises, the runner's state, the API, the views, what the tests claim. Its findings and what was done follow in the next commit._COMMIT | | | FINAL | |
+| review's fixes | (next commit) | | | | |
 
 In all, `src server index.html`: 30 files, +1,518/−61; `test e2e`: 50 files, +2,705/−4. Playwright: 17 → 18 (one
 new spec: build a system from the page, follow it, read its summary, take it to analysis), all passing.
