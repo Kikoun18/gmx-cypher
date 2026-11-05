@@ -4,7 +4,7 @@
 // (T211), the charge check writes to a temporary folder (T205).
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_PLAN, systemsOf, type BuildPlan } from '../src/lib/build/plan';
-import { planSystem } from '../src/lib/build/steps';
+import { orderProblems, planSystem } from '../src/lib/build/steps';
 
 const BASE = '/data/innit_tests', INPUTS = BASE + '/inputs', S = 'solutions/hmr+fast+6/o111/aaaaaaaa';
 const [SYS] = systemsOf({ methods: ['hmr+fast+6'], saccharides: ['o111'], sequences: ['aaaaaaaa'], repeats: 0 });
@@ -96,5 +96,21 @@ describe('what each step reads, writes and replaces', () => {
       'scripts/minim/hmr+fast+6_minim_aaaaaaaa.sh', 'scripts/nvt/hmr+fast+6_nvt_aaaaaaaa.sh', 'scripts/npt/hmr+fast+6_npt_aaaaaaaa.sh',
       'scripts/awh/hmr+fast+6_awh_aaaaaaaa.sh', 'scripts/pull/hmr+fast+6_pull_aaaaaaaa.sh', 'scripts/awh_multi/hmr+fast+6_awh_multi_aaaaaaaa.sh']);
     expect(steps.find(s => s.argv[0] === 'scripts/awh_multi/hmr+fast+6_awh_multi_aaaaaaaa.sh')!.cwd).toBe(S + '/9.multiwalker');
+  });
+});
+
+describe('the stack\'s order (R3c\'s drag and drop moves tiles)', () => {
+  it('the steps follow the tiles, and the notebook\'s order has no problem', () => {
+    expect(orderProblems(planSystem(ALL, SYS, { base: BASE }))).toEqual([]);
+  });
+  it('a tile moved above what it needs is a problem, said in words', () => {
+    const sb = ALL.stages[0], tiles = [...sb.tiles], [pdb2gmx] = tiles.splice(tiles.findIndex(t => t.type === 'pdb2gmx'), 1);
+    tiles.unshift(pdb2gmx);
+    const moved = { ...ALL, stages: [{ ...sb, tiles }, ...ALL.stages.slice(1)] };
+    expect(orderProblems(planSystem(moved, SYS, { base: BASE }))).toEqual(['pdb2gmx, inside ff/ reads aaaaaaaa.gro before centre the peptide writes it']);
+  });
+  it('a stage left out reads what an earlier build left on disk: no problem', () => {
+    const later = { ...ALL, stages: ALL.stages.map(s => ({ ...s, on: s.id === 'awh' })) };
+    expect(orderProblems(planSystem(later, SYS, { base: BASE }))).toEqual([]);
   });
 });
