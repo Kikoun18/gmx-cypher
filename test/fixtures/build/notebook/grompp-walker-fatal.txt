@@ -1,0 +1,74 @@
+Setting the AWH bias MC random seed to 2130632571
+
+WARNING 1 [file /storage/brno/you/02_evomd/innit_tests/inputs/hmr_multi.mdp, line 72]:
+  When simulations share an AWH bias, it is strongly recommended to use a
+  non-zero covering diameter
+
+
+WARNING 2 [file ADDff.itp, line 7]:
+  Atomtype OC311 was defined previously (e.g. in the forcefield files), and
+  has now been defined again. This could happen e.g. if you would use a
+  self-contained molecule .itp file that duplicates or replaces the
+  contents of the standard force-field files. You should check the contents
+  of your files and remove such repetition. If you know you should override
+  the previous definition, then you could choose to suppress this warning
+  with -maxwarn.
+
+
+WARNING 3 [file ADDff.itp, line 8]:
+  Atomtype HCP1 was defined previously (e.g. in the forcefield files), and
+  has now been defined again. This could happen e.g. if you would use a
+  self-contained molecule .itp file that duplicates or replaces the
+  contents of the standard force-field files. You should check the contents
+  of your files and remove such repetition. If you know you should override
+  the previous definition, then you could choose to suppress this warning
+  with -maxwarn.
+
+Generating 1-4 interactions: fudge = 1
+
+NOTE 1 [file rrrrrrrr.top, line 20]:
+  The bond in molecule-type CARB between atoms 12 C and 13 O has an
+  estimated oscillational period of 2.3e-02 ps, which is less than 10 times
+  the time step of 4.0e-03 ps.
+  Maybe you forgot to change the constraints mdp option.
+
+Pull group 1 'Protein' has 195 atoms
+Pull group 2 'CARB' has 110 atoms
+Number of degrees of freedom in T-Coupling group System is 67237.00
+
+ERROR 1 [file /storage/brno/you/02_evomd/innit_tests/inputs/hmr_multi.mdp]:
+  When the maximum distance from a pull group reference atom to other atoms
+  in the group is larger than 0.5 times half the box size a centrally
+  placed atom should be chosen as pbcatom. Pull group 1 is larger than that
+  and does not have a specific atom selected as reference atom.
+
+Pull group  natoms  pbc atom  distance at start  reference at t=0
+       1       195       208
+       2       110        55       2.961 nm          0.000 nm
+
+There was 1 NOTE
+
+There were 3 WARNINGs
+
+-------------------------------------------------------
+Program:     gmx grompp, version 2025.4-PLUMED_spack
+Source file: src/gromacs/gmxpreprocess/grompp.cpp (line 2898)
+
+Fatal error:
+There was 1 error in input file(s)
+
+For more information and tips for troubleshooting, please check the GROMACS
+website at https://manual.gromacs.org/current/user-guide/run-time-errors.html
+-------------------------------------------------------
+Setting the LD random seed to -1124598817
+
+Generated 174936 of the 174936 non-bonded parameter combinations
+
+Generated 124458 of the 174936 1-4 parameter combinations
+
+Excluding 3 bonded neighbours molecule type 'CARB'
+
+turning H bonds into constraints...
+
+Excluding 3 bonded neighbours molecule type 'Protein'
+

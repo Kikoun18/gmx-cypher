@@ -20,7 +20,10 @@ export interface Step {
   where: 'here' | 'cluster'
   /** Values only the run knows (ion counts, a walker's frame), shown as {tokens} in argv. */
   resolves?: string[]
+  /** What a write step writes (R5b): the text it computes, from `text.ts`. */
+  make?: Make
 }
+export type Make = 'moleculetype' | 'merge' | 'topology' | 'water-tip3f' | 'water-sol' | 'carb' | 'hmr'
 
 /** Joined and normalised: `a/7.awh/../6.eqnpt` is `a/6.eqnpt`. */
 const join = (...p: string[]) => p.filter(Boolean).join('/').split('/').reduce<string[]>((out, x) => (x === '..' && out.length && out[out.length - 1] !== '..' ? out.slice(0, -1) : x === '.' ? out : [...out, x]), []).join('/')
@@ -40,13 +43,13 @@ export function planSystem(plan: BuildPlan, sys: System, o: { base: string; prof
   }
   const index = (stage: StageId, cwd: string, ndx: string, gro: string) => {
     add({ stage, tile: stage === 'awh' ? 'awh' : 'pull', label: 'make_ndx', program: 'gmx', cwd, argv: ['make_ndx', '-f', gro, '-o', ndx, '-quiet'], stdin: 'q\n', reads: [join(cwd, gro)], writes: [join(cwd, ndx)] })
-    add({ stage, tile: stage === 'awh' ? 'awh' : 'pull', label: '[ CARB ] appended', program: 'write', cwd, argv: [ndx], reads: [join(d, c + '.gro')], replaces: [join(cwd, ndx)] })
+    add({ stage, tile: stage === 'awh' ? 'awh' : 'pull', label: '[ CARB ] appended', program: 'write', make: 'carb', cwd, argv: [ndx], reads: [join(d, c + '.gro')], replaces: [join(cwd, ndx)] })
   }
   const script = (stage: StageId, cwd: string) => {
     const s = qqScript(stage, sys, profile, sc.walkers.length)
     if (s) add({ stage, tile: stage === 'awh' ? 'awh' : stage === 'pull' ? 'pull' : stage === 'walkers' ? 'walkers' : 'md', label: 'qq script', program: 'copy', cwd, argv: [s.file, s.file.split('/').pop()!], writes: [s.file, join(cwd, s.file.split('/').pop()!)], where: 'cluster' })
   }
-  const water = (to: 'TIP3F' | 'SOL') => fast && add({ stage: 'sb', tile: 'solvate', label: 'water named ' + to, program: 'write', cwd: d, argv: [q + '.top'], reads: [join(d, q + '.top')], replaces: [join(d, q + '.top')] })
+  const water = (to: 'TIP3F' | 'SOL') => fast && add({ stage: 'sb', tile: 'solvate', label: 'water named ' + to, program: 'write', make: to === 'TIP3F' ? 'water-tip3f' : 'water-sol', cwd: d, argv: [q + '.top'], reads: [join(d, q + '.top')], replaces: [join(d, q + '.top')] })
   const npt = '../' + NAMES.npt + '/' + NAMES.npt + '.gro'
   /** One tile's steps (its type, and for trjconv and editconf its molecule). */
   const emit = (stage: StageId, tile: Tile) => {
@@ -67,11 +70,11 @@ export function planSystem(plan: BuildPlan, sys: System, o: { base: string; prof
         const up = '../' + d + '/', answers = (sc.answersBySequence[q] ?? sc.answers).trim().split(/\s+/).join('\n') + '\n'
         add({ stage, tile: 'pdb2gmx', label: 'pdb2gmx, inside ff/', program: 'gmx', cwd: BASE.ff, argv: ['pdb2gmx', '-f', up + q + '.gro', '-v', '-ignh', '-i', up + q + '_restraints.itp', '-p', up + q + '.top', '-o', up + 'pre.gro', '-ter'], stdin: answers,
           reads: [join(d, q + '.gro'), join(BASE.ff, sc.forcefield + '.ff')], writes: [join(d, q + '_restraints.itp'), join(d, q + '.top'), join(d, NAMES.pre)] })
-        return add({ stage, tile: 'pdb2gmx', label: 'the peptide\'s [ moleculetype ] → ' + q + '.itp', program: 'write', cwd: d, argv: [q + '.itp'], reads: [join(d, q + '.top')], writes: [join(d, q + '.itp')] })
+        return add({ stage, tile: 'pdb2gmx', label: 'the peptide\'s [ moleculetype ] → ' + q + '.itp', program: 'write', make: 'moleculetype', cwd: d, argv: [q + '.itp'], reads: [join(d, q + '.top')], writes: [join(d, q + '.itp')] })
       }
       case 'termini': return add({ stage, tile: 'termini', label: 'check the termini', program: 'read', cwd: d, argv: [q + '.itp'], reads: [join(d, q + '.itp')] })
-      case 'merge': return add({ stage, tile: 'merge', label: 'merge into a ' + sc.box.toFixed(1) + ' nm box', program: 'write', cwd: d, argv: [NAMES.conf], reads: [join(d, NAMES.pre), join(d, c + '.gro')], writes: [join(d, NAMES.conf)] })
-      case 'topology': return add({ stage, tile: 'topology', label: 'write the topology', program: 'write', cwd: d, argv: [q + '.top'], replaces: [join(d, q + '.top')] })
+      case 'merge': return add({ stage, tile: 'merge', label: 'merge into a ' + sc.box.toFixed(1) + ' nm box', program: 'write', make: 'merge', cwd: d, argv: [NAMES.conf], reads: [join(d, NAMES.pre), join(d, c + '.gro')], writes: [join(d, NAMES.conf)] })
+      case 'topology': return add({ stage, tile: 'topology', label: 'write the topology', program: 'write', make: 'topology', cwd: d, argv: [q + '.top'], replaces: [join(d, q + '.top')] })
       case 'solvate':
         add({ stage, tile: 'solvate', label: 'add water', program: 'gmx', cwd: d, argv: ['solvate', '-cp', NAMES.conf, '-cs', '-o', NAMES.solvated, '-p', q + '.top', '-quiet'], reads: [join(d, NAMES.conf), join(d, q + '.top')], writes: [join(d, NAMES.solvated)], replaces: [join(d, q + '.top')] })
         return water('TIP3F')
@@ -85,7 +88,7 @@ export function planSystem(plan: BuildPlan, sys: System, o: { base: string; prof
       case 'hmr':
         if (!hmr) return
         add({ stage, tile: 'hmr', label: 'hydrogen masses (gromologist)', program: 'python', cwd: d, argv: ['hmr.py', q + '.top', q + '_hmr.top', ...Object.entries(sc.restraints).map(([k, v]) => k + '=' + v)], reads: [join(d, q + '.top')], writes: [join(d, q + '_hmr.top'), join(d, 'Protein.itp'), join(d, 'CARB.itp')] })
-        return add({ stage, tile: 'hmr', label: 'the topology on Protein.itp and CARB.itp', program: 'write', cwd: d, argv: [q + '.top'], reads: [join(d, q + '_hmr.top')], replaces: [join(d, q + '.top')] })
+        return add({ stage, tile: 'hmr', label: 'the topology on Protein.itp and CARB.itp', program: 'write', make: 'hmr', cwd: d, argv: [q + '.top'], reads: [join(d, q + '.top'), join(d, q + '_hmr.top')], replaces: [join(d, q + '.top')] })
       case 'glucose': return // planned once insert-molecules' output is known (N11)
       case 'md': {
         const md = { min: [NAMES.min, sc.mdp.min, '../' + NAMES.salted, true], nvt: [NAMES.nvt, sc.mdp.nvt, '../' + NAMES.min + '/' + NAMES.min + '.gro', true], npt: [NAMES.npt, sc.mdp.npt, '../' + NAMES.nvt + '/' + NAMES.nvt + '.gro', false] } as const

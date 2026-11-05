@@ -1,0 +1,8 @@
+Fatal error:
+Distance between pull groups 1 and 2 (3.657996 nm) is larger than 0.49 times
+the box size (3.406945).
+
+For more information and tips for troubleshooting, please check the GROMACS
+website at https://manual.gromacs.org/current/user-guide/run-time-errors.html
+-------------------------------------------------------
+Setting the LD random seed to -741941
