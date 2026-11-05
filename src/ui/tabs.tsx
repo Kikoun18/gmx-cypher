@@ -60,4 +60,23 @@ function TabsContent({ className, ...props }: React.ComponentProps<typeof TabsPr
   return <TabsPrimitive.Content data-slot="tabs-content" className={cn("flex-1 outline-none", className)} {...props} />
 }
 
-export { Tabs, TabsList, TabsTrigger, TabsCount, TabsContent, tabsListVariants }
+/**
+ * A tab's second level (T204): a line of tabs under the page's, the width of the page (it undoes main's padding), and
+ * the view it shows, as the panel the selected tab controls. `extra` goes at the line's right end.
+ */
+function SubTabs({ value, onValueChange, label, items, extra, children }: {
+  value: string; onValueChange: (v: string) => void; label: string
+  items: { value: string; label: string; count?: React.ReactNode }[]; extra?: React.ReactNode; children: React.ReactNode
+}) {
+  return (
+    <Tabs value={value} onValueChange={onValueChange} className="-mx-5 -mt-5 gap-0">
+      <TabsList aria-label={label} className="px-5">
+        {items.map(i => <TabsTrigger key={i.value} value={i.value} className="text-caption">{i.label}{i.count != null && <TabsCount>{i.count}</TabsCount>}</TabsTrigger>)}
+        {extra}
+      </TabsList>
+      <TabsContent value={value} className="px-5 pt-5">{children}</TabsContent>
+    </Tabs>
+  )
+}
+
+export { Tabs, TabsList, TabsTrigger, TabsCount, TabsContent, SubTabs, tabsListVariants }

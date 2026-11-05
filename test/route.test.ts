@@ -1,7 +1,7 @@
 // Where the page is (R9a): every view at an address of its own, the old tabs' addresses redirected, ids checked;
 // and a drop split by what each file is (routeDrop).
 import { describe, expect, it } from 'vitest';
-import { formatRoute, parseRoute, type Route } from '../src/lib/route';
+import { formatRoute, parseRoute, SYM_VIEWS, tabOf, type Route } from '../src/lib/route';
 import { dropSummary, routeDrop } from '../src/lib/drop';
 
 const ID = 'jmk2abcd1x9z', ID2 = 'jmk2abcf00aa';
@@ -24,6 +24,18 @@ describe('addresses', () => {
     ['#compare?diff=1&jobs=' + ID + ',' + ID2, { view: 'compare', jobs: [ID, ID2], diff: true }, true],
     ['#compare?jobs=' + ID + '&diff=yes', { view: 'compare', jobs: [ID] }, true],
     ['#cluster', { view: 'cluster' }, false],
+    // The four tabs (R1b): home, and symbuilder's views by a fixed list of ids.
+    ['#home', { view: 'home' }, false],
+    ['#symbuilder/build', { view: 'symbuilder', sub: 'build' }, false],
+    ['#symbuilder/systems', { view: 'symbuilder', sub: 'systems' }, false],
+    ['#symbuilder/files', { view: 'symbuilder', sub: 'files' }, false],
+    ['#symbuilder/progress', { view: 'symbuilder', sub: 'progress' }, false],
+    ['#symbuilder/summary', { view: 'symbuilder', sub: 'summary' }, false],
+    ['#symbuilder', { view: 'symbuilder', sub: 'build' }, true],
+    ['#symbuilder/nope', { view: 'symbuilder', sub: 'build' }, true],
+    ['#symbuilder/../etc', { view: 'symbuilder', sub: 'build' }, true],
+    ['#symbuilder/build/more', { view: 'symbuilder', sub: 'build' }, true],
+    ['#home/x', { view: 'home' }, true],
     // The tabs' old addresses open what they opened, and are written again in the new form.
     ['#inputs', { view: 'setup', step: 'inputs', batch: false }, true],
     ['#groups', { view: 'setup', step: 'groups', batch: false }, true],
@@ -31,11 +43,11 @@ describe('addresses', () => {
     ['#rdf', { view: 'setup', step: 'command', batch: false }, true],
     ['#jobs', { view: 'results', job: null }, true],
     ['#batch', { view: 'setup', step: 'inputs', batch: true }, true],
-    // No address: the first step.
-    ['', { view: 'setup', step: 'inputs', batch: false }, true],
-    ['#', { view: 'setup', step: 'inputs', batch: false }, true],
-    // Anything else falls back, and is written again; a bad id is dropped, never passed on.
-    ['#nowhere', { view: 'setup', step: 'inputs', batch: false }, true],
+    // No address, or an unknown one: home (T216), written again.
+    ['', { view: 'home' }, true],
+    ['#', { view: 'home' }, true],
+    ['#nowhere', { view: 'home' }, true],
+    // A bad part of a known view keeps its view; a bad id is dropped, never passed on.
     ['#setup/nowhere', { view: 'setup', step: 'inputs', batch: false }, true],
     ['#setup', { view: 'setup', step: 'inputs', batch: false }, true],
     ['#results/../etc', { view: 'results', job: null }, true],
@@ -69,6 +81,18 @@ describe('addresses', () => {
     expect(formatRoute({ view: 'compare', jobs: [] })).toBe('#compare');
     expect(formatRoute({ view: 'compare', jobs: [ID, ID2] })).toBe('#compare?jobs=' + ID + ',' + ID2);
     expect(formatRoute({ view: 'cluster' })).toBe('#cluster');
+    expect(formatRoute({ view: 'home' })).toBe('#home');
+    expect(formatRoute({ view: 'symbuilder', sub: 'progress' })).toBe('#symbuilder/progress');
+  });
+
+  it('each view sits in one of the four tabs: set-up, results and compare in analysis', () => {
+    expect(SYM_VIEWS).toEqual(['build', 'systems', 'files', 'progress', 'summary']);
+    expect(tabOf({ view: 'home' })).toBe('home');
+    expect(tabOf({ view: 'symbuilder', sub: 'files' })).toBe('symbuilder');
+    expect(tabOf({ view: 'setup', step: 'groups', batch: false })).toBe('analysis');
+    expect(tabOf({ view: 'results', job: null })).toBe('analysis');
+    expect(tabOf({ view: 'compare', jobs: [] })).toBe('analysis');
+    expect(tabOf({ view: 'cluster' })).toBe('cluster');
   });
 
   it('never writes an id it would not read', () => {

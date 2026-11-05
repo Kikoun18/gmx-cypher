@@ -55,7 +55,7 @@ function watch(page: Page) {
 
 test('tick two jobs, see them side by side and on one graph, export them as one HTML file', async ({ page, context }) => {
   const errors = watch(page)
-  await page.goto(url)
+  await page.goto(url + '#setup/inputs')
   await page.getByRole('tab', { name: /results/ }).click()
   // A click shows one job's result; ticking another selects two, and two open compare in the detail pane.
   await page.getByRole('navigation', { name: 'jobs' }).getByRole('button', { name: /^rdf_o111_Methionine_H/ }).click()
@@ -123,7 +123,7 @@ test('tick two jobs, see them side by side and on one graph, export them as one 
 
 test('the key opens compare and goes back; settings rebind it; records on disk are found', async ({ page }) => {
   const errors = watch(page)
-  await page.goto(url)
+  await page.goto(url + '#setup/inputs')
   // The key works once the page has drawn (its handler is attached then); a press before that is lost under load.
   await expect(page.getByRole('button', { name: 'settings' })).toBeVisible()
   await page.keyboard.press('d')
@@ -163,7 +163,7 @@ test('the key opens compare and goes back; settings rebind it; records on disk a
 
 test('morph the two runs into one card, pick their references, sorted values, headings of my own in the export', async ({ page, context }) => {
   const errors = watch(page)
-  await page.goto(url)
+  await page.goto(url + '#setup/inputs')
   await page.getByRole('tab', { name: /results/ }).click()
   await page.getByRole('navigation', { name: 'jobs' }).getByRole('button', { name: /^rdf_o111_Methionine_H/ }).click()
   await page.getByRole('checkbox', { name: 'select rdf_o111_Methionine_S' }).click()
@@ -250,7 +250,7 @@ test('morph the two runs into one card, pick their references, sorted values, he
 
 test('two RDFs of the vault, whose runs are unknown: the morph menu is there, and they morph by their group names', async ({ page }) => {
   const errors = watch(page)
-  await page.goto(url)
+  await page.goto(url + '#setup/inputs')
   await expect(page.getByRole('button', { name: 'settings' })).toBeVisible()
   await page.keyboard.press('d')
   const dialog = page.getByRole('region', { name: 'compare', exact: true })
@@ -299,7 +299,7 @@ test('two RDFs of the vault, whose runs are unknown: the morph menu is there, an
 
 test('a compare view saved in the vault with the connected project, and opened again (R14b)', async ({ page }) => {
   const errors = watch(page)
-  await page.goto(url)
+  await page.goto(url + '#setup/inputs')
   await expect(page.getByRole('button', { name: 'settings' })).toBeVisible()
   const api = (path: string, body?: unknown) => page.evaluate(async ([p, b]) => { const r = await fetch(p as string, b === undefined ? {} : { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(b) }); return r.json() }, [path, body] as const)
   const project = (await api('/api/vault') as { projects: { id: string }[] }).projects[0].id
