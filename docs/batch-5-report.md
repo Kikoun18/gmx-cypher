@@ -63,8 +63,7 @@ built end to end: the notebook's folder tree, 30 NA_s and 30 CL_2s, nothing else
 `POST /api/build/start` (one build at a time), the runs and their events, cancel (the running step's process group and
 every later system), a step's log. symbuilder · systems' button builds or says why it can't; progress shows each
 system's step of all, what the running step prints, the submit lines of systems that wait for the cluster. The wait for
-mdrun's `.gro` is a setting (10 s, up to 10 min). **Left:** mdrun's own progress bar waits for real `mdrun -v` lines
-(sample 6); the step of all steps stands for it.
+mdrun's `.gro` is a setting (10 s, up to 10 min). mdrun's own progress bar came with sample 6 (§9).
 
 ### R6 Failures, retries, repeats, resume
 `src/lib/build/retry.ts`. Resume continues a failed system in its folder at the first step its record does not have as
@@ -194,6 +193,12 @@ af1c154 The page's theme before the first render: no light-to-dark transition, n
   grompp warnings name them), so the plan keeps them. If your `inputs/` is the upload, set the walkers' mdp to
   `awh_multi.mdp` and hmr's awh to `awh.mdp` in build (files will say what is missing). The mdp files are not in the
   repository.
-- **Still waiting**: sample 6, `mdrun -v`'s own lines, for a progress bar inside each local mdrun step (or, if you
-  prefer, your notebook's own patterns, ported); samples 3, 5, 7 and 8 as before.
-- **Tests**: Vitest 1359 → 1379 passed (1 skipped); Playwright 18, all passing.
+- **Sample 6: `mdrun -v`** (T232). Your minimisation's terminal output is a fixture now (582 steps, the `\r` of each
+  rejected step kept; paths replaced). Progress shows mdrun's own bar for the running mdrun step, read as your
+  notebook's run_live reads it: the output split at `\r` as well as `\n`, the total from `Number of steps = 5000` or
+  `125000 steps,`, each step from `Step= N,` or `step N, remaining wall clock time: S s`. A minimisation also shows its
+  largest force against the tolerance, and says when it converged. The server sends mdrun's head with each step's log,
+  so a page opened mid-run still knows the total. The log shows each line as a terminal would. nvt's and npt's lines
+  are tested as GROMACS prints them; no sample of them was needed beyond your notebook's patterns.
+- **Still waiting**: samples 3, 5, 7 and 8, as before.
+- **Tests**: Vitest 1359 → 1388 passed (1 skipped); Playwright 18, all passing.

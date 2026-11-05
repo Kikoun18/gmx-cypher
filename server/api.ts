@@ -23,6 +23,7 @@ import { listPlans, readPlan, savePlan } from './builds';
 import { baseFolder, checkBuild, checkInputs as checkBuildInputs, checkLanding, readText } from './build-check';
 import { Builder, jobsExec } from './build-run';
 import { reportOf } from './build-report';
+import { mdrunHead } from '../src/lib/build/mdrun';
 import { DEFAULT_PROFILES, profileOf, profileProblem, SCRIPTED_STAGES } from '../src/lib/build/qq';
 import type { Systems } from '../src/lib/build/plan';
 import { recipeFileProblems, type Recipe } from '../src/lib/recipe';
@@ -296,7 +297,8 @@ export function makeApi(ctx: Ctx): Api {
     if (buildLog && req.method === 'GET') {
       if (!buildJobs.get(buildLog[1])) throw new HttpError(404, 'no build step ' + buildLog[1]);
       const from = url.searchParams.get('from');
-      return { body: buildJobs.logRange(buildLog[1], from == null ? undefined : Number(from)) };
+      // With mdrun's head (T232): its number of steps is printed first, which a tail of a long log no longer holds.
+      return { body: { ...buildJobs.logRange(buildLog[1], from == null ? undefined : Number(from)), head: mdrunHead(buildJobs.logRange(buildLog[1], 0, 16_384).text) } };
     }
     if (is(req, 'GET', url, '/api/build/text')) return { body: { text: readText(baseFolder(ctx.config.base, ctx.config.allow), url.searchParams.get('path') ?? '') } };
     if (is(req, 'GET', url, '/api/builds')) return { body: listPlans(ctx.home) };

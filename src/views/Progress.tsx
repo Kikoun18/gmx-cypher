@@ -1,5 +1,6 @@
 import * as React from 'react'
-import type { BuildRun, SystemRun, SystemStatus } from '../builds'
+import type { BuildRun, StepLog, SystemRun, SystemStatus } from '../builds'
+import { mdrunProgress, screenText, type MdrunProgress } from '../lib/build/mdrun'
 import type { Level } from '../core/contract'
 import { cn } from '../lib/utils'
 import { Button } from '../ui/button'
@@ -34,9 +35,28 @@ function SystemRow({ s, selected, onSelect }: { s: SystemRun; selected: boolean;
   )
 }
 
+/** A force as GROMACS prints it: 9.6e+02. */
+const sci = (v: number) => { const [m, e] = v.toExponential(1).split('e'); return m + 'e' + (e[0] === '-' ? '-' : '+') + e.replace(/^[+-]/, '').padStart(2, '0') }
+const secs = (s: number) => (s >= 3600 ? Math.floor(s / 3600) + ' h ' + Math.round((s % 3600) / 60) + ' min' : s >= 60 ? Math.floor(s / 60) + ' min ' + (s % 60) + ' s' : s + ' s')
+
+/** mdrun's own progress (T232), from what it prints with -v: its step of all, the time left, a minimisation's force. */
+export function MdrunBar({ p, label }: { p: MdrunProgress; label: string }) {
+  const step = p.done ? p.done.steps : p.step, pct = p.done ? 100 : Math.min(100, Math.round((100 * step) / p.total))
+  const text = p.done ? (p.kind === 'em' ? p.done.how + ' in ' + p.done.steps + ' steps' : p.done.how + ': ' + p.total + ' steps')
+    : 'step ' + step + ' of ' + (p.kind === 'em' ? 'at most ' : '') + p.total
+      + (p.left != null ? ' · ' + secs(p.left) + ' left' : p.finish ? ' · will finish ' + p.finish : '')
+      + (p.fmax != null ? ' · Fmax ' + sci(p.fmax) + (p.tolerance != null ? ', converged below ' + sci(p.tolerance) : '') : '')
+  return (
+    <div className="flex flex-col gap-1">
+      <span role="progressbar" aria-label={label + ': mdrun\'s steps'} aria-valuemin={0} aria-valuemax={p.total} aria-valuenow={step} aria-valuetext={text} className="h-2 w-full overflow-hidden rounded-full bg-muted"><span className="block h-full rounded-full bg-[var(--state)]" style={{ width: pct + '%' }} /></span>
+      <span className="text-caption tabular-nums text-muted-foreground">{text}</span>
+    </div>
+  )
+}
+
 /** symbuilder · progress (R5c): the last build, its systems one at a time, the step running and what it prints. */
 export function ProgressView({ runs, logs, loadLog, onCancel, onRetry }: {
-  runs: BuildRun[]; logs: Record<string, { text: string; end: number }>; loadLog: (id: string) => void; onCancel: (id: string) => void
+  runs: BuildRun[]; logs: Record<string, StepLog>; loadLog: (id: string) => void; onCancel: (id: string) => void
   /** R6: a failed system again, resumed in its folder or rebuilt after its folder moves to failed/. */
   onRetry?: (run: string, dir: string, how: 'resume' | 'rebuild') => Promise<unknown>
 }) {
@@ -44,6 +64,8 @@ export function ProgressView({ runs, logs, loadLog, onCancel, onRetry }: {
   const [picked, setPicked] = React.useState<string | null>(null), [retryError, setRetryError] = React.useState('')
   const sel = run && (run.systems.find(s => s.dir === picked) ?? run.systems.find(s => s.status === 'building') ?? run.systems.find(s => s.status === 'failed') ?? run.systems[0])
   const job = sel?.job
+  // mdrun's own bar, for an mdrun step (T232): what it printed, its head kept from the log's start.
+  const mdrun = job && sel?.label?.startsWith('mdrun ') && logs[job] ? mdrunProgress(logs[job].text, logs[job].head ?? null) : null
   React.useEffect(() => { if (job && logs[job] == null) loadLog(job) }, [job, logs, loadLog])
   if (!run) return <p className="m-0 text-control text-muted-foreground">nothing is building · plan a build in <a className="underline underline-offset-[3px]" href="#symbuilder/systems">systems</a></p>
   const count = (...k: SystemStatus[]) => run.systems.filter(s => k.includes(s.status)).length
@@ -91,7 +113,8 @@ export function ProgressView({ runs, logs, loadLog, onCancel, onRetry }: {
             </>}
             {job && <>
               <Head label={'log · ' + (sel.label ?? '')} />
-              <pre aria-live="off" className="m-0 max-h-[420px] overflow-auto whitespace-pre-wrap rounded-xl border border-border bg-background px-3 py-2 text-caption">{(logs[job]?.text ?? '').split('\n').slice(-60).join('\n') || 'nothing printed yet'}</pre>
+              {mdrun && <MdrunBar p={mdrun} label={sel.label ?? 'mdrun'} />}
+              <pre aria-live="off" className="m-0 max-h-[420px] overflow-auto whitespace-pre-wrap rounded-xl border border-border bg-background px-3 py-2 text-caption">{screenText(logs[job]?.text ?? '').split('\n').slice(-60).join('\n') || 'nothing printed yet'}</pre>
             </>}
           </Panel>
         )}

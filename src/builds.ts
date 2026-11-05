@@ -4,6 +4,7 @@
 import * as React from 'react'
 import { getJson, postJson } from './api'
 import type { BuildDraft } from './buildDraft'
+import { mdrunHead, type MdrunHead } from './lib/build/mdrun'
 
 export type SystemStatus = 'waiting' | 'building' | 'built' | 'cluster' | 'failed' | 'skipped' | 'cancelled'
 export interface SystemRun {
@@ -18,12 +19,15 @@ export interface BuildRun {
 }
 
 const KEEP = 32_768
+/** A step's log as the page holds it: its last 32 kB, where that ends, and mdrun's head once known. */
+export interface StepLog { text: string; end: number; head?: MdrunHead | null }
 
 export function useBuilds() {
   const [runs, setRuns] = React.useState<BuildRun[]>([])
   // Each step's log as far as it is known: its last 32 kB and where that ends in the whole log, so a chunk that came
-  // while the log was read is neither lost nor added twice (the review).
-  const [logs, setLogs] = React.useState<Record<string, { text: string; end: number }>>({})
+  // while the log was read is neither lost nor added twice (the review); and mdrun's head (its number of steps, T232),
+  // kept once seen, as the last 32 kB of a long run no longer hold it.
+  const [logs, setLogs] = React.useState<Record<string, StepLog>>({})
   React.useEffect(() => {
     getJson<BuildRun[]>('/api/build/runs').then(setRuns, () => {})
     const es = new EventSource('/api/events')
@@ -37,15 +41,17 @@ export function useBuilds() {
         const had = l[id]
         if (had && had.end >= end) return l
         // Only what the log lacks: the chunk's tail past what is held (all of it when nothing was read yet).
-        const add = had ? s.slice(Math.max(0, s.length - (end - had.end))) : s
-        return { ...l, [id]: { text: ((had?.text ?? '') + add).slice(-KEEP), end } }
+        const add = had ? s.slice(Math.max(0, s.length - (end - had.end))) : s, text = (had?.text ?? '') + add
+        // The head is read from the log's start, as it comes: only while what is held still begins there.
+        const head = had?.head ?? (text.length === end ? mdrunHead(text) : null)
+        return { ...l, [id]: { text: text.slice(-KEEP), end, head } }
       })
     })
     return () => es.close()
   }, [])
   // A step's log from the server, when the page opens on it after it began.
   const loadLog = React.useCallback((id: string) => {
-    getJson<{ text: string; to: number }>('/api/build/jobs/' + id + '/log').then(g => setLogs(l => (l[id] && l[id].end >= g.to ? l : { ...l, [id]: { text: g.text.slice(-KEEP), end: g.to } })), () => {})
+    getJson<{ text: string; to: number; head: MdrunHead | null }>('/api/build/jobs/' + id + '/log').then(g => setLogs(l => (l[id] && l[id].end >= g.to ? (l[id].head || !g.head ? l : { ...l, [id]: { ...l[id], head: g.head } }) : { ...l, [id]: { text: g.text.slice(-KEEP), end: g.to, head: l[id]?.head ?? g.head } })), () => {})
   }, [])
   const start = React.useCallback((d: BuildDraft) => postJson<BuildRun>('/api/build/start', { plan: d.plan, systems: d.systems, ifExists: d.ifExists, onFailure: d.onFailure })
     .then(r => { setRuns(list => [r, ...list.filter(x => x.id !== r.id)]); return r }), [])

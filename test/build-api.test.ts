@@ -35,6 +35,10 @@ describe('POST /api/build/start', () => {
     const rec = JSON.parse(readFileSync(join(base, 'solutions/hmr+fast+6/o111/hhhhhhhh/build.json'), 'utf8'));
     const genion = rec.steps.find((x: { label: string }) => x.label === 'add salt').job;
     expect((await s.call('/api/build/jobs/' + genion + '/log')).json.text).toContain('Will try to add 30 NA_s ions and 30 CL_2s ions.');
+    // mdrun's head comes with its log (T232): its number of steps, which a long run's tail no longer holds.
+    const minim = rec.steps.find((x: { label: string }) => x.label === 'mdrun 4.minim').job;
+    expect((await s.call('/api/build/jobs/' + minim + '/log?from=900000')).json).toMatchObject({ text: '', head: { kind: 'em', total: 5000, tolerance: 1000 } });
+    expect((await s.call('/api/build/jobs/' + genion + '/log')).json.head).toBeNull();
     expect((await s.call('/api/jobs')).json).toEqual([]);
     await s.close();
   }, 60_000);

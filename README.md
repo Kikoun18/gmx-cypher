@@ -100,7 +100,9 @@ walkers are prepared and get their qq script and `qq submit` line (nothing is su
   (`1 8 1 1`, one press). GLY's and PRO's own termini (`GLY-NH3+`, `PRO-NH2+`) count as NH3+. A method without hmr
   whose stage uses an mdp with a time step over 2 fs (your `pull.mdp` and `awh_multi.mdp` set 4 fs) is flagged,
   but not stopped.
-- **progress**: the last build, each system's step of all its steps and what the running step prints, the qq submit
+- **progress**: the last build, each system's step of all its steps and what the running step prints (as a terminal
+  shows it: each line as mdrun's last `\r` rewrite left it), mdrun's own bar for minimisation, nvt and npt (its step of
+  all, the time left, a minimisation's largest force against its tolerance, read as your notebook reads `mdrun -v`), the qq submit
   lines of the systems that wait for the cluster, and *cancel the build* (it stops the running step's process group
   and every system after it). A system stops at the first GROMACS fatal error, quoted with its stage, whatever the exit
   code (or at any non-zero exit with strict mode on), with a hint for the pull's two box errors; the others go on, or

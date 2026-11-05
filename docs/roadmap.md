@@ -270,7 +270,7 @@ From [`batch-4.md`](batch-4.md) §6: SymBuilder inside gmx-cypher, four tabs (ho
 ### Phase 4: Building here (R5, R6)
 - [x] R5a Folders and the writing rule; the build record (`server/build-run.ts`: one system at a time, `<system>/build.json` with every file written or replaced and GROMACS's backups; fatal text by `src/lib/build/fatal.ts`)
 - [x] R5b The steps, with fake tools from real output (`test/fake-gmx-build.mjs` and `test/fake-python.mjs` print the notebook's own build of hhhhhhhh; `server/python/build_peptide.py` and `hmr.py` shipped; one system end to end)
-- [x] R5c Progress, waiting for outputs, cancel (`POST /api/build/start`, runs and cancel; symbuilder · progress; the wait in settings; mdrun's own progress bar waits for sample 6)
+- [x] R5c Progress, waiting for outputs, cancel (`POST /api/build/start`, runs and cancel; symbuilder · progress; the wait in settings; mdrun's own progress bar from its `-v` lines, sample 6, T232)
 - [x] R6 Failures, retries, repeats, resume (`src/lib/build/retry.ts`; resume or rebuild a failed system, the folder moved to `failed/`; continue, skip or repeat for a folder that exists; a failed walker rebuilt once from the nearest; the hint on the real box errors)
 
 ### Phase 5: The cluster (R7)

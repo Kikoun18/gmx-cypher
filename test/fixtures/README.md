@@ -74,3 +74,5 @@ GROMACS install as `/opt/gromacs-2025.4`, in the header and banner lines.
   left out.
 - `build/ff-menus/` — your force field's `.tdb` block names (headers only, no parameters) and `watermodels.dat`, for
   pdb2gmx's menus (T230); its own README says more.
+- `build/mdrun-v/minim.txt` — your `gmx_mpi mdrun -deffnm 4.minim -v` output (sample 6, T232), every byte kept
+  except the executable, data prefix and working folder's start (as in `build/notebook/`); its README says more.
