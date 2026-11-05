@@ -248,11 +248,12 @@ From [`batch-4.md`](batch-4.md) §6: SymBuilder inside gmx-cypher, four tabs (ho
 - [x] Baseline recorded; sections 3 and 4 confirmed or corrected (report §1–§2; Playwright needs the page to have an icon with this Chromium, §1)
 - [x] The notebook-to-request table; the board-to-place map; design pass with screenshots (report §3–§4, `docs/img/batch-4/`)
 - [x] Phase 0 report for R1–R10; samples asked for (report §5–§7)
-- [ ] Questions answered; decisions recorded; order and cut confirmed
+- [x] Questions answered; decisions recorded; order and cut confirmed (T201–T221; questions 12 and 34 open until batch 5)
 
 ### Phase 1: The shell (R1, R2)
 - [ ] R1a Contract amended for the new words (question 1, 2)
 - [ ] R1b Four tabs, routes, every old address
+- [ ] R1c The mock-up's look: Morpheus's current tokens, coral for UI state, status as a dot and word (T218)
 - [ ] R2 home
 
 ### Phase 2: The plan, with nothing run (R3, R4)

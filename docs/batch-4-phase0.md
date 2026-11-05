@@ -6,7 +6,7 @@ The plan for [`batch-4.md`](batch-4.md): the baseline, the spec checked against 
 
 **Sources read.** The code of both apps; the mock-up (`symbuilder-mockup.zip`, 10 boards); two notebooks: `solution_builder_seq_5_4.ipynb` (the one the spec names, saved outputs from a 42-system build on 2026-09-25) and `solution_builder_seq_5.ipynb` (an older version, with `qq submit` cells and their output). Both notebooks stay outside the repository (question 19). Quotes from them below have the storage path written `<base>` and the user name removed.
 
-**Status:** waiting for your answers. Phase 1 does not start before them.
+**Answered 2026-11-05:** question 6, submitting becomes a setting, off by default; question 22, (b), pdb2gmx inside `ff/` with menu answers per sequence; question 24, `hmr_multi.mdp` for every method's walkers for now; everything else as recommended (decisions T201–T221). Questions 12 and 34 stay open until batch 5.
 
 ---
 
