@@ -264,7 +264,7 @@ From [`batch-4.md`](batch-4.md) §6: SymBuilder inside gmx-cypher, four tabs (ho
 
 ### Phase 3: The Matrix's names (R8a, R8b)
 - [x] R8a Systems from a project: the groups, column labels and sequences, or only the cells with no runs (`Systems.only`, each cell with its repeats) (T223)
-- [x] R8b Folders and names the project reads, checked with the Matrix's code: `systemLanding` through `planBatch`, `POST /api/build/landing`, the preview's "in the project" line (T224)
+- [x] R8b Folders and names the project reads, checked with the Matrix's code: `systemLanding` through `planBatch`, `POST /api/build/landing`, the preview's "in the project" line (T224); one PMF per system, the multiwalker one from `9.multiwalker/1` (T228, question 12)
 
 ### Phase 4: Building here (R5, R6)
 - [x] R5a Folders and the writing rule; the build record (`server/build-run.ts`: one system at a time, `<system>/build.json` with every file written or replaced and GROMACS's backups; fatal text by `src/lib/build/fatal.ts`)

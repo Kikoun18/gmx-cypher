@@ -7,7 +7,7 @@ import { extname, isAbsolute, join, normalize } from 'node:path';
 import { mergeSettings } from '../../matrix/src/lib/seq';
 import type { Store } from '../../matrix/src/lib/types';
 import { inputsOf, type Input } from '../src/lib/build/inputs';
-import { systemLanding, type FolderLanding } from '../src/lib/build/landing';
+import { systemLanding, type PmfLanding } from '../src/lib/build/landing';
 import { planProblems, systemsOf, systemsProblems, type BuildPlan, type Systems } from '../src/lib/build/plan';
 import { within } from './files';
 import { HttpError } from './http';
@@ -49,12 +49,12 @@ export function checkInputs(base: string, plan: unknown, systems: Systems): { ba
 /** The most systems a landing check reads (the preview lists 200). */
 export const LANDING_MAX = 200;
 /**
- * Where each system's PMFs would land in the connected project (R8b): the project read, nothing written. `base` is
- * the base folder as set (the folders a header would carry), or none.
+ * Where each system's PMF would land in the connected project (R8b): the project read, nothing written. `base` is
+ * the base folder as set (the folders a header would carry), or none. A system is null when its build has no PMF.
  */
 export function checkLanding(read: { store: Store; state: { project: { name: string } } }, plan: unknown, systems: Systems, base: string | null) {
   const p = checked(plan, systems), all = systemsOf(systems), st = mergeSettings({}, read.store.settings);
-  const out: Record<string, FolderLanding[]> = {};
+  const out: Record<string, PmfLanding | null> = {};
   for (const sys of all.slice(0, LANDING_MAX)) out[sys.dir] = systemLanding(read.store, p, sys, base);
   return { project: { name: read.state.project.name, pattern: st.pattern, pathPattern: st.pathPattern }, systems: out, more: Math.max(0, all.length - LANDING_MAX) };
 }

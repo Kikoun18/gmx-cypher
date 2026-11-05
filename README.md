@@ -84,12 +84,13 @@ walkers are prepared and get their qq script and `qq submit` line (nothing is su
   you say *replace*), opened, exported and imported as JSON.
 - **systems**: the methods, saccharides and sequences (each name checked: it becomes a folder and an argument), repeats
   (`hmr+fast+6r`, `r1`, …), what to do with a folder that exists, and the preview: every system, its check (files
-  missing, a stage order that can't work), and, with a connected project, **where its PMFs would land** in it. *From
+  missing, a stage order that can't work), and, with a connected project, **where its PMF would land** in it. *From
   the project* takes the project's row groups, column labels and sequences; *build what the project lacks* only the
-  cells with no runs. Where a PMF would land is worked out with the Matrix's own `planBatch`, for the AWH folder and
-  each walker folder, named by the project's name pattern: another row, column or run, a new row because the project's
-  row is named apart from its sequence, a folder pattern that reads `7.awh` as a run, are said in words before
-  anything is built.
+  cells with no runs. The PMF is the multiwalker one: the walkers share one bias, so `gmx awh` on walker 1's energy
+  file gives it, run in `9.multiwalker/1` (7.awh is prepared, not run). Where it would land is worked out with the
+  Matrix's own `planBatch` for that folder, named by the project's name pattern: another row, column or run, a new row
+  because the project's row is named apart from its sequence, a folder pattern that reads the folder as something
+  else, are said in words before anything is built.
 - **files**: what a build reads from the **base folder** (*settings → SymBuilder*; it must be inside an allowed
   folder): each saccharide's `.gro` and `-ADD.itp`, the force field and its includes, and the mdp file of each stage
   per method, each *found* or *missing*. Click an mdp file to read it.

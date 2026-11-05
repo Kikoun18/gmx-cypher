@@ -7,7 +7,7 @@ import { EMPTY_BUILD, type BuildDraft } from '../src/buildDraft';
 import { BuildView } from '../src/views/Build';
 import { KINDS, stepLine } from '../src/lib/build/tiles';
 import { InProject, SystemsView } from '../src/views/Systems';
-import type { FolderLanding } from '../src/lib/build/landing';
+import type { PmfLanding } from '../src/lib/build/landing';
 import { BuildFilesView } from '../src/views/BuildFiles';
 import { ProgressView } from '../src/views/Progress';
 import { ClusterScriptsView } from '../src/views/ClusterScripts';
@@ -112,35 +112,33 @@ describe('symbuilder · files (R4)', () => {
   });
 });
 
-describe('symbuilder · systems: where each lands in the project (R8b)', () => {
-  const f = (o: Partial<FolderLanding>): FolderLanding => ({ folder: '', what: 'walker', name: '', row: 'AAAAAAAA', rowNew: false, group: 'hmr+fast+6', col: 'O111', colNew: false, run: 1, replaces: false, problems: [], ...o });
-  const html = (folders: FolderLanding[] | undefined) => renderToStaticMarkup(createElement(InProject, { folders }));
-  it('the row, column and runs, ranges joined', () => {
-    expect(html([f({ what: 'awh', run: 9 }), ...[1, 2, 3, 4].map(n => f({ n, run: n }))])).toContain('AAAAAAAA · O111 · run 9, walkers 1–4');
-    expect(html([f({ what: 'awh', run: 1, rowNew: true, colNew: true, row: 'GG', col: 'XYL' })])).toContain('GG (new row) · XYL (new column) · run 1');
+describe('symbuilder · systems: where each PMF lands in the project (R8b)', () => {
+  const f = (o: Partial<PmfLanding>): PmfLanding => ({ folder: '', name: '', row: 'AAAAAAAA', rowNew: false, group: 'hmr+fast+6', col: 'O111', colNew: false, run: 1, replaces: false, problems: [], ...o });
+  const html = (pmf: PmfLanding | null | undefined) => renderToStaticMarkup(createElement(InProject, { pmf }));
+  it('the row, column and run', () => {
+    expect(html(f({ run: 9 }))).toContain('AAAAAAAA · O111 · run 9');
+    expect(html(f({ run: 1, rowNew: true, colNew: true, row: 'GG', col: 'XYL' }))).toContain('GG (new row) · XYL (new column) · run 1');
   });
-  it('runs the project has already: replaced, said as a check', () => {
-    const h = html([f({ what: 'awh', run: 3 }), f({ n: 1, run: 1, replaces: true }), f({ n: 2, run: 2, replaces: true })]);
+  it('a run the project has already: replaced, said as a check', () => {
+    const h = html(f({ run: 1, replaces: true }));
     expect(h).toContain('>replaces<');
-    expect(h).toContain('replaces runs 1–2');
+    expect(h).toContain('replaces the project&#x27;s run 1');
   });
-  it('the first problem, where, and how many more, each said once', () => {
-    const h = html([f({ what: 'awh', problems: ['group solutions, not hmr+fast+6', 'column hmr+fast+6, not O111'] }), f({ n: 1, problems: ['x'] })]);
+  it('the first problem, and how many more', () => {
+    const h = html(f({ problems: ['group solutions, not hmr+fast+6', 'column hmr+fast+6, not O111'] }));
     expect(h).toContain('>elsewhere<');
-    expect(h).toContain('7.awh: group solutions, not hmr+fast+6 · and 2 more');
-    const every = html([f({ what: 'awh', problems: ['a new row WRWYCR'] }), f({ n: 1, problems: ['a new row WRWYCR'] })]);
-    expect(every).toContain('<span class="min-w-0">a new row WRWYCR</span>');
+    expect(h).toContain('group solutions, not hmr+fast+6 · and 1 more');
   });
-  it('no awh or walkers: nothing lands', () => {
-    expect(html([])).toContain('no awh or walkers in this build');
+  it('no pull or walkers: no PMF; not checked: nothing', () => {
+    expect(html(null)).toContain('no pull or walkers in this build: no PMF');
     expect(html(undefined)).toBe('<span></span>');
   });
   it('the preview has the column only with a project', () => {
     expect(renderToStaticMarkup(createElement(SystemsView, { draft, setDraft: noop }))).not.toContain('system · in the project');
-    const landing = { project: { name: 'innit', pattern: '{method}_{column}_{seq}_t{time}.xvg', pathPattern: '' }, systems: { 'solutions/hmr+fast+6/o111/aaaaaaaa': [f({ what: 'awh' })] }, more: 0 };
+    const landing = { project: { name: 'innit', pattern: '{method}_{column}_{seq}_t{time}.xvg', pathPattern: '' }, systems: { 'solutions/hmr+fast+6/o111/aaaaaaaa': f({}) }, more: 0 };
     const h = renderToStaticMarkup(createElement(SystemsView, { draft, setDraft: noop, landing }));
     expect(h).toContain('<span>system · in the project</span>');
-    expect(h).toContain('where each PMF would land in innit, by the Matrix&#x27;s own planBatch · name pattern {method}_{column}_{seq}_t{time}.xvg · folder pattern none');
+    expect(h).toContain('where each system&#x27;s multiwalker PMF (gmx awh in 9.multiwalker/1) would land in innit, by the Matrix&#x27;s own planBatch · name pattern {method}_{column}_{seq}_t{time}.xvg · folder pattern none');
     expect(h.match(/>lands</g)).toHaveLength(1);
   });
 });

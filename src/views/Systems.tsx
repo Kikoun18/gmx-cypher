@@ -2,7 +2,7 @@ import * as React from 'react'
 import { X } from 'lucide-react'
 import type { BuildLanding } from '../buildCheck'
 import type { BuildDraft, IfExists } from '../buildDraft'
-import type { FolderLanding } from '../lib/build/landing'
+import type { PmfLanding } from '../lib/build/landing'
 import { nameProblem, repeatClashes, repeatName, STAGES, switches, systemsOf, type Systems } from '../lib/build/plan'
 import { systemsFromProject, type ProjectLike } from '../lib/build/project'
 import { orderProblems, planSystem } from '../lib/build/steps'
@@ -59,26 +59,13 @@ function FromProject({ project, systems, set }: { project: ProjectLike | null; s
   )
 }
 
-const runList = (ns: number[]) => {
-  const out: string[] = []
-  for (let i = 0; i < ns.length; i++) { let j = i; while (j + 1 < ns.length && ns[j + 1] === ns[j] + 1) j++; out.push(j > i ? ns[i] + '–' + ns[j] : String(ns[i])); i = j }
-  return out.join(', ')
-}
-/** Where one system's PMFs would land (R8b): the first problem in words, or the row, column and runs. */
-export function InProject({ folders }: { folders: FolderLanding[] | undefined }) {
-  if (!folders) return <span />
-  if (!folders.length) return <span className="text-muted-foreground">no awh or walkers in this build</span>
-  // One problem is often every folder's (a new row, a column): each is said once, with where when not everywhere.
-  const all = [...new Set(folders.flatMap(f => f.problems))]
-  if (all.length) {
-    const at = folders.filter(f => f.problems.includes(all[0])), where = at.length === folders.length ? '' : (at[0].what === 'awh' ? '7.awh' : 'walker ' + at[0].n) + ': '
-    return <Status inline level="error" word="elsewhere">{where}{all[0]}{all.length > 1 ? ' · and ' + (all.length - 1) + ' more' : ''}</Status>
-  }
-  const f = folders[0], awh = folders.filter(x => x.what === 'awh').map(x => x.run), walkers = folders.filter(x => x.what === 'walker').map(x => x.run)
-  const runs = [awh.length ? 'run ' + awh[0] : '', walkers.length ? 'walkers ' + runList(walkers) : ''].filter(Boolean).join(', ')
-  const text = f.row + (f.rowNew ? ' (new row)' : '') + ' · ' + f.col + (f.colNew ? ' (new column)' : '') + ' · ' + runs
-  const replaced = folders.filter(x => x.replaces).map(x => x.run)
-  return replaced.length ? <Status inline level="warning" word="replaces">{text} · replaces {replaced.length === 1 ? 'run' : 'runs'} {runList([...new Set(replaced)].sort((a, b) => a - b))}</Status> : <Status inline level="ok" word="lands">{text}</Status>
+/** Where one system's PMF would land (R8b): its first problem in words, or the row, column and run. */
+export function InProject({ pmf }: { pmf: PmfLanding | null | undefined }) {
+  if (pmf === undefined) return <span />
+  if (!pmf) return <span className="text-muted-foreground">no pull or walkers in this build: no PMF</span>
+  if (pmf.problems.length) return <Status inline level="error" word="elsewhere">{pmf.problems[0]}{pmf.problems.length > 1 ? ' · and ' + (pmf.problems.length - 1) + ' more' : ''}</Status>
+  const text = pmf.row + (pmf.rowNew ? ' (new row)' : '') + ' · ' + pmf.col + (pmf.colNew ? ' (new column)' : '') + ' · run ' + pmf.run
+  return pmf.replaces ? <Status inline level="warning" word="replaces">{text} · replaces the project's run {pmf.run}</Status> : <Status inline level="ok" word="lands">{text}</Status>
 }
 
 /** symbuilder · systems (R3c): methods × saccharides × sequences, repeats, and a preview of every system before anything runs. */
@@ -163,12 +150,12 @@ export function SystemsView({ draft, setDraft, missing = null, project = null, l
                 <span className="truncate">{sys.method} / <span className={toneText[sacTone(sys.saccharide)]}>{sys.saccharide}</span> / <b>{sys.sequence}</b>{switches(sys.method).hmr ? <span className={cn('ml-2 rounded px-1', toneSoft.sky)}>hmr</span> : null}{switches(sys.method).fast ? <span className={cn('ml-1 rounded px-1', toneSoft.aqua)}>fast</span> : null}</span>
                 {missing?.[sys.dir] ? <Status inline level="error" word="missing" className="w-full"><span className="block truncate" title={missing[sys.dir].join(', ')}>{missing[sys.dir].join(', ')}</span></Status>
                   : problems.length ? <Status inline level="error" word="order" className="w-full"><span className="block truncate" title={problems[0]}>{problems[0]}</span></Status> : <Status inline level="ok" word="ready" />}
-                {inProject && <div className="col-span-2 pl-3"><InProject folders={landing?.systems[sys.dir]} /></div>}
+                {inProject && <div className="col-span-2 pl-3"><InProject pmf={landing ? landing.systems[sys.dir] : undefined} /></div>}
               </div>
             ))}
           </div>
         )}
-        {landing && <span className="text-caption text-muted-foreground">in the project: where each PMF would land in {landing.project.name}, by the Matrix's own planBatch · name pattern {landing.project.pattern} · folder pattern {landing.project.pathPattern || 'none'}{landing.more ? ' · the first 200 systems are checked' : ''}</span>}
+        {landing && <span className="text-caption text-muted-foreground">in the project: where each system's multiwalker PMF (gmx awh in 9.multiwalker/1) would land in {landing.project.name}, by the Matrix's own planBatch · name pattern {landing.project.pattern} · folder pattern {landing.project.pathPattern || 'none'}{landing.more ? ' · the first 200 systems are checked' : ''}</span>}
         <div className="flex flex-wrap items-center gap-2">
           <Button size="lg" disabled={!!why || starting} aria-describedby="build-why" onClick={() => { if (!build) return; setStarting(true); setFailed(''); build.start().catch(e => setFailed((e as Error).message)).finally(() => setStarting(false)) }}>build {all.length} {all.length === 1 ? 'system' : 'systems'}</Button>
           <span id="build-why" className="text-caption text-muted-foreground">{why ?? 'one system at a time, here · awh, the pull and the walkers get their qq script and submit line · nothing is overwritten'}</span>

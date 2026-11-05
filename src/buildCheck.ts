@@ -4,7 +4,7 @@ import * as React from 'react'
 import { postJson } from './api'
 import type { BuildDraft } from './buildDraft'
 import type { Input } from './lib/build/inputs'
-import type { FolderLanding } from './lib/build/landing'
+import type { PmfLanding } from './lib/build/landing'
 
 export interface BuildCheck { base: string; files: (Input & { found: boolean })[]; missing: Record<string, string[]> }
 
@@ -21,8 +21,8 @@ export function useBuildCheck(draft: BuildDraft, base: string | null | undefined
   return base && read?.base === base ? { check: read.check, error: read.error } : { check: null, error: '' }
 }
 
-/** Where each system's PMFs would land in the connected project (R8b), as `POST /api/build/landing` answers. */
-export interface BuildLanding { project: { name: string; pattern: string; pathPattern: string }; systems: Record<string, FolderLanding[]>; more: number }
+/** Where each system's PMF would land in the connected project (R8b), as `POST /api/build/landing` answers. */
+export interface BuildLanding { project: { name: string; pattern: string; pathPattern: string }; systems: Record<string, PmfLanding | null>; more: number }
 
 export function useBuildLanding(draft: BuildDraft, project: string | null | undefined, base: string | null | undefined): BuildLanding | null {
   const [landing, setLanding] = React.useState<{ key: string; landing: BuildLanding } | null>(null)
