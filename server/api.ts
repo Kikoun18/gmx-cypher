@@ -19,6 +19,7 @@ import type { Job, Jobs } from './jobs';
 import { Batches, checkRunInputs, findTrajectories, sendAll } from './batch';
 import { Cluster } from './cluster';
 import { listRecipes, readRecipe, saveRecipe } from './recipes';
+import { listPlans, readPlan, savePlan } from './builds';
 import { recipeFileProblems, type Recipe } from '../src/lib/recipe';
 import { cpus } from 'node:os';
 import { planRun, recordWritten, startRun } from './runs';
@@ -243,6 +244,10 @@ export function makeApi(ctx: Ctx): Api {
       if (!ctx.config.vault) throw new HttpError(409, 'no vault set');
       return { body: await sendAll(ctx, b, (await readJson<{ project: string }>(req)).project) };
     }
+    if (is(req, 'GET', url, '/api/builds')) return { body: listPlans(ctx.home) };
+    if (is(req, 'POST', url, '/api/builds')) return { body: savePlan(ctx.home, await readJson(req), url.searchParams.get('replace') === '1') };
+    const plan = /^\/api\/builds\/([^/]+)$/.exec(url.pathname);
+    if (plan && req.method === 'GET') return { body: readPlan(ctx.home, decodeURIComponent(plan[1])) };
     if (is(req, 'GET', url, '/api/recipes')) return { body: listRecipes(ctx.home) };
     if (is(req, 'POST', url, '/api/recipes')) return { body: saveRecipe(ctx.home, await readJson(req), url.searchParams.get('replace') === '1') };
     const recipe = /^\/api\/recipes\/([^/]+)$/.exec(url.pathname);
