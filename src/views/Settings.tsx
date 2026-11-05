@@ -1,5 +1,6 @@
 import * as React from 'react'
 import { Button } from '../ui/button'
+import { Checkbox } from '../ui/checkbox'
 import { Dialog, DialogBody, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogHeading, DialogTitle } from '../ui/dialog'
 import { Input } from '../ui/input'
 import { Field, FieldHint, Label } from '../ui/label'
@@ -11,6 +12,7 @@ import { bindingOf, DEFAULT_BINDINGS, keyLabel, keyProblem, pressed, useBindings
 import { KEYS, type KeyAction } from '../core/contract'
 import { Status } from '../ui/status'
 import { ExportSettings } from './ExportSettings'
+import { DEFAULT_PROFILES, PROFILES, SCRIPTED_STAGES, type ScriptedStage } from '../lib/build/qq'
 
 /** The key of one action: change it by pressing the new one (Escape keeps the old one); what it would clash with, in words. */
 function KeyField({ action, words, bindings, setBindings }: { action: KeyAction; words: string; bindings: Bindings; setBindings: (b: Bindings) => void }) {
@@ -77,6 +79,12 @@ export function Settings({ state, open, onOpenChange, onState, returnFocus }: { 
     try { onState(await postJson<AppState>('/api/config', { base: sym.base.trim() || null, python: sym.python.trim() || null, buildWait: { every: Number(sym.every), max: Number(sym.max) } })); setSymError('') } catch (e) { setSymError((e as Error).message) }
   }
   const symChanged = sym.base.trim() !== (state.config.base || '') || sym.python.trim() !== (state.config.python || '') || sym.every !== String(w0.every) || sym.max !== String(w0.max)
+  // A build's qq scripts (R7a): each stage's profile, the queue, and whether gmx-cypher submits them (T206, off by default).
+  const q0 = { profiles: { ...DEFAULT_PROFILES, ...(state.config.qqBuild?.profiles ?? {}) } as Record<ScriptedStage, string>, submit: state.config.qqBuild?.submit ?? false, queue: state.config.qqBuild?.queue ?? 'gpu' }
+  const [qqb, setQqb] = React.useState(q0)
+  const [qqbError, setQqbError] = React.useState('')
+  const saveQqb = async () => { try { onState(await postJson<AppState>('/api/config', { qqBuild: qqb })); setQqbError('') } catch (e) { setQqbError((e as Error).message) } }
+  const qqbChanged = JSON.stringify(qqb) !== JSON.stringify(q0)
   const savePmfUrl = async () => { try { onState(await postJson<AppState>('/api/config', { pmfUrl: pmfUrl.trim() || null })); setPmfError('') } catch (e) { setPmfError((e as Error).message) } }
   // The vault's projects, for the connected one (R14b): read again when the vault changes.
   const vaultAt = state.config.vault, [read, setRead] = React.useState<{ vault: string; projects: { id: string; name: string }[] } | null>(null)
@@ -205,6 +213,27 @@ export function Settings({ state, open, onOpenChange, onState, returnFocus }: { 
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" onClick={saveSym} disabled={!symChanged}>save</Button>
             {symError ? <Status level="error">{symError}</Status> : <FieldHint>The base folder is your notebook's BASE_DIR, inside an allowed folder: builds read ff/, inputs/ and molecules/ there and write solutions/. Python, with PyMOL and gromologist, builds the peptides and their hydrogen masses.</FieldHint>}
+          </div>
+          <Section label="SymBuilder · qq scripts" />
+          <div className="grid grid-cols-3 gap-x-4 gap-y-2 max-[640px]:grid-cols-2">
+            {SCRIPTED_STAGES.map(st => (
+              <Field key={st}>
+                <Label htmlFor={'qq-' + st}>{st === 'min' ? 'minimisation' : st === 'walkers' ? 'multiwalker' : st}</Label>
+                <Select value={qqb.profiles[st]} onValueChange={v => setQqb(x => ({ ...x, profiles: { ...x.profiles, [st]: v } }))}>
+                  <SelectTrigger id={'qq-' + st} size="sm"><SelectValue /></SelectTrigger>
+                  <SelectContent>{PROFILES.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent>
+                </Select>
+              </Field>
+            ))}
+            <Field>
+              <Label htmlFor="qq-queue">queue</Label>
+              <Input id="qq-queue" size="sm" value={qqb.queue} onChange={e => setQqb(x => ({ ...x, queue: e.target.value }))} />
+            </Field>
+          </div>
+          <div className="flex items-center gap-2 text-control"><Checkbox id="qq-submit" checked={qqb.submit} onCheckedChange={v => setQqb(x => ({ ...x, submit: v === true }))} /><Label htmlFor="qq-submit">submit them for me (qq submit -q {qqb.queue || 'gpu'} &lt;script&gt;, in the step's folder)</Label></div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={saveQqb} disabled={!qqbChanged}>save</Button>
+            {qqbError ? <Status level="error">{qqbError}</Status> : <FieldHint>Off, a build writes each script and prints its submit line, and you submit it; on, gmx-cypher runs that line itself, nothing else. The walkers run together with -multidir, which needs an MPI gmx.</FieldHint>}
           </div>
         </DialogBody>
         <DialogFooter><Button variant="ghost" onClick={() => onOpenChange(false)}>close</Button></DialogFooter>

@@ -22,6 +22,7 @@ import { listRecipes, readRecipe, saveRecipe } from './recipes';
 import { listPlans, readPlan, savePlan } from './builds';
 import { baseFolder, checkBuild, checkInputs as checkBuildInputs, checkLanding, readText } from './build-check';
 import { Builder, jobsExec } from './build-run';
+import { DEFAULT_PROFILES, profileOf, profileProblem, SCRIPTED_STAGES } from '../src/lib/build/qq';
 import type { Systems } from '../src/lib/build/plan';
 import { recipeFileProblems, type Recipe } from '../src/lib/recipe';
 import { cpus } from 'node:os';
@@ -59,7 +60,7 @@ function events(jobs: Jobs, batches: Batches, builder: Builder, buildJobs: Jobs,
 }
 
 /** What the GUI may change (T5); anything else is refused. */
-const SETTABLE: (keyof Config)[] = ['gmx', 'allow', 'vault', 'project', 'pmfUrl', 'qq', 'gmxEta', 'base', 'python', 'buildWait'];
+const SETTABLE: (keyof Config)[] = ['gmx', 'allow', 'vault', 'project', 'pmfUrl', 'qq', 'gmxEta', 'base', 'python', 'buildWait', 'qqBuild'];
 
 /** Allowed folders as real paths; each must exist and be a folder. */
 export function realFolders(paths: string[]): string[] {
@@ -393,6 +394,19 @@ export function makeApi(ctx: Ctx): Api {
           throw new HttpError(400, 'buildWait: every 1–600 s, up to (max) 86400 s, max no less than every');
         patch.buildWait = { every: w.every as number, max: w.max as number };
       }
+      // A build's qq scripts (R7a): a known profile for each stage (the walkers' needs an MPI gmx), submitting on or off, a queue's name.
+      if (patch.qqBuild != null) {
+        const q = patch.qqBuild as { profiles?: Record<string, unknown>; submit?: unknown; queue?: unknown };
+        if (typeof q !== 'object' || typeof q.submit !== 'boolean' || typeof q.queue !== 'string' || !/^[\w.-]{1,32}$/.test(q.queue) || (q.profiles != null && typeof q.profiles !== 'object'))
+          throw new HttpError(400, 'qqBuild: { profiles: { stage: profile }, submit: true or false, queue: a queue\'s name }');
+        const profiles: Record<string, string> = {};
+        for (const stage of SCRIPTED_STAGES) {
+          const id = q.profiles?.[stage] ?? DEFAULT_PROFILES[stage], why = typeof id === 'string' ? profileProblem(stage, id) : 'a profile is a name';
+          if (why) throw new HttpError(400, stage + ': ' + why);
+          profiles[stage] = id as string;
+        }
+        patch.qqBuild = { profiles, submit: q.submit, queue: q.queue };
+      }
       // SymBuilder's base folder (R4): a real folder inside the allowed ones.
       if (patch.base) patch.base = baseFolder(patch.base, [...(patch.allow ?? ctx.config.allow)]);
       // A vault is checked before it is kept: the Matrix's manifest, schemas 1–4 (T32, T142).
@@ -418,6 +432,8 @@ export function newBuilder(ctx: Ctx, buildJobs: Jobs): Builder {
   return new Builder({
     home: ctx.home, version: ctx.version, ...jobsExec(buildJobs),
     tools: () => ({ gmx: ctx.gmx.ok ? ctx.gmx.path ?? null : null, python: ctx.config.python }),
+    profiles: () => Object.fromEntries(SCRIPTED_STAGES.map(st => [st, profileOf(ctx.config.qqBuild?.profiles?.[st] ?? DEFAULT_PROFILES[st])!])),
+    submit: () => (ctx.config.qqBuild?.submit ? { qq: ctx.config.qq ?? 'qq', queue: ctx.config.qqBuild.queue } : null),
     wait: { every: (ctx.config.buildWait?.every ?? 10) * 1000, max: (ctx.config.buildWait?.max ?? 600) * 1000 },
   });
 }

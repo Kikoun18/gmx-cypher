@@ -4,7 +4,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { SCIENCE, systemsOf } from '../src/lib/build/plan';
-import { PROFILES, qqScript } from '../src/lib/build/qq';
+import { DEFAULT_PROFILES, PROFILES, profileProblem, qqScript } from '../src/lib/build/qq';
 import { carbGroup, hmrTopology, ionCounts, mergeGro, moleculetype, nearestWalker, netCharge, pullx, renameWater, topologyText, walkerFrames, waters } from '../src/lib/build/text';
 
 const read = (p: string) => readFileSync(new URL(p, import.meta.url), 'utf8');
@@ -152,5 +152,19 @@ exit 0
     expect(w.text).toContain('gmx_mpi mdrun -multidir 1 2 3 4 5 6 7 8 -ntomp 7 -update gpu -nb gpu -bonded gpu -deffnm 9.multiwalker -cpi 9.multiwalker.cpt -dlb yes -px 9.multiwalker_pullx.xvg');
     expect(w.text).toContain('if [ -f "1/9.multiwalker.gro" ] && [ -f "2/9.multiwalker.gro" ]');
     expect(w.submit).toBe('qq submit -q gpu solutions/hmr+fast+6/o111/aaaaaaaa/9.multiwalker/hmr+fast+6_awh_multi_aaaaaaaa.sh');
+  });
+});
+
+describe('profiles by stage (R7a)', () => {
+  it('the notebook\'s: MetaCentrum 2025 for the stages here and awh and the pull, LUMI for the walkers', () => {
+    expect(DEFAULT_PROFILES).toEqual({ min: 'mc2025', nvt: 'mc2025', npt: 'mc2025', awh: 'mc2025', pull: 'mc2025', walkers: 'lumi' });
+  });
+  it.each([
+    ['awh', 'mc2022', null],
+    ['walkers', 'mc2025', null],
+    ['walkers', 'mc2022', 'the walkers run together with mdrun -multidir, which needs an MPI gmx (gmx_mpi): MetaCentrum · GROMACS 2022.3 plumed has gmx'],
+    ['pull', 'nope', 'no qq profile "nope": mc2025, mc2022, lumi'],
+  ] as const)('%s with %s', (stage, id, why) => {
+    expect(profileProblem(stage, id)).toBe(why);
   });
 });

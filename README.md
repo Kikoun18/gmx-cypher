@@ -105,8 +105,10 @@ walkers are prepared and get their qq script and `qq submit` line (nothing is su
 - The build being planned is kept in this browser; *summary* fills with R9.
 
 Methods switch on what their name says: `hmr` hydrogen masses (gromologist), `fast` TIP3PF water; awh, the pull and the
-walkers get a qq script (the notebook's three profiles) and its `qq submit` line; submitting it for you will be a
-setting, off by default, when building comes. *Settings → SymBuilder* also takes the python (with PyMOL and
+walkers get a qq script and its `qq submit` line. *Settings → SymBuilder · qq scripts* chooses each stage's profile
+(the notebook's three: MetaCentrum's GROMACS 2025.4 cuda and 2022.3 plumed, LUMI multidir; the walkers run together
+with `-multidir`, so theirs needs an MPI gmx), the queue, and *submit them for me*, off by default: off, you submit
+each line; on, gmx-cypher runs `qq submit -q <queue> <script>` in the step's folder, and nothing else. *Settings → SymBuilder* also takes the python (with PyMOL and
 gromologist) that builds will use: `python3`, `python`, or a path to one.
 
 ## Set-up
@@ -354,7 +356,7 @@ gmx-cypher can:
 - read files inside the allowed folders, and read your Matrix vault through a reader whose every write throws;
 - start `gmx` and the GROMACS tools it knows (never through a shell), in a trajectory's folder;
 - in the cluster view: start `qq jobs -e`, `qq jobs -a` and `gmx-eta -a` on this machine, with fixed arguments, one
-  at a time;
+  at a time; and, only with *submit them for me* on, `qq submit -q <queue> <script>` for a build's cluster stages;
 - in SymBuilder: look up (stat) the files a build reads in the base folder, read an mdp or topology file there (at most
   256 kB, never through a link that leaves it), and read the connected project to say where results would land;
 - build: start the configured gmx (`pdb2gmx editconf trjconv solvate genion make_ndx grompp mdrun energy`) and the
@@ -371,7 +373,8 @@ It cannot, by design:
   or replacing anything);
 - be reached from another computer, or used by another page in your browser (127.0.0.1 only; every request needs the
   token and a local Host; a request from a page must come from this very address; every POST must be JSON);
-- run anything but the commands above, kill or submit a cluster job, or send free text from the page to a shell;
+- run anything but the commands above, kill a cluster job, submit one unless you turn that on, or send free text from
+  the page to a shell;
 - reach the network beyond serving its own page.
 
 *cancel* stops the whole process group of a job (SIGTERM, then SIGKILL after 5 s); stopping gmx-cypher cancels its

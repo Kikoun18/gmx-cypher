@@ -21,6 +21,20 @@ export const PROFILES: Profile[] = [
   { id: 'lumi', name: 'LUMI · multidir', gmx: 'gmx_mpi', modules: 'export OMP_NUM_THREADS=8\n\nmodule load LUMI/24.03 partition/G\nmodule load GROMACS', flags: '-ntomp 7 -update gpu -nb gpu -bonded gpu', dlb: true, multidir: true, ncpus: 7, ngpus: 1, mem: '60gb', walltime: '23h', loopEnd: 10, maxh: 22 },
 ]
 
+export type ProfileId = Profile['id']
+export type ScriptedStage = 'min' | 'nvt' | 'npt' | 'awh' | 'pull' | 'walkers'
+export const SCRIPTED_STAGES: ScriptedStage[] = ['min', 'nvt', 'npt', 'awh', 'pull', 'walkers']
+/** Each stage's profile as the notebook writes it (R7a): MetaCentrum's GROMACS 2025.4, the walkers on LUMI. */
+export const DEFAULT_PROFILES: Record<ScriptedStage, ProfileId> = { min: 'mc2025', nvt: 'mc2025', npt: 'mc2025', awh: 'mc2025', pull: 'mc2025', walkers: 'lumi' }
+export const profileOf = (id: string) => PROFILES.find(p => p.id === id)
+/** Why a profile can't write a stage's script, in words; null when it can. The walkers share one bias with -multidir, which needs an MPI gmx. */
+export function profileProblem(stage: ScriptedStage, id: string): string | null {
+  const p = profileOf(id)
+  if (!p) return 'no qq profile ' + JSON.stringify(id) + ': ' + PROFILES.map(x => x.id).join(', ')
+  if (stage === 'walkers' && p.gmx !== 'gmx_mpi') return 'the walkers run together with mdrun -multidir, which needs an MPI gmx (gmx_mpi): ' + p.name + ' has ' + p.gmx
+  return null
+}
+
 /** The stages that get a qq script, their folder in scripts/ (the notebook's names) and their mdrun -deffnm. */
 export const SCRIPTED: Partial<Record<StageId, { folder: string; deffnm: string; px?: [string, string] }>> = {
   min: { folder: 'minim', deffnm: '4.minim' }, nvt: { folder: 'nvt', deffnm: '5.eqnvt' }, npt: { folder: 'npt', deffnm: '6.eqnpt' },

@@ -29,7 +29,7 @@ export type Make = 'moleculetype' | 'merge' | 'topology' | 'water-tip3f' | 'wate
 const join = (...p: string[]) => p.filter(Boolean).join('/').split('/').reduce<string[]>((out, x) => (x === '..' && out.length && out[out.length - 1] !== '..' ? out.slice(0, -1) : x === '.' ? out : [...out, x]), []).join('/')
 
 /** Every step of one system under a plan, in order; a stage or tile that is off has none. */
-export function planSystem(plan: BuildPlan, sys: System, o: { base: string; profile?: Profile } = { base: '' }): Step[] {
+export function planSystem(plan: BuildPlan, sys: System, o: { base: string; profile?: Profile; profiles?: Partial<Record<StageId, Profile>> } = { base: '' }): Step[] {
   const sc = plan.science, { hmr, fast } = switches(sys.method), d = sys.dir, q = sys.sequence, c = sys.saccharide
   const inputs = (f: string) => (o.base ? o.base + '/' : '') + join(BASE.inputs, f), steps: Step[] = []
   const profile = o.profile ?? PROFILES[0]
@@ -46,7 +46,7 @@ export function planSystem(plan: BuildPlan, sys: System, o: { base: string; prof
     add({ stage, tile: stage === 'awh' ? 'awh' : 'pull', label: '[ CARB ] appended', program: 'write', make: 'carb', cwd, argv: [ndx], reads: [join(d, c + '.gro')], replaces: [join(cwd, ndx)] })
   }
   const script = (stage: StageId, cwd: string) => {
-    const s = qqScript(stage, sys, profile, sc.walkers.length)
+    const s = qqScript(stage, sys, o.profiles?.[stage] ?? profile, sc.walkers.length)
     if (s) add({ stage, tile: stage === 'awh' ? 'awh' : stage === 'pull' ? 'pull' : stage === 'walkers' ? 'walkers' : 'md', label: 'qq script', program: 'copy', cwd, argv: [s.file, s.file.split('/').pop()!], writes: [s.file, join(cwd, s.file.split('/').pop()!)], where: 'cluster' })
   }
   const water = (to: 'TIP3F' | 'SOL') => fast && add({ stage: 'sb', tile: 'solvate', label: 'water named ' + to, program: 'write', make: to === 'TIP3F' ? 'water-tip3f' : 'water-sol', cwd: d, argv: [q + '.top'], reads: [join(d, q + '.top')], replaces: [join(d, q + '.top')] })

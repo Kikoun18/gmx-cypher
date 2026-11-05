@@ -15,6 +15,7 @@ import { fatalText } from '../src/lib/build/fatal';
 import { BASE, NAMES, systemsOf, type BuildPlan, type Systems, type System } from '../src/lib/build/plan';
 import { freeRepeat, hint, quarantineName, resumeAt } from '../src/lib/build/retry';
 import { PROFILES, qqScript, type Profile } from '../src/lib/build/qq';
+import type { StageId } from '../src/lib/build/plan';
 import { planSystem, type Step } from '../src/lib/build/steps';
 import { carbGroup, hmrTopology, ionCounts, mergeGro, moleculetype, nearestWalker, netCharge, pullx, renameWater, topologyText, walkerFrames, waters } from '../src/lib/build/text';
 import type { Job, JobStatus, Jobs } from './jobs';
@@ -88,8 +89,10 @@ export interface BuilderOptions {
   tools: () => { gmx: string | null; python: string | null };
   /** Waiting for a local mdrun's .gro (R5c): every `every` ms, up to `max` ms. */
   wait?: { every: number; max: number };
-  /** The qq profile a cluster stage's script is written for (R7a). */
-  profile?: () => Profile;
+  /** The qq profile each stage's script is written for (R7a); a stage not named takes MetaCentrum 2025's. */
+  profiles?: () => Partial<Record<StageId, Profile>>;
+  /** qq, and the queue, when the settings say gmx-cypher submits the cluster stages' scripts (T206); null: it doesn't. */
+  submit?: () => { qq: string; queue: string } | null;
 }
 
 /** The shipped python scripts (R5b), by the name the planner gives them. */
@@ -242,7 +245,7 @@ export class Builder extends EventEmitter {
       catch (e) { s.status = 'failed'; s.error = 'could not create ' + sys.dir + ': ' + (e as Error).message; s.ended = now(); this.save(run); return; }
       writeFileSync(recordFile, JSON.stringify(record, null, 2) + '\n', { flag: 'wx' });
     }
-    const steps = planSystem(plan, sys, { base, profile: this.o.profile?.() ?? PROFILES[0] });
+    const steps = planSystem(plan, sys, { base, profiles: this.o.profiles?.() ?? {} });
     s.steps = steps.length;
     const values: Record<string, string> = { ...(prev?.values ?? {}) };
     record.values = values;
@@ -401,7 +404,7 @@ export class Builder extends EventEmitter {
         const from = abs(argv[0]), to = join(cwd, argv[1]);
         if (step.label === 'qq script') {
           // R7a: the script in scripts/, created exclusively; one that exists is kept and used, as the notebook does.
-          const s = qqScript(step.stage, sys, this.o.profile?.() ?? PROFILES[0], plan.science.walkers.length)!;
+          const s = qqScript(step.stage, sys, this.o.profiles?.()[step.stage] ?? PROFILES[0], plan.science.walkers.length)!;
           mkdirSync(dirname(from), { recursive: true });
           try { writeFileSync(from, s.text, { flag: 'wx', mode: 0o755 }); record.files[argv[0]] = await fileRecord(from, i); }
           catch { record.notes.push(argv[0] + ' exists: kept, and used'); }
@@ -409,6 +412,13 @@ export class Builder extends EventEmitter {
         }
         if (!existsSync(from)) throw stop('failed', 'no ' + argv[0]);
         copyFileSync(from, to, constants.COPYFILE_EXCL);
+        // T206: with the setting on, qq submit runs here, in the step's folder, with those fixed arguments; off, the line is printed.
+        const sub = step.label === 'qq script' && CLUSTER.includes(step.stage) ? this.o.submit?.() : null;
+        if (sub) {
+          const job = this.o.exec({ title: sys.dir + ' · qq submit', file: sub.qq, args: ['submit', '-q', sub.queue, argv[1]], cwd, env: {}, meta: { build: run.id, system: sys.dir, step: i } });
+          const r = await job.done, said = /Job '([^']+)' submitted successfully/.exec(r.log);
+          record.notes.push(said ? step.stage + ': qq job ' + said[1] + ' submitted' : step.stage + ': qq submit did not submit it (' + (r.log.trim().split('\n').pop() ?? 'exit ' + r.code) + '): submit it yourself');
+        }
         break;
       }
       case 'rename': renameSync(join(cwd, argv[0]), join(cwd, argv[1])); delete record.files[relative(base, join(cwd, argv[0]))]; break;

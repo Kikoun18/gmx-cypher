@@ -62,6 +62,24 @@ describe('POST /api/build/start', () => {
     await s.close();
   });
 
+  it('submits the cluster stages\' scripts when the setting says so, with qq\'s own answer (R7a, T206)', async () => {
+    const { s, base, ready } = await server();
+    await ready();
+    const qq = RUNNER + 'test/fake-qq.mjs';
+    expect((await s.call('/api/config', { qq, qqBuild: { profiles: { walkers: 'mc2022' }, submit: true, queue: 'gpu' } })))
+      .toMatchObject({ status: 400, json: { error: 'walkers: the walkers run together with mdrun -multidir, which needs an MPI gmx (gmx_mpi): MetaCentrum · GROMACS 2022.3 plumed has gmx' } });
+    expect((await s.call('/api/config', { qqBuild: { profiles: {}, submit: true, queue: 'gpu; rm' } })).status).toBe(400);
+    expect((await s.call('/api/config', { qq, qqBuild: { profiles: { awh: 'mc2022' }, submit: true, queue: 'gpu' } })).json.config.qqBuild)
+      .toEqual({ profiles: { min: 'mc2025', nvt: 'mc2025', npt: 'mc2025', awh: 'mc2022', pull: 'mc2025', walkers: 'lumi' }, submit: true, queue: 'gpu' });
+    await s.call('/api/build/start', { plan: DEFAULT_PLAN, systems: { ...SYSTEMS, sequences: ['hhhhhhhh'] }, ifExists: 'continue', onFailure: 'next' });
+    const run = await until(async () => { const [r] = (await s.call('/api/build/runs')).json; return r.status !== 'running' ? r : undefined; });
+    expect(run.systems[0].notes).toEqual(expect.arrayContaining(['awh: qq job 1500135.robox.cluster.test submitted', 'pull: qq job 1500135.robox.cluster.test submitted']));
+    // awh's script is MetaCentrum 2022's, as set; the pull's 2025's.
+    expect(readFileSync(join(base, 'scripts/awh/hmr+fast+6_awh_hhhhhhhh.sh'), 'utf8')).toContain('module add gromacs:2022.3-plumed');
+    expect(readFileSync(join(base, 'scripts/pull/hmr+fast+6_pull_hhhhhhhh.sh'), 'utf8')).toContain('metamodule add gromacs/2025.4-cuda');
+    await s.close();
+  }, 60_000);
+
   it('the wait for mdrun\'s .gro is a setting, checked', async () => {
     const { s } = await server();
     expect((await s.call('/api/config', { buildWait: { every: 0, max: 10 } })).status).toBe(400);

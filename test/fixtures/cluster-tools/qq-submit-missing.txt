@@ -1,0 +1,4 @@
+Usage: qq submit [OPTIONS] SCRIPT
+Try 'qq submit -h' for help.
+
+Error: Invalid value for 'SCRIPT': File '/storage/brno/you/02_evomd/innit_tests/solutions/hmr+fast+6/wta/vvvvvvvv/8.pull/hmr+fast+6_pull_vvvvvvvv.sh' does not exist.
