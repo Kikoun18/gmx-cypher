@@ -7,6 +7,7 @@ import { EMPTY_BUILD, type BuildDraft } from '../src/buildDraft';
 import { BuildView } from '../src/views/Build';
 import { KINDS, stepLine } from '../src/lib/build/tiles';
 import { SystemsView } from '../src/views/Systems';
+import { BuildFilesView } from '../src/views/BuildFiles';
 import type { Step } from '../src/lib/build/steps';
 
 const draft: BuildDraft = { ...EMPTY_BUILD, systems: { methods: ['hmr+fast+6'], saccharides: ['o111', 'pg'], sequences: ['aaaaaaaa', 'pppppppp'], repeats: 1 } };
@@ -58,5 +59,28 @@ describe('a step as a line', () => {
     ['rename', ['a', 'b'], 'renames a to b'], ['write', ['a.top'], 'writes a.top'], ['read', ['a.itp'], 'reads a.itp'], ['wait', ['4.minim.gro'], 'waits for 4.minim.gro: every 10 s, up to 10 min'],
   ] as const)('%s', (program, argv, line) => {
     expect(stepLine(s(program, [...argv]), 'gmx_mpi')).toBe(line);
+  });
+});
+
+describe('symbuilder · files (R4)', () => {
+  const check = { base: '/data/innit_tests', missing: { 'solutions/hmr+fast+6/pg/aaaaaaaa': ['ff/pg-ADD.itp'] }, files: [
+    { path: 'molecules/saccharides/o111.gro', kind: 'saccharide' as const, what: '', found: true }, { path: 'ff/o111-ADD.itp', kind: 'saccharide' as const, what: '', found: true },
+    { path: 'molecules/saccharides/pg.gro', kind: 'saccharide' as const, what: '', found: true }, { path: 'ff/pg-ADD.itp', kind: 'saccharide' as const, what: '', found: false },
+    { path: 'ff/ADDff.itp', kind: 'force field' as const, what: '', found: true }, { path: 'inputs/minim.mdp', kind: 'mdp' as const, what: '', found: true }] };
+  it('each saccharide ready or missing, the force field\'s files, the mdp per stage and method, and the systems missing a file', () => {
+    const html = renderToStaticMarkup(createElement(BuildFilesView, { draft, check, error: '', base: '/data/innit_tests' }));
+    expect(html).toContain('>o111</b>');
+    expect(html.match(/>ready</g)).toHaveLength(1);
+    expect(html).toContain('one system is missing a file: hmr+fast+6/pg/aaaaaaaa needs ff/pg-ADD.itp');
+    expect(html).toContain('inputs/awh_hmr.mdp');
+    expect(html).toContain('ff/ADDff.itp');
+  });
+  it('says where to set the base folder when there is none', () => {
+    expect(renderToStaticMarkup(createElement(BuildFilesView, { draft, check: null, error: '', base: null }))).toContain('no base folder yet: set it in settings → SymBuilder');
+  });
+  it('the systems preview names a system\'s missing file', () => {
+    const html = renderToStaticMarkup(createElement(SystemsView, { draft, setDraft: noop, missing: check.missing }));
+    expect(html).toContain('ff/pg-ADD.itp');
+    expect(html.match(/>missing</g)).toHaveLength(1);
   });
 });

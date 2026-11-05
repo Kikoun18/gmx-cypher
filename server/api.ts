@@ -20,6 +20,8 @@ import { Batches, checkRunInputs, findTrajectories, sendAll } from './batch';
 import { Cluster } from './cluster';
 import { listRecipes, readRecipe, saveRecipe } from './recipes';
 import { listPlans, readPlan, savePlan } from './builds';
+import { baseFolder, checkInputs as checkBuildInputs, readText } from './build-check';
+import type { Systems } from '../src/lib/build/plan';
 import { recipeFileProblems, type Recipe } from '../src/lib/recipe';
 import { cpus } from 'node:os';
 import { planRun, recordWritten, startRun } from './runs';
@@ -52,7 +54,7 @@ function events(jobs: Jobs, batches: Batches, res: ServerResponse) {
 }
 
 /** What the GUI may change (T5); anything else is refused. */
-const SETTABLE: (keyof Config)[] = ['gmx', 'allow', 'vault', 'project', 'pmfUrl', 'qq', 'gmxEta'];
+const SETTABLE: (keyof Config)[] = ['gmx', 'allow', 'vault', 'project', 'pmfUrl', 'qq', 'gmxEta', 'base', 'python'];
 
 /** Allowed folders as real paths; each must exist and be a folder. */
 export function realFolders(paths: string[]): string[] {
@@ -244,6 +246,8 @@ export function makeApi(ctx: Ctx): Api {
       if (!ctx.config.vault) throw new HttpError(409, 'no vault set');
       return { body: await sendAll(ctx, b, (await readJson<{ project: string }>(req)).project) };
     }
+    if (is(req, 'POST', url, '/api/build/check')) { const b = await readJson<{ plan: unknown; systems: Systems }>(req); return { body: checkBuildInputs(baseFolder(ctx.config.base, ctx.config.allow), b.plan, b.systems) }; }
+    if (is(req, 'GET', url, '/api/build/text')) return { body: { text: readText(baseFolder(ctx.config.base, ctx.config.allow), url.searchParams.get('path') ?? '') } };
     if (is(req, 'GET', url, '/api/builds')) return { body: listPlans(ctx.home) };
     if (is(req, 'POST', url, '/api/builds')) return { body: savePlan(ctx.home, await readJson(req), url.searchParams.get('replace') === '1') };
     const plan = /^\/api\/builds\/([^/]+)$/.exec(url.pathname);
@@ -339,11 +343,13 @@ export function makeApi(ctx: Ctx): Api {
       if (patch.pmfUrl && !/^https?:\/\/[^\s]+$/.test(patch.pmfUrl)) throw new HttpError(400, 'the Matrix address must start with http:// or https://');
       // The tool's own name, found on PATH, or the absolute path of a program that exists: never a relative path
       // resolved against the server's folder, or another program's name (review).
-      for (const k of ['qq', 'gmxEta'] as const) {
-        const v = patch[k], name = k === 'qq' ? 'qq' : 'gmx-eta';
-        if (v != null && (typeof v !== 'string' || !(v === name || (isAbsolute(v) && /^[\w./+-]+$/.test(v) && executable(v)))))
-          throw new HttpError(400, k + ': ' + name + ' (found on PATH), or the absolute path of a program that exists');
+      for (const k of ['qq', 'gmxEta', 'python'] as const) {
+        const v = patch[k], names = k === 'qq' ? ['qq'] : k === 'gmxEta' ? ['gmx-eta'] : ['python3', 'python'];
+        if (v != null && (typeof v !== 'string' || !(names.includes(v) || (isAbsolute(v) && /^[\w./+-]+$/.test(v) && executable(v)))))
+          throw new HttpError(400, k + ': ' + names.join(' or ') + ' (found on PATH), or the absolute path of a program that exists');
       }
+      // SymBuilder's base folder (R4): a real folder inside the allowed ones.
+      if (patch.base) patch.base = baseFolder(patch.base, [...(patch.allow ?? ctx.config.allow)]);
       // A vault is checked before it is kept: the Matrix's manifest, schemas 1–4 (T32, T142).
       if (patch.vault) patch.vault = (await openVault(patch.vault).catch(e => { throw new HttpError(400, (e as Error).message); })).path;
       // The connected project is one of the vault's (R14b): another vault, or none, leaves none connected unless one is given.

@@ -39,7 +39,7 @@ function Chips({ label, kind, items, tones, onChange }: { label: string; kind: '
 }
 
 /** symbuilder · systems (R3c): methods × saccharides × sequences, repeats, and a preview of every system before anything runs. */
-export function SystemsView({ draft, setDraft }: { draft: BuildDraft; setDraft: React.Dispatch<React.SetStateAction<BuildDraft>> }) {
+export function SystemsView({ draft, setDraft, missing = null }: { draft: BuildDraft; setDraft: React.Dispatch<React.SetStateAction<BuildDraft>>; missing?: Record<string, string[]> | null }) {
   const s = draft.systems, all = systemsOf(s), set = (patch: Partial<Systems>) => setDraft(d => ({ ...d, systems: { ...d.systems, ...patch } }))
   const sacTone = (c: string) => TONES[Math.max(0, s.saccharides.indexOf(c)) % TONES.length]
   const plan = draft.plan, scripted = plan.stages.filter(x => x.on && x.tiles.some(t => t.on) && x.id !== 'sb').length
@@ -101,7 +101,7 @@ export function SystemsView({ draft, setDraft }: { draft: BuildDraft; setDraft: 
             {rows.slice(0, 200).map(({ sys, problems }) => (
               <div key={sys.dir} className="grid grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] items-center gap-2 border-b border-border px-3 py-1.5 text-caption last:border-0">
                 <span className="truncate">{sys.method} / <span className={toneText[sacTone(sys.saccharide)]}>{sys.saccharide}</span> / <b>{sys.sequence}</b>{switches(sys.method).hmr ? <span className={cn('ml-2 rounded px-1', toneSoft.sky)}>hmr</span> : null}{switches(sys.method).fast ? <span className={cn('ml-1 rounded px-1', toneSoft.aqua)}>fast</span> : null}</span>
-                {problems.length ? <Status inline level="error" word="order">{problems[0]}</Status> : <Status inline level="ok" word="ready" />}
+                {missing?.[sys.dir] ? <Status inline level="error" word="missing">{missing[sys.dir].join(', ')}</Status> : problems.length ? <Status inline level="error" word="order">{problems[0]}</Status> : <Status inline level="ok" word="ready" />}
               </div>
             ))}
           </div>
