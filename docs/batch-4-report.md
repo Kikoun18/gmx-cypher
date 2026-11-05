@@ -56,8 +56,8 @@ run of its own (1100); I count it as load, not a defect, and it did not recur at
   and its word in the level's tone. The light theme's error red moved from `#8f1d1d` to `#7a1030`, because the new
   coral-strong was too close to it to tell apart (tested by `contrast.test.ts`). Headings (`.text-title`,
   `.text-heading`, `.text-display`) are Archivo.
-- **Limitations:** the chart theme race in the backlog (a chart drawn in the first render takes the light palette in
-  the dark theme) is still open; today's charts wait for data, so none shows it.
+- **Limitations:** none known; the backlog's chart theme race was fixed after the batch (the theme is set before the
+  first render).
 
 ### R2 home
 - **After:** one pure component (`HomeView`) from what the server already knows: gmx, jobs running and done (with how
@@ -187,8 +187,10 @@ scratch vault and base folder; 256 colours):
   `build-steps`, `build-text`, `build-inputs`, `build-project`, `build-landing`, `symbuilder-views`; updated `route`,
   `contract`, `contrast`, `tokens`.
 - **Playwright:** 14 at the baseline (12 failing on the missing icon), 17 now, all passing: the four tabs and old
-  addresses, SymBuilder's drag and drop with a base folder, axe on the new views. Once, under load, the compare view's
-  axe test failed and passed when run again (twice); I could not make it fail again.
+  addresses, SymBuilder's drag and drop with a base folder, axe on the new views. The compare view's dark axe test failed
+  now and then (1 run in 3): a toggle measured mid-transition, because the theme was set after the first render and
+  a child that measured itself first animated from light to dark. The theme is now set before the first render
+  (`main.tsx`), which also closes the backlog's chart-palette race; 0 failures in 6 runs since.
 - **With real tools:** none in this batch runs gmx or python. The golden tests compare with your notebook's own text and
   argument lists, and the merge test with your built system's `.gro`; the fake gmx serves the page.
 - **Manual checks:** every view at 1280 and 1024 px, light and dark, in the built app, with no console errors (passed);
