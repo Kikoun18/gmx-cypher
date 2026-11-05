@@ -54,6 +54,16 @@ describe('the topology', () => {
     expect(moleculetype(read('./fixtures/awh/dumps/topol.top'))).toBe('[ moleculetype ]\nP 1\n[ atoms ]\n1 A 1 P A1 1 0.0 40.0\n');
     expect(moleculetype('[ system ]\nx\n')).toBe('');
   });
+  it('the position restraints from the system\'s own folder, not from ff/ where pdb2gmx ran (your gggggggg.itp)', () => {
+    // pdb2gmx writes -i as it was given, from ff/: GROMACS reads an include from the folder of the file it is in.
+    const top = '[ moleculetype ]\n; Name            nrexcl\nProtein_chain_A     3\n\n[ atoms ]\n     1         NH3      1    GLY      N      1      -0.3     14.007\n\n'
+      + '; Include Position restraint file\n#ifdef POSRES\n#include "../solutions/hmr+fast+auto/ha/gggggggg/gggggggg_restraints.itp"\n#endif\n\n'
+      + '; Include water topology\n#include "./charmm36s-jul2022-prosECCo75.ff/tip3p.itp"\n\n[ system ]\nProtein\n';
+    const itp = moleculetype(top, 'solutions/hmr+fast+auto/ha/gggggggg');
+    expect(itp.split('\n').slice(-6)).toEqual(['; Include Position restraint file', '#ifdef POSRES', '#include "./gggggggg_restraints.itp"', '#endif', '', '']);
+    // Another include is left as written.
+    expect(moleculetype(top.replace('../solutions/hmr+fast+auto/ha/gggggggg/', '../ff/'), 'solutions/hmr+fast+auto/ha/gggggggg')).toContain('#include "../ff/gggggggg_restraints.itp"');
+  });
 });
 
 describe('the merged box', () => {

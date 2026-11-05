@@ -32,8 +32,13 @@ export function waters(top: string): number {
 /** The fast methods' water renamed around grompp and genion, line by line as the notebook's sed does. */
 export const renameWater = (top: string, to: 'TIP3F' | 'SOL') => (to === 'TIP3F' ? top.replace(/^SOL\s/gm, 'TIP3F ') : top.replace(/^TIP3F\s/gm, 'SOL   '))
 
-/** The [ moleculetype ] part of pdb2gmx's topology (extract_moleculetypes): up to [ system ], before the water include. */
-export function moleculetype(top: string): string {
+/**
+ * The [ moleculetype ] part of pdb2gmx's topology (extract_moleculetypes): up to [ system ], before the water include.
+ * pdb2gmx runs in ff/ and writes its includes as it was given them, from there (`-i ../solutions/…/{q}_restraints.itp`).
+ * GROMACS reads an include from the folder of the file it is in, and this .itp is in the system's folder `dir`, not
+ * in ff/ as the notebook's is, so an include of a file in that folder becomes `./{file}` (T233).
+ */
+export function moleculetype(top: string, dir?: string): string {
   const out: string[] = []
   for (const line of top.split('\n')) {
     if (!out.length && !line.includes('[ moleculetype ]')) continue
@@ -43,7 +48,19 @@ export function moleculetype(top: string): string {
   out.pop()
   const w = out.findIndex(l => l.includes('; Include water topology'))
   if (w >= 0) out.splice(w)
-  return out.length ? out.join('\n') + '\n' : ''
+  return out.length ? (dir ? ownIncludes(out.join('\n'), dir) : out.join('\n')) + '\n' : ''
+}
+
+/**
+ * An include written from ff/ of a file in the system's folder `dir` (`../{dir}/{file}`), as `./{file}`: read from a
+ * file in that folder, as GROMACS reads includes (T233). Every other line as it is.
+ */
+export function ownIncludes(text: string, dir: string): string {
+  const from = '../' + dir.replace(/\/+$/, '') + '/'
+  return text.split('\n').map(l => {
+    const m = /^(\s*#include\s+")([^"]+)(".*)$/.exec(l)
+    return m && m[2].startsWith(from) && !m[2].slice(from.length).includes('/') ? m[1] + './' + m[2].slice(from.length) + m[3] : l
+  }).join('\n')
 }
 
 const pad5 = (n: number) => String(n).padStart(5)

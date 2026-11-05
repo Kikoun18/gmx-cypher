@@ -65,6 +65,24 @@ describe('a failed system, again', () => {
   }, 60_000);
 });
 
+describe('a system built before the restraints fix (T233)', () => {
+  it('its .itp\'s include from ff/ is put right when it is resumed, said and recorded, and grompp gets through', async () => {
+    const base = baseFolder(), b = builder();
+    failOnce('3.pre_salted.tpr');
+    const first = await b.start(DEFAULT_PLAN, ONE, opts(base)).done;
+    expect(first.systems[0]).toMatchObject({ status: 'failed', error: expect.stringMatching(/^SB · grompp before the salt/) });
+    // As a build before the fix wrote it: the include as pdb2gmx wrote it, from ff/.
+    const itp = join(base, S, 'hhhhhhhh.itp'), fixed = readFileSync(itp, 'utf8');
+    writeFileSync(itp, fixed.replace('#include "./hhhhhhhh_restraints.itp"', '#include "../' + S + '/hhhhhhhh_restraints.itp"'));
+    const second = await b.retry(first.id, S, 'resume').done;
+    expect(second.systems[0].error).toBeUndefined();
+    expect(second.systems[0]).toMatchObject({ status: 'cluster', notes: expect.arrayContaining(['hhhhhhhh.itp: its includes of files in this folder now read ./<file> (written from ff/ before, they led nowhere)']) });
+    expect(readFileSync(itp, 'utf8')).toBe(fixed);
+    const rec: BuildRecord = JSON.parse(readFileSync(join(base, S, 'build.json'), 'utf8'));
+    expect(rec.files[S + '/hhhhhhhh.itp'].sha256).toBe(hash(itp));
+  }, 60_000);
+});
+
 describe('a folder that exists', () => {
   it('skip leaves it; continue leaves one no gmx-cypher build made; repeat builds beside it', async () => {
     const base = baseFolder();

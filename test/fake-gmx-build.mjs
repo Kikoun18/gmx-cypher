@@ -4,10 +4,11 @@
 // mmmmmmmm.gro as trjconv wrote it; a system's .gro is 9.multiwalker.gro); otherwise they are the smallest file of the
 // right shape, marked "fake" in their first line (a .tpr, an .edr, pdb2gmx's topology), never presented as real.
 // FAKE_GMX_FATAL=<output name> makes grompp for that output (e.g. 7.awh.tpr) print the notebook's real AWH fatal
-// error; FAKE_GMX_SLOW (ms) makes mdrun take that long.
+// error; FAKE_GMX_SLOW (ms) makes mdrun take that long. grompp follows the topology's includes as GROMACS's cpp does
+// (each from the folder of the file it is in, #ifdef by the mdp's define) and stops at one that leads nowhere (T233).
 
 import { copyFileSync, existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
-import { basename, dirname, join } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 
 /** Exits once stdout and stderr are written: a pipe would otherwise lose their end. */
 export const exitWhenWritten = code => process.stdout.write('', () => process.stderr.write('', () => process.exit(code)));
@@ -21,6 +22,30 @@ export const BUILD_TOOLS = ['pdb2gmx', 'editconf', 'trjconv', 'solvate', 'genion
 
 /** True when this is a build's call: its tool is a build tool, or energy on a minimisation's .edr. */
 export const isBuild = (tool, argv) => BUILD_TOOLS.includes(tool) || (tool === 'energy' && /4\.minim\.edr$/.test(argv[argv.indexOf('-f') + 1] || ''));
+
+/** The first include that leads nowhere, read as grompp's cpp reads it: from the folder of the file it is in. */
+function missingInclude(file, defines, seen = new Set()) {
+  if (seen.has(file)) return null;
+  seen.add(file);
+  const on = [];
+  for (const raw of readFileSync(file, 'utf8').split('\n')) {
+    const l = raw.replace(/;.*$/, '').trim();
+    let m;
+    if ((m = /^#ifdef\s+(\S+)/.exec(l))) { on.push(defines.has(m[1])); continue; }
+    if ((m = /^#ifndef\s+(\S+)/.exec(l))) { on.push(!defines.has(m[1])); continue; }
+    if (/^#else\b/.test(l)) { on.push(!on.pop()); continue; }
+    if (/^#endif\b/.test(l)) { on.pop(); continue; }
+    if (on.includes(false)) continue;
+    if ((m = /^#define\s+(\S+)/.exec(l))) { defines.add(m[1]); continue; }
+    if ((m = /^#include\s+"([^"]+)"/.exec(l))) {
+      const p = resolve(dirname(file), m[1]);
+      if (!existsSync(p)) return { from: file, include: m[1] };
+      const deeper = missingInclude(p, defines, seen);
+      if (deeper) return deeper;
+    }
+  }
+  return null;
+}
 
 /** Runs the tool; resolves to its exit code. */
 export async function build(tool, argv) {
@@ -46,9 +71,10 @@ export async function build(tool, argv) {
       say('pdb2gmx');
       const gro = readFileSync(one('-f'), 'utf8'), n = Number(gro.split('\n')[1].trim());
       writeFileSync(one('-i'), '; fake: pdb2gmx\'s position restraints, of the right shape only\n[ position_restraints ]\n');
+      // Its position restraints included as -i was given, from ff/ where it runs (as your gggggggg.itp shows).
       writeFileSync(top, '; fake: pdb2gmx\'s topology, of the right shape only\n#include "./charmm36s-jul2022-prosECCo75.ff/forcefield.itp"\n\n[ moleculetype ]\n; Name            nrexcl\nProtein             3\n\n[ atoms ]\n'
         + Array.from({ length: n }, (_, i) => '  ' + (i + 1) + '  X  1  MET  A' + (i + 1) + '  ' + (i + 1) + '  0.0  1.008').join('\n')
-        + '\n\n; Include water topology\n#include "./charmm36s-jul2022-prosECCo75.ff/tip3p.itp"\n\n[ system ]\nProtein\n\n[ molecules ]\n; Compound        #mols\nProtein             1\n');
+        + '\n\n; Include Position restraint file\n#ifdef POSRES\n#include "' + one('-i') + '"\n#endif\n\n; Include water topology\n#include "./charmm36s-jul2022-prosECCo75.ff/tip3p.itp"\n\n[ system ]\nProtein\n\n[ molecules ]\n; Compound        #mols\nProtein             1\n');
       copyFileSync(one('-f'), one('-o'));
       return;
     }
@@ -74,6 +100,12 @@ export async function build(tool, argv) {
       }
       const which = { '3.pre_salted.tpr': 'grompp-pre-salted', '4.minim.tpr': 'grompp-minim', '5.eqnvt.tpr': 'grompp-eqnvt', '6.eqnpt.tpr': 'grompp-eqnpt', '7.awh.tpr': 'grompp-awh', '8.pull.tpr': 'grompp-pull', '9.multiwalker.tpr': 'grompp-walker', '_charge_check.tpr': 'grompp-pre-salted' }[name];
       if (!which) { process.stderr.write('fake gmx: no real grompp output for ' + name + '\n'); return 1; }
+      const define = existsSync(one('-f')) ? /^\s*define\s*=\s*(.*)$/m.exec(readFileSync(one('-f'), 'utf8').replace(/;.*$/gm, ''))?.[1] ?? '' : '';
+      const lost = missingInclude(resolve(one('-p')), new Set([...define.matchAll(/-D(\w+)/g)].map(m => m[1])));
+      if (lost) {
+        process.stderr.write('fake gmx grompp: an include that leads nowhere (this text is the fake\'s, in GROMACS\'s shape)\n\n-------------------------------------------------------\nProgram:     gmx grompp, version 2025.4-PLUMED_spack\n\nFatal error:\nTopology include file "' + lost.include + '" not found (in ' + basename(lost.from) + ')\n-------------------------------------------------------\n');
+        return 1;
+      }
       process.stderr.write(real(which).replaceAll('hhhhhhhh', seq));
       backUp(o); backUp(one('-po'));
       writeFileSync(o, 'fake: a run input, not a real .tpr\n');

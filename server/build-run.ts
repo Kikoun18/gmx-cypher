@@ -19,7 +19,7 @@ import { freeRepeat, hint, quarantineName, resumeAt } from '../src/lib/build/ret
 import { PROFILES, qqScript, type Profile } from '../src/lib/build/qq';
 import type { StageId } from '../src/lib/build/plan';
 import { planSystem, type Step } from '../src/lib/build/steps';
-import { carbGroup, hmrTopology, ionCounts, mergeGro, moleculetype, nearestWalker, netCharge, pullx, renameWater, topologyText, walkerFrames, waters } from '../src/lib/build/text';
+import { carbGroup, hmrTopology, ionCounts, mergeGro, moleculetype, nearestWalker, netCharge, ownIncludes, pullx, renameWater, topologyText, walkerFrames, waters } from '../src/lib/build/text';
 import type { Job, JobStatus, Jobs } from './jobs';
 
 export const BUILD_FORMAT = 'gmx-cypher build', BUILD_VERSION = 1;
@@ -313,6 +313,18 @@ export class Builder extends EventEmitter {
     // Continue: from the first step the record does not have as done, or whose output is gone.
     const from = prev ? resumeAt(steps, prev.steps, p => p in prev.files && !existsSync(resolve(base, p))) : 0;
     if (prev) { record.steps = [...prev.steps]; s.notes.push(from >= steps.length ? 'every step was done before' : 'continued at step ' + (from + 1) + ' of ' + steps.length + ': ' + steps[from].label); }
+    // T233: a build before the fix wrote the peptide's .itp (and gromologist's split of it) with its position
+    // restraints included from ff/, where pdb2gmx ran: from the system's folder that leads nowhere. Files a build of
+    // this system wrote, so they are put right in place, said, and recorded anew.
+    if (prev) for (const [key, f] of Object.entries(prev.files)) {
+      const at = resolve(base, key);
+      if (dirname(key) !== sys.dir || !key.endsWith('.itp') || !existsSync(at) || linkIn(base, at)) continue;
+      const was = readFileSync(at, 'utf8'), fixed = ownIncludes(was, sys.dir);
+      if (fixed === was) continue;
+      writeFileSync(at, fixed);
+      record.files[key] = await fileRecord(at, f.step);
+      s.notes.push(basename(key) + ': its includes of files in this folder now read ./<file> (written from ff/ before, they led nowhere)');
+    }
     let cluster = steps.slice(0, from).some(x => x.label === 'qq script' && CLUSTER.includes(x.stage));
     const failedWalkers = new Set<number>();
     let frames = false;
@@ -543,7 +555,7 @@ export class Builder extends EventEmitter {
   private make(step: Step, sys: System, plan: BuildPlan, cwd: string, base: string): string {
     const read = (f: string) => readFileSync(join(cwd, f), 'utf8'), q = sys.sequence;
     switch (step.make) {
-      case 'moleculetype': return moleculetype(read(q + '.top'));
+      case 'moleculetype': return moleculetype(read(q + '.top'), sys.dir);
       case 'merge': return mergeGro(read(NAMES.pre), read(sys.saccharide + '.gro'), plan.science.box);
       case 'topology': return topologyText(sys, plan.science);
       case 'water-tip3f': return renameWater(read(q + '.top'), 'TIP3F');

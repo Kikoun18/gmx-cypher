@@ -200,5 +200,10 @@ af1c154 The page's theme before the first render: no light-to-dark transition, n
   largest force against the tolerance, and says when it converged. The server sends mdrun's head with each step's log,
   so a page opened mid-run still knows the total. The log shows each line as a terminal would. nvt's and npt's lines
   are tested as GROMACS prints them; no sample of them was needed beyond your notebook's patterns.
+- **Your `gggggggg.itp`** (T233). Its position-restraint include led nowhere: pdb2gmx writes it from `ff/`, where it
+  runs, and gmx-cypher writes the `.itp` into the system's folder, not into `ff/` as your notebook does. With your
+  `-DPOSRES`, grompp before the salt stopped there. It now reads `./{sequence}_restraints.itp`. A system built before
+  is corrected in place when you resume it (*resume at the step that stopped*). The fake grompp now follows every
+  include, so a test fails if one leads nowhere.
 - **Still waiting**: samples 3, 5, 7 and 8, as before.
-- **Tests**: Vitest 1359 → 1388 passed (1 skipped); Playwright 18, all passing.
+- **Tests**: Vitest 1359 → 1390 passed (1 skipped); Playwright 18, all passing.

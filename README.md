@@ -107,7 +107,8 @@ walkers are prepared and get their qq script and `qq submit` line (nothing is su
   and every system after it). A system stops at the first GROMACS fatal error, quoted with its stage, whatever the exit
   code (or at any non-zero exit with strict mode on), with a hint for the pull's two box errors; the others go on, or
   the build stops, as you choose. A failed system can be *resumed at the step that stopped* (in its folder, nothing
-  before it rewritten) or *rebuilt anew* (its folder moved to `failed/` first, with `FAILED.txt`). A folder that
+  before it rewritten, except a position-restraint include an earlier version wrote from `ff/`, which leads nowhere
+  and is corrected) or *rebuilt anew* (its folder moved to `failed/` first, with `FAILED.txt`). A folder that
   exists is continued if a gmx-cypher build made it, skipped, or built beside as the next repeat, as you choose. A
   walker whose preparation fails is moved to `9.multiwalker/failed/` and prepared again, once, from the start of the
   nearest working walker, as your notebook's retry does.

@@ -46,6 +46,8 @@ describe('one system, end to end', () => {
       'CARB.itp', 'Protein.itp', 'build.json', 'hhhhhhhh.gro', 'hhhhhhhh.itp', 'hhhhhhhh.pdb', 'hhhhhhhh.top', 'hhhhhhhh_hmr.top', 'hhhhhhhh_restraints.itp',
       'o111.gro', 'pre.gro', 'visualization/4.potE_minim.xvg', 'visualization/hhhhhhhh.png',
     ]);
+    // The peptide's moleculetype includes its position restraints from its own folder: pdb2gmx wrote them from ff/ (T233).
+    expect(readFileSync(join(base, S, 'hhhhhhhh.itp'), 'utf8')).toContain('#ifdef POSRES\n#include "./hhhhhhhh_restraints.itp"\n#endif');
     // The topology: gromologist's split files, TIP3PF's HMR water, the waters less the ions, renamed for TIP3PF.
     const top = readFileSync(join(base, S, 'hhhhhhhh.top'), 'utf8');
     expect(top).toContain('#include "Protein.itp"');
