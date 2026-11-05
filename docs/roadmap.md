@@ -282,7 +282,7 @@ From [`batch-4.md`](batch-4.md) §6: SymBuilder inside gmx-cypher, four tabs (ho
 - [ ] R10 From a built system to analysis
 
 ### Phase 7: Finish
-- [ ] README, contract, fresh-context review, report
+- [x] README, contract, fresh-context review, report (`docs/batch-4-report.md`)
 
 ### Backlog (Batch 4: add to it, don't do it)
 - Job submission and killing jobs (unless question 6 says otherwise).
