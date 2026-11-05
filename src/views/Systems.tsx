@@ -4,6 +4,7 @@ import type { BuildDraft, IfExists } from '../buildDraft'
 import { nameProblem, repeatName, STAGES, switches, systemsOf, type Systems } from '../lib/build/plan'
 import { orderProblems, planSystem } from '../lib/build/steps'
 import { toneSolid, toneSoft, toneText, type Tone } from '../lib/tones'
+import { TONES } from '../core'
 import { cn } from '../lib/utils'
 import { Button } from '../ui/button'
 import { Stat } from '../ui/card'
@@ -16,7 +17,6 @@ const Head = ({ label, n }: { label: string; n?: number }) => (
   <div className="flex items-center gap-2"><span className="text-label uppercase text-muted-foreground">{label}</span><span className="h-px flex-1 bg-border" />{n != null && <span className="text-control">{String(n).padStart(2, '0')}</span>}</div>
 )
 const Panel = ({ className, ...p }: React.ComponentProps<'section'>) => <section className={cn('flex flex-col gap-3 rounded-2xl border border-border bg-card p-4', className)} {...p} />
-const TONES: Tone[] = ['coral', 'sky', 'mint', 'lilac', 'butter', 'aqua', 'rose', 'stone']
 const HEAVY = [['min', 'minimise'], ['nvt', 'equilibrate nvt'], ['npt', 'equilibrate npt'], ['awh', 'awh'], ['pull', 'pull'], ['walkers', 'walker windows']] as const
 
 /** One list of names, as chips: each removable, a new one typed and checked (it lands in folders and arguments). */
