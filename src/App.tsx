@@ -178,7 +178,7 @@ export function App() {
           </Alert>
         )}
         <TabsContent value="home">{state && <Home state={state} jobs={jobs.jobs} cluster={clusterRead} />}</TabsContent>
-        <TabsContent value="symbuilder">{route.view === 'symbuilder' && <SymBuilder route={route} go={go} />}</TabsContent>
+        <TabsContent value="symbuilder">{route.view === 'symbuilder' && <SymBuilder route={route} go={go} gmx={state?.gmx.ok ? state.gmx.name ?? 'gmx' : 'gmx'} />}</TabsContent>
         <TabsContent value="analysis">
           <SubTabs value={view === 'setup' ? 'setup' : 'results'} onValueChange={v => go(last[v] ?? (v === 'setup' ? FIRST.analysis : { view: 'results', job: null }))} label="analysis views"
             items={[{ value: 'setup', label: 'set-up' }, { value: 'results', label: 'results' }]}>
