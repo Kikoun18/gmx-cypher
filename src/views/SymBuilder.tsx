@@ -1,5 +1,6 @@
 import { useBuildCheck, useBuildLanding } from '../buildCheck'
 import { useBuildDraft } from '../buildDraft'
+import { systemsOf } from '../lib/build/plan'
 import type { ProjectLike } from '../lib/build/project'
 import { SYM_VIEWS, type Route, type SymView } from '../lib/route'
 import { useProject } from '../project'
@@ -19,7 +20,7 @@ export function SymBuilder({ route, go, gmx, base, vault, projectId }: { route: 
   const [draft, setDraft] = useBuildDraft(), { check, error } = useBuildCheck(draft, base), project = useProject<ProjectLike>(vault, projectId)
   const landing = useBuildLanding(draft, vault && route.sub === 'systems' ? projectId : null, base)
   return (
-    <SubTabs value={route.sub} onValueChange={v => go({ view: 'symbuilder', sub: v as SymView })} label="symbuilder views" items={SYM_VIEWS.map(v => ({ value: v, label: v }))}>
+    <SubTabs value={route.sub} onValueChange={v => go({ view: 'symbuilder', sub: v as SymView })} label="symbuilder views" items={SYM_VIEWS.map(v => ({ value: v, label: v, ...(v === 'systems' ? { count: String(systemsOf(draft.systems).length).padStart(2, '0') } : {}) }))}>
       {route.sub === 'build' && <BuildView draft={draft} setDraft={setDraft} gmx={gmx} />}
       {route.sub === 'systems' && <SystemsView draft={draft} setDraft={setDraft} missing={check?.missing ?? null} project={project} landing={landing} />}
       {route.sub === 'files' && <BuildFilesView draft={draft} check={check} error={error} base={base} />}
