@@ -1,6 +1,6 @@
 # gmx-cypher — design contract
 
-**Approved 2026-10-19** (batch 3, decisions T157–T169). This is the one page later decisions point to. The machine-checkable parts live in `src/core/contract.ts`; where a table here and the module disagree, the module is right and this page is out of date.
+**Approved 2026-10-19** (batch 3, decisions T157–T169); **amended 2026-11-05** (batch 4: the words, T201 and T202). This is the one page later decisions point to. The machine-checkable parts live in `src/core/contract.ts`; where a table here and the module disagree, the module is right and this page is out of date.
 
 Morpheus is the brief; the Matrix is the neighbour. Where gmx-cypher and the Matrix show the same thing (a chart, an export, a key, a word), gmx-cypher matches the Matrix unless this page says otherwise.
 
@@ -8,18 +8,27 @@ Morpheus is the brief; the Matrix is the neighbour. Where gmx-cypher and the Mat
 
 | Term | Means only | Never used for |
 |---|---|---|
-| **job** | one gmx execution by gmx-cypher | a replicate; what a job produced |
-| **record** | a job's `.run.json` | a job; a vault cell |
-| **run** | the Matrix's replicate slot (a, b, …). As a verb, *run* still starts a job | a job (*run again* → *open in set-up*,) |
+| **job** | one gmx analysis gmx-cypher runs; on the cluster tab, a **qq job** is qq's own | a replicate; what a job produced; a build's step |
+| **record** | a job's `.run.json` | a job; a vault cell; a system's `build.json` (*build record*) |
+| **run** | the Matrix's replicate slot (a, b, …). As a verb, *run* still starts a job | a job (*run again* → *open in set-up*,); a build; a repeat |
 | **run input** | the `.tpr` (GROMACS's own term; always with *input*) | a run |
 | **result** | what a job produced (an RDF, a profile, …), and its page | a job (*each job* → *each result*) |
-| **analysis** | the Matrix's type of a curve set (RDF, PMF, …), only | a tab or step (*analysis* tab → *command* step) |
-| **command** | a gmx tool gmx-cypher runs (`gmx rdf`), with its options | a result |
+| **analysis** | the Matrix's type of a curve set (RDF, PMF, …); and the tab that holds set-up and results (T201) | a step (*analysis* step → *command* step) |
+| **command** | a gmx tool gmx-cypher runs (`gmx rdf`, `gmx solvate`), with its options | a result; a python script (*what it runs*); a qq line (*submit line*) |
 | **first shell** / **maximum** | the two peak rules, always named | — ("peak" never stands alone) |
 | **compare** | the view of several results side by side, `#compare` | — ((de)Cypher stays the name of the HTML export,) |
 | **send** → **sent** | copy a result into the vault's inbox | — |
 | **archive** → **archived** | move a finished job's log aside; never delete | delete, hide |
 | **on disk** | records found in a folder | the vault |
+| **recipe** | a saved analysis: its groups, command and options | a build plan |
+| **system** | one method × saccharide × sequence, and its folder `solutions/{method}/{saccharide}/{sequence}/` | a job; a project row |
+| **build** → **built** | making systems (verb and noun) | a run; a job |
+| **stage** | one of the notebook's processes: solution builder · minimisation · nvt · npt · awh · pull · multiwalker | a step |
+| **step** | one tile's work in a build (pdb2gmx, add water, …) | a stage; a job |
+| **build plan** | a saved stack of tiles, with the science values | a recipe |
+| **build record** | a system's `build.json`: every step, every file it wrote or replaced | a record |
+| **repeat** | a method again with `r`, `r1`, … in a new folder tree | a run (*repeated runs* → *repeats*) |
+| **qq script** | the script a heavy stage gets for the cluster; its **submit line** | a job script |
 
 ## 2. Colour roles
 

@@ -36,6 +36,14 @@ describe('one set of words (R3b)', () => {
     const hits = uiStrings().flatMap(s => NEVER_SHOWN.filter(n => n.phrase.test(s.text)).map(n => s.file + ':' + s.line + '  ' + s.text.trim().slice(0, 100) + '  → ' + n.instead));
     expect(hits).toEqual([]);
   });
+
+  // SymBuilder's words (T202): a repeat is not a run, a build plan not a recipe, a qq script not a job's.
+  it.each([
+    ['Repeated runs', true], ['run every system again as a repeated run', true], ['save the build recipe', true], ['qq job scripts', true],
+    ['repeats', false], ['repeat 1', false], ['save build plan', false], ['the qq script of every heavy stage', false], ['your cluster jobs', false],
+  ])('%s → refused: %s', (text, refused) => {
+    expect(NEVER_SHOWN.some(n => n.phrase.test(text))).toBe(refused);
+  });
 });
 
 describe('one status component (R9c)', () => {

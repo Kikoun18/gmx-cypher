@@ -5,7 +5,7 @@ import { TONES } from './index'
 export { TONES }
 
 /**
- * Words the page never shows (R3b, contract §1): a job is one gmx execution, a record its .run.json, a run the
+ * Words the page never shows (R3b, contract §1): a job is one gmx analysis, a record its .run.json, a run the
  * Matrix's replicate slot, a result what a job produced. *Run* stays a verb.
  */
 export const NEVER_SHOWN: { phrase: RegExp; instead: string }[] = [
@@ -17,6 +17,10 @@ export const NEVER_SHOWN: { phrase: RegExp; instead: string }[] = [
   { phrase: /\brun['’]s\b(?! input\b)|\bruns on disk\b|\bthe runs\b/i, instead: "the job's, records on disk, the jobs" },
   { phrase: /\bby job\b|\beach job its\b/i, instead: 'colour by result' },
   { phrase: /\bopen in \(de\)Cypher\b|\b(open|close) \(de\)Cypher\b|\binside \(de\)Cypher\b/i, instead: 'compare' },
+  // SymBuilder (T202): a repeat is a new folder tree, not a run; a saved stack is a build plan; qq's scripts are qq's.
+  { phrase: /\brepeated runs?\b/i, instead: 'repeats' },
+  { phrase: /\bbuild recipes?\b/i, instead: 'build plan' },
+  { phrase: /\bjob scripts?\b/i, instead: 'qq script' },
 ]
 
 /** An internal reference the page never shows (R3a): a ticket, a question or a request, such as "(T35)", "(question 28)" or "(R9c)". */

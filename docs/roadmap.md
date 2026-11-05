@@ -251,7 +251,7 @@ From [`batch-4.md`](batch-4.md) §6: SymBuilder inside gmx-cypher, four tabs (ho
 - [x] Questions answered; decisions recorded; order and cut confirmed (T201–T221; questions 12 and 34 open until batch 5)
 
 ### Phase 1: The shell (R1, R2)
-- [ ] R1a Contract amended for the new words (question 1, 2)
+- [x] R1a Contract amended for the new words (question 1, 2): §1's table, three phrases refused (T201, T202)
 - [ ] R1b Four tabs, routes, every old address
 - [ ] R1c The mock-up's look: Morpheus's current tokens, coral for UI state, status as a dot and word (T218)
 - [ ] R2 home
