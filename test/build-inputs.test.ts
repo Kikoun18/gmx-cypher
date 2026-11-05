@@ -65,6 +65,11 @@ describe('the base folder, python, and the check', () => {
     });
     expect(r.files.find((f: { path: string }) => f.path === 'ff/o111-ADD.itp')).toEqual({ path: 'ff/o111-ADD.itp', kind: 'saccharide', what: 'the saccharide\'s topology', found: true });
     expect((await s.call('/api/build/check', { plan: DEFAULT_PLAN, systems: { methods: ['../x'], saccharides: ['o111'], sequences: ['aa'], repeats: 0 } })).status).toBe(400);
+    // A science value is a name in its folder, never a path (review finding 1): refused before anything is looked up.
+    const out = { ...DEFAULT_PLAN, science: { ...DEFAULT_PLAN.science, mdp: { ...DEFAULT_PLAN.science.mdp, min: '../../../../../../../../etc/passwd' } } };
+    const bad = await s.call('/api/build/check', { plan: out, systems: { methods: ['hmr+fast+6'], saccharides: ['o111'], sequences: ['aa'], repeats: 0 } });
+    expect([bad.status, bad.json.error]).toEqual([400, 'science value mdp.min is not an mdp file name in inputs/: "../../../../../../../../etc/passwd"']);
+    expect((await s.call('/api/build/check', { plan: DEFAULT_PLAN, systems: { methods: ['m'], saccharides: ['o111'], sequences: ['aa'], repeats: 3e6 } })).status).toBe(400);
   });
   it('reads an mdp or topology file of the base folder, and nothing else', async () => {
     const { allowed, base } = tree(), s = await apiServer()

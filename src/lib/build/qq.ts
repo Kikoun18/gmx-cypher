@@ -7,9 +7,12 @@ import type { StageId, System } from './plan'
 
 export interface Profile {
   id: 'mc2025' | 'mc2022' | 'lumi'; name: string; gmx: 'gmx_mpi' | 'gmx'; modules: string
-  /** mdrun's flags before -deffnm; LUMI's come after -multidir. */
+  /**
+   * mdrun's flags before -deffnm (after -multidir in the walkers' script); `multidir`: the notebook wrote this profile
+   * for the walkers (LUMI), though every profile runs them with -multidir, which needs an MPI gmx.
+   */
   flags: string; dlb: boolean; multidir: boolean
-  /** Cores and GPUs per walker for a multidir profile, per job otherwise. */
+  /** Cores and GPUs per walker in the walkers' script, per job otherwise. */
   ncpus: number; ngpus: number; mem: string; walltime: string; loopEnd: number; maxh: number; props?: string
 }
 export const PROFILES: Profile[] = [
@@ -42,12 +45,13 @@ export function qqScript(stage: StageId, sys: System, p: Profile, walkers = 8): 
   const s = SCRIPTED[stage]
   if (!s) return null
   const dirs = Array.from({ length: walkers }, (_, i) => String(i + 1))
-  const multi = stage === 'walkers' && p.multidir
+  // The walkers share one bias, so they always run together with -multidir (review finding 6); an MPI gmx is needed.
+  const multi = stage === 'walkers'
   const mdrun = [p.gmx, 'mdrun', ...(multi ? ['-multidir', ...dirs] : []), ...(p.flags ? [p.flags] : []), '-deffnm', s.deffnm, '-cpi', s.deffnm + '.cpt', ...(p.dlb ? ['-dlb', 'yes'] : []),
     ...(s.px ? ['-px', s.px[0], '-pf', s.px[1]] : []), '-v', '-quiet', '-maxh', String(p.maxh)].join(' ')
   const gro = stage === 'walkers' ? dirs.map(d => d + '/' + s.deffnm + '.gro') : [s.deffnm + '.gro']
   const n = multi ? walkers : 1
-  const text = renderQq({ jobType: 'continuous', props: multi ? undefined : p.props, ncpus: p.ncpus * n, ngpus: p.ngpus * n, mem: p.mem, walltime: p.walltime, loopEnd: p.loopEnd, modules: p.modules, mdrun, resubmit: until(gro) })
+  const text = renderQq({ jobType: 'continuous', props: p.props, ncpus: p.ncpus * n, ngpus: p.ngpus * n, mem: p.mem, walltime: p.walltime, loopEnd: p.loopEnd, modules: p.modules, mdrun, resubmit: until(gro) })
   const file = 'scripts/' + s.folder + '/' + sys.method + '_' + s.folder + '_' + sys.sequence + '.sh'
   return { file, text, submit: 'qq submit -q gpu ' + sys.dir + '/' + STEP_FOLDER[stage] + '/' + file.split('/').pop() }
 }

@@ -109,6 +109,18 @@ describe('the stack\'s order (R3c\'s drag and drop moves tiles)', () => {
     const moved = { ...ALL, stages: [{ ...sb, tiles }, ...ALL.stages.slice(1)] };
     expect(orderProblems(planSystem(moved, SYS, { base: BASE }))).toEqual(['pdb2gmx, inside ff/ reads aaaaaaaa.gro before centre the peptide writes it']);
   });
+  // Review finding 5: a step that changes a file before it exists, or writes over a change nothing read.
+  const moveBefore = (type: string, before: string) => {
+    const sb = ALL.stages[0], tiles = [...sb.tiles], [t] = tiles.splice(tiles.findIndex(x => x.type === type), 1);
+    tiles.splice(tiles.findIndex(x => x.type === before), 0, t);
+    return orderProblems(planSystem({ ...ALL, stages: [{ ...sb, tiles }, ...ALL.stages.slice(1)] }, SYS, { base: BASE }));
+  };
+  it('the topology above pdb2gmx: pdb2gmx would write over it', () => {
+    expect(moveBefore('topology', 'pdb2gmx')).toContain('write the topology changes aaaaaaaa.top before pdb2gmx, inside ff/ writes it');
+  });
+  it('the hydrogen masses above the topology: the topology would drop them', () => {
+    expect(moveBefore('hmr', 'topology')).toContain('write the topology writes aaaaaaaa.top over what the topology on Protein.itp and CARB.itp changed');
+  });
   it('a stage left out reads what an earlier build left on disk: no problem', () => {
     const later = { ...ALL, stages: ALL.stages.map(s => ({ ...s, on: s.id === 'awh' })) };
     expect(orderProblems(planSystem(later, SYS, { base: BASE }))).toEqual([]);

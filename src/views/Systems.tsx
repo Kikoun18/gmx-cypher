@@ -3,7 +3,7 @@ import { X } from 'lucide-react'
 import type { BuildLanding } from '../buildCheck'
 import type { BuildDraft, IfExists } from '../buildDraft'
 import type { FolderLanding } from '../lib/build/landing'
-import { nameProblem, repeatName, STAGES, switches, systemsOf, type Systems } from '../lib/build/plan'
+import { nameProblem, repeatClashes, repeatName, STAGES, switches, systemsOf, type Systems } from '../lib/build/plan'
 import { systemsFromProject, type ProjectLike } from '../lib/build/project'
 import { orderProblems, planSystem } from '../lib/build/steps'
 import { toneSolid, toneSoft, toneText, type Tone } from '../lib/tones'
@@ -85,14 +85,14 @@ export function InProject({ folders }: { folders: FolderLanding[] | undefined })
 export function SystemsView({ draft, setDraft, missing = null, project = null, landing = null }: { draft: BuildDraft; setDraft: React.Dispatch<React.SetStateAction<BuildDraft>>; missing?: Record<string, string[]> | null; project?: ProjectLike | null; landing?: BuildLanding | null }) {
   // A name added to a list drops `only` (the cells the project lacks): the new name has no cell listed.
   const grows = (o: Systems, patch: Partial<Systems>) => (['methods', 'saccharides', 'sequences'] as const).some(k => patch[k]?.some(v => !o[k].includes(v)))
-  const s = draft.systems, all = systemsOf(s), set = (patch: Partial<Systems>) => setDraft(d => {
+  const s = draft.systems, all = React.useMemo(() => systemsOf(s), [s]), set = (patch: Partial<Systems>) => setDraft(d => {
     const next = { ...d.systems, ...patch }
     if (!('only' in patch) && grows(d.systems, patch)) delete next.only
     return { ...d, systems: next }
   })
   const sacTone = (c: string) => TONES[Math.max(0, s.saccharides.indexOf(c)) % TONES.length]
   const plan = draft.plan, scripted = plan.stages.filter(x => x.on && x.tiles.some(t => t.on) && x.id !== 'sb').length
-  const rows = React.useMemo(() => all.map(sys => { const steps = planSystem(plan, sys, { base: '{base}' }); return { sys, steps, problems: orderProblems(steps) } }), [all, plan])
+  const rows = React.useMemo(() => all.slice(0, 200).map(sys => { const steps = planSystem(plan, sys, { base: '{base}' }); return { sys, steps, problems: orderProblems(steps) } }), [all, plan])
   const here = rows[0]?.steps.filter(x => x.where === 'here').length ?? 0
   const inProject = !!(project || landing)
   return (
@@ -131,6 +131,7 @@ export function SystemsView({ draft, setDraft, missing = null, project = null, l
         <Head label="repeats" />
         <label className="flex items-center gap-3 text-control">build every system again, as repeats
           <Input size="sm" type="number" min={0} max={9} value={s.repeats} onChange={e => set({ repeats: Math.max(0, Math.min(9, Number(e.target.value) || 0)) })} className="w-[64px]" /></label>
+        {repeatClashes(s).map(c => <Status key={c} inline level="warning" word="check">{c}</Status>)}
         {s.methods[0] && (
           <div className="overflow-hidden rounded-xl border border-border text-caption">
             {Array.from({ length: s.repeats + 1 }, (_, r) => (

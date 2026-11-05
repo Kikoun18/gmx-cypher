@@ -10,7 +10,7 @@ Branch `cypher-batch-4` from `6de6a96` (gmx-cypher) in the-matrix at `7ae82be`; 
 
 ## 1. Summary
 
-Lines are from `git show --numstat`: code is `src/`, `server/`, `scripts/` and `index.html`; tests are `test/` and
+Lines are from `git show --numstat` (the review's fixes from `git diff`): code is `src/`, `server/`, `scripts/` and `index.html`; tests are `test/` and
 `e2e/` (fixtures included); screenshots and docs are left out. Tests are Vitest at that commit, run on its own in a
 scratch worktree (lint and build skipped there; both ran on every commit before it was made).
 
@@ -28,7 +28,7 @@ scratch worktree (lint and build skipped there; both ran on every commit before 
 | R4 what a build reads | done | `053dfc0` | +226/−14 | +124/−3 | 1223 | T203, T212 |
 | R8a systems from a project | done | `b19c6fb` | +126/−20 | +79/−0 | 1232 | T223 |
 | R8b where PMFs land | done | `1265bcc` | +179/−11 | +183/−1 | 1258 | T214, T224 |
-| Phase 7 README, review, report | done | the last commits | 0 | 0 | 1258 | |
+| Phase 7 README, review, report | done | `d74e50b` and the review's fixes after it | +161/−43 | +77/−4 | 1284 | T225 |
 | R5, R6, R7, R8c–e, R9, R10 | batch 5 | | | | | T220 |
 
 In all, `src server scripts index.html`: 32 files, +1,724/−91; `test e2e`: 19 files, +1,217/−24 (Phase 0 planned
@@ -104,7 +104,8 @@ run of its own (1100); I count it as load, not a defect, and it did not recur at
 
 ### R8b Where each system's PMFs land
 - **After:** under each system in the preview, with a project connected: the row, column and runs its PMFs would take
-  (the AWH folder its cell's next free run, each walker its own number), runs it would replace (a check), or the
+  (the AWH folder its cell's next free run, each walker its own number, the folders planned one after another so
+  two never share a run unsaid: T225), runs it would replace (a check), or the
   first problem in words: another group, sequence or column, a new row because the project's row is named apart from
   its sequence (question 37), a folder pattern that reads `7.awh` as a `{run}`, a folder pattern that reads nothing when
   the name gives nothing either, a walker past the tenth, a full cell. It is the Matrix's own `planBatch` on the file a
@@ -182,7 +183,7 @@ scratch vault and base folder; 256 colours):
 
 ## 7. Tests
 
-- **Vitest:** 1079 passed, 1 skipped at the baseline; 1258 passed, 1 skipped now (95 files). New files: `home`, `build-plan`, `builds`,
+- **Vitest:** 1079 passed, 1 skipped at the baseline; 1284 passed, 1 skipped now (95 files), after the review's fixes. New files: `home`, `build-plan`, `builds`,
   `build-steps`, `build-text`, `build-inputs`, `build-project`, `build-landing`, `symbuilder-views`; updated `route`,
   `contract`, `contrast`, `tokens`.
 - **Playwright:** 14 at the baseline (12 failing on the missing icon), 17 now, all passing: the four tabs and old
@@ -235,8 +236,25 @@ Proposed components, from what SymBuilder needed and built locally:
 
 ## 11. Review
 
-A fresh-context review of the whole diff (security, the planner, the landing check, the hooks, what the tests
-claim) is running as this is written; its findings and what was done about them follow in the next commit.
+A fresh-context agent reviewed the whole diff with only the code in hand (security, the planner, the landing check,
+the hooks, what the tests claim) and reproduced each finding with a probe. All were fixed, each with a test written
+first, in the commit after this report's first version (decision T225):
+
+| # | Finding | Fixed |
+|---|---|---|
+| 1 | **Security:** the plan's science values were not checked, so `mdp.min: "../../…/etc/passwd"` made `/api/build/check` say whether any file on the machine exists; the same values reach gmx's arguments | every science value is checked as what it becomes (a file or folder name in its folder, never a path; menu numbers; an ion name; numbers); 400 in words |
+| 2 | Each folder of a system was planned alone, so with no `{run}` the AWH folder and all eight walkers said "run 2" with no problem, and with `…/9.multiwalker/{run}` the AWH folder and walker 3 shared run 3 | folders are planned one after another, each after the runs the ones before took: the next free runs, and "run 3 is also 7.awh's" where two meet; two tests that asserted the old answer were corrected |
+| 3 | A repeat named like another listed method (`hmr+fast+6` repeat 1 and `hmr+fast+6r`, as the notebook lists them) gave two systems in one folder | built once, and the systems view says why |
+| 4 | Science values of the wrong kind (`mdp: null`, `walkers: {}`) passed `planProblems`, then the server answered 500 and an imported plan took the page down | each value checked for its kind and contents |
+| 5 | The order check missed the topology moved above pdb2gmx (pdb2gmx writes over it) and the hydrogen masses moved above the topology (dropped) | two rules: a change before the file is written, and a file written anew over a change nothing read |
+| 6 | The walkers' qq script on the default profile ran one `mdrun` in `9.multiwalker/` with no `.tpr` there | the walkers run with `-multidir` on every profile (an MPI gmx is needed; refusing a thread-MPI profile is for R7a) |
+| 7 | With two rows of one sequence (HA and WRWYCR), the check named the wrong row and counted its runs | the row named by its sequence comes first, as the Matrix picks it |
+| 8 | `repeats: 3e6` held the server for seconds; a name that wasn't a string gave 500 | systems from the page are checked: names, whole repeats 0–9, a list of cells |
+| — | The check's found/missing stayed after an error or a new base folder; the preview planned every system on every render | the answer belongs to its base folder and an error replaces it; the preview plans the 200 it shows, once per change |
+
+Checked and found sound: route parsing (old addresses, `#symbuilder/../etc`), `readText` (`..`, absolute paths,
+links out of the base folder), saved plans' names and folder, `Systems.only`, the base folder in settings, the
+stale-answer guards of the debounced requests.
 
 ## 12. History
 

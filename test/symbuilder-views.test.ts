@@ -113,7 +113,7 @@ describe('symbuilder · systems: where each lands in the project (R8b)', () => {
   const f = (o: Partial<FolderLanding>): FolderLanding => ({ folder: '', what: 'walker', name: '', row: 'AAAAAAAA', rowNew: false, group: 'hmr+fast+6', col: 'O111', colNew: false, run: 1, replaces: false, problems: [], ...o });
   const html = (folders: FolderLanding[] | undefined) => renderToStaticMarkup(createElement(InProject, { folders }));
   it('the row, column and runs, ranges joined', () => {
-    expect(html([f({ what: 'awh', run: 3 }), ...[1, 2, 3, 4].map(n => f({ n, run: n }))])).toContain('AAAAAAAA · O111 · run 3, walkers 1–4');
+    expect(html([f({ what: 'awh', run: 9 }), ...[1, 2, 3, 4].map(n => f({ n, run: n }))])).toContain('AAAAAAAA · O111 · run 9, walkers 1–4');
     expect(html([f({ what: 'awh', run: 1, rowNew: true, colNew: true, row: 'GG', col: 'XYL' })])).toContain('GG (new row) · XYL (new column) · run 1');
   });
   it('runs the project has already: replaced, said as a check', () => {

@@ -106,13 +106,28 @@ export function nameProblem(kind: keyof typeof NAME, name: string): string | nul
     : 'a ' + kind + ' is letters, digits and ' + (kind === 'method' ? '+ . _ -' : '_ -') + ', starting with a letter or digit: ' + JSON.stringify(name)
 }
 
-/** Every system of a build, each repeat its own (methods × saccharides × sequences × (1 + repeats)), in that order; with `only`, those cells. */
+/**
+ * Every system of a build, each repeat its own (methods × saccharides × sequences × (1 + repeats)), in that order;
+ * with `only`, those cells. A folder comes once: a repeat named like another method listed is that method's system.
+ */
 export function systemsOf(s: Systems): System[] {
-  const out: System[] = [], only = Array.isArray(s.only) ? new Set(s.only) : null
+  const out: System[] = [], only = Array.isArray(s.only) ? new Set(s.only) : null, seen = new Set<string>()
   for (const m of s.methods) for (let r = 0; r <= s.repeats; r++) for (const c of s.saccharides) for (const q of s.sequences) {
     const method = repeatName(m, r)
     if (only && !only.has(cellKey(m, c, q))) continue
+    if (seen.has(cellKey(method, c, q))) continue
+    seen.add(cellKey(method, c, q))
     out.push({ method, saccharide: c, sequence: q, SEQUENCE: q.toUpperCase(), repeat: r, dir: [BASE.solutions, method, c, q].join('/') })
+  }
+  return out
+}
+
+/** Repeats named like another method listed (the notebook lists `hmr+fast+6` and `hmr+fast+6r`), in words. */
+export function repeatClashes(s: Pick<Systems, 'methods' | 'repeats'>): string[] {
+  const out: string[] = []
+  for (const m of s.methods) for (let r = 1; r <= s.repeats; r++) {
+    const name = repeatName(m, r)
+    if (s.methods.includes(name)) out.push(name + ' is a method and ' + m + '\'s repeat ' + r + ': its systems are built once')
   }
   return out
 }
@@ -130,6 +145,63 @@ export function planProblems(p: unknown): string[] {
   else for (const s of o.stages) if (!Array.isArray(s.tiles) || s.tiles.some(x => !x || typeof x.type !== 'string' || typeof x.on !== 'boolean')) out.push('stage ' + s.id + ' has a tile without a type')
   const sc = o.science as Partial<Science> | undefined
   if (!sc || typeof sc !== 'object') out.push('a build plan needs its science values')
-  else for (const k of Object.keys(SCIENCE) as (keyof Science)[]) if (typeof sc[k] !== typeof SCIENCE[k]) out.push('science value ' + k + ' is missing or of another kind')
+  else out.push(...scienceProblems(sc))
+  return out
+}
+
+/** A file or folder name, never a path: no slash, no leading dot (review finding 1). */
+const FILE_NAME = /^[A-Za-z0-9][A-Za-z0-9._+-]{0,127}$/
+const MENU = /^\s*\d+(\s+\d+)*\s*$/
+const isObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
+const finite = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v)
+/**
+ * Each science value checked: they become paths (`inputs/<mdp>`, `ff/<forcefield>.ff`, `molecules/<glucose>`) and
+ * arguments, so a name is a name in its folder and every number is a number (review findings 1 and 4).
+ */
+function scienceProblems(sc: Partial<Science>): string[] {
+  const out: string[] = [], q = JSON.stringify
+  for (const k of Object.keys(SCIENCE) as (keyof Science)[]) {
+    const v = sc[k], want = SCIENCE[k]
+    if (v == null || typeof v !== typeof want || Array.isArray(v) !== Array.isArray(want)) { out.push('science value ' + k + ' is missing or of another kind'); continue }
+    if (typeof want === 'number' && !finite(v)) out.push('science value ' + k + ' is not a number')
+  }
+  if (out.length) return out
+  const s = sc as Science
+  if (!FILE_NAME.test(s.forcefield)) out.push('science value forcefield is not a folder name in ff/: ' + q(s.forcefield))
+  if (!MENU.test(s.answers)) out.push('science value answers is not menu numbers: ' + q(s.answers))
+  for (const [seq, a] of Object.entries(s.answersBySequence)) if (typeof a !== 'string' || !MENU.test(a)) out.push('science value answersBySequence.' + seq + ' is not menu numbers: ' + q(a))
+  for (const k of ['positive', 'negative'] as const) if (!/^[A-Za-z0-9_+-]{1,16}$/.test(s[k])) out.push('science value ' + k + ' is not an ion name: ' + q(s[k]))
+  if (s.shift.length !== 3 || !s.shift.every(finite)) out.push('science value shift is not three numbers')
+  if (!s.walkers.length || s.walkers.length > 64 || !s.walkers.every(w => finite(w) && w > 0)) out.push('science value walkers is not a list of distances in nm')
+  if (!Number.isInteger(s.maxwarn) || s.maxwarn < 0) out.push('science value maxwarn is not a whole number')
+  for (const [k, v] of Object.entries(s.restraints)) if (!/^[A-Za-z_][A-Za-z0-9_]{0,63}$/.test(k) || !finite(v)) out.push('science value restraints has ' + q(k) + ', not a define with a number')
+  if (!isObject(s.mdp)) out.push('science value mdp is missing or of another kind')
+  else for (const k of Object.keys(SCIENCE.mdp) as (keyof Science['mdp'])[]) {
+    const f = s.mdp[k]
+    if (typeof f !== 'string' || !FILE_NAME.test(f) || !f.endsWith('.mdp')) out.push('science value mdp.' + k + ' is not an mdp file name in inputs/: ' + q(f ?? null))
+  }
+  if (!isObject(s.glucose)) out.push('science value glucose is missing or of another kind')
+  else {
+    if (typeof s.glucose.file !== 'string' || !FILE_NAME.test(s.glucose.file)) out.push('science value glucose.file is not a file name in molecules/: ' + q(s.glucose.file ?? null))
+    if (!finite(s.glucose.conc) || !Number.isInteger(s.glucose.tries) || s.glucose.tries < 0) out.push('science value glucose has a concentration or tries that is not a number')
+  }
+  return out
+}
+
+/** Why systems from the page can't be built, in words; empty when they can (review finding 8). */
+export function systemsProblems(s: unknown): string[] {
+  if (!isObject(s)) return ['no systems']
+  const out: string[] = []
+  for (const kind of ['method', 'saccharide', 'sequence'] as const) {
+    const list = s[kind + 's']
+    if (!Array.isArray(list)) { out.push('no ' + kind + ' list'); continue }
+    for (const n of list) {
+      if (typeof n !== 'string') { out.push('a ' + kind + ' is a name: ' + JSON.stringify(n)); continue }
+      const p = nameProblem(kind, n)
+      if (p) out.push(p)
+    }
+  }
+  if (!Number.isInteger(s.repeats) || (s.repeats as number) < 0 || (s.repeats as number) > 9) out.push('repeats is a whole number from 0 to 9')
+  if (s.only !== undefined && (!Array.isArray(s.only) || s.only.some(c => typeof c !== 'string'))) out.push('only is a list of cells')
   return out
 }

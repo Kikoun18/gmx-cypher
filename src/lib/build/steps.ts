@@ -46,7 +46,7 @@ export function planSystem(plan: BuildPlan, sys: System, o: { base: string; prof
     const s = qqScript(stage, sys, profile, sc.walkers.length)
     if (s) add({ stage, tile: stage === 'awh' ? 'awh' : stage === 'pull' ? 'pull' : stage === 'walkers' ? 'walkers' : 'md', label: 'qq script', program: 'copy', cwd, argv: [s.file, s.file.split('/').pop()!], writes: [s.file, join(cwd, s.file.split('/').pop()!)], where: 'cluster' })
   }
-  const water = (to: 'TIP3F' | 'SOL') => fast && add({ stage: 'sb', tile: 'solvate', label: 'water named ' + to, program: 'write', cwd: d, argv: [q + '.top'], replaces: [join(d, q + '.top')] })
+  const water = (to: 'TIP3F' | 'SOL') => fast && add({ stage: 'sb', tile: 'solvate', label: 'water named ' + to, program: 'write', cwd: d, argv: [q + '.top'], reads: [join(d, q + '.top')], replaces: [join(d, q + '.top')] })
   const npt = '../' + NAMES.npt + '/' + NAMES.npt + '.gro'
   /** One tile's steps (its type, and for trjconv and editconf its molecule). */
   const emit = (stage: StageId, tile: Tile) => {
@@ -73,19 +73,19 @@ export function planSystem(plan: BuildPlan, sys: System, o: { base: string; prof
       case 'merge': return add({ stage, tile: 'merge', label: 'merge into a ' + sc.box.toFixed(1) + ' nm box', program: 'write', cwd: d, argv: [NAMES.conf], reads: [join(d, NAMES.pre), join(d, c + '.gro')], writes: [join(d, NAMES.conf)] })
       case 'topology': return add({ stage, tile: 'topology', label: 'write the topology', program: 'write', cwd: d, argv: [q + '.top'], replaces: [join(d, q + '.top')] })
       case 'solvate':
-        add({ stage, tile: 'solvate', label: 'add water', program: 'gmx', cwd: d, argv: ['solvate', '-cp', NAMES.conf, '-cs', '-o', NAMES.solvated, '-p', q + '.top', '-quiet'], reads: [join(d, NAMES.conf)], writes: [join(d, NAMES.solvated)], replaces: [join(d, q + '.top')] })
+        add({ stage, tile: 'solvate', label: 'add water', program: 'gmx', cwd: d, argv: ['solvate', '-cp', NAMES.conf, '-cs', '-o', NAMES.solvated, '-p', q + '.top', '-quiet'], reads: [join(d, NAMES.conf), join(d, q + '.top')], writes: [join(d, NAMES.solvated)], replaces: [join(d, q + '.top')] })
         return water('TIP3F')
       case 'genion':
         add({ stage, tile: 'genion', label: 'grompp before the salt', program: 'gmx', cwd: d, argv: ['grompp', '-f', inputs(sc.mdp.min), '-p', q + '.top', '-c', NAMES.solvated, '-r', NAMES.solvated, '-o', NAMES.preSalted, '-po', '3.pre_salted_mdout.mdp', '-quiet', '-maxwarn', String(sc.maxwarn)],
           reads: [join(d, q + '.top'), join(d, NAMES.solvated)], writes: [join(d, NAMES.preSalted), join(d, '3.pre_salted_mdout.mdp')] })
         water('SOL')
         add({ stage, tile: 'genion', label: 'add salt', program: 'gmx', cwd: d, argv: ['genion', '-s', NAMES.preSalted, '-p', q + '.top', '-o', NAMES.salted, '-pname', sc.positive, '-nname', sc.negative, '-np', '{np}', '-nn', '{nn}', '-quiet'], stdin: 'SOL\n',
-          reads: [join(d, NAMES.preSalted)], writes: [join(d, NAMES.salted)], replaces: [join(d, q + '.top')], resolves: ['np', 'nn'] })
+          reads: [join(d, NAMES.preSalted), join(d, q + '.top')], writes: [join(d, NAMES.salted)], replaces: [join(d, q + '.top')], resolves: ['np', 'nn'] })
         return water('TIP3F')
       case 'hmr':
         if (!hmr) return
         add({ stage, tile: 'hmr', label: 'hydrogen masses (gromologist)', program: 'python', cwd: d, argv: ['hmr.py', q + '.top', q + '_hmr.top', ...Object.entries(sc.restraints).map(([k, v]) => k + '=' + v)], reads: [join(d, q + '.top')], writes: [join(d, q + '_hmr.top'), join(d, 'Protein.itp'), join(d, 'CARB.itp')] })
-        return add({ stage, tile: 'hmr', label: 'the topology on Protein.itp and CARB.itp', program: 'write', cwd: d, argv: [q + '.top'], replaces: [join(d, q + '.top')] })
+        return add({ stage, tile: 'hmr', label: 'the topology on Protein.itp and CARB.itp', program: 'write', cwd: d, argv: [q + '.top'], reads: [join(d, q + '_hmr.top')], replaces: [join(d, q + '.top')] })
       case 'glucose': return // planned once insert-molecules' output is known (N11)
       case 'md': {
         const md = { min: [NAMES.min, sc.mdp.min, '../' + NAMES.salted, true], nvt: [NAMES.nvt, sc.mdp.nvt, '../' + NAMES.min + '/' + NAMES.min + '.gro', true], npt: [NAMES.npt, sc.mdp.npt, '../' + NAMES.nvt + '/' + NAMES.nvt + '.gro', false] } as const
@@ -126,16 +126,28 @@ export function planSystem(plan: BuildPlan, sys: System, o: { base: string; prof
 }
 
 /**
- * Why a stack's order can't work, in words: a step that reads a file of this system which a later step writes. (A
- * file nothing in the plan writes is read from disk: a stage left out, or a system built before.)
+ * Why a stack's order can't work, in words: a step that reads or changes a file of this system before a later step
+ * writes it, and a step that writes a file anew over a change nothing has read (review finding 5). A file nothing
+ * in the plan writes is read from disk: a stage left out, or a system built before.
  */
 export function orderProblems(steps: Step[]): string[] {
-  const out: string[] = []
+  const out: string[] = [], name = (f: string) => f.split('/').pop()
   steps.forEach((s, i) => {
+    const before = steps.slice(0, i), made = (f: string) => before.some(e => e.writes.includes(f) || e.replaces.includes(f))
     for (const r of s.reads) {
-      if (steps.slice(0, i).some(e => e.writes.includes(r) || e.replaces.includes(r))) continue
+      if (made(r)) continue
       const later = steps.slice(i + 1).find(e => e.writes.includes(r))
-      if (later) out.push(s.label + ' reads ' + r.split('/').pop() + ' before ' + later.label + ' writes it')
+      if (later) out.push(s.label + ' reads ' + name(r) + ' before ' + later.label + ' writes it')
+    }
+    for (const f of s.replaces) {
+      if (!made(f)) {
+        const later = steps.slice(i + 1).find(e => e.writes.includes(f))
+        if (later) out.push(s.label + ' changes ' + name(f) + ' before ' + later.label + ' writes it')
+      } else if (!s.reads.includes(f)) {
+        // Written anew: the last change to it must have been read by a step in between, or it is lost.
+        const at = before.map(e => e.replaces.includes(f)).lastIndexOf(true)
+        if (at >= 0 && !steps.slice(at + 1, i).some(e => e.reads.includes(f))) out.push(s.label + ' writes ' + name(f) + ' over what ' + steps[at].label + ' changed')
+      }
     }
   })
   return [...new Set(out)]

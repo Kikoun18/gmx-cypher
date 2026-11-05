@@ -8,7 +8,7 @@ import { mergeSettings } from '../../matrix/src/lib/seq';
 import type { Store } from '../../matrix/src/lib/types';
 import { inputsOf, type Input } from '../src/lib/build/inputs';
 import { systemLanding, type FolderLanding } from '../src/lib/build/landing';
-import { nameProblem, planProblems, systemsOf, type BuildPlan, type Systems } from '../src/lib/build/plan';
+import { planProblems, systemsOf, systemsProblems, type BuildPlan, type Systems } from '../src/lib/build/plan';
 import { within } from './files';
 import { HttpError } from './http';
 
@@ -28,11 +28,8 @@ const exists = (p: string) => { try { return statSync(p).isFile(); } catch { ret
 function checked(plan: unknown, systems: Systems): BuildPlan {
   const problems = planProblems(plan);
   if (problems.length) throw new HttpError(400, problems.join('; '));
-  if (!systems || typeof systems !== 'object') throw new HttpError(400, 'no systems');
-  for (const [kind, names] of [['method', systems.methods], ['saccharide', systems.saccharides], ['sequence', systems.sequences]] as const) {
-    if (!Array.isArray(names)) throw new HttpError(400, 'no ' + kind + ' list');
-    for (const n of names) { const p = nameProblem(kind, String(n)); if (p) throw new HttpError(400, p); }
-  }
+  const bad = systemsProblems(systems);
+  if (bad.length) throw new HttpError(400, bad.join('; '));
   return plan as BuildPlan;
 }
 

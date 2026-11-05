@@ -138,6 +138,12 @@ exit 0
     expect(t).toContain('-deffnm 8.pull -cpi 8.pull.cpt -dlb yes -px pullx.xvg -pf pullf.xvg');
     expect(t).toContain('if [ -f "8.pull.gro" ]; then');
   });
+  it('the walkers share one bias, so every profile runs them with -multidir (review finding 6)', () => {
+    const w = qqScript('walkers', s, mc2025)!;
+    expect(w.text).toContain('gmx_mpi mdrun -multidir 1 2 3 4 5 6 7 8 -ntomp 8 -update gpu -nb gpu -pme gpu -bonded gpu -deffnm 9.multiwalker -cpi 9.multiwalker.cpt');
+    expect(w.text).toContain('# qq ncpus 64\n# qq ngpus 8\n');
+    expect(w.text).toContain('if [ -f "1/9.multiwalker.gro" ]');
+  });
   it('LUMI multidir: every walker\'s folder, 7 cores and a GPU each (T213), resubmitted until every walker has its .gro', () => {
     const w = qqScript('walkers', s, lumi)!;
     expect(w.file).toBe('scripts/awh_multi/hmr+fast+6_awh_multi_aaaaaaaa.sh');

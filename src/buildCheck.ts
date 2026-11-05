@@ -9,14 +9,16 @@ import type { FolderLanding } from './lib/build/landing'
 export interface BuildCheck { base: string; files: (Input & { found: boolean })[]; missing: Record<string, string[]> }
 
 export function useBuildCheck(draft: BuildDraft, base: string | null | undefined): { check: BuildCheck | null; error: string } {
-  const [check, setCheck] = React.useState<BuildCheck | null>(null), [error, setError] = React.useState('')
+  // An answer belongs to the base folder it was asked for, and an error replaces it (review: no stale found/missing).
+  const [read, setRead] = React.useState<{ base: string; check: BuildCheck | null; error: string } | null>(null)
   React.useEffect(() => {
     if (!base) return
     let alive = true
-    const t = setTimeout(() => postJson<BuildCheck>('/api/build/check', { plan: draft.plan, systems: draft.systems }).then(c => { if (alive) { setCheck(c); setError('') } }, e => alive && setError((e as Error).message)), 300)
+    const t = setTimeout(() => postJson<BuildCheck>('/api/build/check', { plan: draft.plan, systems: draft.systems })
+      .then(c => alive && setRead({ base, check: c, error: '' }), e => alive && setRead({ base, check: null, error: (e as Error).message })), 300)
     return () => { alive = false; clearTimeout(t) }
   }, [draft.plan, draft.systems, base])
-  return base ? { check, error } : { check: null, error: '' }
+  return base && read?.base === base ? { check: read.check, error: read.error } : { check: null, error: '' }
 }
 
 /** Where each system's PMFs would land in the connected project (R8b), as `POST /api/build/landing` answers. */

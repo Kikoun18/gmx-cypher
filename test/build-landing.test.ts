@@ -70,11 +70,22 @@ describe('the file a send would make', () => {
 });
 
 describe('where each folder lands', () => {
+  it('no run in either pattern: each folder takes the next free run after the ones before it (review finding 2)', () => {
+    const r = systemLanding(store, WALKERS, sys('aaaaaaaa'), BASE);
+    expect(r.map(f => f.run)).toEqual([3, 4, 5, 6, 7, 8, 9, 10, 1]);
+    expect(r.slice(0, 8).every(f => !f.problems.length && !f.replaces)).toBe(true);
+    expect(r[8]).toMatchObject({ replaces: true, problems: ['the cell has 10 runs already: a send replaces run 1'] });
+  });
+  it('rows of one sequence, one named by it: that row, as the Matrix picks it (review finding 7)', () => {
+    const ha = store.seqs.find(q => q.name === 'HA')!, two = { ...store, seqs: [...store.seqs, { ...ha, id: 'w', name: 'WRWYCR', runs: [] }] };
+    expect(systemLanding(two, DEFAULT_PLAN, sys('wrwycr'), BASE)[0]).toMatchObject({ row: 'WRWYCR', rowNew: false, run: 1, problems: [] });
+  });
   it('the default name pattern: the AWH folder takes the cell\'s next free run, each walker its own', () => {
     const r = systemLanding(using({ pathPattern: FOLDERS }), WALKERS, sys('aaaaaaaa'), BASE);
     expect(r.map(f => [f.folder, f.name, f.row, f.col, f.run, f.problems])).toEqual([
       ['solutions/hmr+fast+6/o111/aaaaaaaa/7.awh', 'hmr+fast+6_O111_AAAAAAAA_t{time}.xvg', 'AAAAAAAA', 'O111', 3, []],
-      ...[1, 2, 3, 4, 5, 6, 7, 8].map(n => ['solutions/hmr+fast+6/o111/aaaaaaaa/9.multiwalker/' + n, 'hmr+fast+6_O111_AAAAAAAA_t{time}.xvg', 'AAAAAAAA', 'O111', n, []]),
+      ...[1, 2, 3, 4, 5, 6, 7, 8].map(n => ['solutions/hmr+fast+6/o111/aaaaaaaa/9.multiwalker/' + n, 'hmr+fast+6_O111_AAAAAAAA_t{time}.xvg', 'AAAAAAAA', 'O111', n,
+        n === 3 ? ['run 3 is also 7.awh\'s: one PMF would replace the other'] : []]),
     ]);
     expect(r.every(f => !f.rowNew && !f.colNew)).toBe(true);
     // Walkers 1 and 2 land on the project's runs 1 and 2: said, as the Matrix's plan says it.
@@ -114,7 +125,8 @@ describe('where each folder lands', () => {
     const plan: BuildPlan = { ...WALKERS, science: { ...WALKERS.science, walkers: Array.from({ length: 11 }, (_, i) => 1 + i / 10) } };
     const r = systemLanding(using({ pattern: '{method}_{column}_{seq}_{run}.xvg' }), plan, sys('aaaaaaaa'), BASE);
     expect(r[10].problems).toEqual([]);
-    expect(r[11].problems).toEqual(['run: 11 (name) is not a run number 1–10']);
+    // The Matrix refuses run 11, and its next free run is walker 1's by then.
+    expect(r[11].problems).toEqual(['run 1 is also walker 1\'s: one PMF would replace the other', 'run: 11 (name) is not a run number 1–10']);
   });
   it('a full cell: the AWH folder has no free run', () => {
     const full = { ...store, seqs: store.seqs.map(q => (q.name === 'AAAAAAAA' ? { ...q, runs: 'abcdefghij'.split('').map(run => ({ ...q.runs[0], run: run as 'a' })) } : q)) };
