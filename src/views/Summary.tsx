@@ -4,6 +4,7 @@ import type { BuildRun } from '../builds'
 import type { Level } from '../core/contract'
 import type { SummaryRow, WalkerMark } from '../lib/build/report'
 import { timedelta } from '../lib/build/report'
+import { analyseOffer, ANALYSE } from '../lib/build/analyse'
 import { toneSoft } from '../lib/tones'
 import { cn } from '../lib/utils'
 import { Button } from '../ui/button'
@@ -95,7 +96,7 @@ export function SummaryReport({ report }: { report: BuildReport }) {
 }
 
 /** symbuilder · summary (R9): the last build's reports, read when it opens and again when that build changes. */
-export function SummaryView({ runs }: { runs: BuildRun[] }) {
+export function SummaryView({ runs, onAnalyse }: { runs: BuildRun[]; onAnalyse?: (root: string, template: string) => void }) {
   const run = runs[0], [read, setRead] = React.useState<{ key: string; report: BuildReport } | null>(null), [error, setError] = React.useState('')
   const key = run ? run.id + ' ' + run.status + ' ' + (run.ended ?? '') : ''
   React.useEffect(() => {
@@ -109,6 +110,12 @@ export function SummaryView({ runs }: { runs: BuildRun[] }) {
     <div className="flex flex-col gap-5">
       <div className="flex flex-col gap-1"><h2 className="m-0 text-title">summary</h2>
         <p className="m-0 text-caption text-muted-foreground">the build of {new Date(run.created).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })} · {run.plan} · read from solutions/{'{method}'}/{'{saccharide}'}/{'{sequence}'}{run.status === 'running' ? ' · still building' : ''}</p></div>
+      {onAnalyse && run.systems.some(s => s.status === 'built' || s.status === 'cluster') && (
+        <div className="flex flex-wrap items-center gap-2">
+          {(['walkers', 'awh'] as const).map(w => { const o = analyseOffer(run.base, w); return <Button key={w} size="sm" variant={w === 'walkers' ? 'default' : 'outline'} onClick={() => onAnalyse(o.root, o.template)}>analyse {ANALYSE[w].label} in set-up</Button> })}
+          <span className="text-caption text-muted-foreground">set-up's batch mode, its root this build's solutions/ and a path template by the notebook's names · a preview first; nothing runs until you press run</span>
+        </div>
+      )}
       {error && <Status level="error">{error}</Status>}
       {read?.key === key ? <SummaryReport report={read.report} /> : !error && <p className="m-0 text-caption text-muted-foreground" aria-live="polite">reading the reports…</p>}
     </div>

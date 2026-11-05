@@ -24,7 +24,7 @@ test.beforeAll(async () => {
 })
 test.afterAll(() => { runner?.kill() })
 
-test('build a system from systems, follow it on progress until it waits for the cluster (R5c), read its summary (R9)', async ({ page }) => {
+test('build a system from systems, follow it on progress until it waits for the cluster (R5c), read its summary (R9), and take it to analysis (R10)', async ({ page }) => {
   const errors: string[] = []
   page.on('console', m => { if (m.type() === 'error') errors.push(m.text()) })
   page.on('pageerror', e => errors.push(e.message))
@@ -46,5 +46,10 @@ test('build a system from systems, follow it on progress until it waits for the 
   await expect(page.getByRole('region', { name: 'build summary' }).getByText('SB 7 · MIN 4 · NVT 4 · NPT 4 · AWH 4 · PULL 3')).toBeVisible()
   const axe2 = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).disableRules(['region']).analyze()
   expect(axe2.violations.filter(v => v.impact === 'serious' || v.impact === 'critical').map(v => v.id + ' ' + v.nodes[0].target.join(' '))).toEqual([])
+  // From the built system to analysis (R10): set-up's batch mode, filled in; nothing runs before its own run.
+  await page.getByRole('button', { name: 'analyse the walkers in set-up' }).click()
+  await expect(page).toHaveURL(/#setup\/inputs\?mode=batch$/)
+  await expect(page.getByLabel('path template')).toHaveValue('{method}/{column}/{seq}/9.multiwalker/{run}/9.multiwalker.xtc')
+  await expect(page.getByLabel('root', { exact: true })).toHaveValue(/\/solutions$/)
   expect(errors).toEqual([])
 })

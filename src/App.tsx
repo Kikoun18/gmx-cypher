@@ -20,6 +20,7 @@ import { Settings } from './views/Settings'
 import { Setup } from './views/Setup'
 import { SymBuilder } from './views/SymBuilder'
 import { useBuilds } from './builds'
+import { FORM } from './views/Batch'
 import { jobSystem } from './lib/build/jobs'
 import { ClusterScriptsView } from './views/ClusterScripts'
 import { Home, type ClusterSummary } from './views/Home'
@@ -152,7 +153,7 @@ export function App() {
   const [batchPreset, setBatchPreset] = React.useState<BatchPreset | null>(null)
   // The cluster tab's last read, for home (T215).
   const [clusterRead, setClusterRead] = React.useState<ClusterSummary | null>(null)
-  const offerBatch = (root: string, recipe: string) => { setBatchPreset({ id: Date.now(), root, recipe }); go({ view: 'setup', step: 'inputs', batch: true }) }
+  const offerBatch = (root: string, recipe: string, template?: string) => { setBatchPreset({ id: Date.now(), root, recipe, ...(template ? { template } : {}) }); go({ view: 'setup', step: 'inputs', batch: true }) }
 
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground">
@@ -187,7 +188,8 @@ export function App() {
           </Alert>
         )}
         <TabsContent value="home">{state && <Home state={state} jobs={jobs.jobs} cluster={clusterRead} />}</TabsContent>
-        <TabsContent value="symbuilder">{route.view === 'symbuilder' && <SymBuilder route={route} go={go} gmx={state?.gmx.ok ? state.gmx.name ?? 'gmx' : 'gmx'} gmxOk={!!state?.gmx.ok} base={state?.config.base} vault={state?.config.vault} projectId={state?.config.project} builds={builds} />}</TabsContent>
+        <TabsContent value="symbuilder">{route.view === 'symbuilder' && <SymBuilder route={route} go={go} gmx={state?.gmx.ok ? state.gmx.name ?? 'gmx' : 'gmx'} gmxOk={!!state?.gmx.ok} base={state?.config.base} vault={state?.config.vault} projectId={state?.config.project} builds={builds}
+          onAnalyse={(root, template) => offerBatch(root, FORM, template)} />}</TabsContent>
         <TabsContent value="analysis">
           <SubTabs value={view === 'setup' ? 'setup' : 'results'} onValueChange={v => go(last[v] ?? (v === 'setup' ? FIRST.analysis : { view: 'results', job: null }))} label="analysis views"
             items={[{ value: 'setup', label: 'set-up' }, { value: 'results', label: 'results' }]}>

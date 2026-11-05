@@ -106,6 +106,10 @@ walkers are prepared and get their qq script and `qq submit` line (nothing is su
   distance, its time, its status and GROMACS's warnings by stage, as your notebook counts them), the pull report, the
   walker report (x output, o run input ready, – missing) and the termini check; the summary is also written, once per
   build, to `<base>/logs/build_summary_<date>_<time>.log`.
+- **From a build to analysis**: the summary's *analyse the walkers in set-up* (or *awh*) opens set-up's batch mode
+  with the build's `solutions/` as its root and a path template by the notebook's names
+  (`{method}/{column}/{seq}/9.multiwalker/{run}/9.multiwalker.xtc`); you preview, choose, and press run.
+- Sending a built system's PMF to the Matrix waits for your answer to which PMF file the vault holds (question 12).
 - The build being planned is kept in this browser.
 
 Methods switch on what their name says: `hmr` hydrogen masses (gromologist), `fast` TIP3PF water; awh, the pull and the
