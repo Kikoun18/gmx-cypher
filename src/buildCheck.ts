@@ -5,8 +5,13 @@ import { postJson } from './api'
 import type { BuildDraft } from './buildDraft'
 import type { Input } from './lib/build/inputs'
 import type { PmfLanding } from './lib/build/landing'
+import type { AnswersCheck } from './lib/build/pdb2gmx'
 
-export interface BuildCheck { base: string; files: (Input & { found: boolean })[]; missing: Record<string, string[]> }
+/**
+ * `pdb2gmx`: each sequence's answers against the force field's menus (T230), null when they can't be read; `timestep`:
+ * methods without hmr whose stages grompp an mdp with dt over 2 fs (T231).
+ */
+export interface BuildCheck { base: string; files: (Input & { found: boolean })[]; missing: Record<string, string[]>; pdb2gmx: AnswersCheck | null; timestep: string[] }
 
 export function useBuildCheck(draft: BuildDraft, base: string | null | undefined): { check: BuildCheck | null; error: string } {
   // An answer belongs to the base folder it was asked for, and an error replaces it (review: no stale found/missing).

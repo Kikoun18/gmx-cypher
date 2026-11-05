@@ -8,7 +8,8 @@ import { BuildView } from '../src/views/Build';
 import { KINDS, stepLine } from '../src/lib/build/tiles';
 import { InProject, SystemsView } from '../src/views/Systems';
 import type { PmfLanding } from '../src/lib/build/landing';
-import { BuildFilesView } from '../src/views/BuildFiles';
+import type { AnswersCheck } from '../src/lib/build/pdb2gmx';
+import { BuildFilesView, Pdb2gmxAnswers } from '../src/views/BuildFiles';
 import { ProgressView } from '../src/views/Progress';
 import { ClusterScriptsView } from '../src/views/ClusterScripts';
 import { PmfReport, SummaryReport, SummaryView, type OnPmf, type PmfRow } from '../src/views/Summary';
@@ -93,7 +94,7 @@ describe('symbuilder · files (R4)', () => {
   const check = { base: '/data/innit_tests', missing: { 'solutions/hmr+fast+6/pg/aaaaaaaa': ['ff/pg-ADD.itp'] }, files: [
     { path: 'molecules/saccharides/o111.gro', kind: 'saccharide' as const, what: '', found: true }, { path: 'ff/o111-ADD.itp', kind: 'saccharide' as const, what: '', found: true },
     { path: 'molecules/saccharides/pg.gro', kind: 'saccharide' as const, what: '', found: true }, { path: 'ff/pg-ADD.itp', kind: 'saccharide' as const, what: '', found: false },
-    { path: 'ff/ADDff.itp', kind: 'force field' as const, what: '', found: true }, { path: 'inputs/minim.mdp', kind: 'mdp' as const, what: '', found: true }] };
+    { path: 'ff/ADDff.itp', kind: 'force field' as const, what: '', found: true }, { path: 'inputs/minim.mdp', kind: 'mdp' as const, what: '', found: true }], pdb2gmx: null, timestep: [] };
   it('each saccharide ready or missing, the force field\'s files, the mdp per stage and method, and the systems missing a file', () => {
     const html = renderToStaticMarkup(createElement(BuildFilesView, { draft, check, error: '', base: '/data/innit_tests' }));
     expect(html).toContain('>o111</b>');
@@ -109,6 +110,35 @@ describe('symbuilder · files (R4)', () => {
     const html = renderToStaticMarkup(createElement(SystemsView, { draft, setDraft: noop, missing: check.missing }));
     expect(html).toContain('ff/pg-ADD.itp');
     expect(html.match(/>missing</g)).toHaveLength(1);
+  });
+});
+
+describe('symbuilder · files and systems: pdb2gmx\'s answers (T230)', () => {
+  const end = (resname: string, menu: string[], picks: string, standsFor: string) => ({ resname, menu, picks, standsFor });
+  const MET_N = ['MET1', 'NH3+', 'NH2'], MET_C = ['MET2', 'COO-', 'COOH'];
+  const answers: AnswersCheck = { general: [], water: 'None', sequences: [
+    { sequence: 'hhhhhhhh', answers: '1 8 0 0', want: '1 8 0 0', own: false, first: end('HIS', ['NH3+'], 'NH3+', 'NH3+'), last: end('HIS', ['COO-'], 'COO-', 'COO-'), problems: [] },
+    { sequence: 'mmmmmmmm', answers: '1 8 0 0', want: '1 8 1 1', own: false, first: end('MET', MET_N, 'MET1', 'NH3+'), last: end('MET', MET_C, 'MET2', 'COO-'), problems: ['the N-terminus answer, 0, picks MET1 for MET, not NH3+ (MET1, NH3+, NH2)', 'the C-terminus answer, 0, picks MET2 for MET, not COO- (MET2, COO-, COOH)'] },
+    { sequence: 'gggggggg', answers: '1 8 1 1', want: '1 8 0 0', own: true, first: end('GLY', ['GLY-NH3+', 'GLY-NH2'], 'GLY-NH2', 'GLY-NH3+'), last: end('GLY', ['COO-', 'COOH'], 'COOH', 'COO-'), problems: [] },
+  ] };
+  it('what each sequence\'s answers pick, MET\'s problem with the answers that fix it, a sequence\'s own answers said', () => {
+    const used: [string, string | null][] = [];
+    const html = renderToStaticMarkup(createElement(Pdb2gmxAnswers, { check: answers, forcefield: 'charmm36s-jul2022-prosECCo75', answers: '1 8 0 0', onUse: (q, a) => used.push([q, a]) }));
+    expect(html).toContain('menus from charmm36s-jul2022-prosECCo75.ff');
+    expect(html).toContain('NH3+ · COO-');
+    expect(html).toContain('the N-terminus answer, 0, picks MET1 for MET, not NH3+ (MET1, NH3+, NH2) · and 1 more');
+    expect(html).toContain('>use 1 8 1 1</button>');
+    expect(html).toContain('GLY … GLY · 1 8 1 1 (its own)');
+    expect(html).toContain('GLY-NH2 · COOH');
+    expect(html.match(/<button/g)).toHaveLength(1);
+  });
+  it('the systems view stops the build on a sequence whose answers pick another terminus, and says it in its row', () => {
+    const d = { ...draft, systems: { ...draft.systems, sequences: ['hhhhhhhh', 'mmmmmmmm'] } };
+    const html = renderToStaticMarkup(createElement(SystemsView, { draft: d, setDraft: noop, answers, build: { blocked: null, start: async () => {} } }));
+    expect(html).toContain('mmmmmmmm&#x27;s pdb2gmx answers pick another terminus: see files');
+    expect(html).toContain('>pdb2gmx<');
+    const general = renderToStaticMarkup(createElement(SystemsView, { draft: d, setDraft: noop, answers: { ...answers, general: ['the first answer, 3, picks one of GROMACS\'s own force fields, not x (1)'] }, build: { blocked: null, start: async () => {} } }));
+    expect(general).toContain('pdb2gmx&#x27;s answers: the first answer, 3, picks one of GROMACS&#x27;s own force fields, not x (1): see files');
   });
 });
 

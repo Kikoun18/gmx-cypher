@@ -3,6 +3,7 @@ import { X } from 'lucide-react'
 import type { BuildLanding } from '../buildCheck'
 import type { BuildDraft, IfExists } from '../buildDraft'
 import type { PmfLanding } from '../lib/build/landing'
+import type { AnswersCheck } from '../lib/build/pdb2gmx'
 import { nameProblem, repeatClashes, repeatName, STAGES, switches, systemsOf, type Systems } from '../lib/build/plan'
 import { systemsFromProject, type ProjectLike } from '../lib/build/project'
 import { orderProblems, planSystem } from '../lib/build/steps'
@@ -69,8 +70,12 @@ export function InProject({ pmf }: { pmf: PmfLanding | null | undefined }) {
 }
 
 /** symbuilder · systems (R3c): methods × saccharides × sequences, repeats, and a preview of every system before anything runs. */
-export function SystemsView({ draft, setDraft, missing = null, project = null, landing = null, build }: {
+export function SystemsView({ draft, setDraft, missing = null, answers = null, timestep = [], project = null, landing = null, build }: {
   draft: BuildDraft; setDraft: React.Dispatch<React.SetStateAction<BuildDraft>>; missing?: Record<string, string[]> | null; project?: ProjectLike | null; landing?: BuildLanding | null
+  /** pdb2gmx's answers against the force field's menus (T230). */
+  answers?: AnswersCheck | null
+  /** Methods without hmr whose mdp has a time step over 2 fs (T231): said, not a reason to stop. */
+  timestep?: string[]
   /** Starting a build (R5c): why it can't start now, or null. */
   build?: { blocked: string | null; start: () => Promise<void> }
 }) {
@@ -88,7 +93,10 @@ export function SystemsView({ draft, setDraft, missing = null, project = null, l
   const here = rows[0]?.steps.filter(x => x.where === 'here').length ?? 0
   const inProject = !!(project || landing)
   const short = missing ? Object.keys(missing).length : 0, ordered = rows.filter(r => r.problems.length).length
-  const why = !build ? 'building is not available here' : build.blocked ?? (!all.length ? 'no system yet' : short ? (short === 1 ? 'one system misses' : short + ' systems miss') + ' a file: see files' : ordered ? 'a stack order can\'t work: see the check column' : null)
+  const answerOf = (q: string) => answers?.sequences.find(x => x.sequence === q)?.problems[0]
+  const picks = s.sequences.filter(q => answerOf(q)), general = answers?.general[0]
+  const why = !build ? 'building is not available here' : build.blocked ?? (!all.length ? 'no system yet' : short ? (short === 1 ? 'one system misses' : short + ' systems miss') + ' a file: see files'
+    : general ? 'pdb2gmx\'s answers: ' + general + ': see files' : picks.length ? (picks.length === 1 ? picks[0] + '\'s' : picks.length + ' sequences\'') + ' pdb2gmx answers pick another terminus: see files' : ordered ? 'a stack order can\'t work: see the check column' : null)
   return (
     <div className="grid grid-cols-[300px_minmax(0,1fr)_minmax(0,1.15fr)] items-start gap-5 max-[1180px]:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
       <Panel aria-label="where heavy steps run">
@@ -149,12 +157,14 @@ export function SystemsView({ draft, setDraft, missing = null, project = null, l
               <div key={sys.dir} className="grid grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] items-center gap-x-2 gap-y-0.5 border-b border-border px-3 py-1.5 text-caption last:border-0">
                 <span className="truncate">{sys.method} / <span className={toneText[sacTone(sys.saccharide)]}>{sys.saccharide}</span> / <b>{sys.sequence}</b>{switches(sys.method).hmr ? <span className={cn('ml-2 rounded px-1', toneSoft.sky)}>hmr</span> : null}{switches(sys.method).fast ? <span className={cn('ml-1 rounded px-1', toneSoft.aqua)}>fast</span> : null}</span>
                 {missing?.[sys.dir] ? <Status inline level="error" word="missing" className="w-full"><span className="block truncate" title={missing[sys.dir].join(', ')}>{missing[sys.dir].join(', ')}</span></Status>
+                  : answerOf(sys.sequence) ? <Status inline level="error" word="pdb2gmx" className="w-full"><span className="block truncate" title={answerOf(sys.sequence)}>{answerOf(sys.sequence)}</span></Status>
                   : problems.length ? <Status inline level="error" word="order" className="w-full"><span className="block truncate" title={problems[0]}>{problems[0]}</span></Status> : <Status inline level="ok" word="ready" />}
                 {inProject && <div className="col-span-2 pl-3"><InProject pmf={landing ? landing.systems[sys.dir] : undefined} /></div>}
               </div>
             ))}
           </div>
         )}
+        {timestep.length > 0 && <Status inline level="warning" word="check">{timestep[0]}{timestep.length > 1 ? ' · and ' + (timestep.length - 1) + ' more: see files' : ''}</Status>}
         {landing && <span className="text-caption text-muted-foreground">in the project: where each system's multiwalker PMF (gmx awh in 9.multiwalker/1) would land in {landing.project.name}, by the Matrix's own planBatch · name pattern {landing.project.pattern} · folder pattern {landing.project.pathPattern || 'none'}{landing.more ? ' · the first 200 systems are checked' : ''}</span>}
         <div className="flex flex-wrap items-center gap-2">
           <Button size="lg" disabled={!!why || starting} aria-describedby="build-why" onClick={() => { if (!build) return; setStarting(true); setFailed(''); build.start().catch(e => setFailed((e as Error).message)).finally(() => setStarting(false)) }}>build {all.length} {all.length === 1 ? 'system' : 'systems'}</Button>

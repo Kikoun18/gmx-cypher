@@ -2,9 +2,11 @@ import * as React from 'react'
 import { getJson } from '../api'
 import type { BuildCheck } from '../buildCheck'
 import type { BuildDraft } from '../buildDraft'
+import type { AnswersCheck } from '../lib/build/pdb2gmx'
 import { STAGES, switches } from '../lib/build/plan'
 import { toneSoft } from '../lib/tones'
 import { cn } from '../lib/utils'
+import { Button } from '../ui/button'
 import { Status } from '../ui/status'
 
 const Head = ({ label, n }: { label: string; n?: number }) => (
@@ -12,8 +14,39 @@ const Head = ({ label, n }: { label: string; n?: number }) => (
 )
 const Found = ({ found, path }: { found: boolean | undefined; path: string }) => (found == null ? <span className="text-caption text-muted-foreground">{path}</span> : <Status inline level={found ? 'ok' : 'error'} word={found ? 'found' : 'missing'}>{path}</Status>)
 
+/**
+ * pdb2gmx's answers (T230): what they pick for each sequence's first and last residue, read from the force field's
+ * menus as pdb2gmx builds them; where the plan's answers pick another terminus (MET's MET1), the answers that pick the
+ * one they stand for, in one press as that sequence's own.
+ */
+export function Pdb2gmxAnswers({ check, forcefield, answers, onUse }: { check: AnswersCheck; forcefield: string; answers: string; onUse?: (sequence: string, answers: string | null) => void }) {
+  return (
+    <section aria-label="pdb2gmx's answers" className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-4">
+      <Head label={"pdb2gmx's answers · menus from " + forcefield + '.ff'} n={check.sequences.length} />
+      {check.general.map(g => <Status key={g} level="error">{g}</Status>)}
+      <span className="text-caption text-muted-foreground">the plan&apos;s answers {answers}: force field, water {check.water ?? '–'}, then the N- and C-terminus of each sequence&apos;s first and last residue</span>
+      <div className="flex flex-col">
+        {check.sequences.map(x => (
+          <div key={x.sequence} className="grid grid-cols-[minmax(0,140px)_minmax(0,1fr)_auto] items-center gap-3 border-b border-border py-1.5 text-caption last:border-0">
+            <span className="flex flex-col"><b className="text-control">{x.sequence}</b><span className="text-muted-foreground">{x.first.resname} … {x.last.resname} · {x.answers}{x.own ? ' (its own)' : ''}</span></span>
+            {x.problems.length ? <Status inline level="error" word="check"><span className="block" title={x.problems.join(' · ')}>{x.problems[0]}{x.problems.length > 1 ? ' · and ' + (x.problems.length - 1) + ' more' : ''}</span></Status>
+              : <Status inline level={x.own ? 'info' : 'ok'} word={x.own ? 'its own' : 'picks'}>{x.first.picks} · {x.last.picks}</Status>}
+            {onUse && x.problems.length > 0 && x.want && <Button size="sm" variant="outline" onClick={() => onUse(x.sequence, x.want === answers ? null : x.want)}>use {x.want}</Button>}
+            {!(onUse && x.problems.length > 0 && x.want) && <span />}
+          </div>
+        ))}
+      </div>
+      <span className="text-caption text-muted-foreground">each menu as pdb2gmx builds it from the .tdb files (GROMACS&apos;s filter_ter): a residue&apos;s own termini first, then the generic ones, None last · MET matches the ethers&apos; MET1 and MET2 by name, so its NH3+ and COO- are 1 · GLY&apos;s and PRO&apos;s own (GLY-NH3+, PRO-NH2+) stand for NH3+</span>
+    </section>
+  )
+}
+
 /** symbuilder · files (R4): what a build reads from the base folder, each file found or missing; mdp files read in place. */
-export function BuildFilesView({ draft, check, error, base }: { draft: BuildDraft; check: BuildCheck | null; error: string; base: string | null | undefined }) {
+export function BuildFilesView({ draft, setDraft, check, error, base }: { draft: BuildDraft; setDraft?: React.Dispatch<React.SetStateAction<BuildDraft>>; check: BuildCheck | null; error: string; base: string | null | undefined }) {
+  const use = (sequence: string, answers: string | null) => setDraft?.(d => {
+    const rest = Object.fromEntries(Object.entries(d.plan.science.answersBySequence).filter(([k]) => k !== sequence))
+    return { ...d, plan: { ...d.plan, science: { ...d.plan.science, answersBySequence: answers == null ? rest : { ...rest, [sequence]: answers } } } }
+  })
   const found = (path: string) => check?.files.find(f => f.path === path)?.found
   const [sel, setSel] = React.useState(draft.systems.saccharides[0] ?? ''), [text, setText] = React.useState<{ path: string; text: string } | null>(null)
   const open = (path: string) => getJson<{ text: string }>('/api/build/text?path=' + encodeURIComponent(path)).then(r => setText({ path, text: r.text }), e => setText({ path, text: (e as Error).message }))
@@ -67,10 +100,12 @@ export function BuildFilesView({ draft, check, error, base }: { draft: BuildDraf
                 return <button key={m} disabled={!base} onClick={() => open(f)} className={cn('truncate rounded-md px-2 py-0.5 text-left', !on ? 'border border-dashed border-border text-muted-foreground' : ok === false ? 'border border-border bg-muted' : toneSoft.lilac)}>{f}{ok === false ? ' · missing' : ''}</button> })}</React.Fragment>
             ))}
           </div>
-          <span className="text-caption text-muted-foreground">your inputs/ files, used as they are · walkers use hmr_multi.mdp for every method, for now · click one to read it</span>
+          {check?.timestep.map(t => <Status key={t} level="warning" word="check">{t}</Status>)}
+          <span className="text-caption text-muted-foreground">your inputs/ files, used as they are · walkers use hmr_multi.mdp for every method, for now · click one to read it · a method without hmr is checked for a time step over 2 fs</span>
           {text && <><Head label={text.path} /><pre className="m-0 max-h-[360px] overflow-auto rounded-xl border border-border bg-background px-3 py-2 text-caption">{text.text}</pre></>}
         </section>
       </div>
+      {check?.pdb2gmx && <Pdb2gmxAnswers check={check.pdb2gmx} forcefield={draft.plan.science.forcefield} answers={draft.plan.science.answers} onUse={setDraft ? use : undefined} />}
     </div>
   )
 }

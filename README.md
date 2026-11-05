@@ -93,7 +93,13 @@ walkers are prepared and get their qq script and `qq submit` line (nothing is su
   else, are said in words before anything is built.
 - **files**: what a build reads from the **base folder** (*settings → SymBuilder*; it must be inside an allowed
   folder): each saccharide's `.gro` and `-ADD.itp`, the force field and its includes, and the mdp file of each stage
-  per method, each *found* or *missing*. Click an mdp file to read it.
+  per method, each *found* or *missing*. Click an mdp file to read it. **pdb2gmx's answers** are checked against
+  your force field's own menus, built as pdb2gmx builds them from its `.tdb` files: for each sequence, what the answers
+  pick for its first and last residue. Where the plan's `1 8 0 0` would pick another terminus (MET's menus start with
+  the ethers' `MET1` and `MET2`), the build is stopped until that sequence has the answers that pick NH3+ and COO-
+  (`1 8 1 1`, one press). GLY's and PRO's own termini (`GLY-NH3+`, `PRO-NH2+`) count as NH3+. A method without hmr
+  whose stage uses an mdp with a time step over 2 fs (your `pull.mdp` and `awh_multi.mdp` set 4 fs) is flagged,
+  but not stopped.
 - **progress**: the last build, each system's step of all its steps and what the running step prints, the qq submit
   lines of the systems that wait for the cluster, and *cancel the build* (it stops the running step's process group
   and every system after it). A system stops at the first GROMACS fatal error, quoted with its stage, whatever the exit

@@ -7,18 +7,16 @@ import { runStats, wellArea } from '../../../../matrix/src/lib/pmf'
 import { DEFAULT_TEMP, ENTROPY, parseTable, transformXY } from '../../../../matrix/src/lib/seq'
 import { awhFrames, type AwhFrame } from '../awh'
 import type { RunRecord } from '../record'
+import { mdpValue } from './mdp'
 import { NAMES } from './plan'
 
 /** Walker 1's folder, relative to the system's, and its files set-up takes. */
 export const PMF_FROM = { folder: NAMES.walkers + '/1', edr: NAMES.walkers + '.edr', tpr: NAMES.walkers + '.tpr', mdout: NAMES.walkers + '_mdout.mdp', out: 'awh' }
 
-/** The temperature an mdp file sets: its first `ref_t` (or `ref-t`), in K; null when it sets none. */
+/** The temperature an mdp file sets: `ref_t` (or `ref-t`) of its first group, in K; null when it sets none. */
 export function refT(mdp: string): number | null {
-  for (const raw of mdp.split(/\r?\n/)) {
-    const m = /^\s*ref[_-]t\s*=\s*([^;]*)/i.exec(raw)
-    if (m) { const t = Number(m[1].trim().split(/\s+/)[0]); return Number.isFinite(t) && t > 0 ? t : null }
-  }
-  return null
+  const v = mdpValue(mdp, 'ref_t'), t = v ? Number(v.split(/\s+/)[0]) : NaN
+  return Number.isFinite(t) && t > 0 ? t : null
 }
 
 export interface PmfNumbers {

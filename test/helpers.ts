@@ -1,10 +1,12 @@
 import { spawn, type ChildProcess } from 'node:child_process';
-import { copyFileSync, cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, cpSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 export const RUNNER = new URL('..', import.meta.url).pathname;
 export const APP = new URL('../../matrix/', import.meta.url).pathname;
+/** Your force field's .tdb block names (no parameters) and its watermodels.dat: pdb2gmx's menus (T230). */
+const FF_MENUS = RUNNER + 'test/fixtures/build/ff-menus';
 // A run leaves nothing in the system's temp folder (a session of runs had filled the disk with them, 65 MB a runner
 // home): Vitest removes each test file's folders after it (test/setup.ts), Playwright when its worker ends.
 const made: string[] = [];
@@ -75,5 +77,7 @@ export function baseFolder() {
   // The force field's files a build reads (R4's check), each a line: the fake tools read none of them.
   for (const f of ['ADDff.itp', 'o111-ADD.itp', 'ions/iontypes.itp', 'ions/ions.itp', 'TIP3PF/TIP3PF_orig.itp', 'TIP3PF/TIP3PF_HMR.itp', 'charmm36s-jul2022-prosECCo75.ff/forcefield.itp', 'charmm36s-jul2022-prosECCo75.ff/aminoacids.rtp'])
     writeFileSync(join(base, 'ff', f), '; yours\n');
+  // pdb2gmx's menus: your force field's .tdb block names and its water models (test/fixtures/build/ff-menus).
+  for (const f of readdirSync(FF_MENUS).filter(f => f !== 'README.md')) copyFileSync(join(FF_MENUS, f), join(base, 'ff/charmm36s-jul2022-prosECCo75.ff', f));
   return base;
 }

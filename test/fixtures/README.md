@@ -72,3 +72,5 @@ GROMACS install as `/opt/gromacs-2025.4`, in the header and banner lines.
   ("1d 00:00:00"), and the one with each job's input machine, input folder and comment. The user name, home and
   project folders, the login host and the nodes are replaced by stand-ins of the same length (T169); the prompt line is
   left out.
+- `build/ff-menus/` — your force field's `.tdb` block names (headers only, no parameters) and `watermodels.dat`, for
+  pdb2gmx's menus (T230); its own README says more.

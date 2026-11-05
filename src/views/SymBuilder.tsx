@@ -22,12 +22,12 @@ export function SymBuilder({ route, go, gmx, gmxOk = true, base, vault, projectI
   return (
     <SubTabs value={route.sub} onValueChange={v => go({ view: 'symbuilder', sub: v as SymView })} label="symbuilder views" items={SYM_VIEWS.map(v => ({ value: v, label: v, ...(v === 'systems' ? { count: String(systemsOf(draft.systems).length).padStart(2, '0') } : v === 'progress' && builds.building ? { count: builds.building + ' building' } : {}) }))}>
       {route.sub === 'build' && <BuildView draft={draft} setDraft={setDraft} gmx={gmx} />}
-      {route.sub === 'systems' && <SystemsView draft={draft} setDraft={setDraft} missing={check?.missing ?? null} project={project} landing={landing}
+      {route.sub === 'systems' && <SystemsView draft={draft} setDraft={setDraft} missing={check?.missing ?? null} answers={check?.pdb2gmx ?? null} timestep={check?.timestep ?? []} project={project} landing={landing}
         build={{ blocked: !base ? 'set a base folder in settings → SymBuilder first' : !gmxOk ? 'no working gmx: set it in settings → gmx' : builds.runs[0]?.status === 'running' ? 'a build is running: one at a time' : null,
           start: () => builds.start(draft).then(() => go({ view: 'symbuilder', sub: 'progress' })) }} />}
       {route.sub === 'summary' && <SummaryView runs={builds.runs} onAnalyse={onAnalyse} onPmf={onPmf} />}
       {route.sub === 'progress' && <ProgressView runs={builds.runs} logs={builds.logs} loadLog={builds.loadLog} onCancel={id => void builds.cancel(id)} onRetry={builds.retry} />}
-      {route.sub === 'files' && <BuildFilesView draft={draft} check={check} error={error} base={base} />}
+      {route.sub === 'files' && <BuildFilesView draft={draft} setDraft={setDraft} check={check} error={error} base={base} />}
     </SubTabs>
   )
 }

@@ -2,7 +2,7 @@
 // first system, a tile moved by its buttons and one dragged from the palette, the draft kept over a reload. Nothing
 // runs here (the base folder lacks files, so the build button says why); e2e/build.spec.ts builds.
 import { spawn, type ChildProcess } from 'node:child_process'
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { copyFileSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test } from '@playwright/test'
@@ -16,6 +16,10 @@ test.beforeAll(async () => {
   const allowed = tmp('e2e-sym'), base = join(allowed, 'innit_tests'), home = tmp('e2e-sym-home')
   for (const d of ['molecules/saccharides', 'ff', 'inputs']) mkdirSync(join(base, d), { recursive: true })
   for (const f of ['molecules/saccharides/o111.gro', 'ff/o111-ADD.itp', 'inputs/eq_nvt.mdp']) writeFileSync(join(base, f), f.endsWith('.mdp') ? 'integrator = md\nnsteps = 125000\n' : '\n')
+  // The force field's terminus block names and water models, for pdb2gmx's menus.
+  const ff = join(base, 'ff/charmm36s-jul2022-prosECCo75.ff'), menus = join(RUNNER, 'test/fixtures/build/ff-menus')
+  mkdirSync(ff)
+  for (const f of readdirSync(menus).filter(f => f !== 'README.md')) copyFileSync(join(menus, f), join(ff, f))
   writeFileSync(join(home, 'config.json'), JSON.stringify({ allow: [allowed], base }))
   runner = spawn(process.execPath, ['--import', './server/register.mjs', 'server/main.ts', '--port', '0', '--gmx', join(RUNNER, 'test/fake-gmx.mjs')],
     { cwd: RUNNER, env: { ...process.env, GMX_CYPHER_HOME: home } })
@@ -69,7 +73,7 @@ test('plan a build: systems, the preview, a tile\'s command, tiles moved and dra
   expect(errors).toEqual([])
 })
 
-test('files: each found or missing in the base folder, an mdp read in place, the system that misses one named (R4)', async ({ page }) => {
+test('files: each found or missing in the base folder, an mdp read in place, the system that misses one named (R4); pdb2gmx\'s answers for MET (T230)', async ({ page }) => {
   const errors: string[] = []
   page.on('console', m => { if (m.type() === 'error') errors.push(m.text()) })
   await page.goto(url + '#symbuilder/systems')
@@ -79,5 +83,14 @@ test('files: each found or missing in the base folder, an mdp read in place, the
   await expect(page.getByText('2 systems are missing a file')).toBeVisible()
   await page.getByRole('button', { name: 'inputs/eq_nvt.mdp' }).click()
   await expect(page.getByText('nsteps = 125000')).toBeVisible()
+  // MET's termini menus start with the ethers' MET1 and MET2: the plan's 1 8 0 0 picks them; one press gives it 1 8 1 1.
+  await page.getByRole('tab', { name: /^systems/ }).click()
+  await page.getByLabel('add a sequence').fill('mmmmmmmm'); await page.keyboard.press('Enter')
+  await page.getByRole('tab', { name: 'files', exact: true }).click()
+  const answers = page.getByRole('region', { name: 'pdb2gmx\'s answers' })
+  await expect(answers.getByText('the N-terminus answer, 0, picks MET1 for MET, not NH3+', { exact: false })).toBeVisible()
+  await answers.getByRole('button', { name: 'use 1 8 1 1' }).click()
+  await expect(answers.getByText('MET … MET · 1 8 1 1 (its own)')).toBeVisible()
+  await expect(answers.getByText('NH3+ · COO-')).toHaveCount(2)
   expect(errors).toEqual([])
 })

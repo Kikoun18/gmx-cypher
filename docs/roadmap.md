@@ -261,6 +261,7 @@ From [`batch-4.md`](batch-4.md) §6: SymBuilder inside gmx-cypher, four tabs (ho
 - [x] R3b The planners: every step's argv, stdin and files, golden against the notebook (with the qq script text; T222)
 - [x] R3c Build and systems views; the preview (drag and drop, ↑ ↓, the stages checkable, the draft kept in this browser)
 - [x] R4 Files, mdp files, force field check, settings (base folder and python; stat and read only, nothing written; settings' python import check left for batch 5, with the first python run)
+- [x] R4 after batch 5: pdb2gmx's answers per sequence against the force field's menus (GROMACS's `filter_ter` ported, T230); the time step of methods without hmr (T231)
 
 ### Phase 3: The Matrix's names (R8a, R8b)
 - [x] R8a Systems from a project: the groups, column labels and sequences, or only the cells with no runs (`Systems.only`, each cell with its repeats) (T223)
