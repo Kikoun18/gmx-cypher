@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { FORM } from './Batch'
 import { cn } from '../lib/utils'
 import { Status } from '../ui/status'
+import type { ClusterSummary } from './Home'
 
 /** What POST /api/cluster answers (server/cluster.ts): one read of qq jobs and gmx-eta -a. */
 type Part<T> = ({ ok: true } & T) | { ok: false; error: string }
@@ -92,11 +93,19 @@ function useNow() {
  * A job seen to end (R15): "run <recipe> on <its input folder>" opens batch set-up filled with them, nothing more;
  * the folder is the one qq jobs -e printed, offered only inside the allowed folders.
  */
-function EndedJob({ e, recipes, onOffer }: { e: ClusterRead['ended'][number]; recipes: { id: string; name: string }[]; onOffer: (root: string, recipe: string) => void }) {
+function EndedJob({ e, recipes, onOffer, system, onGoOn }: { e: ClusterRead['ended'][number]; recipes: { id: string; name: string }[]; onOffer: (root: string, recipe: string) => void; system?: SystemOfJob | null; onGoOn?: GoOn }) {
   const [recipe, setRecipe] = React.useState(FORM), name = recipe === FORM ? 'the form' : recipes.find(r => r.id === recipe)?.name ?? recipe
+  const [went, setWent] = React.useState(''), [goError, setGoError] = React.useState('')
   return (
     <li className="flex flex-wrap items-center gap-x-3 gap-y-1 text-control">
       <span className="font-bold">{e.name}</span>
+      {system && <span className="text-caption text-muted-foreground">{system.dir.split('/').slice(1).join(' / ')} · {system.stage}</span>}
+      {/* R7b: the pull's end, and the system waits for it: its walkers are prepared only on this press. */}
+      {system && system.stage === 'pull' && system.status === 'cluster' && onGoOn && !went && (
+        <Button size="sm" onClick={() => { setGoError(''); onGoOn(system.run, system.dir).then(() => setWent('the walkers are being prepared: see symbuilder · progress'), x => setGoError((x as Error).message)) }}>go on: prepare the walkers</Button>
+      )}
+      {went && <span className="text-caption text-muted-foreground">{went}</span>}
+      {goError && <Status inline level="error">{goError}</Status>}
       <span className="tabular-nums text-muted-foreground">{e.key}</span>
       <Badge tone={e.word === 'finished' ? 'mint' : 'stone'}>{e.word}</Badge>
       <span className="text-caption text-muted-foreground">seen at {new Date(e.at).toLocaleTimeString()}</span>
@@ -113,8 +122,16 @@ function EndedJob({ e, recipes, onOffer }: { e: ClusterRead['ended'][number]; re
   )
 }
 
+/** A qq job as a system's (R7b): the build that made it, its folder, the stage, and where the system stands. */
+export interface SystemOfJob { run: string; dir: string; stage: string; status: string }
+type GoOn = (run: string, dir: string) => Promise<unknown>
+
 /** The cluster tab (R10c): your jobs from qq jobs, each with gmx-eta's time left; watch only. */
-export function ClusterView({ onOffer }: { onOffer: (root: string, recipe: string) => void }) {
+export function ClusterView({ onOffer, onRead, systemOf = () => null, onGoOn }: {
+  onOffer: (root: string, recipe: string) => void; onRead?: (s: ClusterSummary) => void
+  /** A job's system, by its input folder (R7b); go on with it once its pull ended. */
+  systemOf?: (inputDir: string | null) => SystemOfJob | null; onGoOn?: GoOn
+}) {
   const [finished, setFinished] = React.useState(false)
   const { read, error, busy, refresh, failures } = useCluster(finished)
   const now = useNow()
@@ -129,6 +146,8 @@ export function ClusterView({ onOffer }: { onOffer: (root: string, recipe: strin
     for (const { state } of rows) m.set(state.word, { state, n: (m.get(state.word)?.n ?? 0) + 1 })
     return [...m.values()]
   }, [rows])
+  // The last read, handed up for home (T215): home never reads qq itself.
+  React.useEffect(() => { if (read) onRead?.({ at: read.at, states: states.map(({ state, n }) => ({ word: state.word, tone: state.tone, n })) }) }, [read, states]) // eslint-disable-line react-hooks/exhaustive-deps -- onRead is the page's setter
   const shown = rows.filter(r => !hidden.has(r.state.word) && nameOf(r).toLowerCase().includes(name.trim().toLowerCase()))
   if (sort) shown.sort((a, b) => sort.dir * SORTS[sort.key](a, b))
   const at = read ? new Date(read.at) : null
@@ -169,7 +188,7 @@ export function ClusterView({ onOffer }: { onOffer: (root: string, recipe: strin
       {read && read.ended.length > 0 && (
         <div className="flex flex-col gap-1.5">
           <Section label={'Ended since gmx-cypher started ' + String(read.ended.length).padStart(2, '0')} />
-          <ul className="m-0 flex list-none flex-col gap-1.5 p-0" aria-label="ended jobs">{read.ended.map(e => <EndedJob key={e.key} e={e} recipes={recipes} onOffer={onOffer} />)}</ul>
+          <ul className="m-0 flex list-none flex-col gap-1.5 p-0" aria-label="ended jobs">{read.ended.map(e => <EndedJob key={e.key} e={e} recipes={recipes} onOffer={onOffer} system={systemOf(e.inputDir)} onGoOn={onGoOn} />)}</ul>
           <FieldHint>a job running at one read and gone from qq jobs at the next is no longer running; finished only when qq jobs -a says so · the folder is the one qq jobs -e printed</FieldHint>
         </div>
       )}
@@ -193,7 +212,8 @@ export function ClusterView({ onOffer }: { onOffer: (root: string, recipe: strin
                 return (
                   <tr key={r.key} className="border-b border-border/60 align-top">
                     <td className="py-1.5 pr-4 tabular-nums">{q?.id ?? r.eta?.id}</td>
-                    <td className="pr-4">{nameOf(r)}{q?.inputDir && <div className="max-w-96 truncate text-caption text-muted-foreground" title={q.inputDir}>{q.inputDir}</div>}</td>
+                    <td className="pr-4">{nameOf(r)}{q?.inputDir && <div className="max-w-96 truncate text-caption text-muted-foreground" title={q.inputDir}>{q.inputDir}</div>}
+                      {(() => { const sy = systemOf(q?.inputDir ?? null); return sy && <div className="text-caption">system {sy.dir.split('/').slice(1).join(' / ')} · {sy.stage}</div> })()}</td>
                     <td className="pr-4"><Badge tone={s.tone}>{s.word}</Badge></td>
                     <td className="pr-4 tabular-nums">{q ? [q.cpus, q.gpus, q.nodes].map(x => x ?? '?').join(' · ') : ''}</td>
                     <td className="pr-4 tabular-nums">{q?.runtime != null ? hms(q.runtime) + ' / ' + hms(q.walltime) : q?.waiting != null ? 'waiting ' + hms(q.waiting) : ''}</td>
@@ -215,7 +235,7 @@ export function ClusterView({ onOffer }: { onOffer: (root: string, recipe: strin
       {read && <Section label="As read" />}
       {read && (
         <FieldHint>
-          {read.qq.ok ? read.qq.path + ' ' + read.qq.args.join(' ') : 'qq'} and {read.eta.ok ? read.eta.path + ' -a (sha256 ' + read.eta.sha256.slice(0, 12) + '…)' : 'gmx-eta -a'}, at {at!.toLocaleTimeString()}; finish times are that time plus gmx-eta's time left, in this browser's time zone · watch only: gmx-cypher never kills or submits a job
+          {read.qq.ok ? read.qq.path + ' ' + read.qq.args.join(' ') : 'qq'} and {read.eta.ok ? read.eta.path + ' -a (sha256 ' + read.eta.sha256.slice(0, 12) + '…)' : 'gmx-eta -a'}, at {at!.toLocaleTimeString()}; finish times are that time plus gmx-eta's time left, in this browser's time zone · gmx-cypher never kills a job, and submits one only for a build, with submit them for me on
         </FieldHint>
       )}
       {read && ((read.qq.ok && read.qq.table.other.length > 0) || (read.eta.ok && read.eta.other.length > 0)) && (

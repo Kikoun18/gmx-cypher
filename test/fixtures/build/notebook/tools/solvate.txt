@@ -1,0 +1,45 @@
+Reading solute configuration
+Reading solvent configuration
+
+Initialising inter-atomic distances...
+
+WARNING: Masses and atomic (Van der Waals) radii will be guessed
+         based on residue and atom names, since they could not be
+         definitively assigned from the information in your input
+         files. These guessed numbers might deviate from the mass
+         and radius of the atom type. Please check the output
+         files if necessary. Note, that this functionality may
+         be removed in a future GROMACS version. Please, consider
+         using another file format for your input.
+
+NOTE: From version 5.0 gmx solvate uses the Van der Waals radii
+from the source below. This means the results may be different
+compared to previous GROMACS versions.
+
+++++ PLEASE READ AND CITE THE FOLLOWING REFERENCE ++++
+A. Bondi
+van der Waals Volumes and Radii
+J. Phys. Chem. (1964)
+DOI: 10.1021/j100785a001
+-------- -------- --- Thank You --- -------- --------
+
+Generating solvent configuration
+Will generate new solvent configuration of 4x4x4 boxes
+Solvent box contains 39108 atoms in 13036 residues
+Removed 5433 solvent atoms due to solvent-solvent overlap
+Removed 255 solvent atoms due to solute-solvent overlap
+Sorting configuration
+Found 1 molecule type:
+    SOL (   3 atoms): 11140 residues
+Generated solvent containing 33420 atoms in 11140 residues
+Writing generated configuration to 2.solvated.gro
+
+Output configuration contains 33669 atoms in 11153 residues
+Volume                 :         343 (nm^3)
+Density                :     981.209 (g/l)
+Number of solvent molecules:  11140   
+
+Processing topology
+
+Back Off! I just backed up hhhhhhhh.top to ./#hhhhhhhh.top.1#
+Adding line for 11140 solvent molecules with resname (SOL) to topology file (hhhhhhhh.top)

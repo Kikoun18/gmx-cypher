@@ -15,10 +15,17 @@ import { findWindows } from './wham';
 import { inside, listFolder, namesIn, real, saveUpload } from './files';
 import { detectGmx, executable, findTool, type GmxState } from './gmx';
 import { HttpError, readJson, sendFile, type Api } from './http';
-import type { Job, Jobs } from './jobs';
+import { Jobs, type Job } from './jobs';
 import { Batches, checkRunInputs, findTrajectories, sendAll } from './batch';
 import { Cluster } from './cluster';
 import { listRecipes, readRecipe, saveRecipe } from './recipes';
+import { listPlans, readPlan, savePlan } from './builds';
+import { baseFolder, checkBuild, checkInputs as checkBuildInputs, checkLanding, readText } from './build-check';
+import { Builder, jobsExec } from './build-run';
+import { reportOf } from './build-report';
+import { mdrunHead } from '../src/lib/build/mdrun';
+import { DEFAULT_PROFILES, profileOf, profileProblem, SCRIPTED_STAGES } from '../src/lib/build/qq';
+import type { Systems } from '../src/lib/build/plan';
 import { recipeFileProblems, type Recipe } from '../src/lib/recipe';
 import { cpus } from 'node:os';
 import { planRun, recordWritten, startRun } from './runs';
@@ -30,13 +37,13 @@ import type { Fields } from '../src/lib/landing';
 import type { RunRecord } from '../src/lib/record';
 import { saveConfig, type Config } from './state';
 
-export interface Ctx { home: string; version: string; config: Config; gmx: GmxState; jobs: Jobs }
+export interface Ctx { home: string; version: string; config: Config; gmx: GmxState; jobs: Jobs; /** SymBuilder's builds and their own job list (R5, T217). */ builder?: Builder; buildJobs?: Jobs }
 
 /** A job as lists and events send it: its log stays on disk, read with GET /api/jobs/:id/log (R12a). */
 const summary = (j: Job) => j;
 
-/** Server-Sent Events: every job and batch change and every piece of output, to every open page. */
-function events(jobs: Jobs, batches: Batches, res: ServerResponse) {
+/** Server-Sent Events: every job, batch and build change and every piece of output, to every open page. */
+function events(jobs: Jobs, batches: Batches, builder: Builder, buildJobs: Jobs, res: ServerResponse) {
   res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-store', connection: 'keep-alive' });
   const send = (name: string, data: unknown) => res.write('event: ' + name + '\ndata: ' + JSON.stringify(data) + '\n\n');
   const onJob = (j: Job) => send('job', summary(j)), onOut = (id: string, s: string, end: number) => send('out', { id, s, end });
@@ -45,13 +52,17 @@ function events(jobs: Jobs, batches: Batches, res: ServerResponse) {
   jobs.on('gone', onGone);
   jobs.on('out', onOut);
   batches.on('batch', onBatch);
+  // A build's changes, and what its steps print (build steps keep their own job list: T217).
+  const onBuild = (b: unknown) => send('build', b), onBuildOut = (id: string, s: string, end: number) => send('build-out', { id, s, end });
+  builder.on('build', onBuild);
+  buildJobs.on('out', onBuildOut);
   const ping = setInterval(() => res.write(': ping\n\n'), 25_000);
-  res.on('close', () => { clearInterval(ping); jobs.off('job', onJob); jobs.off('gone', onGone); jobs.off('out', onOut); batches.off('batch', onBatch); });
+  res.on('close', () => { clearInterval(ping); jobs.off('job', onJob); jobs.off('gone', onGone); jobs.off('out', onOut); batches.off('batch', onBatch); builder.off('build', onBuild); buildJobs.off('out', onBuildOut); });
   send('hello', {});
 }
 
 /** What the GUI may change (T5); anything else is refused. */
-const SETTABLE: (keyof Config)[] = ['gmx', 'allow', 'vault', 'project', 'pmfUrl', 'qq', 'gmxEta'];
+const SETTABLE: (keyof Config)[] = ['gmx', 'allow', 'vault', 'project', 'pmfUrl', 'qq', 'gmxEta', 'base', 'python', 'buildWait', 'qqBuild'];
 
 /** Allowed folders as real paths; each must exist and be a folder. */
 export function realFolders(paths: string[]): string[] {
@@ -69,6 +80,8 @@ export function makeApi(ctx: Ctx): Api {
   const roots = () => [...ctx.config.allow, join(ctx.home, 'uploads')];
   const batches = new Batches(ctx, roots);
   const cluster = new Cluster(() => ({ qq: ctx.config.qq ?? null, gmxEta: ctx.config.gmxEta ?? null }));
+  // SymBuilder (R5): on this very context, so the builder reads the settings /api/config changes (the review's finding 1).
+  const { builder, buildJobs } = withBuilds(ctx) as Required<Pick<Ctx, 'builder' | 'buildJobs'>>;
   const checked = (r: unknown) => { const p = recipeFileProblems(r); if (p.length) throw new HttpError(400, p.join('; ')); return r as Recipe; };
   // A batch runs a recipe over trajectories: only a command with groups has that shape (energy and AWH batches are not built yet).
   const batchable = (r: Recipe) => {
@@ -77,7 +90,7 @@ export function makeApi(ctx: Ctx): Api {
   };
   return async (req, url, res) => {
     if (is(req, 'GET', url, '/api/state')) return { body: state() };
-    if (is(req, 'GET', url, '/api/events')) { events(ctx.jobs, batches, res); return 'handled'; }
+    if (is(req, 'GET', url, '/api/events')) { events(ctx.jobs, batches, builder, buildJobs, res); return 'handled'; }
     // The jobs, or with ?archived=1 the archived ones (R12c), read from archive/ when asked.
     if (is(req, 'GET', url, '/api/jobs')) return { body: (url.searchParams.get('archived') === '1' ? ctx.jobs.archived() : ctx.jobs.list()).map(summary) };
     if (is(req, 'GET', url, '/api/commands')) {
@@ -243,6 +256,55 @@ export function makeApi(ctx: Ctx): Api {
       if (!ctx.config.vault) throw new HttpError(409, 'no vault set');
       return { body: await sendAll(ctx, b, (await readJson<{ project: string }>(req)).project) };
     }
+    if (is(req, 'POST', url, '/api/build/check')) { const b = await readJson<{ plan: unknown; systems: Systems }>(req); return { body: checkBuildInputs(baseFolder(ctx.config.base, ctx.config.allow), b.plan, b.systems) }; }
+    if (is(req, 'POST', url, '/api/build/landing')) {
+      if (!ctx.config.vault || !ctx.config.project) throw new HttpError(409, 'connect a project in settings → vault to see where each system lands');
+      const v = await openVault(ctx.config.vault), b = await readJson<{ plan: unknown; systems: Systems }>(req);
+      if (!(await listProjects(v)).some(p => p.id === ctx.config.project)) throw new HttpError(404, 'no project ' + ctx.config.project + ' in the vault');
+      return { body: checkLanding(await readProject(v, ctx.config.project), b.plan, b.systems, ctx.config.base ?? null) };
+    }
+    // Building (R5): one build at a time, of the systems the page sends, in the base folder; the page follows it by events.
+    if (is(req, 'POST', url, '/api/build/start')) {
+      const b = await readJson<{ plan: unknown; systems: Systems; ifExists?: string; onFailure?: string }>(req);
+      const base = baseFolder(ctx.config.base, ctx.config.allow);
+      const plan = checkBuild(b.plan, b.systems);
+      if (!ctx.gmx.ok) throw new HttpError(409, 'no working gmx: set it in settings → gmx');
+      const ifExists = (['continue', 'skip', 'repeat'] as const).find(x => x === b.ifExists) ?? 'continue', onFailure = b.onFailure === 'stop' ? 'stop' : 'next';
+      try { const st = builder.start(plan, b.systems, { base, ifExists, onFailure }); st.done.catch(() => {}); return { body: st.run }; } catch (e) { throw new HttpError(409, (e as Error).message); }
+    }
+    // A failed or cancelled system again (R6): resumed in its folder, or rebuilt after its folder moves to failed/.
+    if (is(req, 'POST', url, '/api/build/retry')) {
+      const b = await readJson<{ run?: string; dir?: string; how?: string }>(req);
+      if (b.how !== 'resume' && b.how !== 'rebuild') throw new HttpError(400, 'how is resume or rebuild');
+      try { const st = builder.retry(String(b.run ?? ''), String(b.dir ?? ''), b.how); st.done.catch(() => {}); return { body: st.run }; } catch (e) { throw new HttpError(409, (e as Error).message); }
+    }
+    // A system that waits for the cluster, taken on once its pull has ended (R7b): only when asked.
+    if (is(req, 'POST', url, '/api/build/go-on')) {
+      const b = await readJson<{ run?: string; dir?: string }>(req);
+      try { const st = builder.goOn(String(b.run ?? ''), String(b.dir ?? '')); st.done.catch(() => {}); return { body: st.run }; } catch (e) { throw new HttpError(409, (e as Error).message); }
+    }
+    if (is(req, 'GET', url, '/api/build/runs')) return { body: builder.list() };
+    // A build's reports (R9): the summary, the pull and walker reports, the termini check, read from what it left.
+    const buildReport = /^\/api\/build\/runs\/([\w-]+)\/report$/.exec(url.pathname);
+    if (buildReport && req.method === 'GET') {
+      const r = builder.get(buildReport[1]);
+      if (!r) throw new HttpError(404, 'no build ' + buildReport[1]);
+      return { body: reportOf(r, ctx.gmx.version ?? 'unknown', roots()) };
+    }
+    const buildRun = /^\/api\/build\/runs\/([\w-]+)\/cancel$/.exec(url.pathname);
+    if (buildRun && req.method === 'POST') { try { builder.cancel(buildRun[1]); } catch (e) { throw new HttpError(409, (e as Error).message); } return { body: builder.get(buildRun[1]) }; }
+    const buildLog = /^\/api\/build\/jobs\/([\w-]+)\/log$/.exec(url.pathname);
+    if (buildLog && req.method === 'GET') {
+      if (!buildJobs.get(buildLog[1])) throw new HttpError(404, 'no build step ' + buildLog[1]);
+      const from = url.searchParams.get('from');
+      // With mdrun's head (T232): its number of steps is printed first, which a tail of a long log no longer holds.
+      return { body: { ...buildJobs.logRange(buildLog[1], from == null ? undefined : Number(from)), head: mdrunHead(buildJobs.logRange(buildLog[1], 0, 16_384).text) } };
+    }
+    if (is(req, 'GET', url, '/api/build/text')) return { body: { text: readText(baseFolder(ctx.config.base, ctx.config.allow), url.searchParams.get('path') ?? '') } };
+    if (is(req, 'GET', url, '/api/builds')) return { body: listPlans(ctx.home) };
+    if (is(req, 'POST', url, '/api/builds')) return { body: savePlan(ctx.home, await readJson(req), url.searchParams.get('replace') === '1') };
+    const plan = /^\/api\/builds\/([^/]+)$/.exec(url.pathname);
+    if (plan && req.method === 'GET') return { body: readPlan(ctx.home, decodeURIComponent(plan[1])) };
     if (is(req, 'GET', url, '/api/recipes')) return { body: listRecipes(ctx.home) };
     if (is(req, 'POST', url, '/api/recipes')) return { body: saveRecipe(ctx.home, await readJson(req), url.searchParams.get('replace') === '1') };
     const recipe = /^\/api\/recipes\/([^/]+)$/.exec(url.pathname);
@@ -334,11 +396,33 @@ export function makeApi(ctx: Ctx): Api {
       if (patch.pmfUrl && !/^https?:\/\/[^\s]+$/.test(patch.pmfUrl)) throw new HttpError(400, 'the Matrix address must start with http:// or https://');
       // The tool's own name, found on PATH, or the absolute path of a program that exists: never a relative path
       // resolved against the server's folder, or another program's name (review).
-      for (const k of ['qq', 'gmxEta'] as const) {
-        const v = patch[k], name = k === 'qq' ? 'qq' : 'gmx-eta';
-        if (v != null && (typeof v !== 'string' || !(v === name || (isAbsolute(v) && /^[\w./+-]+$/.test(v) && executable(v)))))
-          throw new HttpError(400, k + ': ' + name + ' (found on PATH), or the absolute path of a program that exists');
+      for (const k of ['qq', 'gmxEta', 'python'] as const) {
+        const v = patch[k], names = k === 'qq' ? ['qq'] : k === 'gmxEta' ? ['gmx-eta'] : ['python3', 'python'];
+        if (v != null && (typeof v !== 'string' || !(names.includes(v) || (isAbsolute(v) && /^[\w./+-]+$/.test(v) && executable(v)))))
+          throw new HttpError(400, k + ': ' + names.join(' or ') + ' (found on PATH), or the absolute path of a program that exists');
       }
+      // How a build waits for a local mdrun's .gro (R5c): every so many seconds, up to so many.
+      if (patch.buildWait != null) {
+        const w = patch.buildWait as { every?: unknown; max?: unknown };
+        if (!Number.isInteger(w.every) || !Number.isInteger(w.max) || (w.every as number) < 1 || (w.every as number) > 600 || (w.max as number) < (w.every as number) || (w.max as number) > 86400)
+          throw new HttpError(400, 'buildWait: every 1–600 s, up to (max) 86400 s, max no less than every');
+        patch.buildWait = { every: w.every as number, max: w.max as number };
+      }
+      // A build's qq scripts (R7a): a known profile for each stage (the walkers' needs an MPI gmx), submitting on or off, a queue's name.
+      if (patch.qqBuild != null) {
+        const q = patch.qqBuild as { profiles?: Record<string, unknown>; submit?: unknown; queue?: unknown };
+        if (typeof q !== 'object' || typeof q.submit !== 'boolean' || typeof q.queue !== 'string' || !/^[\w.-]{1,32}$/.test(q.queue) || (q.profiles != null && typeof q.profiles !== 'object'))
+          throw new HttpError(400, 'qqBuild: { profiles: { stage: profile }, submit: true or false, queue: a queue\'s name }');
+        const profiles: Record<string, string> = {};
+        for (const stage of SCRIPTED_STAGES) {
+          const id = q.profiles?.[stage] ?? DEFAULT_PROFILES[stage], why = typeof id === 'string' ? profileProblem(stage, id) : 'a profile is a name';
+          if (why) throw new HttpError(400, stage + ': ' + why);
+          profiles[stage] = id as string;
+        }
+        patch.qqBuild = { profiles, submit: q.submit, queue: q.queue };
+      }
+      // SymBuilder's base folder (R4): a real folder inside the allowed ones.
+      if (patch.base) patch.base = baseFolder(patch.base, [...(patch.allow ?? ctx.config.allow)]);
       // A vault is checked before it is kept: the Matrix's manifest, schemas 1–4 (T32, T142).
       if (patch.vault) patch.vault = (await openVault(patch.vault).catch(e => { throw new HttpError(400, (e as Error).message); })).path;
       // The connected project is one of the vault's (R14b): another vault, or none, leaves none connected unless one is given.
@@ -355,4 +439,23 @@ export function makeApi(ctx: Ctx): Api {
     }
     return null;
   };
+}
+
+/** The build job list and the builder, made once on this context object (main.ts stops the jobs on its way out). */
+export function withBuilds(ctx: Ctx): Ctx {
+  ctx.buildJobs ??= new Jobs(join(ctx.home, 'builds', 'jobs'));
+  ctx.builder ??= newBuilder(ctx, ctx.buildJobs);
+  return ctx;
+}
+
+/** The builder of a server: steps through the build job list, the tools and the waiting as the settings say now. */
+export function newBuilder(ctx: Ctx, buildJobs: Jobs): Builder {
+  return new Builder({
+    home: ctx.home, version: ctx.version, ...jobsExec(buildJobs),
+    tools: () => ({ gmx: ctx.gmx.ok ? ctx.gmx.path ?? null : null, python: ctx.config.python }),
+    gmxVersion: () => ctx.gmx.version ?? 'unknown',
+    profiles: () => Object.fromEntries(SCRIPTED_STAGES.map(st => [st, profileOf(ctx.config.qqBuild?.profiles?.[st] ?? DEFAULT_PROFILES[st])!])),
+    submit: () => (ctx.config.qqBuild?.submit ? { qq: ctx.config.qq ?? 'qq', queue: ctx.config.qqBuild.queue } : null),
+    wait: () => ({ every: (ctx.config.buildWait?.every ?? 10) * 1000, max: (ctx.config.buildWait?.max ?? 600) * 1000 }),
+  });
 }

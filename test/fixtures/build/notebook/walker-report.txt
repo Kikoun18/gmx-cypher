@@ -1,0 +1,3 @@
+SYSTEM                              1-8       MISSING
+hmr+fast+6/pg/mmmmmmmm              --------  all
+hmr+fast+6r/pg/mmmmmmmm             --------  all

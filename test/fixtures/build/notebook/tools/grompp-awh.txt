@@ -1,0 +1,87 @@
+Setting the AWH bias MC random seed to -541115693
+
+WARNING 1 [file /storage/brno/you/02_evomd/innit_tests/inputs/awh_hmr.mdp, line 72]:
+  When simulations share an AWH bias, it is strongly recommended to use a
+  non-zero covering diameter
+
+
+WARNING 2 [file ADDff.itp, line 7]:
+  Atomtype OC311 was defined previously (e.g. in the forcefield files), and
+  has now been defined again. This could happen e.g. if you would use a
+  self-contained molecule .itp file that duplicates or replaces the
+  contents of the standard force-field files. You should check the contents
+  of your files and remove such repetition. If you know you should override
+  the previous definition, then you could choose to suppress this warning
+  with -maxwarn.
+
+
+WARNING 3 [file ADDff.itp, line 8]:
+  Atomtype HCP1 was defined previously (e.g. in the forcefield files), and
+  has now been defined again. This could happen e.g. if you would use a
+  self-contained molecule .itp file that duplicates or replaces the
+  contents of the standard force-field files. You should check the contents
+  of your files and remove such repetition. If you know you should override
+  the previous definition, then you could choose to suppress this warning
+  with -maxwarn.
+
+Generating 1-4 interactions: fudge = 1
+
+NOTE 1 [file hhhhhhhh.top, line 20]:
+  The bond in molecule-type CARB between atoms 12 C and 13 O has an
+  estimated oscillational period of 2.3e-02 ps, which is less than 10 times
+  the time step of 4.0e-03 ps.
+  Maybe you forgot to change the constraints mdp option.
+
+Pull group 1 'Protein' has 139 atoms
+Pull group 2 'CARB' has 110 atoms
+Number of degrees of freedom in T-Coupling group System is 67291.00
+Pull group  natoms  pbc atom  distance at start  reference at t=0
+       1       139       180
+       2       110        55       1.544 nm          0.000 nm
+
+There was 1 NOTE
+
+There were 3 WARNINGs
+Setting the LD random seed to 1230794111
+
+Generated 174936 of the 174936 non-bonded parameter combinations
+
+Generated 124458 of the 174936 1-4 parameter combinations
+
+Excluding 3 bonded neighbours molecule type 'CARB'
+
+turning H bonds into constraints...
+
+Excluding 3 bonded neighbours molecule type 'Protein'
+
+turning H bonds into constraints...
+
+Excluding 2 bonded neighbours molecule type 'TIP3F'
+
+turning H bonds into constraints...
+
+Excluding 1 bonded neighbours molecule type 'NA_s'
+
+turning H bonds into constraints...
+
+Excluding 1 bonded neighbours molecule type 'CL_2s'
+
+turning H bonds into constraints...
+
+Taking velocities from '../6.eqnpt/6.eqnpt.gro'
+
+The largest distance between excluded atoms is 0.395 nm between atom 240 and 247
+
+Determining Verlet buffer for a tolerance of 0.005 kJ/mol/ps at 310.15 K
+
+Calculated rlist for 1x1 atom pair-list as 1.466 nm, buffer size 0.266 nm
+
+Set rlist, assuming 4x4 atom pair-list, to 1.346 nm, buffer size 0.146 nm
+
+Note that mdrun will redetermine rlist based on the actual pair-list setup
+Calculating fourier grid dimensions for X Y Z
+Using a fourier grid of 60x60x60, spacing 0.116 0.116 0.116
+
+Estimate for the relative computational load of the PME mesh part: 0.18
+
+This run will generate roughly 44 Mb of data

@@ -4,7 +4,7 @@ import { Alert, AlertActions, AlertDescription, AlertTitle } from './ui/alert'
 import { Button } from './ui/button'
 import { toast } from 'sonner'
 import { Toaster } from './ui/sonner'
-import { Tabs, TabsContent, TabsCount, TabsList, TabsTrigger } from './ui/tabs'
+import { SubTabs, Tabs, TabsContent, TabsCount, TabsList, TabsTrigger } from './ui/tabs'
 import { ToggleGroup, ToggleGroupItem } from './ui/toggle-group'
 import { getJson, type AppState } from './api'
 import { readThemePref, saveThemePref, themeOf, type ThemePref } from './lib/theme'
@@ -18,10 +18,16 @@ import { withCommand } from './lib/commands'
 import { JobsView } from './views/Jobs'
 import { Settings } from './views/Settings'
 import { Setup } from './views/Setup'
+import { SymBuilder } from './views/SymBuilder'
+import { useBuilds } from './builds'
+import { FORM } from './views/Batch'
+import { jobSystem } from './lib/build/jobs'
+import { ClusterScriptsView } from './views/ClusterScripts'
+import { Home, type ClusterSummary } from './views/Home'
 import { useDecypherSources } from './decypher/state'
 import type { LoadedFile } from './decypher/parse'
 import { keyLabel, matches, typing, useBindings } from './lib/shortcuts'
-import { formatRoute, parseRoute, type Route } from './lib/route'
+import { formatRoute, parseRoute, tabOf, type Route, type Tab } from './lib/route'
 import { dropEntries, dropSummary, routeDrop } from './lib/drop'
 import { exportFocused } from './core/chartState'
 import { ShortcutSheet } from './ui/shortcut-sheet'
@@ -80,15 +86,23 @@ export function App() {
   const [settings, setSettings] = React.useState(false)
   const [route, go] = useRoute()
   const jobs = useJobs(useNaming(state?.config.vault ?? null, state?.config.project ?? null))
+  const builds = useBuilds()
+  // A qq job as a build's system (R7b), by its input folder; the newest build that has the system says where it stands.
+  const systemOfJob = React.useCallback((inputDir: string | null) => {
+    for (const r of builds.runs) { const m = jobSystem(inputDir, r.systems); if (m) return { ...m, run: r.id, status: r.systems.find(x => x.dir === m.dir)!.status } }
+    return null
+  }, [builds.runs])
   const [draft, setDraft] = useDraft()
   // Closing settings returns the focus to its button, wherever the dialog was opened from.
   const settingsButton = React.useRef<HTMLButtonElement>(null)
   const running = jobs.jobs.filter(j => j.status === 'running').length
   React.useEffect(() => { getJson<AppState>('/api/state').then(setState, e => setError(String(e.message || e))) }, [])
-  // Each tab opens where it was left; results remember their selection, for the compare key from anywhere.
-  const tab = route.view === 'compare' ? 'results' : route.view, [kept, setKept] = React.useState<Record<string, Route>>({})
-  if (kept[tab] !== route) setKept({ ...kept, [tab]: route })
-  const last = { ...kept, [tab]: route }
+  // Each tab, and analysis's set-up and results, opens where it was left; results remember their selection, for the
+  // compare key from anywhere.
+  const tab = tabOf(route), view = route.view === 'compare' ? 'results' : route.view, [kept, setKept] = React.useState<Record<string, Route>>({})
+  if (kept[tab] !== route || kept[view] !== route) setKept({ ...kept, [view]: route, [tab]: route })
+  const last: Record<string, Route | undefined> = { ...kept, [view]: route, [tab]: route }
+  const FIRST: Record<Tab, Route> = { home: { view: 'home' }, symbuilder: { view: 'symbuilder', sub: 'build' }, analysis: { view: 'setup', step: 'inputs', batch: false }, cluster: { view: 'cluster' } }
   const selection = (r => (r?.view === 'compare' ? r.jobs : r?.view === 'results' && r.job ? [r.job] : []))(last.results)
   // Compare: the jobs in the address, the vault RDFs and records on disk kept in this browser, the files dropped (never kept).
   const sources = useDecypherSources(route.view === 'compare' ? route.jobs : [], ids => go({ view: 'compare', jobs: ids }))
@@ -137,7 +151,9 @@ export function App() {
   const openJob = (id: string) => go({ view: 'results', job: id })
   // A cluster job's folder and a recipe (R15): batch set-up opens filled with them; nothing runs until run.
   const [batchPreset, setBatchPreset] = React.useState<BatchPreset | null>(null)
-  const offerBatch = (root: string, recipe: string) => { setBatchPreset({ id: Date.now(), root, recipe }); go({ view: 'setup', step: 'inputs', batch: true }) }
+  // The cluster tab's last read, for home (T215).
+  const [clusterRead, setClusterRead] = React.useState<ClusterSummary | null>(null)
+  const offerBatch = (root: string, recipe: string, template?: string) => { setBatchPreset({ id: Date.now(), root, recipe, ...(template ? { template } : {}) }); go({ view: 'setup', step: 'inputs', batch: true }) }
 
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground">
@@ -153,10 +169,11 @@ export function App() {
           <ToggleGroupItem value="auto">auto</ToggleGroupItem>
         </ToggleGroup>
       </header>
-      <Tabs value={tab} onValueChange={v => go(last[v] ?? (v === 'setup' ? { view: 'setup', step: 'inputs', batch: false } : v === 'results' ? { view: 'results', job: null } : { view: 'cluster' }))} className="flex-1 gap-0">
+      <Tabs value={tab} onValueChange={v => go(last[v] ?? FIRST[v as Tab])} className="flex-1 gap-0">
         <TabsList className="px-3">
-          <TabsTrigger value="setup">set-up</TabsTrigger>
-          <TabsTrigger value="results">results {jobs.jobs.length > 0 && <TabsCount>{running ? running + ' running' : String(jobs.jobs.length).padStart(2, '0')}</TabsCount>}</TabsTrigger>
+          <TabsTrigger value="home">home</TabsTrigger>
+          <TabsTrigger value="symbuilder">symbuilder {builds.building > 0 && <TabsCount>{builds.building} building</TabsCount>}</TabsTrigger>
+          <TabsTrigger value="analysis">analysis {jobs.jobs.length > 0 && <TabsCount>{running ? running + ' running' : String(jobs.jobs.length).padStart(2, '0')}</TabsCount>}</TabsTrigger>
           {/* Your cluster jobs (R10): another kind of job than gmx-cypher's own, so another tab. */}
           <TabsTrigger value="cluster">cluster</TabsTrigger>
         </TabsList>
@@ -170,16 +187,31 @@ export function App() {
             <AlertActions><Button variant="outline" size="sm" onClick={() => setSettings(true)}>set gmx</Button></AlertActions>
           </Alert>
         )}
-        <TabsContent value="setup">{state && route.view === 'setup' && <Setup route={route} go={go} state={state} draft={draft} setDraft={setDraft} jobs={jobs.jobs} uploads={uploads} onUploaded={() => setUploads([])} onSettings={() => setSettings(true)} onOpenJob={openJob} batchPreset={batchPreset} />}</TabsContent>
-        <TabsContent value="results">{(route.view === 'results' || route.view === 'compare') && (
+        <TabsContent value="home">{state && <Home state={state} jobs={jobs.jobs} cluster={clusterRead} />}</TabsContent>
+        <TabsContent value="symbuilder">{route.view === 'symbuilder' && <SymBuilder route={route} go={go} gmx={state?.gmx.ok ? state.gmx.name ?? 'gmx' : 'gmx'} gmxOk={!!state?.gmx.ok} base={state?.config.base} vault={state?.config.vault} projectId={state?.config.project} builds={builds}
+          onAnalyse={(root, template) => offerBatch(root, FORM, template)}
+          onPmf={(edr, tpr, name) => { const why = 'walker 1 of ' + name; setDraft(d => ({ ...withCommand(d, 'awh'), inputs: { edr: { path: edr, why }, runInput: { path: tpr, why } }, outDir: null })); go({ view: 'setup', step: 'command', batch: false }) }} />}</TabsContent>
+        <TabsContent value="analysis">
+          <SubTabs value={view === 'setup' ? 'setup' : 'results'} onValueChange={v => go(last[v] ?? (v === 'setup' ? FIRST.analysis : { view: 'results', job: null }))} label="analysis views"
+            items={[{ value: 'setup', label: 'set-up' }, { value: 'results', label: 'results' }]}>
+          {state && route.view === 'setup' && <Setup route={route} go={go} state={state} draft={draft} setDraft={setDraft} jobs={jobs.jobs} uploads={uploads} onUploaded={() => setUploads([])} onSettings={() => setSettings(true)} onOpenJob={openJob} batchPreset={batchPreset} />}
+          {(route.view === 'results' || route.view === 'compare') && (
           <JobsView {...jobs} route={route} go={go} vault={state?.config.vault ?? null} allow={state?.config.allow ?? []} keyName={bindings.compare ? keyLabel(bindings.compare) : null}
             onRunAgain={r => { setDraft(d => ({ ...withCommand(d, r.analysis ?? 'rdf'), ...recipeFromRecord(r) })); go({ view: 'setup', step: 'command', batch: false }) }}
             compare={<React.Suspense fallback={<p className="m-0 text-control text-muted-foreground" aria-live="polite">opening compare…</p>}>
               <Decypher sources={sources} files={files} onFiles={addFiles} onClearFiles={() => setFiles([])} jobs={jobs.jobs} jobsLoaded={jobs.loaded} allow={state?.config.allow ?? []} vaultPath={state?.config.vault ?? null} version={state?.version ?? ''}
                 keyName={bindings.compare ? keyLabel(bindings.compare) : null} />
             </React.Suspense>} />
-        )}</TabsContent>
-        <TabsContent value="cluster"><ClusterView onOffer={offerBatch} /></TabsContent>
+          )}
+          </SubTabs>
+        </TabsContent>
+        <TabsContent value="cluster">
+          <SubTabs value={route.view === 'cluster' && route.sub === 'scripts' ? 'scripts' : 'jobs'} onValueChange={v => go(v === 'scripts' ? { view: 'cluster', sub: 'scripts' } : { view: 'cluster' })} label="cluster views"
+            items={[{ value: 'jobs', label: 'jobs' }, { value: 'scripts', label: 'scripts' }]}>
+            {route.view === 'cluster' && route.sub === 'scripts' ? <ClusterScriptsView config={state?.config} />
+              : <ClusterView onOffer={offerBatch} onRead={setClusterRead} systemOf={systemOfJob} onGoOn={builds.goOn} />}
+          </SubTabs>
+        </TabsContent>
       </main>
       </Tabs>
       <Toaster />

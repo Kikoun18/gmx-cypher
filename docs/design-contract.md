@@ -1,6 +1,6 @@
 # gmx-cypher — design contract
 
-**Approved 2026-10-19** (batch 3, decisions T157–T169). This is the one page later decisions point to. The machine-checkable parts live in `src/core/contract.ts`; where a table here and the module disagree, the module is right and this page is out of date.
+**Approved 2026-10-19** (batch 3, decisions T157–T169); **amended 2026-11-05** (batch 4: the words, T201 and T202; the mock-up's look, T218). This is the one page later decisions point to. The machine-checkable parts live in `src/core/contract.ts`; where a table here and the module disagree, the module is right and this page is out of date.
 
 Morpheus is the brief; the Matrix is the neighbour. Where gmx-cypher and the Matrix show the same thing (a chart, an export, a key, a word), gmx-cypher matches the Matrix unless this page says otherwise.
 
@@ -8,33 +8,42 @@ Morpheus is the brief; the Matrix is the neighbour. Where gmx-cypher and the Mat
 
 | Term | Means only | Never used for |
 |---|---|---|
-| **job** | one gmx execution by gmx-cypher | a replicate; what a job produced |
-| **record** | a job's `.run.json` | a job; a vault cell |
-| **run** | the Matrix's replicate slot (a, b, …). As a verb, *run* still starts a job | a job (*run again* → *open in set-up*,) |
+| **job** | one gmx analysis gmx-cypher runs; on the cluster tab, a **qq job** is qq's own | a replicate; what a job produced; a build's step |
+| **record** | a job's `.run.json` | a job; a vault cell; a system's `build.json` (*build record*) |
+| **run** | the Matrix's replicate slot (a, b, …). As a verb, *run* still starts a job | a job (*run again* → *open in set-up*,); a build; a repeat |
 | **run input** | the `.tpr` (GROMACS's own term; always with *input*) | a run |
 | **result** | what a job produced (an RDF, a profile, …), and its page | a job (*each job* → *each result*) |
-| **analysis** | the Matrix's type of a curve set (RDF, PMF, …), only | a tab or step (*analysis* tab → *command* step) |
-| **command** | a gmx tool gmx-cypher runs (`gmx rdf`), with its options | a result |
+| **analysis** | the Matrix's type of a curve set (RDF, PMF, …); and the tab that holds set-up and results (T201) | a step (*analysis* step → *command* step) |
+| **command** | a gmx tool gmx-cypher runs (`gmx rdf`, `gmx solvate`), with its options | a result; a python script (*what it runs*); a qq line (*submit line*) |
 | **first shell** / **maximum** | the two peak rules, always named | — ("peak" never stands alone) |
 | **compare** | the view of several results side by side, `#compare` | — ((de)Cypher stays the name of the HTML export,) |
 | **send** → **sent** | copy a result into the vault's inbox | — |
 | **archive** → **archived** | move a finished job's log aside; never delete | delete, hide |
 | **on disk** | records found in a folder | the vault |
+| **recipe** | a saved analysis: its groups, command and options | a build plan |
+| **system** | one method × saccharide × sequence, and its folder `solutions/{method}/{saccharide}/{sequence}/` | a job; a project row |
+| **build** → **built** | making systems (verb and noun) | a run; a job |
+| **stage** | one of the notebook's processes: solution builder · minimisation · nvt · npt · awh · pull · multiwalker | a step |
+| **step** | one tile's work in a build (pdb2gmx, add water, …) | a stage; a job |
+| **build plan** | a saved stack of tiles, with the science values | a recipe |
+| **build record** | a system's `build.json`: every step, every file it wrote or replaced | a record |
+| **repeat** | a method again with `r`, `r1`, … in a new folder tree | a run (*repeated runs* → *repeats*) |
+| **qq script** | the script a heavy stage gets for the cluster; its **submit line** | a job script |
 
 ## 2. Colour roles
 
 | Role | Token | Light | Dark | Used for | Never used for |
 |---|---|---|---|---|---|
-| UI state | `state` (role layer) = ink | `#201e1d` | `#f0eeec` | the selected toggle, the primary action, the focus ring, the active tab | data |
-| Error | `destructive` (role layer) | `#8f1d1d` | `#fd2a6d` | errors, *failed*, armed destructive actions | anything else |
-| Group | the eight tones, `<tone>-strong` for lines and text | coral `#c62410` … stone `#5c5550` | coral `#ff6a4d` … stone `#b0a79f` | a group, from the picker → record → result → compare → export | UI state |
+| UI state | `state` (role layer) = coral; `ring` = coral-strong (T218) | `#ff5429` · ring `#b12b01` | `#ff5429` · ring `#ff7453` | the selected toggle, the primary action and the selected item's bar (coral fill); the focus ring and the active tab's underline (coral-strong) | the reference |
+| Error | `destructive` (role layer) | `#7a1030` | `#fd2a6d` | errors, *failed*, armed destructive actions | anything else |
+| Group | the eight tones, `<tone>-strong` for lines and text | coral `#b12b01` … stone `#5c5550` | coral `#ff7453` … stone `#b0a79f` | a group, from the picker → record → result → compare → export; in SymBuilder, a tile's category (T218) | — |
 | Reference | ink, as an **outline** (chip border, card border, 3D ring) | `#201e1d` | `#f0eeec` | the reference everywhere | — |
 | Source | a numbered badge and a dash; hue only with *colour by result* | ink badge | ink badge | the sources in compare | — |
 | Ordered series | `ramp-0…3` (role layer), interpolated in OKLCH | `#a5700d #a83903 #891151 #3f1a69` | `#a57710 #e97c48 #fd9cba #e3d6fe` | AWH frames (time), WHAM windows (ξ), RMSF on atoms | categories |
 | Neutral | `atom-*`, `bond`, `edge` (from the kit's `NEUTRAL`) | kit values | kit values | atoms and bonds outside every group | — |
-| Status | ink icon and word; error in `destructive` | — | — | the four status levels | group colours |
+| Status | a dot and its word in the level's tone: mint ok, sky note, butter check, `destructive` error (T218) | — | — | the four status levels | — |
 
-- **UI state vs reference.** Both are ink; they differ by form: state is an ink **fill** (selected toggle, primary button), the reference is an ink **outline** (chip, card border, ring). Nothing else is outlined in ink.
+- **UI state vs reference.** UI state is coral (T218, your choice of the SymBuilder mock-up's look, replacing T159's ink); the reference keeps ink to itself, as an **outline** (chip, card border, ring). Nothing else is outlined in ink.
 - **Where deviations live:** `src/roles.json`, a small layer over a verbatim copy of Morpheus's `tokens.json`, generated into CSS by `scripts/tokens.ts`.
 - **Stored tones stay** in records; the reference's stored tone is simply not drawn.
 - **Two curves never differ by hue alone.** With more than eight groups a tone never repeats with the same dash; the dashes are the Matrix's 10, by name.
@@ -83,14 +92,14 @@ The registry is `KEYS` (and `FIXED_KEYS`) in `contract.ts`; `lib/shortcuts.ts` r
 
 ## 4. Status levels
 
-| Level | Icon | Word | Token | Used when | Examples |
+| Level | Dot | Word | Token | Used when | Examples |
 |---|---|---|---|---|---|
-| ok | circle-check | ok / done | `foreground` | a check passed | "the inputs agree · ≈51 frames"; "gmx counts the same" |
-| info | circle-info | note | `foreground` | worth knowing; nothing to do | "68 of 3242 atoms lie outside the box, as recorded"; "the first 400 records only" |
-| warning | triangle-alert | check | `foreground` | a result may mislead; look before trusting it | "no atom groups: no record of the job that wrote this file"; "interrupted" |
-| error | circle-x | error / failed | `destructive` | nothing ran or nothing can be read; says how to fix it | "no working gmx: set its path in settings → gmx" |
+| ok | mint | ok / done | `mint-strong` | a check passed | "the inputs agree · ≈51 frames"; "gmx counts the same" |
+| info | sky | note | `sky-strong` | worth knowing; nothing to do | "68 of 3242 atoms lie outside the box, as recorded"; "the first 400 records only" |
+| warning | butter | check | `butter-strong` | a result may mislead; look before trusting it | "no atom groups: no record of the job that wrote this file"; "interrupted" |
+| error | red | error / failed | `destructive` | nothing ran or nothing can be read; says how to fix it | "no working gmx: set its path in settings → gmx" |
 
-Icon, word, then the text; an optional *why?* opens the long explanation (HoverCard on hover and focus, or a Dialog). Announced with `aria-live="polite"`. Colour is never the only signal.
+Dot, word, then the text, all in the level's tone (each `-strong` tone is at least 4.5:1 on every ground, tested); an optional *why?* opens the long explanation (HoverCard on hover and focus, or a Dialog). Announced with `aria-live="polite"`. Colour is never the only signal.
 
 ## 5. The order of a result page
 
@@ -124,6 +133,6 @@ A compare card follows the same order (`RESULT_ORDER` in `contract.ts`). The act
 | Ramps monotonic and ≥ 3:1, n = 2…50, both themes | `core.test.ts` (R7a) |
 | Every key handler reads the registry; no `e.key === '…'` literals elsewhere | source scan (R8b) |
 | The sheet lists every registered action | component test (R8b) |
-| Every status level has an icon and a word; no ✓/✗/⚠ captions in views | `contract.test.ts`, source scan (R9c) |
+| Every status level has a dot and a word in its tone; no ✓/✗/⚠ captions in views | `contract.test.ts`, source scan (R9c) |
 | The result page order | component test per result kind (R9b) |
 | Writing rules 1–4 | reviewed by hand |

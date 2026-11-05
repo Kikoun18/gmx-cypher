@@ -1,22 +1,16 @@
 {
   "name": "gmx-cypher roles",
-  "about": "The role layer over Morpheus's tokens.json (copied verbatim): where gmx-cypher's colour roles differ from Morpheus (docs/design-contract.md §2, T159). Generated into tokens.css with tokens.json by scripts/tokens.ts.",
+  "about": "The role layer over Morpheus's tokens.json (copied verbatim): where gmx-cypher's colour roles differ from Morpheus (docs/design-contract.md \u00a72, T159). Generated into tokens.css with tokens.json by scripts/tokens.ts.",
   "color": {
     "tokens": [
       {
         "name": "state",
-        "value": {
-          "light": "#201e1d",
-          "dark": "#f0eeec"
-        },
+        "value": "{coral}",
         "usage": "UI state, as an ink fill: the selected toggle, the primary action, the active tab. Never data."
       },
       {
         "name": "state-foreground",
-        "value": {
-          "light": "#f3f2f2",
-          "dark": "#141312"
-        },
+        "value": "{coral-foreground}",
         "usage": "Text on `state`."
       },
       {
@@ -31,13 +25,13 @@
       },
       {
         "name": "ring",
-        "value": "{state}",
+        "value": "{coral-strong}",
         "usage": "The focus ring, in ink."
       },
       {
         "name": "destructive",
         "value": {
-          "light": "#8f1d1d",
+          "light": "#7a1030",
           "dark": "#fd2a6d"
         },
         "usage": "Errors, failed and armed destructive actions only. At least 0.10 apart in OKLab from every tone, ring and primary."
@@ -56,7 +50,7 @@
           "light": "#a5700d",
           "dark": "#a57710"
         },
-        "usage": "Ordered series (time, ξ, RMSF), first stop; interpolated in OKLCH. At least 3:1 on every ground."
+        "usage": "Ordered series (time, \u03be, RMSF), first stop; interpolated in OKLCH. At least 3:1 on every ground."
       },
       {
         "name": "ramp-1",

@@ -23,9 +23,16 @@ export interface Config {
   /** qq and gmx-eta, by name or path, for the cluster view (R10); null: found on PATH. */
   qq: string | null;
   gmxEta: string | null;
+  /** SymBuilder (R4): the folder its builds read and write (the notebook's BASE_DIR), inside an allowed folder; python, by name or path. */
+  base: string | null;
+  python: string | null;
+  /** How a build waits for a local mdrun's .gro (R5c): every `every` s, up to `max` s; null: 10 s, 10 min. */
+  buildWait: { every: number; max: number } | null;
+  /** The qq scripts of a build (R7a): each stage's profile, whether gmx-cypher submits them (T206: off), the queue; null: the notebook's. */
+  qqBuild: { profiles: Partial<Record<'min' | 'nvt' | 'npt' | 'awh' | 'pull' | 'walkers', string>>; submit: boolean; queue: string } | null;
 }
 
-export const DEFAULT_CONFIG: Config = { gmx: null, allow: [], vault: null, project: null, pmfUrl: null, concurrency: 2, hashTrajectories: false, qq: null, gmxEta: null };
+export const DEFAULT_CONFIG: Config = { gmx: null, allow: [], vault: null, project: null, pmfUrl: null, concurrency: 2, hashTrajectories: false, qq: null, gmxEta: null, base: null, python: null, buildWait: null, qqBuild: null };
 
 export const stateDir = (env: NodeJS.ProcessEnv = process.env) => env.GMX_CYPHER_HOME || join(homedir(), '.gmx-cypher');
 

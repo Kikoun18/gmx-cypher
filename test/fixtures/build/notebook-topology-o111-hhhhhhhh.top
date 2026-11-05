@@ -1,0 +1,17 @@
+; Include topology for ions
+#include "../../../../ff/charmm36s-jul2022-prosECCo75.ff/forcefield.itp"
+#include "../../../../ff/ADDff.itp"                                       ;ADD
+#include "../../../../ff/ions/iontypes.itp"                               ;prosECCo75 ions
+#include "../../../../ff/ions/ions.itp"
+#include "../../../../ff/TIP3PF/TIP3PF_orig.itp"                                ; fast and slow water
+#include "../../../../ff/o111-ADD.itp"
+#include "../../../../ff/hhhhhhhh.itp"
+
+[ system ]
+; Name
+o111 with hhhhhhhh system
+
+[ molecules ]
+; Compound        #mols
+CARB               1
+Protein		       1

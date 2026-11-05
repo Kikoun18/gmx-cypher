@@ -1,0 +1,452 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Dashboard</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ds/morpheus/tokens.css">
+<link rel="stylesheet" href="ds/morpheus/components/bundle.css">
+<script src="ds/morpheus/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:inherit}
+button{font-family:inherit}
+button:focus-visible,a:focus-visible{outline:2px solid var(--ring);outline-offset:2px}
+</style>
+</helmet>
+<div data-theme="{{theme}}" style="min-height: 1720px; box-sizing: border-box; display: flex; flex-direction: column; background: var(--background); color: var(--foreground); font-family: var(--font-mono); font-size: 13px; line-height: 1.5;">
+
+  <header style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px 24px; padding: 12px 24px; border-bottom: 1px solid var(--border);">
+    <div style="display: flex; align-items: baseline; gap: 10px;">
+      <span style="font-size: 15px; font-weight: 700;">gmx-cypher</span>
+      <span style="font-size: 10px; line-height: 14px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground);">generate</span>
+    </div>
+    <nav aria-label="generator views" style="display: flex; gap: 4px;">
+      <a href="Main.dc.html" style="padding: 6px 10px; font-size: 12px; line-height: 16px; text-decoration: none; border-bottom: 2px solid transparent; color: var(--muted-foreground);">build</a>
+      <a href="Run.dc.html" style="padding: 6px 10px; font-size: 12px; line-height: 16px; text-decoration: none; border-bottom: 2px solid transparent; color: var(--muted-foreground);">run</a>
+      <a href="Dashboard.dc.html" aria-current="page" style="padding: 6px 10px; font-size: 12px; line-height: 16px; font-weight: 700; text-decoration: none; border-bottom: 2px solid var(--coral-strong);">dashboard</a>
+      <a href="Summary.dc.html" style="padding: 6px 10px; font-size: 12px; line-height: 16px; text-decoration: none; border-bottom: 2px solid transparent; color: var(--muted-foreground);">summary</a>
+      <a href="Library.dc.html" style="padding: 6px 10px; font-size: 12px; line-height: 16px; text-decoration: none; border-bottom: 2px solid transparent; color: var(--muted-foreground);">library</a>
+      <a href="MDP.dc.html" style="padding: 6px 10px; font-size: 12px; line-height: 16px; text-decoration: none; border-bottom: 2px solid transparent; color: var(--muted-foreground);">mdp</a>
+      <a href="Files.dc.html" style="padding: 6px 10px; font-size: 12px; line-height: 16px; text-decoration: none; border-bottom: 2px solid transparent; color: var(--muted-foreground);">files</a>
+      <a href="Cluster.dc.html" style="padding: 6px 10px; font-size: 12px; line-height: 16px; text-decoration: none; border-bottom: 2px solid transparent; color: var(--muted-foreground);">cluster</a>
+      <a href="Warnings.dc.html" style="padding: 6px 10px; font-size: 12px; line-height: 16px; text-decoration: none; border-bottom: 2px solid transparent; color: var(--muted-foreground);">warnings</a>
+      <a href="Settings.dc.html" style="padding: 6px 10px; font-size: 12px; line-height: 16px; text-decoration: none; border-bottom: 2px solid transparent; color: var(--muted-foreground);">settings</a>
+    </nav>
+    <span style="flex: 1 1 0;"></span>
+    <a href="Warnings.dc.html" style="font-size: 11px; line-height: 16px; text-decoration: none; color: var(--butter-strong);">3 open · 2 ignored</a>
+    <span style="font-size: 11px; line-height: 16px; color: var(--muted-foreground);">gmx_mpi 2025.4 · <span style="color: var(--mint-strong);">ready</span></span>
+    <span style="font-size: 11px; line-height: 16px; color: var(--muted-foreground);">qq · <span style="color: var(--mint-strong);">ready</span></span>
+  </header>
+
+  <div style="display: flex; flex-direction: column; gap: 20px; padding: 20px 24px;">
+
+    <div style="display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px 24px;">
+      <div style="display: flex; flex-direction: column; gap: 4px; min-width: 360px;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <h1 style="margin: 0; font-size: 18px; line-height: 24px; font-weight: 700;">checks</h1>
+          <x-import component-from-global-scope="Morpheus.Badge" tone="butter">sample data</x-import>
+        </div>
+        <p style="margin: 0; font-size: 12px; line-height: 16px; color: var(--muted-foreground);">live progress, pull report and walker report · the build summary, termini and PMF numbers are on the <a href="Summary.dc.html" style="color: var(--coral-strong);">summary board</a> · read from <span style="color: var(--foreground);">solutions/{method}/{saccharide}/{sequence}</span> · the charge check is a tile, find it in <a href="Main.dc.html" style="color: var(--coral-strong);">build</a></p>
+      </div>
+      <span style="flex: 1 1 0;"></span>
+      <div style="display: flex; align-items: center; gap: 16px;">
+        <label style="display: flex; align-items: center; gap: 10px; font-size: 12px; cursor: pointer;">
+          <x-import component-from-global-scope="Morpheus.Checkbox" checked="{{ onlyProblems }}" on-checked-change="{{ onOnly }}"></x-import>
+          <span>only problems</span>
+        </label>
+        <div style="width: 240px;">
+          <x-import component-from-global-scope="Morpheus.Input" size="sm" placeholder="filter systems" value="{{ q }}" on-change="{{ onQ }}"></x-import>
+        </div>
+        <x-import component-from-global-scope="Morpheus.Button" variant="outline" size="sm">read folder again</x-import>
+      </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;">
+      <x-import component-from-global-scope="Morpheus.Stat" label="Systems" value="{{ stat.systems }}" hint="{{ stat.systemsHint }}"></x-import>
+      <x-import component-from-global-scope="Morpheus.Stat" label="Pull done" value="{{ stat.pull }}" hint="{{ stat.pullHint }}"></x-import>
+      <x-import component-from-global-scope="Morpheus.Stat" label="Walkers ready" value="{{ stat.walkers }}" hint="{{ stat.walkersHint }}"></x-import>
+      <x-import component-from-global-scope="Morpheus.Stat" label="Need a look" value="{{ stat.problems }}" hint="{{ stat.problemsHint }}"></x-import>
+    </div>
+
+    <x-import component-from-global-scope="Morpheus.Alert" variant="warning">
+      <x-import component-from-global-scope="Morpheus.AlertTitle">{{ alert.title }}</x-import>
+      <x-import component-from-global-scope="Morpheus.AlertDescription">{{ alert.text }}</x-import>
+      <x-import component-from-global-scope="Morpheus.AlertActions">
+        <x-import component-from-global-scope="Morpheus.Button" variant="outline" size="sm">submit the missing ones</x-import>
+        <x-import component-from-global-scope="Morpheus.Button" variant="outline" size="sm">copy the list</x-import>
+      </x-import>
+    </x-import>
+
+    <section aria-label="running now" style="display: flex; flex-direction: column; gap: 8px;">
+      <x-import component-from-global-scope="Morpheus.Section" label="Running now">{{ liveCount }}</x-import>
+      <div style="display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 20px; align-items: start;">
+        <div style="display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--card); overflow: hidden;">
+          <sc-for list="{{ live }}" as="l" hint-placeholder-count="3">
+            <div style="display: grid; grid-template-columns: minmax(0, 1fr) 200px; align-items: center; gap: 6px 14px; padding: 8px 14px; border-bottom: 1px solid var(--border); font-size: 12px; line-height: 16px;">
+              <span style="min-width: 0; display: flex; flex-direction: column;">
+                <span><span style="color: var(--muted-foreground);">{{ l.sys }} · </span><span style="font-weight: 700;">{{ l.stage }}</span></span>
+                <span style="font-size: 11px; color: var(--muted-foreground);">{{ l.line }}</span>
+              </span>
+              <span style="display: flex; flex-direction: column; gap: 4px;">
+                <span style="height: 8px; border-radius: var(--radius-full); background: var(--border); overflow: hidden;"><span style="display: block; width: {{ l.pct }}; height: 100%; background: {{ l.ink }};"></span></span>
+                <span style="font-size: 11px; color: {{ l.ink }};">{{ l.eta }}</span>
+              </span>
+            </div>
+          </sc-for>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 6px;">
+          <div style="display: flex; flex-direction: column; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--field); font-family: var(--font-mono); font-size: 11px; line-height: 17px;">
+            <sc-for list="{{ logLines }}" as="ln" hint-placeholder-count="6">
+              <span style="white-space: pre-wrap; word-break: break-all; color: {{ ln.ink }}; font-weight: {{ ln.weight }};">{{ ln.text }}</span>
+            </sc-for>
+          </div>
+          <p style="margin: 0; font-size: 11px; line-height: 16px; color: var(--muted-foreground);">one bar per local mdrun instead of a line per 100 steps · WARNING and NOTE blocks in yellow · the full output is kept in the step folder's .log</p>
+        </div>
+      </div>
+    </section>
+
+    <div style="display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 20px; align-items: start;">
+
+      <section aria-label="pull report" style="display: flex; flex-direction: column; gap: 8px; min-width: 0;">
+        <x-import component-from-global-scope="Morpheus.Section" label="Pull report">{{ pullCount }}</x-import>
+        <p style="margin: 0; font-size: 11px; line-height: 16px; color: var(--muted-foreground);">the notebook's pull_report(): charge from a grompp on 6.eqnpt.gro, then the shortest and longest distance in 8.pull/pullx.xvg · green reached the target, yellow stopped short, red has no file · click a row to draw its trace</p>
+        <div style="border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--card); overflow: hidden;">
+          <div style="display: grid; grid-template-columns: minmax(0, 1fr) 54px 44px 46px 130px 66px; gap: 10px; padding: 8px 14px; border-bottom: 1px solid var(--border); font-size: 10px; line-height: 14px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground);">
+            <span>system</span>
+            <span style="text-align: right;" title="net charge from grompp on 6.eqnpt.gro">charge</span>
+            <span style="text-align: right;">min</span>
+            <span style="text-align: right;">frames</span>
+            <span>reach</span>
+            <span>state</span>
+          </div>
+          <sc-for list="{{ pullRows }}" as="r" hint-placeholder-count="6">
+            <button type="button" onClick="{{ r.pick }}" aria-pressed="{{ r.isSel }}" aria-label="show the pull trace of {{ r.name }}" style="display: grid; grid-template-columns: minmax(0, 1fr) 54px 44px 46px 130px 66px; align-items: center; gap: 10px; width: 100%; box-sizing: border-box; padding: 7px 14px 7px 12px; border: 0; border-left: 2px solid {{ r.edge }}; border-bottom: 1px solid var(--border); background: {{ r.bg }}; color: var(--foreground); font-size: 12px; line-height: 16px; text-align: left; cursor: pointer;">
+              <span style="min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"><span style="color: var(--muted-foreground);">{{ r.m }} / {{ r.s }} / </span><span style="font-weight: 700;">{{ r.q }}</span></span>
+              <span style="text-align: right; color: {{ r.qInk }};">{{ r.charge }}</span>
+              <span style="text-align: right;">{{ r.min }}</span>
+              <span style="text-align: right; color: {{ r.framesInk }};">{{ r.frames }}</span>
+              <span style="display: flex; align-items: center; gap: 8px;">
+                <span style="flex: 1 1 0; height: 6px; border-radius: var(--radius-full); background: var(--border); overflow: hidden;"><span style="display: block; width: {{ r.pct }}; height: 100%; background: {{ r.ink }};"></span></span>
+                <span style="flex: 0 0 auto; width: 74px; text-align: right; color: var(--muted-foreground);">{{ r.reach }}</span>
+              </span>
+              <span style="display: inline-flex; align-items: center; gap: 6px; color: {{ r.ink }}; font-weight: 700;"><span aria-hidden="true" style="width: 8px; height: 8px; border-radius: var(--radius-full); background: {{ r.ink }};"></span>{{ r.word }}</span>
+            </button>
+          </sc-for>
+          <sc-if value="{{ pullEmpty }}" hint-placeholder-val="{{ false }}">
+            <p style="margin: 0; padding: 18px 14px; font-size: 12px; color: var(--muted-foreground);">no system matches that filter</p>
+          </sc-if>
+        </div>
+      </section>
+
+      <section aria-label="pull trace" style="display: flex; flex-direction: column; gap: 8px; min-width: 0;">
+        <x-import component-from-global-scope="Morpheus.Section" label="Trace">{{ sel.short }}</x-import>
+        <div style="display: flex; flex-direction: column; gap: 12px; padding: 14px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--card);">
+          <div style="display: flex; flex-direction: column; gap: 2px;">
+            <span style="font-size: 13px; font-weight: 700;">{{ sel.name }}</span>
+            <span style="font-size: 11px; line-height: 16px; color: var(--muted-foreground);">{{ sel.path }}</span>
+          </div>
+          <sc-if value="{{ sel.hasTrace }}" hint-placeholder-val="{{ true }}">
+            <x-import component-from-global-scope="Morpheus.LineChart" series="{{ trace }}" x-label="time (ns)" y-label="distance (nm)" height="{{ chartH }}"></x-import>
+          </sc-if>
+          <sc-if value="{{ sel.noTrace }}" hint-placeholder-val="{{ false }}">
+            <div style="display: flex; align-items: center; justify-content: center; height: 220px; border: 2px dashed var(--input); border-radius: var(--radius-lg); color: var(--muted-foreground); text-align: center; padding: 0 24px;">8.pull/pullx.xvg is missing for this system, so there is nothing to draw</div>
+          </sc-if>
+          <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;">
+            <x-import component-from-global-scope="Morpheus.Stat" label="Start" value="{{ sel.start }}" hint="nm"></x-import>
+            <x-import component-from-global-scope="Morpheus.Stat" label="Last" value="{{ sel.last }}" hint="nm"></x-import>
+            <x-import component-from-global-scope="Morpheus.Stat" label="Target" value="{{ sel.target }}" hint="nm"></x-import>
+            <x-import component-from-global-scope="Morpheus.Stat" label="Frames" value="{{ sel.frames }}" hint="{{ sel.span }}"></x-import>
+          </div>
+        </div>
+      </section>
+
+    </div>
+
+    <section aria-label="walker report" style="display: flex; flex-direction: column; gap: 8px;">
+      <x-import component-from-global-scope="Morpheus.Section" label="Walker report">{{ walkerCount }}</x-import>
+      <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px 20px;">
+        <p style="margin: 0; flex: 1 1 420px; font-size: 11px; line-height: 16px; color: var(--muted-foreground);">reads 9.multiwalker/{i}/ for every walker · one cell per walker, in order</p>
+        <span style="display: inline-flex; align-items: center; gap: 14px; font-size: 11px; line-height: 16px;">
+          <span><span style="display: inline-block; width: 16px; text-align: center; border-radius: var(--radius-xs); background: var(--mint-soft); color: var(--mint-strong); font-weight: 700;">x</span> has output</span>
+          <span><span style="display: inline-block; width: 16px; text-align: center; border-radius: var(--radius-xs); background: var(--butter-soft); color: var(--butter-strong); font-weight: 700;">o</span> tpr ready</span>
+          <span><span style="display: inline-block; width: 16px; text-align: center; border-radius: var(--radius-xs); background: var(--coral-soft); color: var(--destructive); font-weight: 700;">-</span> missing</span>
+        </span>
+        <span style="display: inline-flex; align-items: center; gap: 8px;">
+          <span style="font-size: 10px; line-height: 14px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground);">walkers checked</span>
+          <x-import component-from-global-scope="Morpheus.ToggleGroup" type="single" size="sm" value="{{ nSel }}" on-value-change="{{ setN }}">
+            <x-import component-from-global-scope="Morpheus.ToggleGroupItem" value="all">all</x-import>
+            <x-import component-from-global-scope="Morpheus.ToggleGroupItem" value="4">first 4</x-import>
+            <x-import component-from-global-scope="Morpheus.ToggleGroupItem" value="2">first 2</x-import>
+          </x-import>
+        </span>
+      </div>
+
+      <div style="display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 20px; align-items: start;">
+        <div style="border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--card); overflow: hidden; min-width: 0;">
+          <div style="display: grid; grid-template-columns: minmax(0, 1fr) 264px 120px; gap: 12px; padding: 8px 14px; border-bottom: 1px solid var(--border); font-size: 10px; line-height: 14px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground);">
+            <span>system</span>
+            <span>walkers 1 – 8</span>
+            <span>tally</span>
+          </div>
+          <sc-for list="{{ walkerRows }}" as="w" hint-placeholder-count="6">
+            <div style="display: grid; grid-template-columns: minmax(0, 1fr) 264px 120px; align-items: center; gap: 12px; padding: 6px 14px; border-bottom: 1px solid var(--border); font-size: 12px; line-height: 16px;">
+              <span style="min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"><span style="color: var(--muted-foreground);">{{ w.m }} / {{ w.s }} / </span><span style="font-weight: 700;">{{ w.q }}</span></span>
+              <span style="display: flex; gap: 4px;">
+                <sc-for list="{{ w.cells }}" as="c" hint-placeholder-count="8">
+                  <span title="{{ c.title }}" style="display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 22px; border-radius: var(--radius-xs); background: {{ c.bg }}; color: {{ c.fg }}; font-weight: 700;">{{ c.mark }}</span>
+                </sc-for>
+              </span>
+              <span style="color: {{ w.ink }};">{{ w.tally }}</span>
+            </div>
+          </sc-for>
+          <sc-if value="{{ walkerEmpty }}" hint-placeholder-val="{{ false }}">
+            <p style="margin: 0; padding: 18px 14px; font-size: 12px; color: var(--muted-foreground);">no system matches that filter</p>
+          </sc-if>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 10px; padding: 14px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--card); min-width: 0;">
+          <span style="font-size: 10px; line-height: 14px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground);">missing</span>
+          <sc-for list="{{ missingRows }}" as="g" hint-placeholder-count="3">
+            <div style="display: flex; flex-direction: column; gap: 2px; padding-bottom: 8px; border-bottom: 1px solid var(--border); font-size: 12px; line-height: 16px;">
+              <span style="font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ g.name }}</span>
+              <span style="color: var(--destructive);">{{ g.what }}</span>
+              <span style="color: var(--muted-foreground);">{{ g.path }}</span>
+              <span style="color: {{ g.fixInk }};">{{ g.fix }}</span>
+            </div>
+          </sc-for>
+          <sc-if value="{{ noMissing }}" hint-placeholder-val="{{ false }}">
+            <p style="margin: 0; font-size: 12px; line-height: 16px; color: var(--mint-strong);">nothing is missing for the walkers shown</p>
+          </sc-if>
+          <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+            <x-import component-from-global-scope="Morpheus.Button" variant="outline" size="sm">rebuild from the nearest walker</x-import>
+            <x-import component-from-global-scope="Morpheus.Button" variant="ghost" size="sm">run multiwalker again</x-import>
+          </div>
+          <p style="margin: 0; font-size: 11px; line-height: 16px; color: var(--muted-foreground);">retry_failed_walkers(): each walker without a tpr is moved to 9.multiwalker/failed/ and grompped again from the start.gro of the working walker closest in distance · nothing is deleted · nothing happens until you press a button</p>
+        </div>
+      </div>
+    </section>
+
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;light&quot;,&quot;dark&quot;],&quot;default&quot;:&quot;dark&quot;},&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:1720}}">
+const TARGET = 3.0;
+const DT_NS = 0.001;
+// m, s, q, pull state, frames, last distance (nm), walkers (x has .xvg, o tpr ready, - missing)
+// net charge from the grompp on 6.eqnpt.gro, as gmx_charge() · null = no 6.eqnpt.gro
+const CHARGE = [0, 0, 0, -0.05, 0, null, 0, 0, 0, -0.05, 0, 0];
+const DISTS = [0.4, 0.6, 0.8, 1.0, 1.5, 2.0, 2.5, 3.0];
+const LIVE = [
+  { sys: 'hmr+slow+6 / PG / WRWACR', stage: 'NPT', line: 'MDRUN 6.eqnpt  step 45600/125000', pct: 36, eta: '36% · ~17s left', ink: 'var(--sky-strong)' },
+  { sys: 'hmr+slow+6 / O26 / WRWYCR', stage: 'MINIMIZATION', line: 'MDRUN 4.minim  step 1240/50000', pct: 2, eta: '2% · steepest descent', ink: 'var(--sky-strong)' },
+  { sys: 'hmr+slow+6 / O26 / WRWACR', stage: 'NVT', line: 'waiting for 5.eqnvt.gro · looked 3 times', pct: 5, eta: '30 s of 10 min', ink: 'var(--butter-strong)' }
+];
+const LOG = [
+  ['$ gmx_mpi grompp -f inputs/eq_npt.mdp -p ../WRWACR.top -c ../5.eqnvt/5.eqnvt.gro …', 'var(--sky-strong)', 400],
+  ['WARNING 1 [file eq_npt.mdp]:', 'var(--butter-strong)', 700],
+  ['  The Berendsen barostat does not generate any strictly correct ensemble', 'var(--butter-strong)', 700],
+  ['NOTE 1 [file WRWACR.top]:', 'var(--butter-strong)', 700],
+  ['  The largest charge group contains 12 atoms.', 'var(--butter-strong)', 700],
+  ['$ gmx_mpi mdrun -deffnm 6.eqnpt -v -quiet', 'var(--sky-strong)', 400],
+  ['MDRUN 6.eqnpt [##########                  ]  36%  step 45600/125000  ~17s left', 'var(--foreground)', 700]
+];
+const SYS = [
+  ['hmr+fast+6', 'HA',  'WRWYCR', 'done',    3001, 3.02, 'xxxxxxxx'],
+  ['hmr+fast+6', 'HA',  'WRWACR', 'done',    3001, 3.01, 'xxxxxxxx'],
+  ['hmr+fast+6', 'PG',  'WRWYCR', 'done',    3001, 3.00, 'xxxxxxxo'],
+  ['hmr+fast+6', 'PG',  'WRWACR', 'short',   2140, 2.14, 'oooooooo'],
+  ['hmr+fast+6', 'O26', 'WRWYCR', 'done',    3001, 3.03, 'xxxxxxxx'],
+  ['hmr+fast+6', 'O26', 'WRWACR', 'missing',    0, 0,    '--------'],
+  ['hmr+slow+6', 'HA',  'WRWYCR', 'done',    3001, 3.01, '--------'],
+  ['hmr+slow+6', 'HA',  'WRWACR', 'done',    3001, 3.00, 'xxxxxxxx'],
+  ['hmr+slow+6', 'PG',  'WRWYCR', 'done',    3001, 3.02, 'xxxxoooo'],
+  ['hmr+slow+6', 'PG',  'WRWACR', 'short',   1760, 1.76, 'oooooooo'],
+  ['hmr+slow+6', 'O26', 'WRWYCR', 'done',    3001, 3.01, 'xxxxxxx-'],
+  ['hmr+slow+6', 'O26', 'WRWACR', 'done',    3001, 3.00, 'xxxxxxxx']
+].map((r, i) => ({ i: i, m: r[0], s: r[1], q: r[2], state: r[3], frames: r[4], last: r[5], walkers: r[6], start: 0.42 + 0.03 * (i % 4), charge: CHARGE[i] }));
+
+const WORD = { done: 'done', short: 'short', missing: 'missing' };
+const INK = { done: 'var(--mint-strong)', short: 'var(--butter-strong)', missing: 'var(--destructive)' };
+const TONE = { done: 'mint', short: 'butter', missing: 'stone' };
+const pad2 = (n) => (n < 10 ? '0' : '') + n;
+const two = (x) => x.toFixed(2);
+
+function tally(w, n) {
+  let x = 0, o = 0, m = 0;
+  const gone = [];
+  for (let k = 0; k < n; k++) {
+    const c = w.charAt(k);
+    if (c === 'x') x++;
+    else if (c === 'o') o++;
+    else { m++; gone.push(k + 1); }
+  }
+  return { x: x, o: o, m: m, gone: gone };
+}
+
+function trace(r) {
+  const pts = [];
+  const N = r.frames;
+  for (let f = 0; f < N; f += 50) {
+    const frac = N > 1 ? f / (N - 1) : 0;
+    const wob = 0.04 * Math.sin(f / 90 + r.i) * (1 - frac);
+    pts.push([Math.round(f * DT_NS * 1000) / 1000, Math.round((r.start + (r.last - r.start) * frac + wob) * 1000) / 1000]);
+  }
+  const end = (N - 1) * DT_NS;
+  pts.push([Math.round(end * 1000) / 1000, r.last]);
+  return pts;
+}
+
+class Component extends DCLogic {
+  renderVals() {
+    const st = this.state;
+    const q = st.q || '';
+    const only = st.only === true;
+    const nSel = st.n || 'all';
+    const n = nSel === 'all' ? 8 : parseInt(nSel, 10);
+    const selI = st.sel === undefined ? 3 : st.sel;
+    const needle = q.trim().toLowerCase();
+
+    const info = SYS.map((r) => {
+      const t = tally(r.walkers, n);
+      return { r: r, t: t, pullBad: r.state !== 'done', walkBad: t.m > 0 };
+    });
+    const total = info.length;
+    const pullDone = info.filter((x) => !x.pullBad).length;
+    const pullShort = info.filter((x) => x.r.state === 'short').length;
+    const pullMissing = info.filter((x) => x.r.state === 'missing').length;
+    const walkReady = info.filter((x) => !x.walkBad).length;
+    const walkGone = info.reduce((a, x) => a + x.t.m, 0);
+    const problems = info.filter((x) => x.pullBad || x.walkBad).length;
+    const pullBadN = pullShort + pullMissing;
+
+    const hit = (x) => !needle || (x.r.m + '/' + x.r.s + '/' + x.r.q).toLowerCase().indexOf(needle) >= 0;
+
+    const pullRows = info.filter((x) => hit(x) && (!only || x.pullBad)).map((x) => {
+      const r = x.r;
+      const sel = r.i === selI;
+      return {
+        m: r.m, s: r.s, q: r.q,
+        frames: r.frames ? String(r.frames) : '0',
+        charge: r.charge === null ? '–' : (r.charge > 0 ? '+' : r.charge < 0 ? '−' : '') + Math.abs(r.charge).toFixed(2),
+        qInk: r.charge === null ? 'var(--muted-foreground)' : Math.abs(r.charge) > 0.01 ? 'var(--butter-strong)' : 'var(--foreground)',
+        min: r.state === 'missing' ? '–' : two(r.start),
+        framesInk: r.state === 'done' ? 'var(--foreground)' : INK[r.state],
+        reach: r.state === 'missing' ? '–' : two(r.last) + ' nm',
+        pct: r.state === 'missing' ? '0%' : Math.min(100, Math.round(r.last / TARGET * 100)) + '%',
+        word: WORD[r.state],
+        ink: INK[r.state],
+        isSel: sel,
+        edge: sel ? 'var(--coral-strong)' : 'transparent',
+        bg: sel ? 'var(--background)' : 'transparent',
+        name: r.m + ' / ' + r.s + ' / ' + r.q,
+        pick: () => this.setState({ sel: r.i })
+      };
+    });
+
+    const cur = SYS[selI] || SYS[0];
+    const has = cur.state !== 'missing';
+    const series = has ? [
+      { label: 'distance', points: trace(cur), tone: TONE[cur.state] },
+      { label: 'target ' + two(TARGET) + ' nm', points: [[0, TARGET], [Math.round((cur.frames - 1) * DT_NS * 1000) / 1000, TARGET]], tone: 'stone', dash: 1 }
+    ] : [];
+    const sel = {
+      name: cur.m + ' / ' + cur.s + ' / ' + cur.q,
+      short: cur.q,
+      path: 'solutions/' + cur.m + '/' + cur.s + '/' + cur.q + '/8.pull/pullx.xvg',
+      hasTrace: has,
+      noTrace: !has,
+      start: has ? two(cur.start) : '–',
+      last: has ? two(cur.last) : '–',
+      target: two(TARGET),
+      frames: String(cur.frames),
+      span: has ? '0 – ' + ((cur.frames - 1) * DT_NS).toFixed(2) + ' ns' : 'no file'
+    };
+
+    const walkerRows = info.filter((x) => hit(x) && (!only || x.walkBad)).map((x) => {
+      const r = x.r;
+      const cells = [];
+      for (let k = 0; k < 8; k++) {
+        const c = r.walkers.charAt(k);
+        if (k >= n) cells.push({ mark: '·', bg: 'var(--background)', fg: 'var(--muted-foreground)', title: 'walker ' + (k + 1) + ' · not checked' });
+        else if (c === 'x') cells.push({ mark: 'x', bg: 'var(--mint-soft)', fg: 'var(--mint-strong)', title: 'walker ' + (k + 1) + ' · has output' });
+        else if (c === 'o') cells.push({ mark: 'o', bg: 'var(--butter-soft)', fg: 'var(--butter-strong)', title: 'walker ' + (k + 1) + ' · tpr ready, no output yet' });
+        else cells.push({ mark: '-', bg: 'var(--coral-soft)', fg: 'var(--destructive)', title: 'walker ' + (k + 1) + ' · 9.multiwalker/' + (k + 1) + '/9.multiwalker.tpr is missing' });
+      }
+      const t = x.t;
+      return {
+        m: r.m, s: r.s, q: r.q,
+        cells: cells,
+        tally: t.x + ' x · ' + t.o + ' o · ' + t.m + ' -',
+        ink: t.m > 0 ? 'var(--destructive)' : t.o > 0 ? 'var(--butter-strong)' : 'var(--mint-strong)'
+      };
+    });
+
+    const missingRows = info.filter((x) => hit(x) && x.walkBad).map((x) => {
+      const r = x.r;
+      const g = x.t.gone;
+      return {
+        name: r.m + ' / ' + r.s + ' / ' + r.q,
+        what: g.length === n ? 'all ' + n + ' walkers have no tpr' : (g.length === 1 ? 'walker ' : 'walkers ') + g.join(', ') + ' · no tpr',
+        path: 'solutions/' + r.m + '/' + r.s + '/' + r.q + '/9.multiwalker/{' + g.join(',') + '}/',
+        fix: (() => {
+          const ok = [];
+          for (let k = 1; k <= 8; k++) if (r.walkers.charAt(k - 1) !== '-') ok.push(k);
+          if (!ok.length) return 'no working walker to seed from · run multiwalker again';
+          return 'rebuild ' + g.map((i) => {
+            const j = ok.reduce((b, k) => (Math.abs(DISTS[k - 1] - DISTS[i - 1]) < Math.abs(DISTS[b - 1] - DISTS[i - 1]) ? k : b), ok[0]);
+            return i + ' ← ' + j + ' (' + DISTS[j - 1] + ' nm)';
+          }).join(', ');
+        })(),
+        fixInk: r.walkers.indexOf('x') < 0 && r.walkers.indexOf('o') < 0 ? 'var(--destructive)' : 'var(--sky-strong)'
+      };
+    });
+
+    const alertTitle = problems === 0 ? 'everything checked is in place' : problems + (problems === 1 ? ' system needs a look' : ' systems need a look');
+    const alertText = problems === 0
+      ? 'every pull reached its target and every walker has a tpr'
+      : pullBadN + (pullBadN === 1 ? ' pull file stopped short or is missing' : ' pull files stopped short or are missing') + ' · ' + walkGone + (walkGone === 1 ? ' walker has' : ' walkers have') + ' no tpr · nothing is submitted until you press a button';
+
+    return {
+      theme: this.props.theme ?? 'dark',
+      live: LIVE.map((l) => Object.assign({}, l, { pct: l.pct + '%' })),
+      liveCount: pad2(LIVE.length),
+      logLines: LOG.map((l) => ({ text: l[0], ink: l[1], weight: l[2] })),
+      q: q,
+      onQ: (e) => this.setState({ q: e.target.value }),
+      onlyProblems: only,
+      onOnly: (v) => this.setState({ only: v === true }),
+      stat: {
+        systems: String(total),
+        systemsHint: '2 methods × 3 saccharides × 2 sequences',
+        pull: pullDone + ' / ' + total,
+        pullHint: pullShort + ' short · ' + pullMissing + ' missing',
+        walkers: walkReady + ' / ' + total,
+        walkersHint: walkGone + ' missing · ' + (nSel === 'all' ? 'all 8 walkers' : 'first ' + n + ' walkers'),
+        problems: String(problems),
+        problemsHint: 'pull or walkers'
+      },
+      alert: { title: alertTitle, text: alertText },
+      pullCount: pad2(pullRows.length),
+      pullRows: pullRows,
+      pullEmpty: pullRows.length === 0,
+      sel: sel,
+      trace: series,
+      chartH: 260,
+      walkerCount: pad2(walkerRows.length),
+      nSel: nSel,
+      setN: (v) => { if (v) this.setState({ n: v }); },
+      walkerRows: walkerRows,
+      walkerEmpty: walkerRows.length === 0,
+      missingRows: missingRows,
+      noMissing: missingRows.length === 0
+    };
+  }
+}
+</script>
+</body>
+</html>

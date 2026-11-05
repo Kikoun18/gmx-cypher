@@ -1,0 +1,432 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>MDP</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ds/morpheus/tokens.css">
+<link rel="stylesheet" href="ds/morpheus/components/bundle.css">
+<script src="ds/morpheus/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:inherit}
+button{font-family:inherit}
+button:focus-visible,a:focus-visible{outline:2px solid var(--ring);outline-offset:2px}
+pre{margin:0}
+textarea{font-family:var(--font-mono)}
+</style>
+</helmet>
+<div data-theme="{{theme}}" style="min-height: 2080px; box-sizing: border-box; display: flex; flex-direction: column; background: var(--background); color: var(--foreground); font-family: var(--font-mono); font-size: 13px; line-height: 1.5;">
+
+  <header style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px 24px; padding: 12px 24px; border-bottom: 1px solid var(--border);">
+    <div style="display: flex; align-items: baseline; gap: 10px;">
+      <span style="font-size: 15px; font-weight: 700;">gmx-cypher</span>
+      <span style="font-size: 10px; line-height: 14px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground);">generate</span>
+    </div>
+    <nav aria-label="generator views" style="display: flex; gap: 4px;">
+      <a href="Main.dc.html" style="padding: 6px 10px; font-size: 12px; line-height: 16px; text-decoration: none; border-bottom: 2px solid transparent; color: var(--muted-foreground);">build</a>
+      <a href="Run.dc.html" style="padding: 6px 10px; font-size: 12px; line-height: 16px; text-decoration: none; border-bottom: 2px solid transparent; color: var(--muted-foreground);">run</a>
+      <a href="Dashboard.dc.html" style="padding: 6px 10px; font-size: 12px; line-height: 16px; text-decoration: none; border-bottom: 2px solid transparent; color: var(--muted-foreground);">dashboard</a>
+      <a href="Summary.dc.html" style="padding: 6px 10px; font-size: 12px; line-height: 16px; text-decoration: none; border-bottom: 2px solid transparent; color: var(--muted-foreground);">summary</a>
+      <a href="Library.dc.html" style="padding: 6px 10px; font-size: 12px; line-height: 16px; text-decoration: none; border-bottom: 2px solid transparent; color: var(--muted-foreground);">library</a>
+      <a href="MDP.dc.html" aria-current="page" style="padding: 6px 10px; font-size: 12px; line-height: 16px; font-weight: 700; text-decoration: none; border-bottom: 2px solid var(--coral-strong);">mdp</a>
+      <a href="Files.dc.html" style="padding: 6px 10px; font-size: 12px; line-height: 16px; text-decoration: none; border-bottom: 2px solid transparent; color: var(--muted-foreground);">files</a>
+      <a href="Cluster.dc.html" style="padding: 6px 10px; font-size: 12px; line-height: 16px; text-decoration: none; border-bottom: 2px solid transparent; color: var(--muted-foreground);">cluster</a>
+      <a href="Warnings.dc.html" style="padding: 6px 10px; font-size: 12px; line-height: 16px; text-decoration: none; border-bottom: 2px solid transparent; color: var(--muted-foreground);">warnings</a>
+      <a href="Settings.dc.html" style="padding: 6px 10px; font-size: 12px; line-height: 16px; text-decoration: none; border-bottom: 2px solid transparent; color: var(--muted-foreground);">settings</a>
+    </nav>
+    <span style="flex: 1 1 0;"></span>
+    <a href="Warnings.dc.html" style="font-size: 11px; line-height: 16px; text-decoration: none; color: var(--butter-strong);">3 open · 2 ignored</a>
+    <span style="font-size: 11px; line-height: 16px; color: var(--muted-foreground);">gmx_mpi 2025.4 · <span style="color: var(--mint-strong);">ready</span></span>
+    <span style="font-size: 11px; line-height: 16px; color: var(--muted-foreground);">qq · <span style="color: var(--mint-strong);">ready</span></span>
+  </header>
+
+  <div style="display: flex; flex-direction: column; gap: 4px; padding: 20px 24px 0;">
+    <h1 style="margin: 0; font-size: 18px; line-height: 24px; font-weight: 700;">mdp library</h1>
+    <p style="margin: 0; font-size: 12px; line-height: 16px; color: var(--muted-foreground);">your files from inputs/ (minim, eq_nvt, eq_npt, awh, awh_hmr, pull, hmr_multi) and library defaults next to them · pick one on a tile, or assign one per method further down · files from inputs/ are used as they are</p>
+  </div>
+
+  <div style="display: grid; grid-template-columns: 430px minmax(0, 1fr); gap: 20px; align-items: start; padding: 20px 24px 0;">
+
+    <aside aria-label="mdp files" style="display: flex; flex-direction: column; gap: 10px; min-width: 0;">
+      <x-import component-from-global-scope="Morpheus.Section" label="Files">{{ fileCount }}</x-import>
+      <x-import component-from-global-scope="Morpheus.Dropzone" title="Drop an .mdp file here" description="it is copied into inputs/ and listed here · nothing runs when you upload" on-files="{{ onFiles }}"></x-import>
+      <sc-if value="{{ hasDrop }}" hint-placeholder-val="{{ false }}">
+        <p style="margin: 0; font-size: 11px; line-height: 16px; color: var(--butter-strong);">{{ dropNote }}</p>
+      </sc-if>
+      <div style="display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--card); overflow: hidden;">
+        <sc-for list="{{ groups }}" as="g" hint-placeholder-count="4">
+          <div style="display: flex; align-items: center; justify-content: space-between; padding: 6px 14px; border-bottom: 1px solid var(--border); background: var(--field); font-size: 10px; line-height: 14px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground);">
+            <span>{{ g.name }}</span><span>{{ g.count }}</span>
+          </div>
+          <sc-for list="{{ g.items }}" as="f" hint-placeholder-count="2">
+            <button type="button" onClick="{{ f.pick }}" aria-pressed="{{ f.isSel }}" aria-label="show {{ f.file }}" style="display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; width: 100%; box-sizing: border-box; padding: 7px 14px 7px 12px; border: 0; border-left: 2px solid {{ f.edge }}; border-bottom: 1px solid var(--border); background: {{ f.bg }}; color: var(--foreground); text-align: left; cursor: pointer;">
+              <span style="min-width: 0; display: flex; flex-direction: column;">
+                <span style="font-size: 12px; line-height: 16px; font-weight: 700;">{{ f.file }}</span>
+                <span style="font-size: 11px; line-height: 16px; color: var(--muted-foreground); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ f.desc }}</span>
+              </span>
+              <span style="font-size: 10px; line-height: 14px; letter-spacing: 0.08em; text-transform: uppercase; color: {{ f.tagInk }};">{{ f.tag }}</span>
+            </button>
+          </sc-for>
+        </sc-for>
+      </div>
+    </aside>
+
+    <section aria-label="preview" style="min-width: 0; display: flex; flex-direction: column; gap: 12px; padding: 16px; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-xl);">
+      <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px;">
+        <div style="flex: 1 1 0; min-width: 0;">
+          <div style="font-size: 18px; line-height: 24px; font-weight: 700;">{{ cur.file }}</div>
+          <div style="font-size: 11px; line-height: 16px; color: var(--muted-foreground);">{{ cur.desc }}</div>
+        </div>
+        <x-import component-from-global-scope="Morpheus.Badge" tone="{{ cur.hue }}">{{ cur.kindName }}</x-import>
+        <x-import component-from-global-scope="Morpheus.Button" variant="outline" size="sm" on-click="{{ onDup }}">duplicate as my own</x-import>
+        <x-import component-from-global-scope="Morpheus.Button" variant="ghost" size="sm">download</x-import>
+        <sc-if value="{{ cur.isMine }}" hint-placeholder-val="{{ false }}">
+          <x-import component-from-global-scope="Morpheus.Button" variant="ghost" size="sm" on-click="{{ onDel }}">remove</x-import>
+        </sc-if>
+      </div>
+
+      <x-import component-from-global-scope="Morpheus.Section" label="File">{{ cur.lines }}</x-import>
+      <sc-if value="{{ cur.isMine }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="Morpheus.Textarea" value="{{ cur.text }}" on-change="{{ onText }}" aria-label="edit {{ cur.file }}" style="min-height: 300px; font-family: var(--font-mono); font-size: 12px; line-height: 18px;"></x-import>
+      </sc-if>
+      <sc-if value="{{ cur.isDefault }}" hint-placeholder-val="{{ true }}">
+        <pre style="padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--field); font-family: var(--font-mono); font-size: 12px; line-height: 18px; white-space: pre-wrap;">{{ cur.text }}</pre>
+      </sc-if>
+      <p style="margin: 0; font-size: 11px; line-height: 16px; color: var(--muted-foreground);">{{ cur.fileNote }}</p>
+
+      <x-import component-from-global-scope="Morpheus.Section" label="Added by general settings"></x-import>
+      <pre style="padding: 10px 12px; border: 1px dashed var(--input); border-radius: var(--radius-md); background: var(--background); font-family: var(--font-mono); font-size: 12px; line-height: 18px; white-space: pre-wrap; color: var(--muted-foreground);">{{ cur.added }}</pre>
+
+      <x-import component-from-global-scope="Morpheus.Section" label="Used by">{{ cur.usedCount }}</x-import>
+      <div style="border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--background); overflow: hidden;">
+        <sc-for list="{{ cur.used }}" as="u" hint-placeholder-count="2">
+          <div style="display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 12px; padding: 5px 12px; border-bottom: 1px solid var(--border); font-size: 12px; line-height: 16px;">
+            <span style="font-weight: 700;">{{ u.stage }}</span>
+            <span style="color: var(--muted-foreground);">{{ u.where }}</span>
+          </div>
+        </sc-for>
+        <sc-if value="{{ cur.notUsed }}" hint-placeholder-val="{{ false }}">
+          <p style="margin: 0; padding: 8px 12px; font-size: 12px; line-height: 16px; color: var(--muted-foreground);">not assigned to any method yet · a tile can still pick it on the build tab</p>
+        </sc-if>
+      </div>
+    </section>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 10px; padding: 20px 24px 24px;">
+    <x-import component-from-global-scope="Morpheus.Section" label="Assign per method"></x-import>
+    <p style="margin: 0; font-size: 11px; line-height: 16px; color: var(--muted-foreground);">a tile set to <span style="color: var(--foreground);">method default</span> on the build tab reads this table · as in the notebook, methods with hmr in the name get awh_hmr.mdp and the others awh.mdp · pick a cell, then the file</p>
+    <div style="display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 20px; align-items: start;">
+
+      <div style="border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--card); overflow: hidden;">
+        <div style="display: grid; grid-template-columns: 150px minmax(0, 1fr) minmax(0, 1fr); gap: 8px; padding: 8px 14px; border-bottom: 1px solid var(--border); font-size: 10px; line-height: 14px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground);">
+          <span>step</span>
+          <span>{{ methodA }}</span>
+          <span>{{ methodB }}</span>
+        </div>
+        <sc-for list="{{ matrix }}" as="r" hint-placeholder-count="8">
+          <div style="display: grid; grid-template-columns: 150px minmax(0, 1fr) minmax(0, 1fr); align-items: center; gap: 8px; padding: 4px 14px; border-bottom: 1px solid var(--border);">
+            <span style="font-size: 12px; line-height: 16px;">{{ r.name }}</span>
+            <sc-for list="{{ r.cells }}" as="c" hint-placeholder-count="2">
+              <button type="button" onClick="{{ c.pick }}" aria-pressed="{{ c.isSel }}" aria-label="{{ c.label }}" style="display: flex; align-items: baseline; justify-content: space-between; gap: 8px; min-width: 0; padding: 5px 10px; border: 1px solid {{ c.edge }}; border-radius: var(--radius-md); background: {{ c.bg }}; color: var(--foreground); font-size: 12px; line-height: 16px; text-align: left; cursor: pointer;">
+                <span style="min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700;">{{ c.file }}</span>
+                <span style="flex: 0 0 auto; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: {{ c.tagInk }};">{{ c.tag }}</span>
+              </button>
+            </sc-for>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 10px; padding: 14px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--card);">
+        <span style="font-size: 10px; line-height: 14px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground);">{{ chooser.title }}</span>
+        <div style="display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: var(--radius-md); overflow: hidden;">
+          <sc-for list="{{ chooser.options }}" as="o" hint-placeholder-count="3">
+            <button type="button" onClick="{{ o.pick }}" style="display: grid; grid-template-columns: 12px minmax(0, 1fr) auto; gap: 8px; align-items: baseline; padding: 7px 10px; border: 0; border-bottom: 1px solid var(--border); background: {{ o.bg }}; color: var(--foreground); text-align: left; cursor: pointer;">
+              <span aria-hidden="true" style="width: 8px; height: 8px; border-radius: var(--radius-full); background: {{ o.dot }}; border: 1px solid var(--input);"></span>
+              <span style="display: flex; flex-direction: column;">
+                <span style="font-size: 12px; line-height: 16px; font-weight: 700;">{{ o.file }}</span>
+                <span style="font-size: 11px; line-height: 16px; color: var(--muted-foreground);">{{ o.desc }}</span>
+              </span>
+              <span style="font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: {{ o.tagInk }};">{{ o.tag }}</span>
+            </button>
+          </sc-for>
+        </div>
+        <span style="font-size: 10px; line-height: 14px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground);">or a file of your own</span>
+        <div style="display: flex; gap: 8px;">
+          <x-import component-from-global-scope="Morpheus.Input" size="sm" value="{{ ownPath }}" on-change="{{ onOwn }}" placeholder="~/mdp/my_run.mdp" style="flex: 1 1 0; min-width: 0;"></x-import>
+          <x-import component-from-global-scope="Morpheus.Button" variant="outline" size="sm" on-click="{{ useOwn }}">use this file</x-import>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px;">
+          <x-import component-from-global-scope="Morpheus.Button" variant="ghost" size="sm" on-click="{{ copyOver }}">{{ chooser.copyLabel }}</x-import>
+          <x-import component-from-global-scope="Morpheus.Button" variant="ghost" size="sm" on-click="{{ resetCell }}">back to the default</x-import>
+        </div>
+        <p style="margin: 0; font-size: 11px; line-height: 16px; color: var(--muted-foreground);">{{ chooser.hint }}</p>
+      </div>
+    </div>
+  </div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["light","dark"],"default":"dark"},"$preview":{"width":1440,"height":2080}}'>
+const P = (pairs) => pairs.map((x) => (typeof x === 'string' ? x : x[0].padEnd(24) + '= ' + x[1])).join('\n');
+const CUT = [['cutoff-scheme', 'Verlet'], ['nstlist', '20'], ['coulombtype', 'PME'], ['rcoulomb', '1.0'], ['rvdw', '1.0'], ['DispCorr', 'EnerPres'], ['pbc', 'xyz']];
+const OUT = [['nstxout-compressed', '5000'], ['nstenergy', '5000'], ['nstlog', '5000']];
+const TC = [['tcoupl', 'V-rescale'], ['tc-grps', 'System'], ['tau-t', '0.1'], ['ref-t', '{T}']];
+const PULLG = [['pull', 'yes'], ['pull-ngroups', '2'], ['pull-ncoords', '1'], ['pull-group1-name', 'Saccharide'], ['pull-group2-name', 'Peptide'], ['pull-coord1-groups', '1 2'], ['pull-coord1-geometry', 'distance'], ['pull-coord1-dim', 'N N Y']];
+const NPT = (baro, tau, ext) => P([
+  '; NPT equilibration · solute restrained', ['define', '-DPOSRES'], ['integrator', 'md'], ['nsteps', '{nsteps}'],
+  ['continuation', 'yes'], ['gen-vel', 'no'], ...TC.slice(0, 4), ['pcoupl', baro], ['pcoupltype', 'isotropic'], ['tau-p', tau], ['ref-p', '{P}'],
+  ['compressibility', '4.5e-5'], ['refcoord-scaling', 'com'], ...OUT, ...CUT].concat(ext || []));
+const NVT = (anneal) => P([
+  '; NVT equilibration · solute restrained', ['define', '-DPOSRES'], ['integrator', 'md'], ['nsteps', '{nsteps}'],
+  ['continuation', 'no'], ['gen-vel', 'yes'], ['gen-temp', anneal ? '50' : '{T}'], ['gen-seed', '-1'], ...TC, ['pcoupl', 'no']]
+  .concat(anneal ? [['annealing', 'single'], ['annealing-npoints', '2'], ['annealing-time', '0 {ps}'], ['annealing-temp', '50 {T}']] : [])
+  .concat([...OUT, ...CUT]));
+const PROD = (baro) => P([
+  '; unbiased production', ['integrator', 'md'], ['nsteps', '{nsteps}'], ['continuation', 'yes'], ['gen-vel', 'no'], ...TC.slice(0, 4),
+  ['pcoupl', baro], ['pcoupltype', 'isotropic'], ['tau-p', '2.0'], ['ref-p', '{P}'], ['compressibility', '4.5e-5'],
+  ['compressed-x-grps', 'System'], ...OUT, ...CUT]);
+const PULL = (type, extra) => P([
+  '; pull the saccharide away from the peptide along z', ['integrator', 'md'], ['nsteps', '{nsteps}'], ['continuation', 'yes'], ['gen-vel', 'no'], ...TC.slice(0, 4),
+  ['pcoupl', 'C-rescale'], ['pcoupltype', 'isotropic'], ['tau-p', '2.0'], ['ref-p', '{P}'], ['compressibility', '4.5e-5'],
+  ...PULLG, ['pull-coord1-type', type], ...extra, ['pull-nstxout', '500'], ['pull-nstfout', '500'], ...OUT, ...CUT]);
+const AWH = (share) => P([
+  '; adaptive biasing along the distance', ['integrator', 'md'], ['nsteps', '{nsteps}'], ['continuation', 'yes'], ['gen-vel', 'no'], ...TC.slice(0, 4),
+  ['pcoupl', 'C-rescale'], ['pcoupltype', 'isotropic'], ['tau-p', '2.0'], ['ref-p', '{P}'], ['compressibility', '4.5e-5'],
+  ...PULLG, ['pull-coord1-type', 'external-potential'], ['pull-coord1-potential-provider', 'AWH'], ['pull-coord1-start', 'yes'],
+  ['awh', 'yes'], ['awh-potential', 'convolved'], ['awh-nstsample', '10'], ['awh-nsamples-update', '10'], ['awh-nbias', '1'],
+  ['awh1-ndim', '1'], ['awh1-dim1-coord-index', '1'], ['awh1-dim1-start', '0.3'], ['awh1-dim1-end', '3.0'],
+  ['awh1-dim1-force-constant', '1000'], ['awh1-dim1-diffusion', '5e-5'], ['awh1-error-init', '5.0'], ['awh1-growth', 'exp-linear'],
+  ['awh1-target', 'constant'], ['awh1-equilibrate-histogram', 'yes']].concat(share ? [['awh-share-multisim', 'yes'], ['awh1-share-group', '1']] : [])
+  .concat([...OUT, ...CUT]));
+
+const KINDS = [
+  { id: 'min', name: 'Minimise', short: 'minimise', hue: 'coral' },
+  { id: 'eqnvt', name: 'Equilibrate · NVT', short: 'eq-nvt', hue: 'coral' },
+  { id: 'eqnpt', name: 'Equilibrate · NPT', short: 'eq-npt', hue: 'coral' },
+  { id: 'prod', name: 'Production', short: 'production', hue: 'coral' },
+  { id: 'pull', name: 'Pull', short: 'pull', hue: 'butter' },
+  { id: 'awh', name: 'AWH', short: 'awh', hue: 'butter' },
+  { id: 'windows', name: 'Multiwalker windows', short: 'multiwalker', hue: 'butter' },
+  { id: 'ions', name: 'Ions · genion, charge check', short: 'ions', hue: 'aqua' }
+];
+// what each step reads unless a method or a tile says otherwise · the notebook's inputs/ files
+const DEFU = { min: 'minim', eqnvt: 'eq_nvt', eqnpt: 'eq_npt', prod: 'md-prod', pull: 'pull', awh: 'awh_hmr', windows: 'hmr_multi', ions: 'minim' };
+// methods with hmr in the name read awh_hmr.mdp, the others awh.mdp
+const defOf = (stage, method) => (stage === 'awh' ? (/(^|\+)hmr(\+|$)/.test(method) ? 'awh_hmr' : 'awh') : DEFU[stage]);
+const METHODS = ['hmr+fast+6', 'hmr+slow+6'];
+
+const LIB = [
+  { id: 'minim-steep', kind: 'min', fits: ['min'], desc: 'steepest descent · emtol 1000 · 50 000 steps', md: false,
+    text: P(['; energy minimisation', ['integrator', 'steep'], ['emtol', '1000.0'], ['emstep', '0.01'], ['nsteps', '50000'], ...CUT]) },
+  { id: 'minim-cg', kind: 'min', fits: ['min'], desc: 'conjugate gradient · for a second pass after steep', md: false,
+    text: P(['; energy minimisation, second pass', ['integrator', 'cg'], ['nstcgsteep', '1000'], ['emtol', '1000.0'], ['emstep', '0.01'], ['nsteps', '50000'], ...CUT]) },
+  { id: 'eq-nvt', kind: 'eqnvt', fits: ['eqnvt'], desc: 'v-rescale · position restraints · velocities generated', md: true, text: NVT(false) },
+  { id: 'eq-nvt-anneal', kind: 'eqnvt', fits: ['eqnvt'], desc: 'temperature ramp from 50 K to the target', md: true, text: NVT(true) },
+  { id: 'eq-npt', kind: 'eqnpt', fits: ['eqnpt'], desc: 'c-rescale · position restraints', md: true, text: NPT('C-rescale', '2.0') },
+  { id: 'eq-npt-berendsen', kind: 'eqnpt', fits: ['eqnpt'], desc: 'Berendsen · grompp warns · equilibration only', md: true, text: NPT('Berendsen', '1.0') },
+  { id: 'md-prod', kind: 'prod', fits: ['prod'], desc: 'v-rescale · c-rescale · compressed xtc', md: true, text: PROD('C-rescale') },
+  { id: 'md-prod-pr', kind: 'prod', fits: ['prod'], desc: 'Parrinello-Rahman barostat', md: true, text: PROD('Parrinello-Rahman') },
+  { id: 'pull-const-vel', kind: 'pull', fits: ['pull'], desc: 'umbrella · constant velocity 0.005 nm/ps · k 1000', md: true,
+    text: PULL('umbrella', [['pull-coord1-start', 'yes'], ['pull-coord1-rate', '0.005'], ['pull-coord1-k', '1000']]) },
+  { id: 'pull-const-force', kind: 'pull', fits: ['pull'], desc: 'constant force along z', md: true,
+    text: PULL('constant-force', [['pull-coord1-k', '-500']]) },
+  { id: 'awh-single', kind: 'awh', fits: ['awh'], desc: 'one walker · 0.3 to 3.0 nm · constant target', md: true, text: AWH(false) },
+  { id: 'awh-multiwalker', kind: 'awh', fits: ['awh', 'windows'], desc: 'walkers share one bias · run with -multidir', md: true, text: AWH(true) },
+  { id: 'umbrella-window', kind: 'windows', fits: ['windows'], desc: 'one window · fixed distance · {d} per window', md: true,
+    text: PULL('umbrella', [['pull-coord1-start', 'no'], ['pull-coord1-init', '{d}'], ['pull-coord1-rate', '0'], ['pull-coord1-k', '1000']]) },
+  { id: 'ions', kind: 'ions', fits: ['ions'], desc: 'only makes the .tpr for genion and the charge check', md: false,
+    text: P(['; used only to make a .tpr · nothing is simulated', ['integrator', 'steep'], ['emtol', '1000.0'], ['emstep', '0.01'], ['nsteps', '50'], ['nstlist', '1'], ['cutoff-scheme', 'Verlet'], ['coulombtype', 'cutoff'], ['rcoulomb', '1.0'], ['rvdw', '1.0'], ['pbc', 'xyz']]) }
+];
+const BYID = {};
+LIB.forEach((l) => { BYID[l.id] = l; });
+
+// files of the user, with the text they start from
+// the files in inputs/ · their text here is a sample until inputs/ is read
+const MINE0 = [
+  { id: 'minim', kind: 'min', fits: ['min', 'ions'], desc: 'inputs/ · minimisation, the pre-salt grompp and the charge check', md: false, from: 'minim-steep', sub: [] },
+  { id: 'eq_nvt', kind: 'eqnvt', fits: ['eqnvt'], desc: 'inputs/ · NVT equilibration', md: true, from: 'eq-nvt', sub: [] },
+  { id: 'eq_npt', kind: 'eqnpt', fits: ['eqnpt'], desc: 'inputs/ · NPT equilibration', md: true, from: 'eq-npt', sub: [] },
+  { id: 'awh', kind: 'awh', fits: ['awh'], desc: 'inputs/ · AWH for methods without hmr', md: true, from: 'awh-single', sub: [] },
+  { id: 'awh_hmr', kind: 'awh', fits: ['awh'], desc: 'inputs/ · AWH for methods with hmr in the name', md: true, from: 'awh-single', sub: [] },
+  { id: 'pull', kind: 'pull', fits: ['pull'], desc: 'inputs/ · the steered pull', md: true, from: 'pull-const-vel', sub: [] },
+  { id: 'hmr_multi', kind: 'windows', fits: ['windows'], desc: 'inputs/ · every multiwalker window', md: true, from: 'awh-multiwalker', sub: [] }
+];
+const baseText = (m) => {
+  let t = BYID[m.from].text;
+  m.sub.forEach((x) => { t = t.replace(x[0].padEnd(24) + '= ' + x[1], x[0].padEnd(24) + '= ' + x[2]); });
+  return '; inputs/' + m.id + '.mdp · sample text, your file is shown once inputs/ is read\n' + t;
+};
+const ASSIGN0 = {};
+
+const ADDED = [
+  'dt                      = 0.004', 'constraints             = h-bonds', 'constraint-algorithm    = lincs', 'mass-repartition-factor = 3'
+].join('\n');
+const base = (p) => p.split('/').pop();
+
+class Component extends DCLogic {
+  mineList() { return this.state.mine || MINE0; }
+  all() { return this.mineList().concat(LIB); }
+  find(id) { return this.all().find((x) => x.id === id); }
+  textOf(id) {
+    const t = this.state.texts || {};
+    if (t[id] !== undefined) return t[id];
+    const m = this.mineList().find((x) => x.id === id);
+    return m ? (m.text !== undefined ? m.text : baseText(m)) : BYID[id].text;
+  }
+  assign() { return Object.assign({}, ASSIGN0, this.state.assign || {}); }
+  valueAt(stage, method) {
+    const a = this.assign()[stage + '|' + method];
+    const d = defOf(stage, method);
+    if (a === undefined || a === d) return d;
+    if (a.indexOf('file:') === 0) return a;
+    return this.find(a) ? a : d;
+  }
+  setAssign(stage, method, v) {
+    const a = Object.assign({}, this.state.assign || {});
+    // an explicit value always wins over the starting table, the default is stored as itself
+    a[stage + '|' + method] = v;
+    this.setState({ assign: a });
+  }
+  cell() { return { stage: this.state.cellStage || 'awh', method: this.state.cellMethod || METHODS[1] }; }
+  renderVals() {
+    const st = this.state;
+    const all = this.all();
+    const selId = st.sel && this.find(st.sel) ? st.sel : 'awh_hmr';
+    const cur0 = this.find(selId);
+    const kind = KINDS.find((k) => k.id === cur0.kind);
+    const cell = this.cell();
+    const isMine = !!this.mineList().find((x) => x.id === selId);
+
+    const groups = KINDS.map((k) => {
+      const items = all.filter((x) => x.kind === k.id).map((x) => {
+        const mine = this.mineList().indexOf(x) >= 0;
+        return {
+          file: x.id + '.mdp',
+          desc: x.desc,
+          tag: mine ? 'inputs/' : 'library',
+          tagInk: mine ? 'var(--lilac-strong)' : 'var(--muted-foreground)',
+          isSel: x.id === selId,
+          edge: x.id === selId ? 'var(--coral-strong)' : 'transparent',
+          bg: x.id === selId ? 'var(--accent)' : 'transparent',
+          pick: () => this.setState({ sel: x.id })
+        };
+      });
+      return { name: k.name, count: String(items.length).padStart(2, '0'), items: items };
+    });
+
+    // where the selected file is assigned
+    const asg = this.assign();
+    const used = [];
+    KINDS.forEach((k) => METHODS.forEach((m) => {
+      if (this.valueAt(k.id, m) === selId) used.push({ stage: k.short, where: m });
+    }));
+    const merged = [];
+    used.forEach((u) => {
+      const f = merged.find((x) => x.stage === u.stage);
+      if (f) f.where += ' · ' + u.where; else merged.push({ stage: u.stage, where: u.where });
+    });
+    const lines = this.textOf(selId).split('\n').length;
+
+    const cur = {
+      file: selId + '.mdp',
+      desc: cur0.desc,
+      hue: kind.hue,
+      kindName: kind.name,
+      isMine: isMine,
+      isDefault: !isMine,
+      text: this.textOf(selId),
+      lines: lines + ' lines',
+      fileNote: 'values in { } are filled in by the tile: {nsteps} from its length and the timestep, {T} and {P} from its options' + (cur0.kind === 'pull' || cur0.kind === 'awh' || cur0.kind === 'windows' ? ' · Saccharide and Peptide are index groups the tool writes' : ''),
+      added: isMine ? '; nothing is added · files from inputs/ are used as they are, as in the notebook' : cur0.md ? ADDED + '\n; hydrogen mass 3.024 amu and fast water, 4 fs · all from general settings' : '; nothing is added · steepest descent and conjugate gradient do not use dt',
+      used: merged,
+      notUsed: merged.length === 0,
+      usedCount: String(merged.length).padStart(2, '0')
+    };
+
+    // the assignment table
+    const matrix = KINDS.map((k) => ({
+      name: k.short,
+      cells: METHODS.map((m) => {
+        const v = this.valueAt(k.id, m);
+        const sel = cell.stage === k.id && cell.method === m;
+        const own = v.indexOf('file:') === 0;
+        const changed = v !== defOf(k.id, m);
+        return {
+          file: own ? base(v.slice(5)) : v + '.mdp',
+          tag: own ? 'file' : changed ? 'changed' : '',
+          tagInk: own ? 'var(--sky-strong)' : 'var(--butter-strong)',
+          isSel: sel,
+          label: k.short + ' · ' + m + ' · ' + (own ? v.slice(5) : v + '.mdp'),
+          edge: sel ? 'var(--coral-strong)' : 'var(--border)',
+          bg: sel ? 'var(--accent)' : 'var(--background)',
+          pick: () => this.setState({ cellStage: k.id, cellMethod: m, sel: own ? selId : v })
+        };
+      })
+    }));
+
+    const nowV = this.valueAt(cell.stage, cell.method);
+    const options = all.filter((x) => x.fits.indexOf(cell.stage) >= 0).map((x) => {
+      const mine = this.mineList().indexOf(x) >= 0;
+      return {
+        file: x.id + '.mdp',
+        desc: x.desc,
+        tag: x.id === defOf(cell.stage, cell.method) ? 'default' : mine ? 'inputs/' : 'library',
+        tagInk: mine ? 'var(--lilac-strong)' : 'var(--muted-foreground)',
+        bg: x.id === nowV ? 'var(--accent)' : 'transparent',
+        dot: x.id === nowV ? 'var(--coral-strong)' : 'transparent',
+        pick: () => { this.setAssign(cell.stage, cell.method, x.id); this.setState({ sel: x.id }); }
+      };
+    });
+    const other = METHODS.find((m) => m !== cell.method);
+    const kindShort = KINDS.find((k) => k.id === cell.stage).short;
+    const ownPath = st.ownPath === undefined ? '~/mdp/eq_npt_long.mdp' : st.ownPath;
+
+    return {
+      theme: this.props.theme ?? 'dark',
+      fileCount: String(all.length).padStart(2, '0'),
+      hasDrop: !!(st.dropped && st.dropped.length),
+      dropNote: 'got ' + (st.dropped || []).join(', ') + ' · reading the file is not wired in this mockup',
+      onFiles: (list) => this.setState({ dropped: (list || []).map((f) => f.name) }),
+      groups: groups,
+      cur: cur,
+      onText: (e) => { const t = Object.assign({}, st.texts || {}); t[selId] = e.target.value; this.setState({ texts: t }); },
+      onDup: () => {
+        let id = selId.replace(/-copy\d*$/, '') + '-copy', k = 1;
+        while (this.find(id)) { k += 1; id = selId.replace(/-copy\d*$/, '') + '-copy' + k; }
+        const m = { id: id, kind: cur0.kind, fits: cur0.fits, desc: 'mine · copy of ' + selId, md: cur0.md, text: this.textOf(selId).replace(/^; my copy of .*\n/, '') };
+        const t = Object.assign({}, st.texts || {});
+        t[id] = '; my copy of ' + selId + '.mdp\n' + m.text;
+        this.setState({ mine: this.mineList().concat([m]), texts: t, sel: id });
+      },
+      onDel: () => {
+        const a = Object.assign({}, st.assign || {});
+        Object.keys(this.assign()).forEach((key) => { if (this.assign()[key] === selId) a[key] = defOf(key.split('|')[0], key.split('|')[1]); });
+        this.setState({ mine: this.mineList().filter((x) => x.id !== selId), assign: a, sel: cur0.from || DEFU[cur0.kind] });
+      },
+      methodA: METHODS[0],
+      methodB: METHODS[1],
+      matrix: matrix,
+      chooser: {
+        title: kindShort + ' · ' + cell.method,
+        options: options,
+        copyLabel: 'copy to ' + other,
+        hint: nowV.indexOf('file:') === 0
+          ? 'your own file is read from where it is and copied beside each system · dt and constraints are added to the copy'
+          : 'library files are copied to inputs/ when the run starts · a file of yours is read from where it is'
+      },
+      ownPath: ownPath,
+      onOwn: (e) => this.setState({ ownPath: e.target.value }),
+      useOwn: () => this.setAssign(cell.stage, cell.method, 'file:' + ownPath),
+      copyOver: () => this.setAssign(cell.stage, other, nowV),
+      resetCell: () => this.setAssign(cell.stage, cell.method, defOf(cell.stage, cell.method))
+    };
+  }
+}
+</script>
+</body>
+</html>

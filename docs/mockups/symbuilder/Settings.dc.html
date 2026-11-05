@@ -1,0 +1,593 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Settings</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ds/morpheus/tokens.css">
+<link rel="stylesheet" href="ds/morpheus/components/bundle.css">
+<script src="ds/morpheus/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:inherit}
+button{font-family:inherit}
+button:focus-visible,a:focus-visible{outline:2px solid var(--ring);outline-offset:2px}
+pre{margin:0}
+</style>
+</helmet>
+<div data-theme="{{theme}}" style="min-height: 2560px; box-sizing: border-box; display: flex; flex-direction: column; background: var(--background); color: var(--foreground); font-family: var(--font-mono); font-size: 13px; line-height: 1.5;">
+
+  <header style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px 24px; padding: 12px 24px; border-bottom: 1px solid var(--border);">
+    <div style="display: flex; align-items: baseline; gap: 10px;">
+      <span style="font-size: 15px; font-weight: 700;">gmx-cypher</span>
+      <span style="font-size: 10px; line-height: 14px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground);">generate</span>
+    </div>
+    <nav aria-label="generator views" style="display: flex; gap: 4px;">
+      <a href="Main.dc.html" style="padding: 6px 10px; font-size: 12px; line-height: 16px; text-decoration: none; border-bottom: 2px solid transparent; color: var(--muted-foreground);">build</a>
+      <a href="Run.dc.html" style="padding: 6px 10px; font-size: 12px; line-height: 16px; text-decoration: none; border-bottom: 2px solid transparent; color: var(--muted-foreground);">run</a>
+      <a href="Dashboard.dc.html" style="padding: 6px 10px; font-size: 12px; line-height: 16px; text-decoration: none; border-bottom: 2px solid transparent; color: var(--muted-foreground);">dashboard</a>
+      <a href="Summary.dc.html" style="padding: 6px 10px; font-size: 12px; line-height: 16px; text-decoration: none; border-bottom: 2px solid transparent; color: var(--muted-foreground);">summary</a>
+      <a href="Library.dc.html" style="padding: 6px 10px; font-size: 12px; line-height: 16px; text-decoration: none; border-bottom: 2px solid transparent; color: var(--muted-foreground);">library</a>
+      <a href="MDP.dc.html" style="padding: 6px 10px; font-size: 12px; line-height: 16px; text-decoration: none; border-bottom: 2px solid transparent; color: var(--muted-foreground);">mdp</a>
+      <a href="Files.dc.html" style="padding: 6px 10px; font-size: 12px; line-height: 16px; text-decoration: none; border-bottom: 2px solid transparent; color: var(--muted-foreground);">files</a>
+      <a href="Cluster.dc.html" style="padding: 6px 10px; font-size: 12px; line-height: 16px; text-decoration: none; border-bottom: 2px solid transparent; color: var(--muted-foreground);">cluster</a>
+      <a href="Warnings.dc.html" style="padding: 6px 10px; font-size: 12px; line-height: 16px; text-decoration: none; border-bottom: 2px solid transparent; color: var(--muted-foreground);">warnings</a>
+      <a href="Settings.dc.html" aria-current="page" style="padding: 6px 10px; font-size: 12px; line-height: 16px; font-weight: 700; text-decoration: none; border-bottom: 2px solid var(--coral-strong);">settings</a>
+    </nav>
+    <span style="flex: 1 1 0;"></span>
+    <a href="Warnings.dc.html" style="font-size: 11px; line-height: 16px; text-decoration: none; color: var(--butter-strong);">3 open · 2 ignored</a>
+    <span style="font-size: 11px; line-height: 16px; color: var(--muted-foreground);">gmx_mpi 2025.4 · <span style="color: var(--mint-strong);">ready</span></span>
+    <span style="font-size: 11px; line-height: 16px; color: var(--muted-foreground);">qq · <span style="color: var(--mint-strong);">ready</span></span>
+  </header>
+
+  <div style="display: flex; flex-direction: column; gap: 4px; padding: 20px 24px 0;">
+    <h1 style="margin: 0; font-size: 18px; line-height: 24px; font-weight: 700;">general settings</h1>
+    <p style="margin: 0; font-size: 12px; line-height: 16px; color: var(--muted-foreground);">defaults for every recipe · a tile can override most of them · nothing here changes your files</p>
+  </div>
+
+  <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; align-items: start; padding: 20px 24px;">
+
+    <div style="display: flex; flex-direction: column; gap: 20px; min-width: 0;">
+      <section aria-label="project" style="display: flex; flex-direction: column; gap: 10px;">
+        <x-import component-from-global-scope="Morpheus.Section" label="Project"></x-import>
+        <div style="display: flex; flex-direction: column; gap: 5px;">
+          <span style="font-size: 10px; line-height: 14px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground);">base folder · BASE_DIR</span>
+          <x-import component-from-global-scope="Morpheus.Input" value="{{ baseDir }}" on-change="{{ onBase }}" aria-label="base folder"></x-import>
+        </div>
+        <div style="border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--card); overflow: hidden;">
+          <div style="display: grid; grid-template-columns: 110px minmax(0, 1fr) 84px; gap: 12px; padding: 6px 14px; border-bottom: 1px solid var(--border); font-size: 10px; line-height: 14px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground);"><span>folder</span><span>holds</span><span>status</span></div>
+          <sc-for list="{{ folders }}" as="f" hint-placeholder-count="7">
+            <div style="display: grid; grid-template-columns: 110px minmax(0, 1fr) 84px; align-items: center; gap: 12px; padding: 5px 14px; border-bottom: 1px solid var(--border); font-size: 12px; line-height: 16px;"><span style="font-weight: 700;">{{ f.name }}</span><span style="color: var(--muted-foreground);">{{ f.role }}</span><span style="display: inline-flex; align-items: center; gap: 6px; color: {{ f.ink }};"><span aria-hidden="true" style="width: 8px; height: 8px; border-radius: var(--radius-full); background: {{ f.ink }};"></span>{{ f.word }}</span></div>
+          </sc-for>
+        </div>
+        <p style="margin: 0; font-size: 11px; line-height: 16px; color: var(--muted-foreground);">each system folder also gets <span style="color: var(--foreground);">visualization/</span> for the peptide picture and the potential energy · the run reads and writes only inside the base folder</p>
+      </section>
+
+      <section aria-label="force field" style="display: flex; flex-direction: column; gap: 10px;">
+        <x-import component-from-global-scope="Morpheus.Section" label="Force field"></x-import>
+        <div style="display: flex; flex-direction: column; gap: 5px;">
+          <span style="font-size: 10px; line-height: 14px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground);">force-field directory (.ff)</span>
+          <x-import component-from-global-scope="Morpheus.Input" value="{{ ffPath }}" on-change="{{ onFf }}" placeholder="ff/yours.ff"></x-import>
+          <span style="font-size: 11px; line-height: 16px; color: {{ ff.ink }};">{{ ff.note }}</span>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px;">
+          <span style="font-size: 10px; line-height: 14px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground);">how tools find it</span>
+          <x-import component-from-global-scope="Morpheus.ToggleGroup" type="single" size="sm" value="{{ ffMode }}" on-value-change="{{ setFfMode }}">
+            <x-import component-from-global-scope="Morpheus.ToggleGroupItem" value="relative">#include ../../../../ff/</x-import>
+            <x-import component-from-global-scope="Morpheus.ToggleGroupItem" value="copy">copy beside each system</x-import>
+            <x-import component-from-global-scope="Morpheus.ToggleGroupItem" value="gmxlib">GMXLIB</x-import>
+          </x-import>
+        </div>
+        <p style="margin: 0; font-size: 11px; line-height: 16px; color: var(--muted-foreground);">{{ ff.modeText }}</p>
+        <div style="border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--card); overflow: hidden;">
+          <sc-for list="{{ ff.files }}" as="f" hint-placeholder-count="6">
+            <div style="display: grid; grid-template-columns: 170px minmax(0, 1fr) 84px; align-items: center; gap: 12px; padding: 6px 14px; border-bottom: 1px solid var(--border); font-size: 12px; line-height: 16px;">
+              <span style="font-weight: 700;">{{ f.name }}</span>
+              <span style="color: var(--muted-foreground);">{{ f.role }}</span>
+              <span style="display: inline-flex; align-items: center; gap: 6px; color: {{ f.ink }};"><span aria-hidden="true" style="width: 8px; height: 8px; border-radius: var(--radius-full); background: {{ f.ink }};"></span>{{ f.word }}</span>
+            </div>
+          </sc-for>
+        </div>
+        <span style="font-size: 10px; line-height: 14px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground);">also in ff/ · the system topology includes these</span>
+        <div style="border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--card); overflow: hidden;">
+          <div style="display: grid; grid-template-columns: 210px minmax(0, 1fr) 84px; gap: 12px; padding: 6px 14px; border-bottom: 1px solid var(--border); font-size: 10px; line-height: 14px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground);"><span>file</span><span>used for</span><span>status</span></div>
+          <sc-for list="{{ ff.extras }}" as="x" hint-placeholder-count="8">
+            <div style="display: grid; grid-template-columns: 210px minmax(0, 1fr) 84px; align-items: center; gap: 12px; padding: 5px 14px; border-bottom: 1px solid var(--border); font-size: 12px; line-height: 16px;"><span style="font-weight: 700;">{{ x.name }}</span><span style="color: var(--muted-foreground);">{{ x.role }}</span><span style="display: inline-flex; align-items: center; gap: 6px; color: {{ x.ink }};"><span aria-hidden="true" style="width: 8px; height: 8px; border-radius: var(--radius-full); background: {{ x.ink }};"></span>{{ x.word }}</span></div>
+          </sc-for>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; font-size: 11px; line-height: 16px;">
+          <span style="color: var(--muted-foreground);">water models in watermodels.dat</span>
+          <sc-for list="{{ ff.waters }}" as="w" hint-placeholder-count="3">
+            <span style="padding: 1px 8px; border: 1px solid var(--input); border-radius: var(--radius-full); background: var(--field);">{{ w }}</span>
+          </sc-for>
+        </div>
+      </section>
+
+      <section aria-label="python" style="display: flex; flex-direction: column; gap: 10px;">
+        <x-import component-from-global-scope="Morpheus.Section" label="Python"></x-import>
+        <div style="display: flex; flex-direction: column; gap: 5px;">
+          <span style="font-size: 10px; line-height: 14px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground);">python used by python tiles</span>
+          <x-import component-from-global-scope="Morpheus.Input" value="{{ pyPath }}" on-change="{{ onPy }}" placeholder="python3 or a venv path"></x-import>
+        </div>
+        <div style="display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--card); overflow: hidden;">
+          <label style="display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 10px 14px; border-bottom: 1px solid var(--border); cursor: pointer;">
+            <x-import component-from-global-scope="Morpheus.Checkbox" checked="{{ gml }}" on-checked-change="{{ onGml }}"></x-import>
+            <span style="display: flex; flex-direction: column;">
+              <span style="font-weight: 700;">gromologist</span>
+              <span style="font-size: 11px; line-height: 16px; color: var(--muted-foreground);">read and edit topologies and structures · rename, re-type, fix charges, merge parameters</span>
+            </span>
+            <span style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--mint-strong);"><span aria-hidden="true" style="width: 8px; height: 8px; border-radius: var(--radius-full); background: var(--mint-strong);"></span>found</span>
+          </label>
+          <label style="display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 10px 14px; border-bottom: 1px solid var(--border); cursor: pointer;">
+            <x-import component-from-global-scope="Morpheus.Checkbox" checked="{{ mda }}" on-checked-change="{{ onMda }}"></x-import>
+            <span style="display: flex; flex-direction: column;">
+              <span style="font-weight: 700;">MDAnalysis</span>
+              <span style="font-size: 11px; line-height: 16px; color: var(--muted-foreground);">read trajectories and compute things from them · distances, contacts, RMSD, selections</span>
+            </span>
+            <span style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--mint-strong);"><span aria-hidden="true" style="width: 8px; height: 8px; border-radius: var(--radius-full); background: var(--mint-strong);"></span>found</span>
+          </label>
+          <label style="display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 10px 14px; cursor: pointer;">
+            <x-import component-from-global-scope="Morpheus.Checkbox" checked="{{ pml }}" on-checked-change="{{ onPml }}"></x-import>
+            <span style="display: flex; flex-direction: column;">
+              <span style="font-weight: 700;">PyMOL</span>
+              <span style="font-size: 11px; line-height: 16px; color: var(--muted-foreground);">build a peptide from its sequence, look at a system, make images · runs headless, no window opens</span>
+            </span>
+            <span style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--mint-strong);"><span aria-hidden="true" style="width: 8px; height: 8px; border-radius: var(--radius-full); background: var(--mint-strong);"></span>found</span>
+          </label>
+        </div>
+        <p style="margin: 0; font-size: 11px; line-height: 16px; color: var(--muted-foreground);">found means the import works in the python above · a missing one shows <span style="color: var(--foreground);">pip install gromologist</span>, <span style="color: var(--foreground);">pip install MDAnalysis</span> or <span style="color: var(--foreground);">conda install -c conda-forge pymol-open-source</span> here and its tiles stay off until it imports</p>
+        <span style="font-size: 10px; line-height: 14px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground);">put on top of every python tile</span>
+        <pre style="padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--field); font-family: var(--font-mono); font-size: 12px; line-height: 18px; white-space: pre-wrap;">{{ preamble }}</pre>
+        <span style="font-size: 10px; line-height: 14px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground);">given to every python tile</span>
+        <div style="border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--card); overflow: hidden;">
+          <sc-for list="{{ ctxRows }}" as="c" hint-placeholder-count="6">
+            <div style="display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 12px; padding: 5px 14px; border-bottom: 1px solid var(--border); font-size: 12px; line-height: 16px;">
+              <span style="font-weight: 700;">{{ c.name }}</span>
+              <span style="color: var(--muted-foreground); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ c.value }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </section>
+
+      <section aria-label="repeated runs" style="display: flex; flex-direction: column; gap: 10px;">
+        <x-import component-from-global-scope="Morpheus.Section" label="Repeated runs"></x-import>
+        <div style="display: grid; grid-template-columns: 250px 90px; align-items: center; gap: 8px 12px;">
+          <span style="font-size: 12px;">letter after the number in the method name</span>
+          <x-import component-from-global-scope="Morpheus.Input" size="sm" value="{{ sfx }}" on-change="{{ onSfx }}"></x-import>
+        </div>
+        <div style="border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--card); overflow: hidden;">
+          <sc-for list="{{ seq }}" as="s" hint-placeholder-count="4">
+            <div style="display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 12px; padding: 6px 14px; border-bottom: 1px solid var(--border); font-size: 12px; line-height: 16px;">
+              <span style="color: var(--muted-foreground);">{{ s.when }}</span>
+              <span style="font-weight: 700;">{{ s.name }}</span>
+            </div>
+          </sc-for>
+        </div>
+        <p style="margin: 0; font-size: 11px; line-height: 16px; color: var(--muted-foreground);">a repeat is a completely different folder tree and never overwrites: the first one puts the letter behind the number of the method, the next ones count 1, 2, 3 … · the system names inside stay the same, and the repeat starts again from the first tile · set how many repeats on the run tab</p>
+      </section>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 20px; min-width: 0;">
+      <section aria-label="speed" style="display: flex; flex-direction: column; gap: 10px;">
+        <x-import component-from-global-scope="Morpheus.Section" label="Methods · hmr and fast"></x-import>
+        <p style="margin: 0; font-size: 11px; line-height: 16px; color: var(--muted-foreground);">a method switches these on by its name, as in the notebook: <span style="color: var(--foreground);">hmr</span> repartitions the hydrogens, <span style="color: var(--foreground);">fast</span> uses the fast water · the rest of the name (6, r, r1 …) is only a label</p>
+        <div style="border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--card); overflow: hidden;">
+          <div style="display: grid; grid-template-columns: 120px 60px minmax(0, 1fr) 120px; gap: 12px; padding: 6px 14px; border-bottom: 1px solid var(--border); font-size: 10px; line-height: 14px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground);"><span>method</span><span>hmr</span><span>water</span><span>awh mdp</span></div>
+          <sc-for list="{{ methodRows }}" as="m" hint-placeholder-count="2">
+            <div style="display: grid; grid-template-columns: 120px 60px minmax(0, 1fr) 120px; align-items: center; gap: 12px; padding: 5px 14px; border-bottom: 1px solid var(--border); font-size: 12px; line-height: 16px;"><span style="font-weight: 700;">{{ m.name }}</span><span style="color: {{ m.hmrInk }};">{{ m.hmr }}</span><span style="color: var(--muted-foreground);">{{ m.water }}</span><span>{{ m.awh }}</span></div>
+          </sc-for>
+        </div>
+        <span style="font-size: 10px; line-height: 14px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground);">what the words switch on</span>
+        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px;">
+          <span style="flex: 0 0 210px; font-size: 12px;">hmr · hydrogen masses</span>
+          <x-import component-from-global-scope="Morpheus.ToggleGroup" type="single" size="sm" value="{{ hmr }}" on-value-change="{{ setHmr }}">
+            <x-import component-from-global-scope="Morpheus.ToggleGroupItem" value="on">on</x-import>
+            <x-import component-from-global-scope="Morpheus.ToggleGroupItem" value="off">off</x-import>
+          </x-import>
+        </div>
+        <sc-if value="{{ hmrOn }}" hint-placeholder-val="{{ true }}">
+          <div style="display: grid; grid-template-columns: 150px minmax(0, 1fr); align-items: center; gap: 8px 12px; padding-left: 12px; border-left: 2px solid var(--border);">
+            <span style="font-size: 11px; color: var(--muted-foreground);">hydrogen mass (amu)</span>
+            <div style="width: 90px;"><x-import component-from-global-scope="Morpheus.Input" size="sm" value="{{ hmrMass }}" on-change="{{ onMass }}"></x-import></div>
+            <span style="font-size: 11px; color: var(--muted-foreground);">done by</span>
+            <x-import component-from-global-scope="Morpheus.ToggleGroup" type="single" size="sm" value="{{ hmrHow }}" on-value-change="{{ setHow }}">
+              <x-import component-from-global-scope="Morpheus.ToggleGroupItem" value="gml">gromologist (.top)</x-import>
+              <x-import component-from-global-scope="Morpheus.ToggleGroupItem" value="mdp">grompp (mdp factor)</x-import>
+              <x-import component-from-global-scope="Morpheus.ToggleGroupItem" value="heavyh">pdb2gmx -heavyh</x-import>
+            </x-import>
+          </div>
+        </sc-if>
+        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px;">
+          <span style="flex: 0 0 210px; font-size: 12px;">fast · fast water (TIP3PF)</span>
+          <x-import component-from-global-scope="Morpheus.ToggleGroup" type="single" size="sm" value="{{ fast }}" on-value-change="{{ setFast }}">
+            <x-import component-from-global-scope="Morpheus.ToggleGroupItem" value="on">on</x-import>
+            <x-import component-from-global-scope="Morpheus.ToggleGroupItem" value="off">off</x-import>
+          </x-import>
+        </div>
+        <p style="margin: 0; font-size: 11px; line-height: 16px; color: var(--muted-foreground);">{{ speed.fastText }}</p>
+        <sc-if value="{{ fastNoHmr }}" hint-placeholder-val="{{ false }}">
+          <x-import component-from-global-scope="Morpheus.Alert" variant="warning">
+            <x-import component-from-global-scope="Morpheus.AlertTitle">fast water needs repartitioned hydrogens</x-import>
+            <x-import component-from-global-scope="Morpheus.AlertDescription">without them the step stays at 2 fs · switch repartitioning on to reach 4 fs</x-import>
+          </x-import>
+        </sc-if>
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;">
+          <x-import component-from-global-scope="Morpheus.Stat" label="Timestep" value="{{ speed.dt }}" hint="fs · hmr + fast methods"></x-import>
+          <x-import component-from-global-scope="Morpheus.Stat" label="Hydrogens" value="{{ speed.mass }}" hint="amu"></x-import>
+          <x-import component-from-global-scope="Morpheus.Stat" label="Water" value="{{ speed.water }}" hint="{{ speed.waterHint }}"></x-import>
+        </div>
+        <span style="font-size: 10px; line-height: 14px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground);">added to the mdp of hmr + fast methods</span>
+        <pre style="padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--field); font-family: var(--font-mono); font-size: 12px; line-height: 18px; white-space: pre-wrap;">{{ speed.mdp }}</pre>
+      </section>
+
+      <section aria-label="charges" style="display: flex; flex-direction: column; gap: 10px;">
+        <x-import component-from-global-scope="Morpheus.Section" label="Charges"></x-import>
+        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px;">
+          <span style="flex: 0 0 210px; font-size: 12px;">charges in the force field</span>
+          <x-import component-from-global-scope="Morpheus.ToggleGroup" type="single" size="sm" value="{{ scaled }}" on-value-change="{{ setScaled }}">
+            <x-import component-from-global-scope="Morpheus.ToggleGroupItem" value="whole">whole</x-import>
+            <x-import component-from-global-scope="Morpheus.ToggleGroupItem" value="scaled">scaled</x-import>
+          </x-import>
+        </div>
+        <sc-if value="{{ scaleOn }}" hint-placeholder-val="{{ true }}">
+          <div style="display: grid; grid-template-columns: 150px 90px 150px 90px; align-items: center; gap: 8px 12px; padding-left: 12px; border-left: 2px solid var(--border);">
+            <span style="font-size: 11px; color: var(--muted-foreground);">scale factor</span>
+            <x-import component-from-global-scope="Morpheus.Input" size="sm" value="{{ scaleVal }}" on-change="{{ onScale }}"></x-import>
+            <span style="font-size: 11px; color: var(--muted-foreground);">tolerance (e)</span>
+            <x-import component-from-global-scope="Morpheus.Input" size="sm" value="{{ tolVal }}" on-change="{{ onTol }}"></x-import>
+          </div>
+        </sc-if>
+        <p style="margin: 0; font-size: 11px; line-height: 16px; color: var(--muted-foreground);">{{ charge.rule }}</p>
+        <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--card);">
+          <span style="grid-column: 1 / -1; font-size: 10px; line-height: 14px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground);">try it · what does the salt tile add?</span>
+          <div style="display: flex; flex-direction: column; gap: 5px;">
+            <span style="font-size: 11px; color: var(--muted-foreground);">net charge of the solute (e)</span>
+            <x-import component-from-global-scope="Morpheus.Input" size="sm" value="{{ qTest }}" on-change="{{ onQ }}"></x-import>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 5px;">
+            <span style="font-size: 11px; color: var(--muted-foreground);">ion moleculetypes (+ and −)</span>
+            <div style="display: flex; gap: 8px;">
+              <x-import component-from-global-scope="Morpheus.Input" size="sm" value="{{ posIon }}" on-change="{{ onPos }}" aria-label="positive ion"></x-import>
+              <x-import component-from-global-scope="Morpheus.Input" size="sm" value="{{ negIon }}" on-change="{{ onNeg }}" aria-label="negative ion"></x-import>
+            </div>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 5px;">
+            <span style="font-size: 11px; color: var(--muted-foreground);">waters in the box (SOL + TIP3F)</span>
+            <x-import component-from-global-scope="Morpheus.Input" size="sm" value="{{ wTest }}" on-change="{{ onW }}" aria-label="waters"></x-import>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 5px;">
+            <span style="font-size: 11px; color: var(--muted-foreground);">salt · water (mol/l)</span>
+            <div style="display: flex; gap: 8px;">
+              <x-import component-from-global-scope="Morpheus.Input" size="sm" value="{{ saltVal }}" on-change="{{ onSalt }}" aria-label="salt concentration"></x-import>
+              <x-import component-from-global-scope="Morpheus.Input" size="sm" value="{{ molVal }}" on-change="{{ onMol }}" aria-label="water molarity"></x-import>
+            </div>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--background);">
+            <span style="font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground);">plain genion -neutral</span>
+            <span style="font-weight: 700;">{{ charge.whole }}</span>
+            <span style="color: {{ charge.wholeInk }};">{{ charge.wholeNet }}</span>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--background);">
+            <span style="font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground);">this tool · counts the ions itself</span>
+            <span style="font-weight: 700;">{{ charge.mine }}</span>
+            <span style="color: {{ charge.mineInk }};">{{ charge.mineNet }}</span>
+            <span style="color: var(--muted-foreground);">{{ charge.salt }}</span>
+            <span style="font-weight: 700;">{{ charge.flags }}</span>
+          </div>
+        </div>
+        <ul style="margin: 0; padding-left: 16px; list-style: disc; display: flex; flex-direction: column; gap: 4px; font-size: 11px; line-height: 16px; color: var(--muted-foreground);">
+          <li>the charge check tile compares the net charge with a whole number of charge units, not with zero</li>
+          <li>the salt tile counts the ions itself and gives genion -np and -nn, so genion never has to round · salt pairs = round(salt × waters ÷ water molarity), the waters being SOL and TIP3F in [ molecules ]</li>
+          <li>anything left over beyond the tolerance goes to the warnings board</li>
+        </ul>
+      </section>
+
+      <section aria-label="programs" style="display: flex; flex-direction: column; gap: 10px;">
+        <x-import component-from-global-scope="Morpheus.Section" label="Programs"></x-import>
+        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px;">
+          <span style="flex: 0 0 210px; font-size: 12px;">GROMACS version</span>
+          <x-import component-from-global-scope="Morpheus.ToggleGroup" type="single" size="sm" value="{{ gv }}" on-value-change="{{ setGv }}">
+            <x-import component-from-global-scope="Morpheus.ToggleGroupItem" value="2025">2025 · gmx_mpi</x-import>
+            <x-import component-from-global-scope="Morpheus.ToggleGroupItem" value="2022">2022 · gmx</x-import>
+          </x-import>
+        </div>
+        <p style="margin: 0; font-size: 11px; line-height: 16px; color: var(--muted-foreground);">{{ gvText }}</p>
+        <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px;">
+          <div style="display: flex; flex-direction: column; gap: 5px;">
+            <span style="font-size: 10px; line-height: 14px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground);">binary</span>
+            <x-import component-from-global-scope="Morpheus.Input" size="sm" value="{{ gmxBin }}" disabled="{{ yes }}" aria-label="gromacs binary"></x-import>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 5px;">
+            <span style="font-size: 10px; line-height: 14px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground);">grompp -maxwarn</span>
+            <x-import component-from-global-scope="Morpheus.Input" size="sm" value="{{ maxwarn }}" on-change="{{ onMaxwarn }}" aria-label="maxwarn"></x-import>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 5px;">
+            <span style="font-size: 10px; line-height: 14px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground);">cluster command</span>
+            <x-import component-from-global-scope="Morpheus.Input" size="sm" default-value="qq" aria-label="cluster command"></x-import>
+          </div>
+        </div>
+        <p style="margin: 0; font-size: 11px; line-height: 16px; color: var(--muted-foreground);">-maxwarn {{ maxwarn }} goes to every grompp unless a tile sets its own · the module lines and the mdrun flags for each version are on the <a href="Cluster.dc.html" style="color: var(--coral-strong);">cluster board</a></p>
+      </section>
+
+      <section aria-label="warnings" style="display: flex; flex-direction: column; gap: 10px;">
+        <x-import component-from-global-scope="Morpheus.Section" label="Warnings"></x-import>
+        <x-import component-from-global-scope="Morpheus.ToggleGroup" type="single" size="sm" value="{{ pol }}" on-value-change="{{ setPol }}">
+          <x-import component-from-global-scope="Morpheus.ToggleGroupItem" value="stop">stop at warnings I have not ignored</x-import>
+          <x-import component-from-global-scope="Morpheus.ToggleGroupItem" value="go">run anyway and list them</x-import>
+        </x-import>
+        <p style="margin: 0; font-size: 11px; line-height: 16px; color: var(--muted-foreground);">{{ polText }}</p>
+        <a href="Warnings.dc.html" style="align-self: flex-start; font-size: 12px; color: var(--coral-strong);">open the warnings board →</a>
+      </section>
+
+      <section aria-label="errors and waiting" style="display: flex; flex-direction: column; gap: 10px;">
+        <x-import component-from-global-scope="Morpheus.Section" label="Errors and waiting"></x-import>
+        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px;">
+          <span style="flex: 0 0 210px; font-size: 12px;">a command exits with an error code</span>
+          <x-import component-from-global-scope="Morpheus.ToggleGroup" type="single" size="sm" value="{{ strict }}" on-value-change="{{ setStrict }}">
+            <x-import component-from-global-scope="Morpheus.ToggleGroupItem" value="off">look at the output</x-import>
+            <x-import component-from-global-scope="Morpheus.ToggleGroupItem" value="on">stop (strict)</x-import>
+          </x-import>
+        </div>
+        <p style="margin: 0; font-size: 11px; line-height: 16px; color: var(--muted-foreground);">{{ strictText }}</p>
+        <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+          <x-import component-from-global-scope="Morpheus.Toggle" variant="chip" size="sm" default-pressed="{{ yes }}">stop on "Fatal error" and quote the ERROR block</x-import>
+          <x-import component-from-global-scope="Morpheus.Toggle" variant="chip" size="sm" default-pressed="{{ yes }}">check each step wrote its output</x-import>
+          <x-import component-from-global-scope="Morpheus.Toggle" variant="chip" size="sm" default-pressed="{{ yes }}">one progress bar per mdrun</x-import>
+          <x-import component-from-global-scope="Morpheus.Toggle" variant="chip" size="sm" default-pressed="{{ yes }}">WARNING and NOTE blocks in yellow</x-import>
+        </div>
+        <div style="display: grid; grid-template-columns: 210px 90px 120px 90px; align-items: center; gap: 8px 12px;">
+          <span style="font-size: 12px;">wait for a .gro · look every</span>
+          <x-import component-from-global-scope="Morpheus.Input" size="sm" value="{{ poll }}" on-change="{{ onPoll }}" aria-label="seconds between looks"></x-import>
+          <span style="font-size: 11px; color: var(--muted-foreground);">s · give up after</span>
+          <x-import component-from-global-scope="Morpheus.Input" size="sm" value="{{ waitMin }}" on-change="{{ onWait }}" aria-label="minutes before giving up"></x-import>
+        </div>
+        <p style="margin: 0; font-size: 11px; line-height: 16px; color: var(--muted-foreground);">{{ waitText }} · what happens to a failed system is set on the <a href="Run.dc.html" style="color: var(--coral-strong);">run board</a></p>
+      </section>
+    </div>
+
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["light","dark"],"default":"dark"},"$preview":{"width":1440,"height":2560}}'>
+const NEED = [
+  ['forcefield.itp', 'entry point · includes the rest', true],
+  ['ffnonbonded.itp', 'atom types and Lennard-Jones', true],
+  ['ffbonded.itp', 'bonds, angles, dihedrals', true],
+  ['watermodels.dat', 'list of water models', true],
+  ['tip3p.itp', 'water topology', true],
+  ['ions.itp', 'ion topology', true],
+  ['aminoacids.rtp', 'residue templates for pdb2gmx', true],
+  ['aminoacids.hdb', 'hydrogen database for pdb2gmx', true],
+  ['specbond.dat', 'special bonds', false]
+];
+// the other files the notebook's topology and HMR step read from ff/
+const EXTRA = [
+  ['ADDff.itp', 'extra parameters for the saccharides'],
+  ['ions/iontypes.itp', 'prosECCo75 ion types'],
+  ['ions/ions.itp', 'NA_s, CL_2s and the other scaled ions'],
+  ['TIP3PF/TIP3PF_orig.itp', 'fast water · methods with fast'],
+  ['TIP3PF/TIP3PF_HMR.itp', 'fast water · methods with hmr and fast'],
+  ['{saccharide}-ADD.itp', 'one per saccharide · set on the files board'],
+  ['AGLC-ADD.itp', 'glucose · only when it is added'],
+  ['{sequence}.itp', 'written by pdb2gmx for every sequence']
+];
+const FOLDERS = [
+  ['ff/', 'force field, extra .itp files, per-method HMR files'],
+  ['inputs/', 'the mdp files · minim, eq_nvt, eq_npt, awh, awh_hmr, pull, hmr_multi'],
+  ['molecules/', 'saccharides/{saccharide}.gro and aglc.gro'],
+  ['scripts/', 'qq scripts per stage · written once, then reused'],
+  ['solutions/', '{method}/{saccharide}/{sequence}/ · one folder per system'],
+  ['logs/', 'build_summary_YYYYMMDD_HHMM.log and build_summary_latest.log'],
+  ['pmf/', 'AWH profiles and the corrected .dat files']
+];
+const METHODS = ['hmr+fast+6', 'hmr+slow+6'];
+const SAMPLE_SYS = 'solutions/hmr+slow+6/HA/WRWYCR';
+const fmt = (x) => (Math.round(x * 100) / 100).toFixed(2);
+
+function sideText(Q, s, N, tol) {
+  const net = Q + (Q < 0 ? 1 : -1) * N * s;
+  const ok = Math.abs(net) <= tol;
+  return {
+    what: N === 0 ? 'no ions' : N + (Q < 0 ? ' positive' : ' negative') + (N === 1 ? ' ion' : ' ions') + ' of ' + (Q < 0 ? '+' : '−') + fmt(s) + ' e',
+    net: 'net ' + (net > 0 ? '+' : net < 0 ? '−' : '') + fmt(Math.abs(net)) + ' e' + (ok ? ' · neutral' : ' · not neutral'),
+    ink: ok ? 'var(--mint-strong)' : 'var(--destructive)'
+  };
+}
+
+class Component extends DCLogic {
+  renderVals() {
+    const st = this.state;
+    const ffPath = st.ffPath === undefined ? 'ff/charmm36s-jul2022-prosECCo75.ff' : st.ffPath;
+    const baseDir = st.baseDir === undefined ? '/storage/<cluster>/<you>/02_evomd/innit_tests/' : st.baseDir;
+    const gv = st.gv || '2025';
+    const maxwarn = st.maxwarn === undefined ? '6' : st.maxwarn;
+    const strict = st.strict || 'off';
+    const poll = st.poll === undefined ? '10' : st.poll;
+    const waitMin = st.waitMin === undefined ? '10' : st.waitMin;
+    const posIon = st.posIon === undefined ? 'NA_s' : st.posIon;
+    const negIon = st.negIon === undefined ? 'CL_2s' : st.negIon;
+    const wTest = st.wTest === undefined ? '10412' : st.wTest;
+    const saltVal = st.saltVal === undefined ? '0.15' : st.saltVal;
+    const molVal = st.molVal === undefined ? '55.5' : st.molVal;
+    const ffMode = st.ffMode || 'relative';
+    const pyPath = st.pyPath === undefined ? '~/venvs/md/bin/python' : st.pyPath;
+    const gml = st.gml !== false, mda = st.mda !== false, pml = st.pml !== false;
+    const hmr = st.hmr || 'on', hmrOn = hmr === 'on';
+    const hmrMass = st.hmrMass === undefined ? '3.024' : st.hmrMass;
+    const hmrHow = st.hmrHow || 'gml';
+    const fast = st.fast || 'on', fastOn = fast === 'on';
+    const scaled = st.scaled || 'scaled', scaleOn = scaled === 'scaled';
+    const scaleVal = st.scaleVal === undefined ? '0.75' : st.scaleVal;
+    const tolVal = st.tolVal === undefined ? '0.01' : st.tolVal;
+    const qTest = st.qTest === undefined ? '-3.75' : st.qTest;
+    const sfx = st.sfx === undefined ? 'r' : st.sfx;
+    const pol = st.pol || 'stop';
+
+    // force field
+    const trimmed = ffPath.trim();
+    const valid = /\.ff\/?$/.test(trimmed);
+    const base = trimmed.replace(/\/$/, '').split('/').pop();
+    const ff = {
+      note: !trimmed ? 'enter the path of the folder that holds forcefield.itp'
+        : valid ? 'found ' + base + ' · 8 of 8 needed files · specbond.dat is optional'
+        : 'the folder name has to end in .ff, like charmm36s-jul2022-prosECCo75.ff',
+      ink: !trimmed ? 'var(--muted-foreground)' : valid ? 'var(--mint-strong)' : 'var(--destructive)',
+      modeText: ffMode === 'relative'
+        ? 'as in the notebook: every .top includes ../../../../ff/… from its system folder and pdb2gmx runs inside ff/ · nothing is copied'
+        : ffMode === 'copy'
+        ? 'the folder is copied beside each system, so a run can be repeated later and pdb2gmx, grompp and genion all find it · your folder is never changed'
+        : 'GMXLIB points at the folder that holds the .ff for each run · nothing is copied · the systems depend on this folder staying where it is',
+      extras: EXTRA.map((f) => ({ name: f[0], role: f[1], word: valid ? 'found' : 'not checked', ink: valid ? 'var(--mint-strong)' : 'var(--muted-foreground)' })),
+      files: NEED.map((f) => ({
+        name: f[0], role: f[1],
+        word: !valid ? 'not checked' : f[2] ? 'found' : 'optional',
+        ink: !valid ? 'var(--muted-foreground)' : f[2] ? 'var(--mint-strong)' : 'var(--butter-strong)'
+      })),
+      waters: valid ? ['tip3p', 'TIP3PF'] : []
+    };
+
+    // python
+    const lines = [];
+    if (gml) lines.push('import gromologist as gml');
+    if (mda) lines.push('import MDAnalysis as mda');
+    if (pml) lines.push('from pymol import cmd');
+    lines.push(lines.length ? '# ctx holds the system folder, the files you assigned and your settings' : '# no library switched on · ctx holds the system folder, the files you assigned and your settings');
+    const ctxRows = [
+      { name: 'ctx.method', value: 'hmr+slow+6' + ' · a repeat reads hmr+slow+6r' },
+      { name: 'ctx.saccharide', value: 'HA' },
+      { name: 'ctx.sequence', value: 'WRWYCR · one-letter code' },
+      { name: 'ctx.files', value: 'the saccharide files from the files tab · ["gro"], ["itp"], ["other"]' },
+      { name: 'ctx.seq_files', value: 'the sequence files, or the PyMOL output · ["pdb"], ["gro"]' },
+      { name: 'ctx.mdp', value: 'the mdp of the tile · from the library or your own file' },
+      { name: 'ctx.system_dir', value: SAMPLE_SYS },
+      { name: 'ctx.step_dir', value: SAMPLE_SYS + '/6.eqnpt' },
+      { name: 'ctx.top', value: SAMPLE_SYS + '/WRWYCR.top' },
+      { name: 'ctx.gro', value: 'the last coordinates · ' + SAMPLE_SYS + '/6.eqnpt/6.eqnpt.gro' },
+      { name: 'ctx.xtc', value: 'the last trajectory, when there is one' },
+      { name: 'ctx.ff_dir', value: trimmed || '(not set)' },
+      { name: 'ctx.charge_scale', value: scaleOn ? (scaleVal || '?') : '1.0' },
+      { name: 'ctx.hmr', value: hmrOn ? hmrMass + ' amu' : 'off' },
+      { name: 'ctx.fast_water', value: fastOn ? 'on' : 'off' },
+      { name: 'ctx.repeat', value: '0 · first run, 1 · the r folder, 2 · r1 …' }
+    ];
+
+    // speed
+    const massNum = hmrHow === 'heavyh' ? 4.0 : parseFloat(hmrMass);
+    const factor = isNaN(massNum) ? '?' : String(Math.round(massNum / 1.008 * 100) / 100);
+    const dtFs = hmrOn && fastOn ? 4 : hmrOn ? 3 : 2;
+    const mdp = ['dt                      = ' + (dtFs / 1000).toFixed(3), 'constraints             = h-bonds', 'constraint-algorithm    = lincs'];
+    if (hmrOn) mdp.push(hmrHow === 'mdp' ? 'mass-repartition-factor = ' + factor : hmrHow === 'gml' ? '; hydrogens repartitioned by gromologist in Protein.itp and CARB.itp' : '; hydrogens are 4 amu from pdb2gmx -heavyh');
+    mdp.push(fastOn ? '; water: rigid, hydrogens ' + (hmrOn ? (isNaN(massNum) ? '?' : String(massNum)) : '1.008') + ' amu' : '; water: rigid, normal hydrogens');
+    const speed = {
+      dt: String(dtFs),
+      mass: hmrOn ? (isNaN(massNum) ? '?' : massNum.toFixed(3)) : '1.008',
+      water: fastOn ? 'fast' : 'standard',
+      waterHint: fastOn ? 'rigid · repartitioned too' : 'rigid · normal hydrogens',
+      mdp: mdp.join('\n'),
+      fastText: fastOn
+        ? 'fast methods include TIP3PF/TIP3PF_orig.itp, or TIP3PF_HMR.itp when the name also has hmr · after solvate SOL is renamed TIP3F, and back to SOL around genion'
+        : 'water keeps normal hydrogens · repartitioning, when on, changes the solute only and the step stays shorter'
+    };
+
+    // charges
+    const s = scaleOn ? parseFloat(scaleVal) : 1;
+    const Q = parseFloat(qTest);
+    const tol = isNaN(parseFloat(tolVal)) ? 0.01 : parseFloat(tolVal);
+    const good = s > 0 && !isNaN(Q);
+    let charge = { rule: '', whole: '', wholeNet: '', wholeInk: 'var(--muted-foreground)', mine: '', mineNet: '', mineInk: 'var(--muted-foreground)', salt: '', flags: '' };
+    if (!good) {
+      charge.rule = s > 0 ? 'enter a net charge to try' : 'enter a scale factor above 0';
+    } else {
+      const k = Q / s;
+      const whole = Math.abs(k - Math.round(k)) * s <= tol;
+      charge.rule = (scaleOn
+        ? 'the solute\'s net charge should be a whole number of charge units of ' + fmt(s) + ' e · ions carry ±' + fmt(s) + ' e'
+        : 'the solute\'s net charge should be a whole number · ions carry ±1 e')
+        + ' · ' + fmt(Q) + ' = ' + fmt(k) + ' × ' + fmt(s) + (whole ? '' : ' · not a whole number, so it goes to the warnings board');
+      const a = sideText(Q, s, Math.round(Math.abs(Q)), tol);
+      const b = sideText(Q, s, Math.round(Math.abs(Q) / s), tol);
+      const W = parseInt(wTest, 10) || 0, conc = parseFloat(saltVal) || 0, mol = parseFloat(molVal) || 55.5;
+      const nSalt = W ? Math.round(conc * W / mol) : 0;
+      const d = Math.round(Q / s);
+      const np = nSalt + Math.max(0, -d), nn = nSalt + Math.max(0, d);
+      charge = { rule: charge.rule, whole: a.what, wholeNet: a.net, wholeInk: a.ink, mine: b.what, mineNet: b.net, mineInk: b.ink,
+        salt: '+ ' + nSalt + ' salt pairs from ' + W.toLocaleString('en') + ' waters',
+        flags: '-pname ' + posIon + ' -nname ' + negIon + ' -np ' + np + ' -nn ' + nn };
+    }
+
+    // repeats
+    const L = sfx.trim() || 'r';
+    const tail = '/HA/WRWYCR';
+    const seq = [
+      { when: 'first run', name: 'solutions/hmr+slow+6' + tail },
+      { when: 'repeated once', name: 'solutions/hmr+slow+6' + L + tail },
+      { when: 'repeated again', name: 'solutions/hmr+slow+6' + L + '1' + tail },
+      { when: 'and again', name: 'solutions/hmr+slow+6' + L + '2' + tail },
+      { when: 'and so on', name: 'solutions/hmr+slow+6' + L + '3' + tail }
+    ];
+
+    const folders = FOLDERS.map((f) => ({ name: f[0], role: f[1], word: baseDir.trim() ? 'found' : 'not set', ink: baseDir.trim() ? 'var(--mint-strong)' : 'var(--muted-foreground)' }));
+    const methodRows = METHODS.map((m) => {
+      const h = /(^|\+)hmr(\+|$)/.test(m), f = /(^|\+)fast(\+|$)/.test(m);
+      return { name: m, hmr: h ? 'yes' : 'no', hmrInk: h ? 'var(--mint-strong)' : 'var(--muted-foreground)', water: f ? (h ? 'TIP3PF_HMR.itp' : 'TIP3PF_orig.itp') + ' · fast' : 'tip3p.itp', awh: h ? 'awh_hmr.mdp' : 'awh.mdp' };
+    });
+    return {
+      theme: this.props.theme ?? 'dark',
+      yes: true,
+      baseDir: baseDir, onBase: (e) => this.setState({ baseDir: e.target.value }),
+      folders: folders,
+      methodRows: methodRows,
+      gv: gv, setGv: (v) => { if (v) this.setState({ gv: v }); },
+      gmxBin: gv === '2025' ? 'gmx_mpi' : 'gmx',
+      gvText: gv === '2025'
+        ? 'GROMACS version: 2025.4 · read from the "GROMACS version:" line of gmx_mpi --version and shown in the build summary'
+        : 'GROMACS version: 2022.3-plumed · gmx, no GPU flags in the scripts',
+      maxwarn: maxwarn, onMaxwarn: (e) => this.setState({ maxwarn: e.target.value }),
+      strict: strict, setStrict: (v) => { if (v) this.setState({ strict: v }); },
+      strictText: strict === 'off'
+        ? 'like !cmd in the notebook: the exit code alone does not stop a system, but a "Fatal error:" or "Error in user input:" in the output always does, and so does a missing output file'
+        : 'any command that exits with an error stops the system at that stage · it is marked failed in the build summary',
+      poll: poll, onPoll: (e) => this.setState({ poll: e.target.value }),
+      waitMin: waitMin, onWait: (e) => this.setState({ waitMin: e.target.value }),
+      waitText: 'a local mdrun is followed by a wait for its .gro · every ' + poll + ' s, up to ' + waitMin + ' min, then the system is marked failed',
+      posIon: posIon, onPos: (e) => this.setState({ posIon: e.target.value }),
+      negIon: negIon, onNeg: (e) => this.setState({ negIon: e.target.value }),
+      wTest: wTest, onW: (e) => this.setState({ wTest: e.target.value }),
+      saltVal: saltVal, onSalt: (e) => this.setState({ saltVal: e.target.value }),
+      molVal: molVal, onMol: (e) => this.setState({ molVal: e.target.value }),
+      ffPath: ffPath, onFf: (e) => this.setState({ ffPath: e.target.value }),
+      ffMode: ffMode, setFfMode: (v) => { if (v) this.setState({ ffMode: v }); },
+      ff: ff,
+      pyPath: pyPath, onPy: (e) => this.setState({ pyPath: e.target.value }),
+      gml: gml, onGml: (v) => this.setState({ gml: v === true }),
+      mda: mda, onMda: (v) => this.setState({ mda: v === true }),
+      pml: pml, onPml: (v) => this.setState({ pml: v === true }),
+      preamble: lines.join('\n'),
+      ctxRows: ctxRows,
+      hmr: hmr, hmrOn: hmrOn, setHmr: (v) => { if (v) this.setState({ hmr: v }); },
+      hmrMass: hmrMass, onMass: (e) => this.setState({ hmrMass: e.target.value }),
+      hmrHow: hmrHow, setHow: (v) => { if (v) this.setState({ hmrHow: v }); },
+      fast: fast, setFast: (v) => { if (v) this.setState({ fast: v }); },
+      fastNoHmr: fastOn && !hmrOn,
+      speed: speed,
+      scaled: scaled, scaleOn: scaleOn, setScaled: (v) => { if (v) this.setState({ scaled: v }); },
+      scaleVal: scaleVal, onScale: (e) => this.setState({ scaleVal: e.target.value }),
+      tolVal: tolVal, onTol: (e) => this.setState({ tolVal: e.target.value }),
+      qTest: qTest, onQ: (e) => this.setState({ qTest: e.target.value }),
+      charge: charge,
+      sfx: sfx, onSfx: (e) => this.setState({ sfx: e.target.value }),
+      seq: seq,
+      pol: pol, setPol: (v) => { if (v) this.setState({ pol: v }); },
+      polText: pol === 'stop'
+        ? 'grompp gets -maxwarn for just the warnings you ignored on that tile · any other warning stops it, and it shows up on the warnings board'
+        : 'grompp gets a -maxwarn high enough to pass · every warning is still listed, and the ones you ignored are marked as known'
+    };
+  }
+}
+</script>
+</body>
+</html>

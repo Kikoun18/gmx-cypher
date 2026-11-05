@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Warnings</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ds/morpheus/tokens.css">
+<link rel="stylesheet" href="ds/morpheus/components/bundle.css">
+<script src="ds/morpheus/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:inherit}
+button{font-family:inherit}
+button:focus-visible,a:focus-visible{outline:2px solid var(--ring);outline-offset:2px}
+pre{margin:0}
+</style>
+</helmet>
+<div data-theme="{{theme}}" style="min-height: 1000px; box-sizing: border-box; display: flex; flex-direction: column; background: var(--background); color: var(--foreground); font-family: var(--font-mono); font-size: 13px; line-height: 1.5;">
+
+  <header style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px 24px; padding: 12px 24px; border-bottom: 1px solid var(--border);">
+    <div style="display: flex; align-items: baseline; gap: 10px;">
+      <span style="font-size: 15px; font-weight: 700;">gmx-cypher</span>
+      <span style="font-size: 10px; line-height: 14px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground);">generate</span>
+    </div>
+    <nav aria-label="generator views" style="display: flex; gap: 4px;">
+      <a href="Main.dc.html" style="padding: 6px 10px; font-size: 12px; line-height: 16px; text-decoration: none; border-bottom: 2px solid transparent; color: var(--muted-foreground);">build</a>
+      <a href="Run.dc.html" style="padding: 6px 10px; font-size: 12px; line-height: 16px; text-decoration: none; border-bottom: 2px solid transparent; color: var(--muted-foreground);">run</a>
+      <a href="Dashboard.dc.html" style="padding: 6px 10px; font-size: 12px; line-height: 16px; text-decoration: none; border-bottom: 2px solid transparent; color: var(--muted-foreground);">dashboard</a>
+      <a href="Summary.dc.html" style="padding: 6px 10px; font-size: 12px; line-height: 16px; text-decoration: none; border-bottom: 2px solid transparent; color: var(--muted-foreground);">summary</a>
+      <a href="Library.dc.html" style="padding: 6px 10px; font-size: 12px; line-height: 16px; text-decoration: none; border-bottom: 2px solid transparent; color: var(--muted-foreground);">library</a>
+      <a href="MDP.dc.html" style="padding: 6px 10px; font-size: 12px; line-height: 16px; text-decoration: none; border-bottom: 2px solid transparent; color: var(--muted-foreground);">mdp</a>
+      <a href="Files.dc.html" style="padding: 6px 10px; font-size: 12px; line-height: 16px; text-decoration: none; border-bottom: 2px solid transparent; color: var(--muted-foreground);">files</a>
+      <a href="Cluster.dc.html" style="padding: 6px 10px; font-size: 12px; line-height: 16px; text-decoration: none; border-bottom: 2px solid transparent; color: var(--muted-foreground);">cluster</a>
+      <a href="Warnings.dc.html" aria-current="page" style="padding: 6px 10px; font-size: 12px; line-height: 16px; font-weight: 700; text-decoration: none; border-bottom: 2px solid var(--coral-strong);">warnings</a>
+      <a href="Settings.dc.html" style="padding: 6px 10px; font-size: 12px; line-height: 16px; text-decoration: none; border-bottom: 2px solid transparent; color: var(--muted-foreground);">settings</a>
+    </nav>
+    <span style="flex: 1 1 0;"></span>
+    <span style="font-size: 11px; line-height: 16px; color: var(--butter-strong);">{{ badge }}</span>
+    <span style="font-size: 11px; line-height: 16px; color: var(--muted-foreground);">gmx_mpi 2025.4 · <span style="color: var(--mint-strong);">ready</span></span>
+    <span style="font-size: 11px; line-height: 16px; color: var(--muted-foreground);">qq · <span style="color: var(--mint-strong);">ready</span></span>
+  </header>
+
+  <div style="display: flex; flex-direction: column; gap: 16px; padding: 20px 24px;">
+    <div style="display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px 24px;">
+      <div style="display: flex; flex-direction: column; gap: 4px; min-width: 360px;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <h1 style="margin: 0; font-size: 18px; line-height: 24px; font-weight: 700;">warnings</h1>
+          <x-import component-from-global-scope="Morpheus.Badge" tone="butter">sample data</x-import>
+        </div>
+        <p style="margin: 0; font-size: 12px; line-height: 16px; color: var(--muted-foreground);">every warning and note from grompp, pdb2gmx, the charge check and this tool · ignore the ones that are fine, they stay listed as known</p>
+      </div>
+      <span style="flex: 1 1 0;"></span>
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <x-import component-from-global-scope="Morpheus.ToggleGroup" type="single" size="sm" value="{{ src }}" on-value-change="{{ setSrc }}">
+          <x-import component-from-global-scope="Morpheus.ToggleGroupItem" value="all">all</x-import>
+          <x-import component-from-global-scope="Morpheus.ToggleGroupItem" value="grompp">grompp</x-import>
+          <x-import component-from-global-scope="Morpheus.ToggleGroupItem" value="pdb2gmx">pdb2gmx</x-import>
+          <x-import component-from-global-scope="Morpheus.ToggleGroupItem" value="charge">charge</x-import>
+          <x-import component-from-global-scope="Morpheus.ToggleGroupItem" value="settings">settings</x-import>
+        </x-import>
+        <div style="width: 220px;">
+          <x-import component-from-global-scope="Morpheus.Input" size="sm" placeholder="filter by step or text" value="{{ q }}" on-change="{{ onQ }}"></x-import>
+        </div>
+      </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;">
+      <x-import component-from-global-scope="Morpheus.Stat" label="Open" value="{{ stat.open }}" hint="{{ stat.openHint }}"></x-import>
+      <x-import component-from-global-scope="Morpheus.Stat" label="Ignored" value="{{ stat.ignored }}" hint="known, still listed"></x-import>
+      <x-import component-from-global-scope="Morpheus.Stat" label="Total" value="{{ stat.total }}" hint="{{ stat.totalHint }}"></x-import>
+      <x-import component-from-global-scope="Morpheus.Stat" label="maxwarn" value="{{ stat.maxwarn }}" hint="{{ stat.maxwarnHint }}"></x-import>
+    </div>
+
+    <sc-if value="{{ hasOpen }}" hint-placeholder-val="{{ true }}">
+      <x-import component-from-global-scope="Morpheus.Alert" variant="warning">
+        <x-import component-from-global-scope="Morpheus.AlertTitle">{{ alert.title }}</x-import>
+        <x-import component-from-global-scope="Morpheus.AlertDescription">{{ alert.text }}</x-import>
+      </x-import>
+    </sc-if>
+    <sc-if value="{{ noOpen }}" hint-placeholder-val="{{ false }}">
+      <x-import component-from-global-scope="Morpheus.Alert" variant="success">
+        <x-import component-from-global-scope="Morpheus.AlertTitle">nothing open</x-import>
+        <x-import component-from-global-scope="Morpheus.AlertDescription">every warning is either gone or marked as known below · they stay listed</x-import>
+      </x-import>
+    </sc-if>
+
+    <div style="display: grid; grid-template-columns: minmax(0, 1fr) 440px; gap: 20px; align-items: start;">
+      <div style="display: flex; flex-direction: column; gap: 10px; min-width: 0;">
+        <x-import component-from-global-scope="Morpheus.Section" label="Open">{{ openCount }}</x-import>
+        <sc-for list="{{ openRows }}" as="w" hint-placeholder-count="3">
+          <div style="display: flex; align-items: stretch; border: 1px solid var(--border); border-left: 3px solid {{ w.edge }}; border-radius: var(--radius-lg); background: {{ w.bg }};">
+            <button type="button" onClick="{{ w.pick }}" aria-pressed="{{ w.isSel }}" aria-label="show warning {{ w.step }}" style="flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border: 0; background: none; color: var(--foreground); font-size: 12px; line-height: 16px; text-align: left; cursor: pointer;">
+              <span style="display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px;">
+                <span style="padding: 0 8px; border-radius: var(--radius-full); background: {{ w.sevSoft }}; color: {{ w.sevInk }}; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; font-weight: 700;">{{ w.sev }}</span>
+                <span style="padding: 0 8px; border-radius: var(--radius-full); background: {{ w.srcSoft }}; color: {{ w.srcInk }}; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; font-weight: 700;">{{ w.src }}</span>
+                <span style="font-weight: 700;">{{ w.step }}</span>
+                <span style="color: var(--muted-foreground);">{{ w.tile }} · {{ w.where }}</span>
+              </span>
+              <span style="font-weight: 700;">{{ w.title }}</span>
+              <span style="color: var(--muted-foreground);">{{ w.why }}</span>
+            </button>
+            <button type="button" onClick="{{ w.toggle }}" aria-label="ignore this warning for later" style="flex: 0 0 auto; align-self: center; margin: 0 14px 0 0; height: 26px; padding: 0 12px; border: 1px solid var(--input); border-radius: var(--radius-full); background: transparent; color: var(--foreground); font-size: 11px; cursor: pointer;">ignore for later</button>
+          </div>
+        </sc-for>
+        <sc-if value="{{ noOpenRows }}" hint-placeholder-val="{{ false }}">
+          <p style="margin: 0; padding: 14px; border: 2px dashed var(--input); border-radius: var(--radius-lg); font-size: 12px; color: var(--muted-foreground);">nothing open here</p>
+        </sc-if>
+
+        <div style="margin-top: 10px;">
+          <x-import component-from-global-scope="Morpheus.Section" label="Ignored · still known">{{ ignCount }}</x-import>
+        </div>
+        <sc-for list="{{ ignoredRows }}" as="w" hint-placeholder-count="2">
+          <div style="display: flex; align-items: stretch; border: 1px solid var(--border); border-left: 3px solid var(--border); border-radius: var(--radius-lg); background: {{ w.bg }};">
+            <button type="button" onClick="{{ w.pick }}" aria-pressed="{{ w.isSel }}" aria-label="show ignored warning {{ w.step }}" style="flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border: 0; background: none; color: var(--muted-foreground); font-size: 12px; line-height: 16px; text-align: left; cursor: pointer;">
+              <span style="display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px;">
+                <span style="padding: 0 8px; border-radius: var(--radius-full); border: 1px solid var(--border); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase;">{{ w.sev }}</span>
+                <span style="padding: 0 8px; border-radius: var(--radius-full); border: 1px solid var(--border); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase;">{{ w.src }}</span>
+                <span style="font-weight: 700; color: var(--foreground);">{{ w.step }}</span>
+                <span>{{ w.tile }} · {{ w.where }}</span>
+              </span>
+              <span style="color: var(--foreground);">{{ w.title }}</span>
+              <span>ignored {{ w.date }} · {{ w.note }}</span>
+            </button>
+            <button type="button" onClick="{{ w.toggle }}" aria-label="stop ignoring this warning" style="flex: 0 0 auto; align-self: center; margin: 0 14px 0 0; height: 26px; padding: 0 12px; border: 1px solid var(--input); border-radius: var(--radius-full); background: transparent; color: var(--foreground); font-size: 11px; cursor: pointer;">stop ignoring</button>
+          </div>
+        </sc-for>
+        <sc-if value="{{ noIgnRows }}" hint-placeholder-val="{{ false }}">
+          <p style="margin: 0; padding: 14px; border: 2px dashed var(--input); border-radius: var(--radius-lg); font-size: 12px; color: var(--muted-foreground);">nothing ignored here</p>
+        </sc-if>
+      </div>
+      <aside aria-label="selected warning" style="display: flex; flex-direction: column; gap: 10px; min-width: 0; padding: 14px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--card);">
+        <x-import component-from-global-scope="Morpheus.Section" label="Details">{{ cur.step }}</x-import>
+        <div style="display: flex; flex-direction: column; gap: 2px;">
+          <span style="font-size: 13px; font-weight: 700;">{{ cur.title }}</span>
+          <span style="font-size: 11px; line-height: 16px; color: var(--muted-foreground);">{{ cur.src }} · {{ cur.tile }} · {{ cur.where }}</span>
+        </div>
+        <span style="font-size: 10px; line-height: 14px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground);">what the tool printed</span>
+        <pre style="padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--field); font-family: var(--font-mono); font-size: 12px; line-height: 18px; white-space: pre-wrap;">{{ cur.msg }}</pre>
+        <p style="margin: 0; font-size: 12px; line-height: 18px;">{{ cur.why }}</p>
+        <p style="margin: 0; font-size: 11px; line-height: 16px; color: var(--muted-foreground);">{{ cur.link }}</p>
+
+        <x-import component-from-global-scope="Morpheus.Section" label="Systems">{{ cur.sysCount }}</x-import>
+        <div style="display: flex; flex-direction: column; gap: 2px; font-size: 12px; line-height: 16px;">
+          <sc-for list="{{ cur.systems }}" as="s" hint-placeholder-count="3">
+            <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ s }}</span>
+          </sc-for>
+        </div>
+
+        <x-import component-from-global-scope="Morpheus.Section" label="Ignore for later"></x-import>
+        <x-import component-from-global-scope="Morpheus.ToggleGroup" type="single" size="sm" value="{{ cur.scope }}" on-value-change="{{ setScope }}">
+          <x-import component-from-global-scope="Morpheus.ToggleGroupItem" value="these">these systems</x-import>
+          <x-import component-from-global-scope="Morpheus.ToggleGroupItem" value="all">every system</x-import>
+        </x-import>
+        <div style="display: flex; flex-direction: column; gap: 5px;">
+          <span style="font-size: 10px; line-height: 14px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground);">why it is fine</span>
+          <x-import component-from-global-scope="Morpheus.Input" size="sm" placeholder="a note for future you" value="{{ cur.note }}" on-change="{{ onNote }}"></x-import>
+        </div>
+        <p style="margin: 0; font-size: 11px; line-height: 16px; color: var(--muted-foreground);">{{ cur.effect }}</p>
+        <div style="display: flex; gap: 8px;">
+          <sc-if value="{{ cur.canIgnore }}" hint-placeholder-val="{{ true }}">
+            <x-import component-from-global-scope="Morpheus.Button" variant="default" on-click="{{ toggleCur }}">ignore for later</x-import>
+          </sc-if>
+          <sc-if value="{{ cur.isIgnored }}" hint-placeholder-val="{{ false }}">
+            <x-import component-from-global-scope="Morpheus.Button" variant="outline" on-click="{{ toggleCur }}">stop ignoring</x-import>
+          </sc-if>
+        </div>
+      </aside>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["light","dark"],"default":"dark"},"$preview":{"width":1440,"height":1000}}'>
+const DATE = '2026-10-23';
+const ALLSYS = [];
+['hmr+fast+6', 'hmr+slow+6'].forEach((m) => ['HA', 'PG', 'O26'].forEach((s) => ['WRWYCR', 'WRWACR'].forEach((q) => ALLSYS.push(m + '/' + s + '/' + q))));
+const PG2 = ['hmr+slow+6/PG/WRWYCR', 'hmr+slow+6/PG/WRWACR'];
+
+const W = [
+  { id: 'w1', sev: 'warning', src: 'grompp', step: '6.eqnpt', tile: 'equilibrate npt', systems: null,
+    title: 'Berendsen barostat',
+    msg: 'WARNING 1 [file 6.eqnpt.mdp]:\n  The Berendsen barostat does not generate any strictly correct\n  ensemble, and should not be used for new production simulations.',
+    why: 'only the equilibration uses it · production and pull use C-rescale',
+    link: '', ign0: true, note0: 'equilibration only · production uses C-rescale', date: '2026-10-22' },
+  { id: 'w2', sev: 'warning', src: 'charge', step: '4.genion', tile: 'add salt', systems: PG2,
+    title: 'net charge left after the ions: −0.05 e',
+    msg: 'net charge after ions: −0.05 e  (tolerance 0.01)\n  solute −3.80 e = −5.07 × 0.75 e\n  5 ions of +0.75 e leave −0.05 e',
+    why: 'the solute charge is not a whole number of 0.75 e units, so no count of scaled ions makes it neutral · check the residue charges in the .ff',
+    link: 'the Ewald warning on 7.awh below comes from this one', ign0: false, note0: '', date: '' },
+  { id: 'w3', sev: 'note', src: 'settings', step: 'force field', tile: 'pdb2gmx', systems: null,
+    title: 'specbond.dat is not in charmm36s-jul2022-prosECCo75.ff',
+    msg: 'specbond.dat not found in charmm36s-jul2022-prosECCo75.ff\n  pdb2gmx will not make special bonds',
+    why: 'optional · it only matters for disulfides and similar links, which these systems do not have',
+    link: '', ign0: false, note0: '', date: '' },
+  { id: 'w4', sev: 'note', src: 'grompp', step: '4.genion', tile: 'add salt', systems: null,
+    title: 'non-bonded parameter combinations generated',
+    msg: 'NOTE 1 [file 4.genion.top]:\n  Generated 2145 of the 2145 non-bonded parameter combinations',
+    why: 'normal for a custom .ff that lists no explicit pair parameters',
+    link: '', ign0: true, note0: 'normal for this .ff', date: '2026-10-22' },
+  { id: 'w5', sev: 'warning', src: 'grompp', step: '7.awh', tile: 'awh', systems: PG2,
+    title: 'Ewald electrostatics with a net charge',
+    msg: 'WARNING 2 [file 7.awh.mdp]:\n  You are using Ewald electrostatics in a system with net charge.\n  This can lead to severe artifacts, such as ions moving into regions\n  with low dielectric, due to the uniform background charge.',
+    why: 'same cause as the charge warning on 4.genion · fix that one and this one goes away',
+    link: 'caused by: net charge left after the ions (4.genion)', ign0: false, note0: '', date: '' }
+];
+
+const SEV = {
+  warning: { soft: 'var(--butter-soft)', ink: 'var(--butter-strong)' },
+  note: { soft: 'var(--sky-soft)', ink: 'var(--sky-strong)' }
+};
+const SRC = {
+  grompp: { soft: 'var(--coral-soft)', ink: 'var(--coral-strong)' },
+  pdb2gmx: { soft: 'var(--sky-soft)', ink: 'var(--sky-strong)' },
+  charge: { soft: 'var(--lilac-soft)', ink: 'var(--lilac-strong)' },
+  settings: { soft: 'var(--stone-soft)', ink: 'var(--stone-strong)' }
+};
+const pad2 = (n) => (n < 10 ? '0' : '') + n;
+
+class Component extends DCLogic {
+  renderVals() {
+    const st = this.state;
+    const ign = st.ign || {};
+    const notes = st.notes || {};
+    const scopes = st.scopes || {};
+    const src = st.src || 'all';
+    const q = st.q || '';
+    const needle = q.trim().toLowerCase();
+    const selId = st.sel || 'w2';
+
+    const isIgn = (w) => (ign[w.id] === undefined ? w.ign0 : ign[w.id]);
+    const noteOf = (w) => (notes[w.id] === undefined ? w.note0 : notes[w.id]);
+    const dateOf = (w) => (ign[w.id] === undefined ? w.date : DATE);
+    const flip = (w) => { const m = Object.assign({}, ign); m[w.id] = !isIgn(w); this.setState({ ign: m }); };
+
+    const shown = W.filter((w) => (src === 'all' || w.src === src) && (!needle || (w.step + ' ' + w.tile + ' ' + w.title + ' ' + w.msg).toLowerCase().indexOf(needle) >= 0));
+    const row = (w) => {
+      const sel = w.id === selId;
+      return {
+        sev: w.sev, src: w.src, step: w.step, tile: w.tile, title: w.title, why: w.why,
+        where: w.systems ? w.systems.length + ' of 12 systems' : 'all 12 systems',
+        sevSoft: SEV[w.sev].soft, sevInk: SEV[w.sev].ink,
+        srcSoft: SRC[w.src].soft, srcInk: SRC[w.src].ink,
+        edge: w.sev === 'warning' ? 'var(--butter-strong)' : 'var(--sky-strong)',
+        bg: sel ? 'var(--card)' : 'transparent',
+        isSel: sel,
+        note: noteOf(w) || 'no note', date: dateOf(w),
+        pick: () => this.setState({ sel: w.id }),
+        toggle: () => flip(w)
+      };
+    };
+    const openRows = shown.filter((w) => !isIgn(w)).map(row);
+    const ignoredRows = shown.filter((w) => isIgn(w)).map(row);
+
+    const open = W.filter((w) => !isIgn(w));
+    const ignd = W.filter((w) => isIgn(w));
+    const nWarn = W.filter((w) => w.sev === 'warning').length;
+    const openWarn = open.filter((w) => w.sev === 'warning').length;
+    const maxwarn = ignd.filter((w) => w.src === 'grompp' && w.sev === 'warning').length;
+
+    const c = W.filter((w) => w.id === selId)[0] || W[1];
+    const cIgn = isIgn(c);
+    const effect = c.src === 'grompp' && c.sev === 'warning'
+      ? 'ignoring adds one to -maxwarn for ' + c.step + ' · the warning stays listed here as known'
+      : c.src === 'grompp'
+        ? 'a note never stops grompp, so -maxwarn does not change · it is only marked as known here'
+        : 'this tool stops the tile itself when its own check fails · ignoring tells it to carry on and keep listing this';
+    const cur = {
+      title: c.title, src: c.src, tile: c.tile, step: c.step,
+      where: c.systems ? c.systems.length + ' of 12 systems' : 'all 12 systems',
+      msg: c.msg, why: c.why,
+      link: c.link || (cIgn ? 'ignored ' + dateOf(c) + ' · it is still listed and still counted' : 'open · the run stops here until it is fixed or ignored'),
+      systems: c.systems || ALLSYS,
+      sysCount: pad2((c.systems || ALLSYS).length),
+      scope: scopes[c.id] || 'these',
+      note: noteOf(c),
+      effect: effect,
+      canIgnore: !cIgn,
+      isIgnored: cIgn,
+      step2: c.step
+    };
+
+    return {
+      theme: this.props.theme ?? 'dark',
+      badge: open.length + ' open · ' + ignd.length + ' ignored',
+      src: src, setSrc: (v) => { if (v) this.setState({ src: v }); },
+      q: q, onQ: (e) => this.setState({ q: e.target.value }),
+      stat: {
+        open: String(open.length), openHint: openWarn + (openWarn === 1 ? ' warning · ' : ' warnings · ') + (open.length - openWarn) + (open.length - openWarn === 1 ? ' note' : ' notes'),
+        ignored: String(ignd.length),
+        total: String(W.length), totalHint: nWarn + (nWarn === 1 ? ' warning · ' : ' warnings · ') + (W.length - nWarn) + (W.length - nWarn === 1 ? ' note' : ' notes'),
+        maxwarn: String(maxwarn), maxwarnHint: 'grompp warnings you ignored · per tile'
+      },
+      hasOpen: open.length > 0, noOpen: open.length === 0,
+      alert: {
+        title: open.length + (open.length === 1 ? ' warning is open' : ' warnings are open'),
+        text: 'the run stops at the first tile that has an open warning · ignored ones do not stop it, and they stay listed below'
+      },
+      openCount: pad2(openRows.length), openRows: openRows, noOpenRows: openRows.length === 0,
+      ignCount: pad2(ignoredRows.length), ignoredRows: ignoredRows, noIgnRows: ignoredRows.length === 0,
+      cur: cur,
+      setScope: (v) => { if (v) { const m = Object.assign({}, scopes); m[c.id] = v; this.setState({ scopes: m }); } },
+      onNote: (e) => { const m = Object.assign({}, notes); m[c.id] = e.target.value; this.setState({ notes: m }); },
+      toggleCur: () => flip(c)
+    };
+  }
+}
+</script>
+</body>
+</html>

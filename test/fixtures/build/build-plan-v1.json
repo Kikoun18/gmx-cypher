@@ -1,0 +1,184 @@
+{
+  "format": "gmx-cypher build plan",
+  "version": 1,
+  "name": "peptide × saccharide · awh and pull",
+  "science": {
+    "forcefield": "charmm36s-jul2022-prosECCo75",
+    "answers": "1 8 0 0",
+    "answersBySequence": {},
+    "ionCharge": 0.75,
+    "salt": 0.15,
+    "waterMolarity": 55.5,
+    "positive": "NA_s",
+    "negative": "CL_2s",
+    "shift": [
+      0,
+      1.5,
+      0
+    ],
+    "box": 7,
+    "walkers": [
+      0.4,
+      0.6,
+      0.8,
+      1,
+      1.5,
+      2,
+      2.5,
+      3
+    ],
+    "maxwarn": 6,
+    "strict": false,
+    "restraints": {
+      "POSRES_FC_BB": 400,
+      "POSRES_FC_SC": 40,
+      "DIHRES_FC": 4
+    },
+    "mdp": {
+      "min": "minim.mdp",
+      "nvt": "eq_nvt.mdp",
+      "npt": "eq_npt.mdp",
+      "awh": "awh.mdp",
+      "awhHmr": "awh_hmr.mdp",
+      "pull": "pull.mdp",
+      "walkers": "hmr_multi.mdp"
+    },
+    "glucose": {
+      "file": "aglc.gro",
+      "conc": 1,
+      "tries": 1000
+    }
+  },
+  "stages": [
+    {
+      "id": "sb",
+      "on": true,
+      "tiles": [
+        {
+          "type": "sequence",
+          "on": true
+        },
+        {
+          "type": "trjconv",
+          "on": true,
+          "mol": "peptide"
+        },
+        {
+          "type": "saccharide",
+          "on": true
+        },
+        {
+          "type": "trjconv",
+          "on": true,
+          "mol": "saccharide"
+        },
+        {
+          "type": "editconf",
+          "on": true,
+          "mol": "saccharide"
+        },
+        {
+          "type": "pdb2gmx",
+          "on": true
+        },
+        {
+          "type": "termini",
+          "on": true
+        },
+        {
+          "type": "editconf",
+          "on": true,
+          "mol": "peptide"
+        },
+        {
+          "type": "merge",
+          "on": true
+        },
+        {
+          "type": "topology",
+          "on": true
+        },
+        {
+          "type": "solvate",
+          "on": true
+        },
+        {
+          "type": "genion",
+          "on": true
+        },
+        {
+          "type": "hmr",
+          "on": true
+        },
+        {
+          "type": "glucose",
+          "on": false
+        }
+      ]
+    },
+    {
+      "id": "min",
+      "on": true,
+      "tiles": [
+        {
+          "type": "md",
+          "on": true
+        }
+      ]
+    },
+    {
+      "id": "nvt",
+      "on": true,
+      "tiles": [
+        {
+          "type": "md",
+          "on": true
+        }
+      ]
+    },
+    {
+      "id": "npt",
+      "on": true,
+      "tiles": [
+        {
+          "type": "md",
+          "on": true
+        },
+        {
+          "type": "charge",
+          "on": true
+        }
+      ]
+    },
+    {
+      "id": "awh",
+      "on": true,
+      "tiles": [
+        {
+          "type": "awh",
+          "on": true
+        }
+      ]
+    },
+    {
+      "id": "pull",
+      "on": true,
+      "tiles": [
+        {
+          "type": "pull",
+          "on": true
+        }
+      ]
+    },
+    {
+      "id": "walkers",
+      "on": false,
+      "tiles": [
+        {
+          "type": "walkers",
+          "on": true
+        }
+      ]
+    }
+  ]
+}

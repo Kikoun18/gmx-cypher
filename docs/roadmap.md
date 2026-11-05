@@ -232,3 +232,64 @@ From [`batch-3.md`](batch-3.md) §5: one coherent app, (de)Cypher for every anal
 - Trajectory preparation (`trjconv`), still only a candidate.
 - Found in Phase 0, not on lines this batch changes: none yet.
 - From the final report (§11): load the Matrix's export pipeline on demand (the main bundle grew 66 kB gzip); vault types other than RDF in compare (needs a type map from the Matrix); several AWH biases and AWH's second dimension; a GROMACS 2021 dump for R7c; a membrane run for `gmx order` and a real electron file for `gmx density`; a `qq jobs -a -e` sample with a finished job; real-gmx tests that also run against 2023.3; `vault-read`'s listing still differs now and then under a loaded parallel run (the Matrix's own setup writing late; gmx-cypher's reads go through a backend that refuses writes).
+
+## Batch 4
+
+From [`batch-4.md`](batch-4.md) §6: SymBuilder inside gmx-cypher, four tabs (home · symbuilder · analysis · cluster), working with the Matrix. Baseline `6de6a96` (gmx-cypher), the-matrix `7ae82be`. The Phase 0 report is [`batch-4-phase0.md`](batch-4-phase0.md); its §8 proposes the cut into two batches (question 21) and two changes of order.
+
+**Why this order:**
+- **The shell comes first:** small, and every later screen lives in it.
+- **The plan comes before anything runs.** Every command is computed and tested against the notebook before a single file is written.
+- **The Matrix's names come before the first build,** so the first folders a build writes already land in the right rows, columns and runs.
+- **Running comes after the decisions about programs and writes** (questions 5–11), and the cluster after running here.
+- **PMFs into the vault and the reports come last,** when real systems exist to test them on.
+
+### Phase 0: Plan and design
+- [x] Baseline recorded; sections 3 and 4 confirmed or corrected (report §1–§2; Playwright needs the page to have an icon with this Chromium, §1)
+- [x] The notebook-to-request table; the board-to-place map; design pass with screenshots (report §3–§4, `docs/img/batch-4/`)
+- [x] Phase 0 report for R1–R10; samples asked for (report §5–§7)
+- [x] Questions answered; decisions recorded; order and cut confirmed (T201–T221; questions 12 and 34 open until batch 5)
+
+### Phase 1: The shell (R1, R2)
+- [x] R1a Contract amended for the new words (question 1, 2): §1's table, three phrases refused (T201, T202)
+- [x] R1b Four tabs, routes, every old address; the page's icon (T216, T220)
+- [x] R1c The mock-up's look: Morpheus's current tokens, coral for UI state, status as a dot and word (T218); the light theme's error red moved to `#7a1030` to stay apart from the new coral-strong
+- [x] R2 home: one component from what the server knows; the cluster tab's last read handed up (T215)
+
+### Phase 2: The plan, with nothing run (R3, R4)
+- [x] R3a The build model, saved build plans (frozen format fixture first): `src/lib/build/plan.ts`, `server/builds.ts`, `test/fixtures/build/build-plan-v1.json`
+- [x] R3b The planners: every step's argv, stdin and files, golden against the notebook (with the qq script text; T222)
+- [x] R3c Build and systems views; the preview (drag and drop, ↑ ↓, the stages checkable, the draft kept in this browser)
+- [x] R4 Files, mdp files, force field check, settings (base folder and python; stat and read only, nothing written; settings' python import check left for batch 5, with the first python run)
+- [x] R4 after batch 5: pdb2gmx's answers per sequence against the force field's menus (GROMACS's `filter_ter` ported, T230); the time step of methods without hmr (T231)
+
+### Phase 3: The Matrix's names (R8a, R8b)
+- [x] R8a Systems from a project: the groups, column labels and sequences, or only the cells with no runs (`Systems.only`, each cell with its repeats) (T223)
+- [x] R8b Folders and names the project reads, checked with the Matrix's code: `systemLanding` through `planBatch`, `POST /api/build/landing`, the preview's "in the project" line (T224); one PMF per system, the multiwalker one from `9.multiwalker/1` (T228, question 12)
+
+### Phase 4: Building here (R5, R6)
+- [x] R5a Folders and the writing rule; the build record (`server/build-run.ts`: one system at a time, `<system>/build.json` with every file written or replaced and GROMACS's backups; fatal text by `src/lib/build/fatal.ts`)
+- [x] R5b The steps, with fake tools from real output (`test/fake-gmx-build.mjs` and `test/fake-python.mjs` print the notebook's own build of hhhhhhhh; `server/python/build_peptide.py` and `hmr.py` shipped; one system end to end)
+- [x] R5c Progress, waiting for outputs, cancel (`POST /api/build/start`, runs and cancel; symbuilder · progress; the wait in settings; mdrun's own progress bar from its `-v` lines, sample 6, T232)
+- [x] R6 Failures, retries, repeats, resume (`src/lib/build/retry.ts`; resume or rebuild a failed system, the folder moved to `failed/`; continue, skip or repeat for a folder that exists; a failed walker rebuilt once from the nearest; the hint on the real box errors)
+
+### Phase 5: The cluster (R7)
+- [x] R7a qq scripts and profiles (each stage's profile in settings, the walkers' an MPI gmx; submit for me, off by default, with qq's real answer from the older notebook)
+- [x] R7b The cluster tab: scripts, and SymBuilder's systems among the jobs (`#cluster/scripts`; a job matched by its input folder's end; go on, on a press, prepares the walkers once the pull ended)
+
+### Phase 6: Results (R8c–R8e, R9, R10)
+- [x] R8c PMFs into the vault: the summary's *PMF in set-up* on walker 1's energy file and run input (question 12: the multiwalker PMF), sent by the AWH result's own send (T229)
+- [x] R8d PMF numbers with the Matrix's code: min, where and area of the newest PMF in `9.multiwalker/1/awh/`, by `transformXY`, `runStats` and `wellArea` at walker 1's `ref_t` (T229)
+- [x] R9 Reports (`src/lib/build/report.ts`, golden against the notebook's saved summary of 42 systems, pull and walker reports and termini; a build's warnings by stage reproduce the notebook's row for hhhhhhhh; symbuilder · summary; `logs/build_summary_<stamp>.log`)
+- [x] R10 From a built system to analysis (`src/lib/build/analyse.ts`: the summary opens set-up's batch mode with the build's `solutions/` and a template by the notebook's names, through the cluster tab's offer; matched by `matchTrajectory`)
+
+### Phase 7: Finish
+- [x] README, contract, fresh-context review, report (`docs/batch-4-report.md`)
+
+### Backlog (Batch 4: add to it, don't do it)
+- Job submission and killing jobs (unless question 6 says otherwise).
+- Python scripts as tiles (the mock-up's library board), unless question 7 says otherwise.
+- The notebook's plots; the production tile (the notebook has none).
+- Requests for the Matrix and for Morpheus (section 23).
+- Found in the review (T225): the walkers' script needs an MPI gmx for `-multidir`; R7a should refuse a thread-MPI profile (MetaCentrum's GROMACS 2022.3 `gmx`) for the walkers, in words.
+- Found in Phase 0: (fixed in R1b) the page had no icon, so Chromium 1243 (the one installed here; Playwright 1.56.1 is pinned) logs a 404 for `/favicon.ico` and 12 of the 14 e2e tests fail on their "no console errors" check (report §1). (fixed after batch 4: the theme is set in `main.tsx` before the first render) A chart drawn in the page's first render takes the light palette in the dark theme: `usePageTheme` (`src/core/theme.ts`) reads `<html data-theme>` before `App`'s layout effect sets it, and its observer starts after the change (today's result pages escape it because their charts wait for data).

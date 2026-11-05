@@ -1,0 +1,43 @@
+Reading structure file
+Going to read 0 old index file(s)
+Analysing residue names:
+There are:     5      Other residues
+There are:     8    Protein residues
+There are: 11080      Water residues
+There are:    60        Ion residues
+Analysing residues not classified as Protein/DNA/RNA/Water and splitting into groups...
+Analysing Protein...
+
+  0 System              : 33549 atoms
+  1 Other               :   110 atoms
+  2 BGLCN               :    29 atoms
+  3 AGAL                :    21 atoms
+  4 AGLC                :    20 atoms
+  5 AFUC                :    40 atoms
+  6 NA                  :    30 atoms
+  7 CL                  :    30 atoms
+  8 Protein             :   139 atoms
+  9 Protein-H           :    81 atoms
+ 10 C-alpha             :     8 atoms
+ 11 Backbone            :    24 atoms
+ 12 MainChain           :    31 atoms
+ 13 MainChain+Cb        :    39 atoms
+ 14 MainChain+H         :    41 atoms
+ 15 SideChain           :    98 atoms
+ 16 SideChain-H         :    50 atoms
+ 17 Prot-Masses         :   139 atoms
+ 18 non-Protein         : 33410 atoms
+ 19 Water               : 33240 atoms
+ 20 SOL                 : 33240 atoms
+ 21 non-Water           :   309 atoms
+ 22 Ion                 :    60 atoms
+ 23 Water_and_ions      : 33300 atoms
+
+ nr : group      '!': not  'name' nr name   'splitch' nr    Enter: list groups
+ 'a': atom       '&': and  'del' nr         'splitres' nr   'l': list residues
+ 't': atom type  '|': or   'keep' nr        'splitat' nr    'h': help
+ 'r': residue              'res' nr         'chain' char
+ "name": group             'case': case sensitive           'q': save and quit
+ 'ri': residue index
+
+> 

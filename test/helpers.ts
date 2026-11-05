@@ -1,10 +1,12 @@
 import { spawn, type ChildProcess } from 'node:child_process';
-import { copyFileSync, cpSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { copyFileSync, cpSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 export const RUNNER = new URL('..', import.meta.url).pathname;
 export const APP = new URL('../../matrix/', import.meta.url).pathname;
+/** Your force field's .tdb block names (no parameters) and its watermodels.dat: pdb2gmx's menus (T230). */
+const FF_MENUS = RUNNER + 'test/fixtures/build/ff-menus';
 // A run leaves nothing in the system's temp folder (a session of runs had filled the disk with them, 65 MB a runner
 // home): Vitest removes each test file's folders after it (test/setup.ts), Playwright when its worker ends.
 const made: string[] = [];
@@ -63,4 +65,21 @@ export function clusterCopy() {
     for (const [from, to] of [['nvt.xtc', '07_md.xtc'], ['nvt.tpr', '07_md.tpr'], ['nvt.gro', '07_md.gro']]) copyFileSync(RUNNER + 'test/fixtures/nvt/' + from, join(d, to));
   }
   return root;
+}
+
+/** A base folder as the notebook's: the saccharide (the first 110 atoms of a real system), the mdp files, ff/. */
+export function baseFolder() {
+  const base = tmp('base'), system = readFileSync(new URL('./fixtures/decypher/9.multiwalker.gro', import.meta.url), 'utf8').split('\n');
+  for (const d of ['molecules/saccharides', 'inputs', 'ff/charmm36s-jul2022-prosECCo75.ff', 'ff/TIP3PF', 'ff/ions']) mkdirSync(join(base, d), { recursive: true });
+  writeFileSync(join(base, 'molecules/saccharides/o111.gro'), ['o111', '  110', ...system.slice(2, 112), system[2 + Number(system[1])], ''].join('\n'));
+  // Your mdp files are not in the fixtures: a line each, which the fake grompp copies to its mdout, and minim's and
+  // nvt's define, as yours set it (the fake grompp reads #ifdef POSRES by it).
+  const define = 'define                  = -DPOSRES -DPOSRES_FC_BB=400.0 -DPOSRES_FC_SC=40.0 -DDIHRES -DDIHRES_FC=4.0\n';
+  for (const f of ['minim', 'eq_nvt', 'eq_npt', 'awh', 'awh_hmr', 'pull', 'hmr_multi']) writeFileSync(join(base, 'inputs', f + '.mdp'), (f === 'minim' || f === 'eq_nvt' ? define : '') + '; ' + f + '.mdp\n');
+  // The force field's files a build reads (R4's check), each a line: the fake tools read none of them.
+  for (const f of ['ADDff.itp', 'o111-ADD.itp', 'ions/iontypes.itp', 'ions/ions.itp', 'TIP3PF/TIP3PF_orig.itp', 'TIP3PF/TIP3PF_HMR.itp', 'charmm36s-jul2022-prosECCo75.ff/forcefield.itp', 'charmm36s-jul2022-prosECCo75.ff/aminoacids.rtp'])
+    writeFileSync(join(base, 'ff', f), '; yours\n');
+  // pdb2gmx's menus: your force field's .tdb block names and its water models (test/fixtures/build/ff-menus).
+  for (const f of readdirSync(FF_MENUS).filter(f => f !== 'README.md')) copyFileSync(join(FF_MENUS, f), join(base, 'ff/charmm36s-jul2022-prosECCo75.ff', f));
+  return base;
 }

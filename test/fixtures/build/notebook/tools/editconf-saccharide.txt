@@ -1,0 +1,45 @@
+              :-) GROMACS - gmx editconf, 2025.4-PLUMED_spack (-:
+
+Executable:   /opt/gromacs-2025.4/bin/gmx_mpi
+Data prefix:  /opt/gromacs-2025.4
+Working dir:  /storage/brno/you/02_evomd/innit_tests/solutions/hmr+fast+6/o111/hhhhhhhh
+Command line:
+  gmx_mpi editconf -f o111.gro -o o111_princ.gro -translate 0 1.5 0 -princ
+
+
+Select group for the determining the orientation
+Group     0 (         System) has   110 elements
+Group     1 (          Other) has   110 elements
+Group     2 (          BGLCN) has    29 elements
+Group     3 (           AGAL) has    21 elements
+Group     4 (           AGLC) has    20 elements
+Group     5 (           AFUC) has    40 elements
+Select a group: 
+GROMACS reminds you: "The biggest lie in science is 'data and code available upon request'" (Michael Eisen)
+
+Note that major changes are planned in future for editconf, to improve usability and utility.
+Read 110 atoms
+Volume: 1 nm^3, corresponds to roughly 400 electrons
+No velocities found
+    system size :  1.817  1.367  0.647 (nm)
+    center      :  0.491  0.413  0.494 (nm)
+    box vectors :  1.000  1.000  1.000 (nm)
+    box angles  :  90.00  90.00  90.00 (degrees)
+    box volume  :   1.00               (nm^3)
+
+WARNING: Masses and atomic (Van der Waals) radii will be guessed
+         based on residue and atom names, since they could not be
+         definitively assigned from the information in your input
+         files. These guessed numbers might deviate from the mass
+         and radius of the atom type. Please check the output
+         files if necessary. Note, that this functionality may
+         be removed in a future GROMACS version. Please, consider
+         using another file format for your input.
+
+Selected 0: 'System'
+Translating 110 atoms (out of 110) by 0 1.5 0 nm
+new system size :  1.819  1.342  0.651
+new center      :  0.491  1.912  0.495 (nm)
+new box vectors :  1.000  1.000  1.000 (nm)
+new box angles  :  90.00  90.00  90.00 (degrees)
+new box volume  :   1.00               (nm^3)

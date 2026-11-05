@@ -28,7 +28,7 @@ test('pick inputs, make groups, run, see the chart', async ({ page }) => {
   const errors: string[] = []
   page.on('console', m => { if (m.type() === 'error') errors.push(m.text()) })
   page.on('pageerror', e => errors.push(e.message))
-  await page.goto(url)
+  await page.goto(url + '#setup/inputs')
 
   // Inputs: the trajectory brings the rest, and gmx (fake) agrees on the atom counts.
   await page.getByRole('button', { name: 'nvt.xtc' }).click()
@@ -146,7 +146,7 @@ test('Shift+Enter adds a rule and keeps the form open in the same group, with th
   const errors: string[] = []
   page.on('console', m => { if (m.type() === 'error') errors.push(m.text()) })
   page.on('pageerror', e => errors.push(e.message))
-  await page.goto(url)
+  await page.goto(url + '#setup/inputs')
   await page.getByRole('button', { name: 'nvt.xtc' }).click()
   await expect(page.getByText('the inputs agree')).toBeVisible()
   await page.getByRole('button', { name: 'use these inputs' }).click()
@@ -182,7 +182,7 @@ test('the old addresses open their view; a drop anywhere is split by type, and t
   const errors: string[] = []
   page.on('console', m => { if (m.type() === 'error') errors.push(m.text()) })
   page.on('pageerror', e => errors.push(e.message))
-  for (const [old, now] of [['#jobs', /#results$/], ['#analysis', /#setup\/command$/], ['#rdf', /#setup\/command$/], ['#results/NOT-AN-ID', /#results$/], ['#batch', /#setup\/inputs\?mode=batch$/]] as const) {
+  for (const [old, now] of [['#nowhere', /#home$/], ['#jobs', /#results$/], ['#analysis', /#setup\/command$/], ['#rdf', /#setup\/command$/], ['#results/NOT-AN-ID', /#results$/], ['#batch', /#setup\/inputs\?mode=batch$/]] as const) {
     await page.goto(url + old)
     await expect(page).toHaveURL(now)
   }
@@ -216,7 +216,7 @@ test('the old addresses open their view; a drop anywhere is split by type, and t
 test('Shift-click on an atom in the picker takes its residue (R8a)', async ({ page }) => {
   const errors: string[] = []
   page.on('pageerror', e => errors.push(e.message))
-  await page.goto(url)
+  await page.goto(url + '#setup/inputs')
   await page.getByRole('button', { name: 'nvt.xtc' }).click()
   await expect(page.getByText('the inputs agree')).toBeVisible()
   await page.getByRole('button', { name: 'use these inputs' }).click()
@@ -238,5 +238,39 @@ test('Shift-click on an atom in the picker takes its residue (R8a)', async ({ pa
   // Nudge into the atom's disc: the first red pixel is its top edge.
   await page.keyboard.down('Shift'); await page.mouse.click(b.x + b.width * spot!.x, b.y + b.height * spot!.y + 3); await page.keyboard.up('Shift')
   await expect(card.getByText('5 atoms')).toBeVisible()
+  expect(errors).toEqual([])
+})
+
+test('four tabs, each opening where it was left; the keyboard reaches them and a reload keeps the view (R1b)', async ({ page }) => {
+  const errors: string[] = []
+  page.on('console', m => { if (m.type() === 'error') errors.push(m.text()) })
+  page.on('pageerror', e => errors.push(e.message))
+  await page.goto(url)
+  await expect(page).toHaveURL(/#home$/)
+  const tab = (name: string | RegExp) => page.getByRole('tab', { name })
+  await tab(/^symbuilder/).click()
+  await expect(page).toHaveURL(/#symbuilder\/build$/)
+  await tab('systems').click()
+  await expect(page).toHaveURL(/#symbuilder\/systems$/)
+  await tab(/^analysis/).click()
+  await expect(page).toHaveURL(/#setup\/inputs$/)
+  await tab('results').click()
+  await expect(page).toHaveURL(/#results$/)
+  await tab('cluster').click()
+  await expect(page).toHaveURL(/#cluster$/)
+  // Each tab opens where it was left.
+  await tab(/^symbuilder/).click()
+  await expect(page).toHaveURL(/#symbuilder\/systems$/)
+  await tab(/^analysis/).click()
+  await expect(page).toHaveURL(/#results$/)
+  // A reload keeps the view (where the other tabs were left is the page's memory, so they start afresh); the arrow
+  // keys move between the tabs.
+  await page.reload()
+  await expect(tab('results')).toHaveAttribute('aria-selected', 'true')
+  await tab(/^analysis/).focus()
+  await page.keyboard.press('ArrowLeft')
+  await expect(page).toHaveURL(/#symbuilder\/build$/)
+  await page.keyboard.press('ArrowLeft')
+  await expect(page).toHaveURL(/#home$/)
   expect(errors).toEqual([])
 })

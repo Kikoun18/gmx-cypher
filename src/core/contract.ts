@@ -5,7 +5,7 @@ import { TONES } from './index'
 export { TONES }
 
 /**
- * Words the page never shows (R3b, contract §1): a job is one gmx execution, a record its .run.json, a run the
+ * Words the page never shows (R3b, contract §1): a job is one gmx analysis, a record its .run.json, a run the
  * Matrix's replicate slot, a result what a job produced. *Run* stays a verb.
  */
 export const NEVER_SHOWN: { phrase: RegExp; instead: string }[] = [
@@ -17,6 +17,10 @@ export const NEVER_SHOWN: { phrase: RegExp; instead: string }[] = [
   { phrase: /\brun['’]s\b(?! input\b)|\bruns on disk\b|\bthe runs\b/i, instead: "the job's, records on disk, the jobs" },
   { phrase: /\bby job\b|\beach job its\b/i, instead: 'colour by result' },
   { phrase: /\bopen in \(de\)Cypher\b|\b(open|close) \(de\)Cypher\b|\binside \(de\)Cypher\b/i, instead: 'compare' },
+  // SymBuilder (T202): a repeat is a new folder tree, not a run; a saved stack is a build plan; qq's scripts are qq's.
+  { phrase: /\brepeated runs?\b/i, instead: 'repeats' },
+  { phrase: /\bbuild recipes?\b/i, instead: 'build plan' },
+  { phrase: /\bjob scripts?\b/i, instead: 'qq script' },
 ]
 
 /** An internal reference the page never shows (R3a): a ticket, a question or a request, such as "(T35)", "(question 28)" or "(R9c)". */
@@ -36,16 +40,19 @@ export const ROLES: Record<string, readonly string[]> = {
 /** The only files in src/ that may name a colour by its hex value (R4b): Morpheus's tokens and the role layer. */
 export const COLOUR_FILES = ['src/tokens.json', 'src/roles.json']
 
-/** The tokens of UI state: never a data tone (contract §2). */
+/** The tokens of UI state (contract §2, T218): coral for the fill, coral-strong for the focus ring and underlines. */
 export const UI_STATE = ROLES['ui state']
 
-/** The four status levels (R9c, contract §4): an icon and a word before the text, so colour is never the only signal. */
+/**
+ * The four status levels (R9c, contract §4, T218): a dot and a word in the level's tone before the text, so colour is
+ * never the only signal.
+ */
 export type Level = 'ok' | 'info' | 'warning' | 'error'
-export const STATUS: Record<Level, { icon: string; word: string; token: string; when: string }> = {
-  ok: { icon: 'circle-check', word: 'ok', token: 'foreground', when: 'a check passed' },
-  info: { icon: 'info', word: 'note', token: 'foreground', when: 'worth knowing; nothing to do' },
-  warning: { icon: 'triangle-alert', word: 'check', token: 'foreground', when: 'a result may mislead: look before trusting it' },
-  error: { icon: 'circle-x', word: 'error', token: 'destructive', when: 'nothing ran or nothing can be read; it says how to fix it' },
+export const STATUS: Record<Level, { word: string; token: string; when: string }> = {
+  ok: { word: 'ok', token: 'mint-strong', when: 'a check passed' },
+  info: { word: 'note', token: 'sky-strong', when: 'worth knowing; nothing to do' },
+  warning: { word: 'check', token: 'butter-strong', when: 'a result may mislead: look before trusting it' },
+  error: { word: 'error', token: 'destructive', when: 'nothing ran or nothing can be read; it says how to fix it' },
 }
 
 /** The only files whose classes may colour text or a ground `destructive` (R4a, R9c): the status component and destructive buttons. */

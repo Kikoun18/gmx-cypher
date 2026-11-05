@@ -1,0 +1,93 @@
+Reading file 3.pre_salted.tpr, VERSION 2025.4-PLUMED_spack (single precision)
+Reading file 3.pre_salted.tpr, VERSION 2025.4-PLUMED_spack (single precision)
+Group     0 (         System) has 33669 elements
+Group     1 (          Other) has   110 elements
+Group     2 (         BGLCNA) has    29 elements
+Group     3 (           AGAL) has    21 elements
+Group     4 (           AGLC) has    20 elements
+Group     5 (           AFUC) has    40 elements
+Group     6 (        Protein) has   139 elements
+Group     7 (      Protein-H) has    81 elements
+Group     8 (        C-alpha) has     8 elements
+Group     9 (       Backbone) has    24 elements
+Group    10 (      MainChain) has    31 elements
+Group    11 (   MainChain+Cb) has    39 elements
+Group    12 (    MainChain+H) has    41 elements
+Group    13 (      SideChain) has    98 elements
+Group    14 (    SideChain-H) has    50 elements
+Group    15 (    Prot-Masses) has   139 elements
+Group    16 (    non-Protein) has 33530 elements
+Group    17 (          Water) has 33420 elements
+Group    18 (            SOL) has 33420 elements
+Group    19 (      non-Water) has   249 elements
+Select a group: Number of (3-atomic) solvent molecules: 11140
+
+Back Off! I just backed up hhhhhhhh.top to ./#hhhhhhhh.top.2#
+Using random seed 805304313.
+Replacing solvent molecule 350 (atom 1299) with NA_s
+Replacing solvent molecule 8410 (atom 25479) with NA_s
+Replacing solvent molecule 8234 (atom 24951) with NA_s
+Replacing solvent molecule 3921 (atom 12012) with NA_s
+Replacing solvent molecule 3414 (atom 10491) with NA_s
+Replacing solvent molecule 6442 (atom 19575) with NA_s
+Replacing solvent molecule 777 (atom 2580) with NA_s
+Replacing solvent molecule 3327 (atom 10230) with NA_s
+Replacing solvent molecule 6326 (atom 19227) with NA_s
+Replacing solvent molecule 3183 (atom 9798) with NA_s
+Replacing solvent molecule 126 (atom 627) with NA_s
+Replacing solvent molecule 218 (atom 903) with NA_s
+Replacing solvent molecule 4455 (atom 13614) with NA_s
+Replacing solvent molecule 2111 (atom 6582) with NA_s
+Replacing solvent molecule 931 (atom 3042) with NA_s
+Replacing solvent molecule 7220 (atom 21909) with NA_s
+Replacing solvent molecule 5520 (atom 16809) with NA_s
+Replacing solvent molecule 1646 (atom 5187) with NA_s
+Replacing solvent molecule 10908 (atom 32973) with NA_s
+Replacing solvent molecule 4520 (atom 13809) with NA_s
+Replacing solvent molecule 8258 (atom 25023) with NA_s
+Replacing solvent molecule 7617 (atom 23100) with NA_s
+Replacing solvent molecule 3934 (atom 12051) with NA_s
+Replacing solvent molecule 8004 (atom 24261) with NA_s
+Replacing solvent molecule 3331 (atom 10242) with NA_s
+Replacing solvent molecule 9847 (atom 29790) with NA_s
+Replacing solvent molecule 4000 (atom 12249) with NA_s
+Replacing solvent molecule 6884 (atom 20901) with NA_s
+Replacing solvent molecule 3831 (atom 11742) with NA_s
+Replacing solvent molecule 8412 (atom 25485) with NA_s
+Replacing solvent molecule 3558 (atom 10923) with CL_2s
+Replacing solvent molecule 10761 (atom 32532) with CL_2s
+Replacing solvent molecule 4290 (atom 13119) with CL_2s
+Replacing solvent molecule 5988 (atom 18213) with CL_2s
+Replacing solvent molecule 5023 (atom 15318) with CL_2s
+Replacing solvent molecule 4024 (atom 12321) with CL_2s
+Replacing solvent molecule 8478 (atom 25683) with CL_2s
+Replacing solvent molecule 8260 (atom 25029) with CL_2s
+Replacing solvent molecule 10989 (atom 33216) with CL_2s
+Replacing solvent molecule 10263 (atom 31038) with CL_2s
+Replacing solvent molecule 4302 (atom 13155) with CL_2s
+Replacing solvent molecule 6021 (atom 18312) with CL_2s
+Replacing solvent molecule 4913 (atom 14988) with CL_2s
+Replacing solvent molecule 8144 (atom 24681) with CL_2s
+Replacing solvent molecule 5419 (atom 16506) with CL_2s
+Replacing solvent molecule 2240 (atom 6969) with CL_2s
+Replacing solvent molecule 9627 (atom 29130) with CL_2s
+Replacing solvent molecule 8054 (atom 24411) with CL_2s
+Replacing solvent molecule 7614 (atom 23091) with CL_2s
+Replacing solvent molecule 8723 (atom 26418) with CL_2s
+Replacing solvent molecule 7860 (atom 23829) with CL_2s
+Replacing solvent molecule 5619 (atom 17106) with CL_2s
+Replacing solvent molecule 2910 (atom 8979) with CL_2s
+Replacing solvent molecule 9281 (atom 28092) with CL_2s
+Replacing solvent molecule 8571 (atom 25962) with CL_2s
+Replacing solvent molecule 5218 (atom 15903) with CL_2s
+Replacing solvent molecule 9758 (atom 29523) with CL_2s
+Replacing solvent molecule 10300 (atom 31149) with CL_2s
+Replacing solvent molecule 6603 (atom 20058) with CL_2s
+Replacing solvent molecule 6917 (atom 21000) with CL_2s
+
+Will try to add 30 NA_s ions and 30 CL_2s ions.
+Select a continuous group of solvent molecules
+Selected 18: 'SOL'
+
+Processing topology
+Replacing 60 solute molecules in topology file (hhhhhhhh.top)  by 30 NA_s and 30 CL_2s ions.

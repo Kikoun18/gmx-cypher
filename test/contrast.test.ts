@@ -19,7 +19,7 @@ function luminance(hex: string) {
 }
 const ratio = (a: string, b: string) => { const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x); return (hi + 0.05) / (lo + 0.05); };
 
-const TEXT = ['foreground', 'muted-foreground', 'mint-strong', 'butter-strong', 'destructive'];
+const TEXT = ['foreground', 'muted-foreground', 'mint-strong', 'sky-strong', 'butter-strong', 'destructive'];
 const ROWS = [
   { view: 'src/views/Jobs.tsx', background: 'muted', what: 'the selected job (on the page)' },
   { view: 'src/views/Inputs.tsx', background: 'background', what: 'a picked file (in a card)' },
@@ -61,10 +61,13 @@ describe('colour roles (R4a, T159)', () => {
     expect(ratio(colour(theme, 'destructive-foreground'), d)).toBeGreaterThanOrEqual(4.5);
   });
 
-  it.each(Object.entries(THEMES))('%s: no UI-state token resolves to a data tone; the focus ring is at least 3:1 on every ground', (_, theme) => {
-    const data = new Set(TONES.flatMap(t => [t, t + '-strong', t + '-soft', t + '-foreground']).map(n => colour(theme, n)));
-    for (const n of UI_STATE) expect([n, data.has(colour(theme, n))]).toEqual([n, false]);
+  it.each(Object.entries(THEMES))('%s: UI state is coral (T218): the fill coral, its text readable on it, the ring and underline coral-strong and at least 3:1 on every ground', (_, theme) => {
+    expect(colour(theme, 'state')).toBe(colour(theme, 'coral'));
+    expect(colour(theme, 'primary')).toBe(colour(theme, 'coral'));
+    expect(colour(theme, 'ring')).toBe(colour(theme, 'coral-strong'));
+    expect(ratio(colour(theme, 'state-foreground'), colour(theme, 'state'))).toBeGreaterThanOrEqual(4.5);
     for (const g of ['background', 'card', 'field']) expect(ratio(colour(theme, 'ring'), colour(theme, g))).toBeGreaterThanOrEqual(3);
+    for (const n of UI_STATE) expect([n, colour(theme, n).startsWith('#')]).toEqual([n, true]);
   });
 
   it('every role has a token, and every token it names exists in both themes', () => {

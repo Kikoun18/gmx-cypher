@@ -4,7 +4,9 @@ A local tool that runs GROMACS analyses on your trajectories and energy files: `
 `rmsf`, `gyrate`, `mindist`, `density`, `order`, `energy`, `awh` and `wham`. You pick atom groups in 3D or by rule, see
 the exact command before it runs, get every output with its record, compare results of any command side by side or on
 one graph, export any chart, and hand results to **the Matrix** through its vault, where they land in the right row,
-column and run. A *cluster* tab shows your cluster jobs (`qq jobs` with `gmx-eta -a`).
+column and run. A *cluster* tab shows your cluster jobs (`qq jobs` with `gmx-eta -a`), and **SymBuilder** plans the
+systems you simulate (peptide + saccharide in water and salt) step by step, as your solution-builder notebook builds
+them, and builds them here, one system at a time, up to the qq scripts of the stages that run on the cluster.
 
 It runs on your machine (or the machine that has the trajectories), serves its page on 127.0.0.1 only, and never
 deletes or overwrites a file.
@@ -56,6 +58,80 @@ says so when it starts: `ssh -L 8765:127.0.0.1:8765 workstation`, then the same 
 finish and get their records; it logs `SIGHUP: the terminal closed; gmx-cypher keeps running (pid N). Stop it with:
 kill N`. Its page stays where it was. To stop it: Ctrl-C in its terminal, or `kill <pid>`; that cancels its running
 jobs first. To start it detached from the outset, `nohup npm start > gmx-cypher.log 2>&1 &` (or inside `tmux`).
+
+## Tabs
+
+Four tabs, each at an address of its own, each opening where you left it:
+
+- **home** (`#home`, and an address it doesn't know): what gmx-cypher knows now: gmx, jobs running and done, the
+  cluster's last read, the connected project and its cells with no runs, each linking to its tab.
+- **symbuilder** (`#symbuilder/build`, `systems`, `files`, `progress`, `summary`): see *SymBuilder* below.
+- **analysis**: *set-up* (`#setup/inputs`, …) and *results* (`#results`, `#result/<id>`, `#compare/…`), as before;
+  every older address still opens what it opened.
+- **cluster** (`#cluster`, `#cluster/scripts`): see *The cluster view*.
+
+## SymBuilder
+
+SymBuilder plans a build: every system (method × saccharide × sequence, with repeats) and every step each runs, from
+the PyMOL peptide to the walkers, as your notebook runs them; you see each command before anything runs. *build N
+systems* then builds them in the base folder, one at a time: minimisation, nvt and npt run here, awh, the pull and the
+walkers are prepared and get their qq script and `qq submit` line (nothing is submitted for you).
+
+- **build**: the build plan as tiles in stages (solution builder, minimisation, nvt, npt, awh, pull, multiwalker), each
+  stage checkable, tiles dragged (or moved with ↑ ↓) within a stage and from the palette. The selected tile shows its
+  exact command for the first system, the answers it types (pdb2gmx's `1 8 0 0`, per sequence if they differ), and the
+  files it reads and writes. A build plan is saved by name (`~/.gmx-cypher/builds/<name>.json`, never overwritten unless
+  you say *replace*), opened, exported and imported as JSON.
+- **systems**: the methods, saccharides and sequences (each name checked: it becomes a folder and an argument), repeats
+  (`hmr+fast+6r`, `r1`, …), what to do with a folder that exists, and the preview: every system, its check (files
+  missing, a stage order that can't work), and, with a connected project, **where its PMF would land** in it. *From
+  the project* takes the project's row groups, column labels and sequences; *build what the project lacks* only the
+  cells with no runs. The PMF is the multiwalker one: the walkers share one bias, so `gmx awh` on walker 1's energy
+  file gives it, run in `9.multiwalker/1` (7.awh is prepared, not run). Where it would land is worked out with the
+  Matrix's own `planBatch` for that folder, named by the project's name pattern: another row, column or run, a new row
+  because the project's row is named apart from its sequence, a folder pattern that reads the folder as something
+  else, are said in words before anything is built.
+- **files**: what a build reads from the **base folder** (*settings → SymBuilder*; it must be inside an allowed
+  folder): each saccharide's `.gro` and `-ADD.itp`, the force field and its includes, and the mdp file of each stage
+  per method, each *found* or *missing*. Click an mdp file to read it. **pdb2gmx's answers** are checked against
+  your force field's own menus, built as pdb2gmx builds them from its `.tdb` files: for each sequence, what the answers
+  pick for its first and last residue. Where the plan's `1 8 0 0` would pick another terminus (MET's menus start with
+  the ethers' `MET1` and `MET2`), the build is stopped until that sequence has the answers that pick NH3+ and COO-
+  (`1 8 1 1`, one press). GLY's and PRO's own termini (`GLY-NH3+`, `PRO-NH2+`) count as NH3+. A method without hmr
+  whose stage uses an mdp with a time step over 2 fs (your `pull.mdp` and `awh_multi.mdp` set 4 fs) is flagged,
+  but not stopped.
+- **progress**: the last build, each system's step of all its steps and what the running step prints (as a terminal
+  shows it: each line as mdrun's last `\r` rewrite left it), mdrun's own bar for minimisation, nvt and npt (its step of
+  all, the time left, a minimisation's largest force against its tolerance, read as your notebook reads `mdrun -v`), the qq submit
+  lines of the systems that wait for the cluster, and *cancel the build* (it stops the running step's process group
+  and every system after it). A system stops at the first GROMACS fatal error, quoted with its stage, whatever the exit
+  code (or at any non-zero exit with strict mode on), with a hint for the pull's two box errors; the others go on, or
+  the build stops, as you choose. A failed system can be *resumed at the step that stopped* (in its folder, nothing
+  before it rewritten, except a position-restraint include an earlier version wrote from `ff/`, which leads nowhere
+  and is corrected) or *rebuilt anew* (its folder moved to `failed/` first, with `FAILED.txt`). A folder that
+  exists is continued if a gmx-cypher build made it, skipped, or built beside as the next repeat, as you choose. A
+  walker whose preparation fails is moved to `9.multiwalker/failed/` and prepared again, once, from the start of the
+  nearest working walker, as your notebook's retry does.
+- **summary**: the last build's summary (each system's charge before the salt, its ions, the pull's shortest
+  distance, its time, its status and GROMACS's warnings by stage, as your notebook counts them), the pull report, the
+  walker report (x output, o run input ready, – missing) and the termini check; the summary is also written, once per
+  build, to `<base>/logs/build_summary_<date>_<time>.log`.
+- **From a build to analysis**: the summary's *analyse the walkers in set-up* (or *awh*) opens set-up's batch mode
+  with the build's `solutions/` as its root and a path template by the notebook's names
+  (`{method}/{column}/{seq}/9.multiwalker/{run}/9.multiwalker.xtc`); you preview, choose, and press run.
+- **A built system's PMF**: the multiwalker one (the walkers share one bias, so `gmx awh` on walker 1's energy file
+  gives it). Once the walkers ran, the summary's *PMF in set-up* fills set-up's AWH command with walker 1's
+  `9.multiwalker.edr` and `.tpr` (inside the allowed folders only). Its result is sent to the vault as every AWH result
+  is. The summary then shows the newest PMF's minimum, where it is and its area, by the Matrix's own code at walker
+  1's `ref_t`.
+- The build being planned is kept in this browser.
+
+Methods switch on what their name says: `hmr` hydrogen masses (gromologist), `fast` TIP3PF water; awh, the pull and the
+walkers get a qq script and its `qq submit` line. *Settings → SymBuilder · qq scripts* chooses each stage's profile
+(the notebook's three: MetaCentrum's GROMACS 2025.4 cuda and 2022.3 plumed, LUMI multidir; the walkers run together
+with `-multidir`, so theirs needs an MPI gmx), the queue, and *submit them for me*, off by default: off, you submit
+each line; on, gmx-cypher runs `qq submit -q <queue> <script>` in the step's folder, and nothing else. *Settings → SymBuilder* also takes the python (with PyMOL and
+gromologist) that builds will use: `python3`, `python`, or a path to one.
 
 ## Set-up
 
@@ -233,7 +309,13 @@ words when it needs more than its walltime left.
   If they are not on `PATH`, set their paths in *settings*.
 - **How often:** once when the tab opens, then every minute while it is open and the page is visible, one read at a
   time, less often after a failure. *refresh* reads now.
-- **What it never does:** kill or submit a job, or run anything but those three commands.
+- **A build's jobs** (SymBuilder): a job whose input folder is a system's step folder (`…/<method>/<saccharide>/<sequence>/8.pull`)
+  is shown as that system's, at that stage. When a system's pull has ended, *go on: prepare the walkers* continues
+  that system with its walkers' stage on, only when you press it.
+- **scripts** (`#cluster/scripts`): the three profiles, each stage's (as set in settings), and the qq script a build
+  writes for the first system planned, with its submit line.
+- **What it never does:** kill a job, or run anything but those three commands; it submits only a build's scripts, and
+  only with *submit them for me* on.
 
 ## Where files go
 
@@ -245,6 +327,12 @@ words when it needs more than its walltime left.
 | Uploads, group size checks | `~/.gmx-cypher/uploads/…`, `~/.gmx-cypher/checks/…` |
 | Jobs (an event log each) | `~/.gmx-cypher/jobs/<id>.ndjson`; archived: `~/.gmx-cypher/jobs/archive/<id>.ndjson` |
 | Recipes, settings | `~/.gmx-cypher/recipes/<name>.json`, `~/.gmx-cypher/config.json` |
+| Build plans (SymBuilder) | `~/.gmx-cypher/builds/<name>.json` |
+| A built system | `<base>/solutions/<method>/<saccharide>/<sequence>/`, the notebook's names, with its record `build.json` (every file written or replaced, with its size and SHA-256) |
+| Its qq scripts | `<base>/scripts/<stage>/<method>_<stage>_<sequence>.sh` (kept if it exists), copied into the step's folder |
+| A system rebuilt, a walker rebuilt | its old folder moved to `<base>/solutions/<method>/<saccharide>/failed/<sequence>_<stamp>/` with `FAILED.txt`; a walker's to `9.multiwalker/failed/<n>_<stamp>/` |
+| Builds and their steps' logs | `~/.gmx-cypher/builds/runs/<id>.json`, `~/.gmx-cypher/builds/jobs/<id>.ndjson` |
+| A build's summary | `<base>/logs/build_summary_<YYYYMMDD_HHMM>.log`, a new file each build (`_2` if the minute's is taken) |
 | A sent result | `<vault>/<project folder>/_inbox/<name>` |
 | Its record's copy | `<vault>/gmx-cypher/records/<sha256 of the sent file>.run.json` |
 | Saved compare views | `<vault>/gmx-cypher/projects/<project id>/views/<name>.json` |
@@ -297,16 +385,25 @@ gmx-cypher can:
 - read files inside the allowed folders, and read your Matrix vault through a reader whose every write throws;
 - start `gmx` and the GROMACS tools it knows (never through a shell), in a trajectory's folder;
 - in the cluster view: start `qq jobs -e`, `qq jobs -a` and `gmx-eta -a` on this machine, with fixed arguments, one
-  at a time;
+  at a time; and, only with *submit them for me* on, `qq submit -q <queue> <script>` for a build's cluster stages;
+- in SymBuilder: look up (stat) the files a build reads in the base folder, read an mdp or topology file there (at most
+  256 kB, never through a link that leaves it), and read the connected project to say where results would land;
+- build: start the configured gmx (`pdb2gmx editconf trjconv solvate genion make_ndx grompp mdrun energy`) and the
+  configured python with its two shipped scripts (`server/python/build_peptide.py`, PyMOL; `hmr.py`, gromologist),
+  each argument from the build plan, never through a shell;
 - write new files: a job's outputs, under names that are free; files in its own state folder; a result you send, into
-  the project's `_inbox`; and its own vault space.
+  the project's `_inbox`; its own vault space; a saved build plan in its state folder; and a system's folder, which a
+  build creates (one that exists is left as it is), with every file in it new or written by that build, and its qq
+  scripts in `<base>/scripts/`, created only where none is. Retrying **moves** a folder a build created to `failed/`;
+  nothing is deleted.
 
 It cannot, by design:
 - overwrite or delete any of your files (new names are created exclusively; archive moves a job's file without copying
   or replacing anything);
 - be reached from another computer, or used by another page in your browser (127.0.0.1 only; every request needs the
   token and a local Host; a request from a page must come from this very address; every POST must be JSON);
-- run anything but the commands above, kill or submit a cluster job, or send free text from the page to a shell;
+- run anything but the commands above, kill a cluster job, submit one unless you turn that on, or send free text from
+  the page to a shell;
 - reach the network beyond serving its own page.
 
 *cancel* stops the whole process group of a job (SIGTERM, then SIGKILL after 5 s); stopping gmx-cypher cancels its

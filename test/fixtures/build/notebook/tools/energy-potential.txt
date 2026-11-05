@@ -1,0 +1,67 @@
+Opened ./4.minim/4.minim.edr as single precision energy file
+
+Select the terms you want from the following list by
+selecting either (part of) the name or the number or a combination.
+End your selection with an empty line or a zero.
+-------------------------------------------------------------------
+  1  Bond             2  U-B              3  Proper-Dih.      4  Improper-Dih. 
+  5  CMAP-Dih.        6  LJ-14            7  Coulomb-14       8  LJ-(SR)       
+  9  Coulomb-(SR)    10  Coul.-recip.    11  Position-Rest.  12  Dih.-Rest.    
+ 13  Potential       14  Pressure        15  Constr.-rmsd    16  Vir-XX        
+ 17  Vir-XY          18  Vir-XZ          19  Vir-YX          20  Vir-YY        
+ 21  Vir-YZ          22  Vir-ZX          23  Vir-ZY          24  Vir-ZZ        
+ 25  Pres-XX         26  Pres-XY         27  Pres-XZ         28  Pres-YX       
+ 29  Pres-YY         30  Pres-YZ         31  Pres-ZX         32  Pres-ZY       
+ 33  Pres-ZZ         34  #Surf*SurfTen   35  T-rest        
+
+
+Reading energy frame      0 time    0.000         
+Reading energy frame      1 time    1.000         
+Reading energy frame      2 time    2.000         
+Reading energy frame      3 time    3.000         
+Reading energy frame      4 time    4.000         
+Reading energy frame      5 time    5.000         
+Reading energy frame      6 time    6.000         
+Reading energy frame      7 time    7.000         
+Reading energy frame      8 time    8.000         
+Reading energy frame      9 time    9.000         
+Reading energy frame     10 time   11.000         
+Reading energy frame     11 time   12.000         
+Reading energy frame     12 time   13.000         
+Reading energy frame     13 time   15.000         
+Reading energy frame     14 time   16.000         
+Reading energy frame     15 time   17.000         
+Reading energy frame     16 time   18.000         
+Reading energy frame     17 time   19.000         
+Reading energy frame     18 time   21.000         
+Reading energy frame     19 time   22.000         
+Reading energy frame     20 time   23.000         
+Reading energy frame     30 time   36.000         
+Reading energy frame     40 time   48.000         
+Reading energy frame     50 time   61.000         
+Reading energy frame     60 time   74.000         
+Reading energy frame     70 time   87.000         
+Reading energy frame     80 time  100.000         
+Reading energy frame     90 time  112.000         
+Reading energy frame    100 time  125.000         
+Reading energy frame    110 time  138.000         
+Reading energy frame    120 time  151.000         
+Reading energy frame    130 time  164.000         
+Reading energy frame    140 time  176.000         
+Reading energy frame    150 time  189.000         
+Reading energy frame    160 time  202.000         
+Reading energy frame    170 time  214.000         
+Reading energy frame    180 time  227.000         
+Reading energy frame    190 time  239.000         
+Reading energy frame    200 time  252.000         
+Reading energy frame    300 time  378.000         
+Reading energy frame    400 time  505.000         
+Reading energy frame    500 time  631.000         
+Last energy frame read 502 time  634.000         
+
+Statistics over 635 steps [ 0.0000 through 634.0000 ps ], 1 data sets
+All statistics are over 503 points (frames)
+
+Energy                      Average   Err.Est.       RMSD  Tot-Drift
+-------------------------------------------------------------------------------
+Potential                   -524659      10000    27356.9     -68295  (kJ/mol)

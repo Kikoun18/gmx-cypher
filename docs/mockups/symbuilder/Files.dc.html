@@ -1,0 +1,454 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Files</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ds/morpheus/tokens.css">
+<link rel="stylesheet" href="ds/morpheus/components/bundle.css">
+<script src="ds/morpheus/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:inherit}
+button{font-family:inherit}
+button:focus-visible,a:focus-visible{outline:2px solid var(--ring);outline-offset:2px}
+pre{margin:0}
+textarea{font-family:var(--font-mono)}
+</style>
+</helmet>
+<div data-theme="{{theme}}" style="min-height: 1240px; box-sizing: border-box; display: flex; flex-direction: column; background: var(--background); color: var(--foreground); font-family: var(--font-mono); font-size: 13px; line-height: 1.5;">
+
+  <header style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px 24px; padding: 12px 24px; border-bottom: 1px solid var(--border);">
+    <div style="display: flex; align-items: baseline; gap: 10px;">
+      <span style="font-size: 15px; font-weight: 700;">gmx-cypher</span>
+      <span style="font-size: 10px; line-height: 14px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground);">generate</span>
+    </div>
+    <nav aria-label="generator views" style="display: flex; gap: 4px;">
+      <a href="Main.dc.html" style="padding: 6px 10px; font-size: 12px; line-height: 16px; text-decoration: none; border-bottom: 2px solid transparent; color: var(--muted-foreground);">build</a>
+      <a href="Run.dc.html" style="padding: 6px 10px; font-size: 12px; line-height: 16px; text-decoration: none; border-bottom: 2px solid transparent; color: var(--muted-foreground);">run</a>
+      <a href="Dashboard.dc.html" style="padding: 6px 10px; font-size: 12px; line-height: 16px; text-decoration: none; border-bottom: 2px solid transparent; color: var(--muted-foreground);">dashboard</a>
+      <a href="Summary.dc.html" style="padding: 6px 10px; font-size: 12px; line-height: 16px; text-decoration: none; border-bottom: 2px solid transparent; color: var(--muted-foreground);">summary</a>
+      <a href="Library.dc.html" style="padding: 6px 10px; font-size: 12px; line-height: 16px; text-decoration: none; border-bottom: 2px solid transparent; color: var(--muted-foreground);">library</a>
+      <a href="MDP.dc.html" style="padding: 6px 10px; font-size: 12px; line-height: 16px; text-decoration: none; border-bottom: 2px solid transparent; color: var(--muted-foreground);">mdp</a>
+      <a href="Files.dc.html" aria-current="page" style="padding: 6px 10px; font-size: 12px; line-height: 16px; font-weight: 700; text-decoration: none; border-bottom: 2px solid var(--coral-strong);">files</a>
+      <a href="Cluster.dc.html" style="padding: 6px 10px; font-size: 12px; line-height: 16px; text-decoration: none; border-bottom: 2px solid transparent; color: var(--muted-foreground);">cluster</a>
+      <a href="Warnings.dc.html" style="padding: 6px 10px; font-size: 12px; line-height: 16px; text-decoration: none; border-bottom: 2px solid transparent; color: var(--muted-foreground);">warnings</a>
+      <a href="Settings.dc.html" style="padding: 6px 10px; font-size: 12px; line-height: 16px; text-decoration: none; border-bottom: 2px solid transparent; color: var(--muted-foreground);">settings</a>
+    </nav>
+    <span style="flex: 1 1 0;"></span>
+    <a href="Warnings.dc.html" style="font-size: 11px; line-height: 16px; text-decoration: none; color: var(--butter-strong);">3 open · 2 ignored</a>
+    <span style="font-size: 11px; line-height: 16px; color: var(--muted-foreground);">gmx_mpi 2025.4 · <span style="color: var(--mint-strong);">ready</span></span>
+    <span style="font-size: 11px; line-height: 16px; color: var(--muted-foreground);">qq · <span style="color: var(--mint-strong);">ready</span></span>
+  </header>
+
+  <div style="display: flex; flex-direction: column; gap: 4px; padding: 20px 24px 0;">
+    <h1 style="margin: 0; font-size: 18px; line-height: 24px; font-weight: 700;">files</h1>
+    <p style="margin: 0; font-size: 12px; line-height: 16px; color: var(--muted-foreground);">assign the .gro, .itp and other files that belong to a saccharide or a sequence · every tile, python parameter and path template can read them as tokens, like <span style="color: var(--foreground);">{saccharide.gro}</span></p>
+  </div>
+
+  <div style="display: grid; grid-template-columns: 330px minmax(0, 1fr) 390px; gap: 20px; align-items: start; padding: 20px 24px 0;">
+
+    <aside aria-label="saccharides and sequences" style="display: flex; flex-direction: column; gap: 10px; min-width: 0;">
+      <x-import component-from-global-scope="Morpheus.Section" label="Saccharides">{{ sugarCount }}</x-import>
+      <div style="display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--card); overflow: hidden;">
+        <sc-for list="{{ sugars }}" as="f" hint-placeholder-count="3">
+          <button type="button" onClick="{{ f.pick }}" aria-pressed="{{ f.isSel }}" aria-label="show the files of {{ f.name }}" style="display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; width: 100%; box-sizing: border-box; padding: 8px 14px 8px 12px; border: 0; border-left: 2px solid {{ f.edge }}; border-bottom: 1px solid var(--border); background: {{ f.bg }}; color: var(--foreground); text-align: left; cursor: pointer;">
+            <span style="min-width: 0; display: flex; flex-direction: column;">
+              <span style="font-size: 13px; line-height: 18px; font-weight: 700;">{{ f.name }}</span>
+              <span style="font-size: 11px; line-height: 16px; color: var(--muted-foreground);">{{ f.summary }}</span>
+            </span>
+            <span style="display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: {{ f.ink }};"><span aria-hidden="true" style="width: 8px; height: 8px; border-radius: var(--radius-full); background: {{ f.ink }};"></span>{{ f.word }}</span>
+          </button>
+        </sc-for>
+      </div>
+
+      <div style="margin-top: 6px;">
+        <x-import component-from-global-scope="Morpheus.Section" label="Sequences">{{ seqCount }}</x-import>
+      </div>
+      <div style="display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--card); overflow: hidden;">
+        <sc-for list="{{ seqs }}" as="f" hint-placeholder-count="2">
+          <button type="button" onClick="{{ f.pick }}" aria-pressed="{{ f.isSel }}" aria-label="show the files of {{ f.name }}" style="display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; width: 100%; box-sizing: border-box; padding: 8px 14px 8px 12px; border: 0; border-left: 2px solid {{ f.edge }}; border-bottom: 1px solid var(--border); background: {{ f.bg }}; color: var(--foreground); text-align: left; cursor: pointer;">
+            <span style="min-width: 0; display: flex; flex-direction: column;">
+              <span style="font-size: 13px; line-height: 18px; font-weight: 700;">{{ f.name }}</span>
+              <span style="font-size: 11px; line-height: 16px; color: var(--muted-foreground);">{{ f.summary }}</span>
+            </span>
+            <span style="display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: {{ f.ink }};"><span aria-hidden="true" style="width: 8px; height: 8px; border-radius: var(--radius-full); background: {{ f.ink }};"></span>{{ f.word }}</span>
+          </button>
+        </sc-for>
+      </div>
+
+      <div style="margin-top: 6px;">
+        <x-import component-from-global-scope="Morpheus.Dropzone" title="Drop files here" description="HA.gro and HA.itp go to HA, WRWYCR.pdb to WRWYCR · matched by name" on-files="{{ onFiles }}"></x-import>
+      </div>
+      <sc-if value="{{ hasDrop }}" hint-placeholder-val="{{ false }}">
+        <p style="margin: 0; font-size: 11px; line-height: 16px; color: var(--butter-strong);">{{ dropNote }}</p>
+      </sc-if>
+    </aside>
+
+    <section aria-label="files of the selected item" style="min-width: 0; display: flex; flex-direction: column; gap: 12px; padding: 16px; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-xl);">
+      <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px;">
+        <div style="flex: 1 1 0; min-width: 0;">
+          <div style="font-size: 18px; line-height: 24px; font-weight: 700;">{{ cur.name }}</div>
+          <div style="font-size: 11px; line-height: 16px; color: var(--muted-foreground);">{{ cur.sub }}</div>
+        </div>
+        <x-import component-from-global-scope="Morpheus.Badge" tone="{{ cur.hue }}">{{ cur.kindName }}</x-import>
+      </div>
+
+      <sc-if value="{{ cur.isSeq }}" hint-placeholder-val="{{ false }}">
+        <div style="display: flex; flex-direction: column; gap: 10px; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--background);">
+          <span style="font-size: 10px; line-height: 14px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground);">where the structure comes from</span>
+          <x-import component-from-global-scope="Morpheus.ToggleGroup" type="single" size="sm" value="{{ cur.source }}" on-value-change="{{ setSource }}">
+            <x-import component-from-global-scope="Morpheus.ToggleGroupItem" value="file">a file</x-import>
+            <x-import component-from-global-scope="Morpheus.ToggleGroupItem" value="pymol">build it with PyMOL</x-import>
+          </x-import>
+          <sc-if value="{{ cur.isPymol }}" hint-placeholder-val="{{ false }}">
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+              <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px;">
+                <span style="font-size: 11px; color: var(--muted-foreground);">starts in</span>
+                <x-import component-from-global-scope="Morpheus.ToggleGroup" type="single" size="sm" value="{{ cur.ss }}" on-value-change="{{ setSs }}">
+                  <x-import component-from-global-scope="Morpheus.ToggleGroupItem" value="0">extended</x-import>
+                  <x-import component-from-global-scope="Morpheus.ToggleGroupItem" value="1">helix</x-import>
+                  <x-import component-from-global-scope="Morpheus.ToggleGroupItem" value="2">strand</x-import>
+                </x-import>
+                <x-import component-from-global-scope="Morpheus.Toggle" variant="chip" size="sm">ACE / NME caps</x-import>
+              </div>
+              <pre style="padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--field); font-family: var(--font-mono); font-size: 12px; line-height: 18px; white-space: pre-wrap;">{{ cur.pymolCall }}</pre>
+              <p style="margin: 0; font-size: 11px; line-height: 16px; color: var(--muted-foreground);">used by the <a href="Main.dc.html" style="color: var(--coral-strong);">build sequence</a> tile · the files below that PyMOL replaces are greyed out · a topology or index file you assign still goes along</p>
+            </div>
+          </sc-if>
+        </div>
+      </sc-if>
+
+      <x-import component-from-global-scope="Morpheus.Section" label="Files">{{ cur.fileCount }}</x-import>
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        <div style="display: grid; grid-template-columns: 130px minmax(0, 1fr) 96px auto; align-items: center; gap: 10px;">
+          <span style="display: flex; flex-direction: column;">
+            <span style="font-size: 12px; line-height: 16px; font-weight: 700;">{{ roles.gro.label }}</span>
+            <span style="font-size: 10px; line-height: 14px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted-foreground);">{{ roles.gro.ext }} · {{ roles.gro.need }}</span>
+          </span>
+          <x-import component-from-global-scope="Morpheus.Input" size="sm" value="{{ roles.gro.value }}" on-change="{{ roles.gro.change }}" disabled="{{ roles.gro.off }}" placeholder="{{ roles.gro.hint }}" aria-label="{{ roles.gro.label }}" style="min-width: 0;"></x-import>
+          <span style="display: inline-flex; align-items: center; gap: 6px; font-size: 11px; line-height: 16px; color: {{ roles.gro.ink }};"><span aria-hidden="true" style="width: 8px; height: 8px; border-radius: var(--radius-full); background: {{ roles.gro.ink }};"></span>{{ roles.gro.word }}</span>
+          <x-import component-from-global-scope="Morpheus.Button" variant="outline" size="sm">browse…</x-import>
+        </div>
+        <div style="display: grid; grid-template-columns: 130px minmax(0, 1fr) 96px auto; align-items: center; gap: 10px;">
+          <span style="display: flex; flex-direction: column;">
+            <span style="font-size: 12px; line-height: 16px; font-weight: 700;">{{ roles.pdb.label }}</span>
+            <span style="font-size: 10px; line-height: 14px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted-foreground);">{{ roles.pdb.ext }} · {{ roles.pdb.need }}</span>
+          </span>
+          <x-import component-from-global-scope="Morpheus.Input" size="sm" value="{{ roles.pdb.value }}" on-change="{{ roles.pdb.change }}" disabled="{{ roles.pdb.off }}" placeholder="{{ roles.pdb.hint }}" aria-label="{{ roles.pdb.label }}" style="min-width: 0;"></x-import>
+          <span style="display: inline-flex; align-items: center; gap: 6px; font-size: 11px; line-height: 16px; color: {{ roles.pdb.ink }};"><span aria-hidden="true" style="width: 8px; height: 8px; border-radius: var(--radius-full); background: {{ roles.pdb.ink }};"></span>{{ roles.pdb.word }}</span>
+          <x-import component-from-global-scope="Morpheus.Button" variant="outline" size="sm">browse…</x-import>
+        </div>
+        <div style="display: grid; grid-template-columns: 130px minmax(0, 1fr) 96px auto; align-items: center; gap: 10px;">
+          <span style="display: flex; flex-direction: column;">
+            <span style="font-size: 12px; line-height: 16px; font-weight: 700;">{{ roles.itp.label }}</span>
+            <span style="font-size: 10px; line-height: 14px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted-foreground);">{{ roles.itp.ext }} · {{ roles.itp.need }}</span>
+          </span>
+          <x-import component-from-global-scope="Morpheus.Input" size="sm" value="{{ roles.itp.value }}" on-change="{{ roles.itp.change }}" disabled="{{ roles.itp.off }}" placeholder="{{ roles.itp.hint }}" aria-label="{{ roles.itp.label }}" style="min-width: 0;"></x-import>
+          <span style="display: inline-flex; align-items: center; gap: 6px; font-size: 11px; line-height: 16px; color: {{ roles.itp.ink }};"><span aria-hidden="true" style="width: 8px; height: 8px; border-radius: var(--radius-full); background: {{ roles.itp.ink }};"></span>{{ roles.itp.word }}</span>
+          <x-import component-from-global-scope="Morpheus.Button" variant="outline" size="sm">browse…</x-import>
+        </div>
+        <div style="display: grid; grid-template-columns: 130px minmax(0, 1fr) 96px auto; align-items: center; gap: 10px;">
+          <span style="display: flex; flex-direction: column;">
+            <span style="font-size: 12px; line-height: 16px; font-weight: 700;">{{ roles.ndx.label }}</span>
+            <span style="font-size: 10px; line-height: 14px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted-foreground);">{{ roles.ndx.ext }} · {{ roles.ndx.need }}</span>
+          </span>
+          <x-import component-from-global-scope="Morpheus.Input" size="sm" value="{{ roles.ndx.value }}" on-change="{{ roles.ndx.change }}" disabled="{{ roles.ndx.off }}" placeholder="{{ roles.ndx.hint }}" aria-label="{{ roles.ndx.label }}" style="min-width: 0;"></x-import>
+          <span style="display: inline-flex; align-items: center; gap: 6px; font-size: 11px; line-height: 16px; color: {{ roles.ndx.ink }};"><span aria-hidden="true" style="width: 8px; height: 8px; border-radius: var(--radius-full); background: {{ roles.ndx.ink }};"></span>{{ roles.ndx.word }}</span>
+          <x-import component-from-global-scope="Morpheus.Button" variant="outline" size="sm">browse…</x-import>
+        </div>
+      </div>
+
+      <x-import component-from-global-scope="Morpheus.Section" label="Other files">{{ cur.extraCount }}</x-import>
+      <div style="border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--background); overflow: hidden;">
+        <sc-for list="{{ cur.extras }}" as="x" hint-placeholder-count="2">
+          <div style="display: grid; grid-template-columns: 120px minmax(0, 1fr) 84px 26px; align-items: center; gap: 10px; padding: 5px 12px; border-bottom: 1px solid var(--border); font-size: 12px; line-height: 16px;">
+            <span style="color: var(--muted-foreground);">{{ x.role }}</span>
+            <span style="min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700;">{{ x.path }}</span>
+            <span style="display: inline-flex; align-items: center; gap: 6px; color: var(--mint-strong);"><span aria-hidden="true" style="width: 8px; height: 8px; border-radius: var(--radius-full); background: var(--mint-strong);"></span>found</span>
+            <button type="button" onClick="{{ x.remove }}" aria-label="remove {{ x.path }}" style="width: 26px; height: 26px; border: 0; border-radius: var(--radius-full); background: transparent; color: var(--foreground); font-size: 15px; cursor: pointer;">×</button>
+          </div>
+        </sc-for>
+        <sc-if value="{{ cur.noExtras }}" hint-placeholder-val="{{ false }}">
+          <p style="margin: 0; padding: 8px 12px; font-size: 12px; line-height: 16px; color: var(--muted-foreground);">none yet · restraints, index groups, parameter files, anything a tile or script should be able to find</p>
+        </sc-if>
+      </div>
+      <div style="display: flex; gap: 8px;">
+        <x-import component-from-global-scope="Morpheus.Input" size="sm" value="{{ addPath }}" on-change="{{ onAddPath }}" placeholder="{{ cur.addHint }}" style="flex: 1 1 0; min-width: 0;"></x-import>
+        <x-import component-from-global-scope="Morpheus.Button" variant="outline" size="sm" on-click="{{ onAdd }}">add file</x-import>
+      </div>
+      <p style="margin: 0; font-size: 11px; line-height: 16px; color: var(--muted-foreground);">files are read from where they are and copied beside each system that uses them · yours are never changed · <span style="color: var(--foreground);">found</span> is sample data in this mockup</p>
+    </section>
+
+    <aside aria-label="tokens" style="min-width: 0; display: flex; flex-direction: column; gap: 12px; padding: 16px; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-xl);">
+      <x-import component-from-global-scope="Morpheus.Section" label="Tokens">{{ tokenSystem }}</x-import>
+      <p style="margin: 0; font-size: 11px; line-height: 16px; color: var(--muted-foreground);">write these in any tile field or path template · they change per system · shown for the saccharide and the sequence selected on the left</p>
+      <div style="border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--background); overflow: hidden;">
+        <sc-for list="{{ tokens }}" as="t" hint-placeholder-count="6">
+          <div style="display: grid; grid-template-columns: 138px minmax(0, 1fr); gap: 10px; padding: 5px 12px; border-bottom: 1px solid var(--border); font-size: 12px; line-height: 16px;">
+            <span style="font-weight: 700;">{{ t.name }}</span>
+            <span style="min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: {{ t.ink }};">{{ t.value }}</span>
+          </div>
+        </sc-for>
+      </div>
+      <x-import component-from-global-scope="Morpheus.Section" label="In a python tile"></x-import>
+      <pre style="padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--field); font-family: var(--font-mono); font-size: 11px; line-height: 18px; white-space: pre; overflow-x: auto;">{{ pyText }}</pre>
+      <p style="margin: 0; font-size: 11px; line-height: 16px; color: var(--muted-foreground);">the same values are on <span style="color: var(--foreground);">ctx</span> · the list of ctx names is in <a href="Settings.dc.html" style="color: var(--coral-strong);">general settings</a></p>
+    </aside>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 10px; padding: 20px 24px 24px;">
+    <x-import component-from-global-scope="Morpheus.Section" label="What each system gets">{{ systemCount }}</x-import>
+    <sc-if value="{{ hasProblem }}" hint-placeholder-val="{{ true }}">
+      <x-import component-from-global-scope="Morpheus.Alert" variant="warning">
+        <x-import component-from-global-scope="Morpheus.AlertTitle">{{ problemTitle }}</x-import>
+        <x-import component-from-global-scope="Morpheus.AlertDescription">{{ problemText }}</x-import>
+      </x-import>
+    </sc-if>
+    <div style="border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--card); overflow: hidden;">
+      <div style="display: grid; grid-template-columns: 170px minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) 90px; gap: 12px; padding: 8px 14px; border-bottom: 1px solid var(--border); font-size: 10px; line-height: 14px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground);">
+        <span>system · both methods</span><span>saccharide .gro</span><span>saccharide .itp</span><span>peptide structure</span><span>state</span>
+      </div>
+      <sc-for list="{{ systems }}" as="s" hint-placeholder-count="6">
+        <button type="button" onClick="{{ s.pick }}" aria-label="show the files of {{ s.name }}" style="display: grid; grid-template-columns: 170px minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) 90px; align-items: center; gap: 12px; width: 100%; box-sizing: border-box; padding: 6px 14px; border: 0; border-bottom: 1px solid var(--border); background: {{ s.bg }}; color: var(--foreground); font-size: 12px; line-height: 16px; text-align: left; cursor: pointer;">
+          <span style="font-weight: 700;">{{ s.name }}</span>
+          <span style="min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: {{ s.groInk }};">{{ s.gro }}</span>
+          <span style="min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: {{ s.itpInk }};">{{ s.itp }}</span>
+          <span style="min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: {{ s.seqInk }};">{{ s.seq }}</span>
+          <span style="color: {{ s.ink }};">{{ s.word }}</span>
+        </button>
+      </sc-for>
+    </div>
+    <p style="margin: 0; font-size: 11px; line-height: 16px; color: var(--muted-foreground);">the run board lists the same systems · one that is missing a file is named there before anything runs</p>
+  </div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["light","dark"],"default":"dark"},"$preview":{"width":1440,"height":1240}}'>
+const SUGARS = ['HA', 'PG', 'O26'];
+const SEQS = ['WRWYCR', 'WRWACR'];
+const METHOD_COUNT = 2;
+const ROLE = {
+  gro: { label: 'coordinates', ext: '.gro' },
+  pdb: { label: 'structure', ext: '.pdb' },
+  itp: { label: 'topology', ext: '.itp' },
+  ndx: { label: 'index groups', ext: '.ndx' }
+};
+const KEYS = ['gro', 'pdb', 'itp', 'ndx'];
+const EXTRA_ROLE = { itp: 'topology include', ndx: 'index groups', gro: 'coordinates', pdb: 'structure', top: 'topology', rtp: 'residue templates', frcmod: 'parameters', mol2: 'molecule', prep: 'residue prep', xvg: 'table', dat: 'data', mdp: 'mdp' };
+
+const FILES0 = {
+  HA: { gro: 'molecules/saccharides/HA.gro', pdb: '', itp: 'ff/HA-ADD.itp', ndx: '', extras: ['molecules/saccharides/HA_restraints.itp'] },
+  PG: { gro: 'molecules/saccharides/PG.gro', pdb: 'molecules/saccharides/PG.pdb', itp: 'ff/PG-ADD.itp', ndx: '', extras: [] },
+  O26: { gro: 'molecules/saccharides/O26.gro', pdb: '', itp: '', ndx: '', extras: ['ff/O26.frcmod'] },
+  WRWYCR: { source: 'pymol', ss: '0', gro: '', pdb: '', itp: '', ndx: '', extras: [] },
+  WRWACR: { source: 'pymol', ss: '0', gro: 'sequences/WRWACR.gro', pdb: 'sequences/WRWACR.pdb', itp: '', ndx: 'sequences/WRWACR.ndx', extras: [] }
+};
+const SS_NAME = { '0': 'extended', '1': 'helix', '2': 'strand' };
+const okExt = (role, p) => p.toLowerCase().slice(-ROLE[role].ext.length) === ROLE[role].ext;
+const ext = (p) => (p.indexOf('.') >= 0 ? p.split('.').pop().toLowerCase() : '');
+
+class Component extends DCLogic {
+  get(name) {
+    const f = (this.state.files || {})[name];
+    return Object.assign({}, FILES0[name], f || {});
+  }
+  put(name, patch) {
+    const files = Object.assign({}, this.state.files || {});
+    files[name] = Object.assign(this.get(name), patch);
+    this.setState({ files: files });
+  }
+  isSeq(name) { return SEQS.indexOf(name) >= 0; }
+  // what an item still lacks, '' when it is complete
+  lacks(name) {
+    const f = this.get(name);
+    if (this.isSeq(name)) {
+      if (f.source === 'pymol') return '';
+      return f.pdb || f.gro ? '' : 'a .pdb or .gro';
+    }
+    const miss = [];
+    if (!f.gro) miss.push('.gro');
+    if (!f.itp) miss.push('.itp');
+    return miss.join(' and ');
+  }
+  summary(name) {
+    const f = this.get(name);
+    const have = KEYS.filter((k) => f[k] && !(this.isSeq(name) && f.source === 'pymol' && (k === 'gro' || k === 'pdb'))).map((k) => ROLE[k].ext.slice(1));
+    const parts = [];
+    if (this.isSeq(name) && f.source === 'pymol') parts.push('PyMOL · ' + SS_NAME[f.ss]);
+    if (have.length) parts.push(have.join(' · '));
+    if (f.extras.length) parts.push('+' + f.extras.length + (f.extras.length === 1 ? ' file' : ' files'));
+    return parts.length ? parts.join(' · ') : 'no files yet';
+  }
+  renderVals() {
+    const st = this.state;
+    const side = st.side || 'sugar';
+    const selSugar = st.selSugar || 'HA';
+    const selSeq = st.selSeq || 'WRWYCR';
+    const curName = side === 'sugar' ? selSugar : selSeq;
+    const isSeq = side === 'seq';
+    const f = this.get(curName);
+    const pymol = isSeq && f.source === 'pymol';
+    const addPath = st.addPath === undefined ? '' : st.addPath;
+
+    const item = (name) => {
+      const lack = this.lacks(name);
+      const on = (this.isSeq(name) ? 'seq' : 'sugar') === side && name === curName;
+      const inSystems = (this.isSeq(name) ? selSeq : selSugar) === name;
+      return {
+        name: name,
+        summary: this.summary(name),
+        word: lack ? 'no ' + lack : 'ready',
+        ink: lack ? 'var(--destructive)' : 'var(--mint-strong)',
+        isSel: on,
+        edge: on ? 'var(--coral-strong)' : inSystems ? 'var(--input)' : 'transparent',
+        bg: on ? 'var(--accent)' : 'transparent',
+        pick: () => this.setState(this.isSeq(name) ? { side: 'seq', selSeq: name, addPath: '' } : { side: 'sugar', selSugar: name, addPath: '' })
+      };
+    };
+    const sugars = SUGARS.map(item);
+    const seqs = SEQS.map(item);
+
+    // one input per role
+    const roles = {};
+    KEYS.forEach((k) => {
+      const v = f[k] || '';
+      const off = pymol && (k === 'gro' || k === 'pdb');
+      let need = 'optional', word, ink;
+      if (isSeq && !pymol && (k === 'gro' || k === 'pdb')) need = 'one of .gro, .pdb';
+      if (!isSeq && (k === 'gro' || k === 'itp')) need = 'required';
+      if (off) { need = 'via PyMOL'; word = 'not used'; ink = 'var(--muted-foreground)'; }
+      else if (!v) {
+        const required = need === 'required' || (need === 'one of .gro, .pdb' && !f.gro && !f.pdb);
+        word = required ? 'missing' : 'not set';
+        ink = required ? 'var(--destructive)' : 'var(--muted-foreground)';
+      } else if (!okExt(k, v)) { word = 'not a ' + ROLE[k].ext; ink = 'var(--butter-strong)'; }
+      else { word = 'found'; ink = 'var(--mint-strong)'; }
+      const stem = isSeq ? 'sequences/' + curName : k === 'itp' ? 'ff/' + curName + '-ADD' : 'molecules/saccharides/' + curName;
+      roles[k] = {
+        label: ROLE[k].label, ext: ROLE[k].ext, need: need, value: v, off: off, word: word, ink: ink,
+        hint: stem + ROLE[k].ext,
+        change: (e) => { const p = {}; p[k] = e.target.value; this.put(curName, p); }
+      };
+    });
+
+    const extras = f.extras.map((p, i) => ({
+      role: EXTRA_ROLE[ext(p)] || 'other',
+      path: p,
+      remove: () => this.put(curName, { extras: f.extras.filter((x, j) => j !== i) })
+    }));
+    const assigned = KEYS.filter((k) => f[k] && !(pymol && (k === 'gro' || k === 'pdb'))).length;
+    const lackNow = this.lacks(curName);
+
+    const cur = {
+      name: curName,
+      sub: isSeq ? 'sequence · one-letter code · in ' + SUGARS.length * METHOD_COUNT + ' systems' : 'saccharide · in ' + SEQS.length * METHOD_COUNT + ' systems',
+      hue: isSeq ? 'lilac' : 'sky',
+      kindName: isSeq ? 'Sequence' : 'Saccharide',
+      isSeq: isSeq,
+      source: f.source || 'file',
+      isPymol: pymol,
+      ss: f.ss || '0',
+      pymolCall: 'cmd.fab("' + curName + '", "pep", ss=' + (f.ss || '0') + ')   # ' + SS_NAME[f.ss || '0'] + '\ncmd.save("{n}.sequence/' + curName + '.pdb", "pep")',
+      fileCount: String(assigned).padStart(2, '0'),
+      extras: extras,
+      extraCount: String(extras.length).padStart(2, '0'),
+      noExtras: extras.length === 0,
+      addHint: isSeq ? 'sequences/' + curName + '_restraints.itp' : 'molecules/saccharides/' + curName + '_restraints.itp'
+    };
+
+    // tokens for the selected pair
+    const fs = this.get(selSugar), fq = this.get(selSeq);
+    const tv = (v, ph) => ({ value: v || ph || '(not set)', ink: v || ph ? 'var(--foreground)' : 'var(--muted-foreground)' });
+    const qPy = fq.source === 'pymol';
+    const tok = [
+      ['{saccharide}', { value: selSugar, ink: 'var(--foreground)' }],
+      ['{saccharide.gro}', fs.gro ? tv(fs.gro) : { value: '(missing)', ink: 'var(--destructive)' }],
+      ['{saccharide.itp}', fs.itp ? tv(fs.itp) : { value: '(missing)', ink: 'var(--destructive)' }],
+      ['{saccharide.pdb}', tv(fs.pdb)],
+      ['{saccharide.ndx}', tv(fs.ndx)],
+      ['{saccharide.files}', fs.extras.length ? { value: fs.extras.length + (fs.extras.length === 1 ? ' more file' : ' more files') + ' · ' + fs.extras.map((p) => p.split('/').pop()).join(', '), ink: 'var(--foreground)' } : tv('')],
+      ['{sequence}', { value: selSeq, ink: 'var(--foreground)' }],
+      ['{sequence.pdb}', qPy ? { value: '{n}.sequence/' + selSeq + '.pdb · from PyMOL', ink: 'var(--lilac-strong)' } : tv(fq.pdb)],
+      ['{sequence.gro}', qPy ? tv('') : tv(fq.gro)],
+      ['{sequence.itp}', tv(fq.itp)]
+    ].map((x) => ({ name: x[0], value: x[1].value, ink: x[1].ink }));
+    const py = [
+      'ctx.saccharide        = "' + selSugar + '"',
+      'ctx.files["gro"]      = ' + (fs.gro ? '"' + fs.gro + '"' : 'None'),
+      'ctx.files["itp"]      = ' + (fs.itp ? '"' + fs.itp + '"' : 'None'),
+      'ctx.files["other"]    = [' + fs.extras.map((p) => '"' + p + '"').join(', ') + ']',
+      'ctx.sequence          = "' + selSeq + '"',
+      'ctx.seq_files["pdb"]  = ' + (qPy ? '"{n}.sequence/' + selSeq + '.pdb"' : fq.pdb ? '"' + fq.pdb + '"' : 'None')
+    ].join('\n');
+
+    // what every system gets
+    const systems = [];
+    const bad = [];
+    SUGARS.forEach((a) => SEQS.forEach((q) => {
+      const sa = this.get(a), sq = this.get(q);
+      const la = this.lacks(a), lq = this.lacks(q);
+      const issue = [la ? a + ' has no ' + la : '', lq ? q + ' has no ' + lq : ''].filter(Boolean).join(' · ');
+      const sel = a === selSugar && q === selSeq;
+      systems.push({
+        name: a + ' / ' + q,
+        gro: sa.gro || '— missing', groInk: sa.gro ? 'var(--foreground)' : 'var(--destructive)',
+        itp: sa.itp || '— missing', itpInk: sa.itp ? 'var(--foreground)' : 'var(--destructive)',
+        seq: sq.source === 'pymol' ? 'PyMOL · cmd.fab · ' + SS_NAME[sq.ss] : (sq.pdb || sq.gro || '— missing'),
+        seqInk: sq.source === 'pymol' ? 'var(--lilac-strong)' : (sq.pdb || sq.gro) ? 'var(--foreground)' : 'var(--destructive)',
+        word: issue ? 'stops' : 'ready',
+        ink: issue ? 'var(--destructive)' : 'var(--mint-strong)',
+        bg: sel ? 'var(--accent)' : 'transparent',
+        pick: () => this.setState({ selSugar: a, selSeq: q })
+      });
+      if (issue) bad.push(issue);
+    }));
+    const badItems = SUGARS.concat(SEQS).filter((n) => this.lacks(n)).map((n) => n + ' has no ' + this.lacks(n) + ' · ' + (this.isSeq(n) ? SUGARS.length : SEQS.length) + (this.isSeq(n) ? ' saccharide' : ' sequence') + ' pairs · both methods');
+
+    const drop = st.dropNote || '';
+    return {
+      theme: this.props.theme ?? 'dark',
+      sugars: sugars, sugarCount: String(sugars.length).padStart(2, '0'),
+      seqs: seqs, seqCount: String(seqs.length).padStart(2, '0'),
+      hasDrop: !!drop, dropNote: drop,
+      onFiles: (list) => {
+        const files = Object.assign({}, st.files || {});
+        const done = [], miss = [];
+        (list || []).forEach((file) => {
+          const nm = file.name, e = ext(nm), stem = nm.slice(0, nm.length - e.length - (e ? 1 : 0));
+          const hit = SUGARS.concat(SEQS).find((n) => stem.toLowerCase() === n.toLowerCase() || stem.toLowerCase().indexOf(n.toLowerCase() + '_') === 0);
+          if (!hit) { miss.push(nm); return; }
+          const path = (this.isSeq(hit) ? 'sequences/' : e === 'itp' ? 'ff/' : 'molecules/saccharides/') + nm;
+          const cur0 = Object.assign(this.get(hit), files[hit] || {});
+          if (stem.toLowerCase() === hit.toLowerCase() && KEYS.indexOf(e) >= 0) cur0[e] = path;
+          else cur0.extras = cur0.extras.concat([path]);
+          files[hit] = cur0;
+          done.push(nm + ' → ' + hit);
+        });
+        this.setState({ files: files, dropNote: (done.length ? 'assigned ' + done.join(', ') : '') + (miss.length ? (done.length ? ' · ' : '') + miss.join(', ') + ' not matched to a name' : '') });
+      },
+      cur: cur,
+      roles: roles,
+      setSource: (v) => { if (v) this.put(curName, { source: v }); },
+      setSs: (v) => { if (v) this.put(curName, { ss: v }); },
+      addPath: addPath,
+      onAddPath: (e) => this.setState({ addPath: e.target.value }),
+      onAdd: () => { const p = addPath.trim(); if (!p) return; this.put(curName, { extras: f.extras.concat([p]) }); this.setState({ addPath: '' }); },
+      tokenSystem: selSugar + ' · ' + selSeq,
+      tokens: tok,
+      pyText: py,
+      systems: systems,
+      systemCount: String(systems.length).padStart(2, '0'),
+      hasProblem: badItems.length > 0,
+      problemTitle: bad.length * METHOD_COUNT + (bad.length * METHOD_COUNT === 1 ? ' system is' : ' systems are') + ' missing a file',
+      problemText: badItems.join(' · ') + ' · they stop at the first tile that needs it and the others run'
+    };
+  }
+}
+</script>
+</body>
+</html>

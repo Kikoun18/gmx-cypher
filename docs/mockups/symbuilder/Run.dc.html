@@ -1,0 +1,526 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Run</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ds/morpheus/tokens.css">
+<link rel="stylesheet" href="ds/morpheus/components/bundle.css">
+<script src="ds/morpheus/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:inherit}
+button{font-family:inherit}
+button:focus-visible,a:focus-visible{outline:2px solid var(--ring);outline-offset:2px}
+</style>
+</helmet>
+<div data-theme="{{theme}}" style="min-height: 1360px; box-sizing: border-box; display: flex; flex-direction: column; background: var(--background); color: var(--foreground); font-family: var(--font-mono); font-size: 13px; line-height: 1.5;">
+
+  <header style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px 24px; padding: 12px 24px; border-bottom: 1px solid var(--border);">
+    <div style="display: flex; align-items: baseline; gap: 10px;">
+      <span style="font-size: 15px; font-weight: 700;">gmx-cypher</span>
+      <span style="font-size: 10px; line-height: 14px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground);">generate</span>
+    </div>
+    <nav aria-label="generator views" style="display: flex; gap: 4px;">
+      <a href="Main.dc.html" style="padding: 6px 10px; font-size: 12px; line-height: 16px; text-decoration: none; border-bottom: 2px solid transparent; color: var(--muted-foreground);">build</a>
+      <a href="Run.dc.html" aria-current="page" style="padding: 6px 10px; font-size: 12px; line-height: 16px; font-weight: 700; text-decoration: none; border-bottom: 2px solid var(--coral-strong);">run</a>
+      <a href="Dashboard.dc.html" style="padding: 6px 10px; font-size: 12px; line-height: 16px; text-decoration: none; border-bottom: 2px solid transparent; color: var(--muted-foreground);">dashboard</a>
+      <a href="Summary.dc.html" style="padding: 6px 10px; font-size: 12px; line-height: 16px; text-decoration: none; border-bottom: 2px solid transparent; color: var(--muted-foreground);">summary</a>
+      <a href="Library.dc.html" style="padding: 6px 10px; font-size: 12px; line-height: 16px; text-decoration: none; border-bottom: 2px solid transparent; color: var(--muted-foreground);">library</a>
+      <a href="MDP.dc.html" style="padding: 6px 10px; font-size: 12px; line-height: 16px; text-decoration: none; border-bottom: 2px solid transparent; color: var(--muted-foreground);">mdp</a>
+      <a href="Files.dc.html" style="padding: 6px 10px; font-size: 12px; line-height: 16px; text-decoration: none; border-bottom: 2px solid transparent; color: var(--muted-foreground);">files</a>
+      <a href="Cluster.dc.html" style="padding: 6px 10px; font-size: 12px; line-height: 16px; text-decoration: none; border-bottom: 2px solid transparent; color: var(--muted-foreground);">cluster</a>
+      <a href="Warnings.dc.html" style="padding: 6px 10px; font-size: 12px; line-height: 16px; text-decoration: none; border-bottom: 2px solid transparent; color: var(--muted-foreground);">warnings</a>
+      <a href="Settings.dc.html" style="padding: 6px 10px; font-size: 12px; line-height: 16px; text-decoration: none; border-bottom: 2px solid transparent; color: var(--muted-foreground);">settings</a>
+    </nav>
+    <span style="flex: 1 1 0;"></span>
+    <a href="Warnings.dc.html" style="font-size: 11px; line-height: 16px; text-decoration: none; color: var(--butter-strong);">3 open · 2 ignored</a>
+    <span style="font-size: 11px; line-height: 16px; color: var(--muted-foreground);">gmx_mpi 2025.4 · <span style="color: var(--mint-strong);">ready</span></span>
+    <span style="font-size: 11px; line-height: 16px; color: var(--muted-foreground);">qq · <span style="color: var(--mint-strong);">ready</span></span>
+  </header>
+
+  <div style="display: flex; flex-wrap: wrap; align-items: stretch; gap: 20px; padding: 20px 24px;">
+
+    <section aria-label="where to run" style="flex: 0 0 360px; box-sizing: border-box; display: flex; flex-direction: column; gap: 14px; padding: 16px; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-xl);">
+      <x-import component-from-global-scope="Morpheus.Section" label="Where to run"></x-import>
+      <x-import component-from-global-scope="Morpheus.ToggleGroup" type="single" size="lg" value="{{ where }}" on-value-change="{{ setWhere }}">
+        <x-import component-from-global-scope="Morpheus.ToggleGroupItem" value="local">local</x-import>
+        <x-import component-from-global-scope="Morpheus.ToggleGroupItem" value="cluster">cluster</x-import>
+      </x-import>
+      <p style="margin: 0; font-size: 11px; line-height: 16px; color: var(--muted-foreground);">the default for every heavy tile · a tile can override it on the build tab, and the table below shows where it does</p>
+
+      <sc-if value="{{ isLocal }}" hint-placeholder-val="{{ false }}">
+        <div style="display: flex; flex-direction: column; gap: 12px;">
+          <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px;">
+            <div style="display: flex; flex-direction: column; gap: 5px;">
+              <label for="r-n" style="font-size: 10px; line-height: 14px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground);">at a time</label>
+              <x-import component-from-global-scope="Morpheus.Input" id="r-n" size="sm" default-value="2"></x-import>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 5px;">
+              <label for="r-omp" style="font-size: 10px; line-height: 14px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground);">threads each (-ntomp)</label>
+              <x-import component-from-global-scope="Morpheus.Input" id="r-omp" size="sm" default-value="8"></x-import>
+            </div>
+          </div>
+          <p style="margin: 0; font-size: 11px; line-height: 16px; color: var(--muted-foreground);">gmx_mpi 2025.4 on this machine · systems queue here and start two at a time · closing the page does not stop them</p>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isCluster }}" hint-placeholder-val="{{ true }}">
+        <div style="display: flex; flex-direction: column; gap: 12px;">
+          <div style="display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--background); font-size: 11px; line-height: 16px;">
+            <span style="font-size: 10px; line-height: 14px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground);">job scripts</span>
+            <span><span style="font-weight: 700;">MetaCentrum 2025</span> <span style="color: var(--muted-foreground);">· gmx_mpi · 8 cpus, 1 gpu, 30gb, 23h · min, nvt, npt, awh, pull</span></span>
+            <span><span style="font-weight: 700;">LUMI multidir</span> <span style="color: var(--muted-foreground);">· 8 walkers in one job · 64 cpus, 8 gpus, 60gb</span></span>
+            <span style="color: var(--muted-foreground);">resubmitted until the step's .gro exists · the qq submit command is printed, as in the notebook</span>
+            <a href="Cluster.dc.html" style="align-self: flex-start; color: var(--coral-strong);">edit on the cluster board →</a>
+          </div>
+
+          <x-import component-from-global-scope="Morpheus.Section" label="After submitting"></x-import>
+          <x-import component-from-global-scope="Morpheus.ToggleGroup" type="single" size="sm" value="{{ after }}" on-value-change="{{ setAfter }}">
+            <x-import component-from-global-scope="Morpheus.ToggleGroupItem" value="wait">wait for results</x-import>
+            <x-import component-from-global-scope="Morpheus.ToggleGroupItem" value="move on">move on</x-import>
+          </x-import>
+          <p style="margin: 0; font-size: 11px; line-height: 16px;">{{ afterText }}</p>
+
+          <div role="img" aria-label="{{ chartLabel }}" style="display: flex; flex-direction: column; gap: 6px; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--background);">
+            <sc-for list="{{ lanes }}" as="ln" hint-placeholder-count="3">
+              <div style="display: grid; grid-template-columns: 52px minmax(0, 1fr); align-items: center; gap: 8px;">
+                <span style="font-size: 11px; line-height: 16px; color: var(--muted-foreground);">{{ ln.name }}</span>
+                <div style="position: relative; height: 18px; border-radius: var(--radius-xs); background: var(--card);">
+                  <sc-for list="{{ ln.segs }}" as="sg" hint-placeholder-count="3">
+                    <span style="position: absolute; top: 0; bottom: 0; left: {{ sg.left }}; width: {{ sg.width }}; border-radius: var(--radius-xs); background: {{ sg.bg }};"></span>
+                  </sc-for>
+                </div>
+              </div>
+            </sc-for>
+            <div style="display: flex; flex-wrap: wrap; gap: 4px 14px; padding-left: 60px; font-size: 10px; line-height: 14px; color: var(--muted-foreground);">
+              <span><span aria-hidden="true" style="display: inline-block; width: 8px; height: 8px; margin-right: 5px; border-radius: 2px; background: var(--stone);"></span>prepare here</span>
+              <span><span aria-hidden="true" style="display: inline-block; width: 8px; height: 8px; margin-right: 5px; border-radius: 2px; background: var(--butter);"></span>job on the cluster</span>
+              <span><span aria-hidden="true" style="display: inline-block; width: 8px; height: 8px; margin-right: 5px; border-radius: 2px; background: var(--sky);"></span>continues after the job</span>
+              <span>time →</span>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+
+      <x-import component-from-global-scope="Morpheus.Section" label="Heavy tiles">06</x-import>
+      <div style="display: flex; flex-direction: column; font-size: 11px; line-height: 16px;">
+        <sc-for list="{{ tileRows }}" as="tr" hint-placeholder-count="5">
+          <div style="display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; padding: 6px 0; border-top: 1px solid var(--border);">
+            <span style="font-weight: 700;">{{ tr.name }}</span>
+            <span style="text-align: right;">{{ tr.where }}<span style="color: var(--muted-foreground);"> · {{ tr.source }}</span></span>
+          </div>
+        </sc-for>
+      </div>
+      <p style="margin: 0; font-size: 11px; line-height: 16px; color: var(--muted-foreground);">the 14 light steps of the solution builder and the two checks always run here · min, nvt and npt run here too, with a progress bar, as in the notebook</p>
+    </section>
+
+    <section aria-label="systems and names" style="flex: 1 1 400px; min-width: 0; display: flex; flex-direction: column; gap: 14px; padding: 16px; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-xl);">
+      <x-import component-from-global-scope="Morpheus.Section" label="Systems">{{ countText }}</x-import>
+      <p style="margin: 0; font-size: 11px; line-height: 16px; color: var(--muted-foreground);">the stack runs once for every combination · switch a value off to leave it out</p>
+
+      <div style="display: flex; flex-direction: column; gap: 5px;">
+        <span style="font-size: 10px; line-height: 14px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground);">{method}</span>
+        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px;">
+          <x-import component-from-global-scope="Morpheus.ToggleGroup" type="multiple" size="sm" value="{{ methods }}" on-value-change="{{ setMethods }}">
+            <x-import component-from-global-scope="Morpheus.ToggleGroupItem" value="hmr+fast+6">hmr+fast+6</x-import>
+            <x-import component-from-global-scope="Morpheus.ToggleGroupItem" value="hmr+slow+6">hmr+slow+6</x-import>
+          </x-import>
+          <x-import component-from-global-scope="Morpheus.Button" variant="dashed" shape="pill" size="sm">+ value</x-import>
+        </div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 5px;">
+        <span style="font-size: 10px; line-height: 14px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground);">{saccharide}</span>
+        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px;">
+          <x-import component-from-global-scope="Morpheus.ToggleGroup" type="multiple" size="sm" value="{{ saccharides }}" on-value-change="{{ setSaccharides }}">
+            <x-import component-from-global-scope="Morpheus.ToggleGroupItem" value="HA" tone="coral">HA</x-import>
+            <x-import component-from-global-scope="Morpheus.ToggleGroupItem" value="PG" tone="sky">PG</x-import>
+            <x-import component-from-global-scope="Morpheus.ToggleGroupItem" value="O26" tone="mint">O26</x-import>
+          </x-import>
+          <x-import component-from-global-scope="Morpheus.Button" variant="dashed" shape="pill" size="sm">+ value</x-import>
+        </div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 5px;">
+        <span style="font-size: 10px; line-height: 14px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground);">{sequence}</span>
+        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px;">
+          <x-import component-from-global-scope="Morpheus.ToggleGroup" type="multiple" size="sm" value="{{ sequences }}" on-value-change="{{ setSequences }}">
+            <x-import component-from-global-scope="Morpheus.ToggleGroupItem" value="WRWYCR">WRWYCR</x-import>
+            <x-import component-from-global-scope="Morpheus.ToggleGroupItem" value="WRWACR">WRWACR</x-import>
+          </x-import>
+          <x-import component-from-global-scope="Morpheus.Button" variant="dashed" shape="pill" size="sm">+ value</x-import>
+          <x-import component-from-global-scope="Morpheus.Button" variant="dashed" shape="pill" size="sm">+ factor</x-import>
+        </div>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 5px;">
+        <label for="r-from" style="font-size: 10px; line-height: 14px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground);">or take the systems from files</label>
+        <x-import component-from-global-scope="Morpheus.Input" id="r-from" size="sm" placeholder="structures/{saccharide}/{sequence}.pdb"></x-import>
+        <p style="margin: 0; font-size: 11px; line-height: 16px; color: var(--muted-foreground);">a path template: every file it matches is one system, and the tokens are read from the folder names · or give each saccharide and sequence its own files on the <a href="Files.dc.html" style="color: var(--coral-strong);">files board</a></p>
+      </div>
+
+      <x-import component-from-global-scope="Morpheus.Section" label="Names"></x-import>
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px;">
+        <div style="display: flex; flex-direction: column; gap: 5px;">
+          <label for="r-root" style="font-size: 10px; line-height: 14px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground);">root folder</label>
+          <x-import component-from-global-scope="Morpheus.Input" id="r-root" size="sm" value="{{ root }}" on-change="{{ onRoot }}"></x-import>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 5px;">
+          <label for="r-top" style="font-size: 10px; line-height: 14px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground);">topology file</label>
+          <x-import component-from-global-scope="Morpheus.Input" id="r-top" size="sm" value="{{ topTpl }}" on-change="{{ onTop }}"></x-import>
+        </div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 5px;">
+        <label for="r-sys" style="font-size: 10px; line-height: 14px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground);">system folder</label>
+        <x-import component-from-global-scope="Morpheus.Input" id="r-sys" size="sm" value="{{ sysTpl }}" on-change="{{ onSys }}"></x-import>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px;">
+        <div style="display: flex; flex-direction: column; gap: 5px;">
+          <label for="r-step" style="font-size: 10px; line-height: 14px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground);">step folder</label>
+          <x-import component-from-global-scope="Morpheus.Input" id="r-step" size="sm" value="{{ stepTpl }}" on-change="{{ onStep }}"></x-import>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 5px;">
+          <label for="r-stem" style="font-size: 10px; line-height: 14px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground);">file stem</label>
+          <x-import component-from-global-scope="Morpheus.Input" id="r-stem" size="sm" value="{{ stemTpl }}" on-change="{{ onStem }}"></x-import>
+        </div>
+      </div>
+      <sc-if value="{{ hasBad }}" hint-placeholder-val="{{ false }}">
+        <p role="alert" style="margin: 0; font-size: 11px; line-height: 16px; color: var(--destructive);">unknown token {{ bad }} · use {method} {saccharide} {sequence} {n} {step} {i} or {date}</p>
+      </sc-if>
+      <div style="display: flex; flex-direction: column; gap: 5px;">
+        <span style="font-size: 10px; line-height: 14px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground);">the first system's gro would be</span>
+        <div style="padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--field); font-size: 11px; line-height: 16px; word-break: break-all;">{{ example }}</div>
+      </div>
+      <div style="display: flex; flex-wrap: wrap; gap: 4px;">
+        <x-import component-from-global-scope="Morpheus.Badge" variant="outline">{method}</x-import>
+        <x-import component-from-global-scope="Morpheus.Badge" variant="outline">{saccharide}</x-import>
+        <x-import component-from-global-scope="Morpheus.Badge" variant="outline">{sequence}</x-import>
+        <x-import component-from-global-scope="Morpheus.Badge" variant="outline">{n}</x-import>
+        <x-import component-from-global-scope="Morpheus.Badge" variant="outline">{step}</x-import>
+        <x-import component-from-global-scope="Morpheus.Badge" variant="outline">{i}</x-import>
+        <x-import component-from-global-scope="Morpheus.Badge" variant="outline">{date}</x-import>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 5px;">
+        <span style="font-size: 10px; line-height: 14px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground);">if a folder already exists</span>
+        <x-import component-from-global-scope="Morpheus.ToggleGroup" type="single" size="sm" value="{{ clash }}" on-value-change="{{ setClash }}">
+          <x-import component-from-global-scope="Morpheus.ToggleGroupItem" value="continue">continue</x-import>
+          <x-import component-from-global-scope="Morpheus.ToggleGroupItem" value="skip">skip</x-import>
+          <x-import component-from-global-scope="Morpheus.ToggleGroupItem" value="new">new folder (6r, 6r1 …)</x-import>
+        </x-import>
+        <p style="margin: 0; font-size: 11px; line-height: 16px; color: var(--muted-foreground);">{{ clashText }}</p>
+      </div>
+
+      <x-import component-from-global-scope="Morpheus.Section" label="Repeated runs"></x-import>
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <label for="r-reps" style="font-size: 12px;">run every system this many more times</label>
+        <x-import component-from-global-scope="Morpheus.Input" id="r-reps" size="sm" value="{{ reps }}" on-change="{{ onReps }}" style="width: 70px;"></x-import>
+      </div>
+      <div style="border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--field); overflow: hidden;">
+        <sc-for list="{{ repRows }}" as="rr" hint-placeholder-count="4">
+          <div style="display: grid; grid-template-columns: 130px minmax(0, 1fr); gap: 10px; padding: 5px 10px; border-bottom: 1px solid var(--border); font-size: 11px; line-height: 16px;">
+            <span style="color: var(--muted-foreground);">{{ rr.when }}</span>
+            <span style="font-weight: 700; color: {{ rr.ink }};">{{ rr.name }}</span>
+          </div>
+        </sc-for>
+      </div>
+      <p style="margin: 0; font-size: 11px; line-height: 16px; color: var(--muted-foreground);">{{ repText }}</p>
+    </section>
+
+    <section aria-label="preview and run" style="flex: 1 1 440px; min-width: 0; display: flex; flex-direction: column; gap: 14px; padding: 16px; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-xl);">
+      <x-import component-from-global-scope="Morpheus.Section" label="Preview">{{ countText }}</x-import>
+
+      <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px;">
+        <x-import component-from-global-scope="Morpheus.Stat" label="Systems" value="{{ stat.systems }}" hint="{{ stat.systemsHint }}"></x-import>
+        <x-import component-from-global-scope="Morpheus.Stat" label="Cluster jobs" value="{{ stat.jobs }}" hint="{{ stat.jobsHint }}"></x-import>
+        <x-import component-from-global-scope="Morpheus.Stat" label="Local steps" value="{{ stat.local }}" hint="{{ stat.localHint }}"></x-import>
+      </div>
+
+      <sc-if value="{{ resumeShown }}" hint-placeholder-val="{{ true }}">
+        <x-import component-from-global-scope="Morpheus.Alert" variant="warning">
+          <x-import component-from-global-scope="Morpheus.AlertTitle">one folder already exists</x-import>
+          <x-import component-from-global-scope="Morpheus.AlertDescription">{{ resumeText }}</x-import>
+        </x-import>
+      </sc-if>
+      <sc-if value="{{ empty }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="Morpheus.Alert" variant="destructive">
+          <x-import component-from-global-scope="Morpheus.AlertTitle">no system</x-import>
+          <x-import component-from-global-scope="Morpheus.AlertDescription">switch at least one value on in every row</x-import>
+        </x-import>
+      </sc-if>
+
+      <div style="overflow-x: auto;">
+        <div style="min-width: 420px; display: flex; flex-direction: column; font-size: 11px; line-height: 16px;">
+          <div style="display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) 150px; gap: 8px; padding: 0 0 6px; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground);">
+            <span>system</span><span>structure</span><span>state</span>
+          </div>
+          <sc-for list="{{ systems }}" as="s" hint-placeholder-count="6">
+            <div style="display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) 150px; gap: 8px; padding: 5px 0; border-top: 1px solid var(--border);">
+              <span style="font-size: 12px; word-break: break-all;">{{ s.path }}</span>
+              <span style="color: var(--muted-foreground); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ s.input }}</span>
+              <span style="color: {{ s.ink }};">{{ s.word }}</span>
+            </div>
+          </sc-for>
+          <sc-if value="{{ hasMore }}" hint-placeholder-val="{{ true }}">
+            <div style="padding: 5px 0; border-top: 1px solid var(--border); color: var(--muted-foreground);">{{ moreSystems }}</div>
+          </sc-if>
+        </div>
+      </div>
+
+      <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px;">
+        <x-import component-from-global-scope="Morpheus.Button" size="lg">{{ runLabel }}</x-import>
+        <x-import component-from-global-scope="Morpheus.Button" variant="outline" size="lg">write the inputs only</x-import>
+        <x-import component-from-global-scope="Morpheus.Button" variant="ghost" size="lg">export recipe</x-import>
+      </div>
+      <p style="margin: 0; font-size: 11px; line-height: 16px; color: var(--muted-foreground);">nothing runs until you press run · a tile that already finished is skipped when its folder name matches · the cluster jobs appear on the cluster tab as they are submitted</p>
+
+      <x-import component-from-global-scope="Morpheus.Section" label="Stages"></x-import>
+      <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+        <sc-for list="{{ stageChips }}" as="c" hint-placeholder-count="7">
+          <button type="button" onClick="{{ c.toggle }}" aria-pressed="{{ c.on }}" style="padding: 2px 10px; border: 1px solid {{ c.edge }}; border-radius: var(--radius-full); background: {{ c.bg }}; color: {{ c.ink }}; font-size: 11px; line-height: 16px; cursor: pointer;">{{ c.name }}</button>
+        </sc-for>
+      </div>
+      <p style="margin: 0; font-size: 11px; line-height: 16px; color: var(--muted-foreground);">{{ stageText }}</p>
+
+      <x-import component-from-global-scope="Morpheus.Section" label="When a system fails"></x-import>
+      <x-import component-from-global-scope="Morpheus.ToggleGroup" type="single" size="sm" value="{{ fail }}" on-value-change="{{ setFail }}">
+        <x-import component-from-global-scope="Morpheus.ToggleGroupItem" value="next">go on with the next system</x-import>
+        <x-import component-from-global-scope="Morpheus.ToggleGroupItem" value="stop">stop the run</x-import>
+      </x-import>
+      <p style="margin: 0; font-size: 11px; line-height: 16px; color: var(--muted-foreground);">{{ failText }}</p>
+      <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px;">
+        <span style="font-size: 10px; line-height: 14px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground);">retry</span>
+        <x-import component-from-global-scope="Morpheus.ToggleGroup" type="single" size="sm" value="{{ retry }}" on-value-change="{{ setRetry }}">
+          <x-import component-from-global-scope="Morpheus.ToggleGroupItem" value="resume">resume at the failed stage</x-import>
+          <x-import component-from-global-scope="Morpheus.ToggleGroupItem" value="rebuild">rebuild from scratch</x-import>
+        </x-import>
+        <span style="font-size: 10px; line-height: 14px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground);">attempts</span>
+        <x-import component-from-global-scope="Morpheus.Input" size="sm" value="{{ attempts }}" on-change="{{ onAttempts }}" aria-label="attempts" style="width: 60px;"></x-import>
+      </div>
+      <pre style="margin: 0; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--field); font-family: var(--font-mono); font-size: 11px; line-height: 18px; white-space: pre-wrap; word-break: break-all;">{{ retryText }}</pre>
+      <p style="margin: 0; font-size: 11px; line-height: 16px; color: var(--muted-foreground);">a pull that fails with "0.5 times half the box" or a pbcatom error gets a hint: set pull-pbc-ref-prev-step-com = yes (or pull-group1-pbcatom) in the mdp, or grow the box · failed walkers are rebuilt one by one from the start.gro of the nearest walker that worked · both are on the <a href="Dashboard.dc.html" style="color: var(--coral-strong);">dashboard</a></p>
+    </section>
+
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;light&quot;,&quot;dark&quot;],&quot;default&quot;:&quot;dark&quot;},&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:1360}}">
+const ALL = {
+  method: ['hmr+fast+6', 'hmr+slow+6'],
+  saccharide: ['HA', 'PG', 'O26'],
+  sequence: ['WRWYCR', 'WRWACR']
+};
+const KNOWN = ['method', 'saccharide', 'sequence', 'n', 'step', 'i', 'date'];
+const SFX = 'r';
+const repSuffix = (k) => (k === 0 ? '' : SFX + (k > 1 ? String(k - 1) : ''));
+// the letter goes right after the number that ends the method name: hmr+slow+6 -> hmr+slow+6r -> hmr+slow+6r1
+const repMethod = (m, k) => (k === 0 ? m : /\d+$/.test(m) ? m.replace(/(\d+)$/, '$1' + repSuffix(k)) : m + repSuffix(k));
+const DATE = '2026-10-23';
+const TILES_TOTAL = 20;
+const HEAVY = [
+  { name: 'minimise', own: 'local', after: 'inherit' },
+  { name: 'equilibrate nvt', own: 'local', after: 'inherit' },
+  { name: 'equilibrate npt', own: 'local', after: 'inherit' },
+  { name: 'awh', own: 'inherit', after: 'inherit' },
+  { name: 'pull', own: 'inherit', after: 'inherit' },
+  { name: 'multiwalker windows', own: 'inherit', after: 'inherit' }
+];
+const STAGES = [
+  ['SOLUTION_BUILDER', 'solution builder'], ['MINIMIZATION', 'min'], ['NVT', 'nvt'], ['NPT', 'npt'], ['AWH', 'awh'], ['PULL', 'pull'], ['MULTIWALKER', 'multiwalker']
+];
+
+function fill(tpl, vals) {
+  let bad = '';
+  const s = tpl.replace(/\{([^{}]*)\}/g, (m, k) => {
+    if (KNOWN.indexOf(k) < 0) { if (!bad) bad = m; return m; }
+    return vals[k];
+  });
+  return { s: s, bad: bad };
+}
+const pick = (all, sel) => all.filter((x) => sel.indexOf(x) >= 0);
+const seg = (l, w, bg) => ({ left: l + '%', width: w + '%', bg: bg });
+
+class Component extends DCLogic {
+  renderVals() {
+    const st = this.state;
+    const where = st.where || 'cluster';
+    const after = st.after || 'move on';
+    const clash = st.clash || 'continue';
+    const root = st.root === undefined ? 'solutions' : st.root;
+    const topTpl = st.topTpl === undefined ? '{sequence}.top' : st.topTpl;
+    const sysTpl = st.sysTpl === undefined ? '{method}/{saccharide}/{sequence}' : st.sysTpl;
+    const stepTpl = st.stepTpl === undefined ? '{n}.{step}' : st.stepTpl;
+    const stemTpl = st.stemTpl === undefined ? '{n}.{step}' : st.stemTpl;
+    const methods = st.methods || ALL.method;
+    const saccharides = st.saccharides || ALL.saccharide;
+    const sequences = st.sequences || ALL.sequence;
+
+    const M = pick(ALL.method, methods), S = pick(ALL.saccharide, saccharides), Q = pick(ALL.sequence, sequences);
+    let bad = '';
+    const note = (f) => { if (f.bad && !bad) bad = f.bad; return f.s; };
+    const blank = { method: '', saccharide: '', sequence: '', n: '', step: '', i: '', date: DATE };
+    const reps = Math.max(0, Math.min(99, parseInt(st.reps === undefined ? '0' : st.reps, 10) || 0));
+    note(fill(root, blank));
+    note(fill(topTpl, blank));
+    note(fill(stepTpl, blank));
+    note(fill(stemTpl, blank));
+
+    const times = 1 + reps;
+    const systems = [];
+    for (let k = 0; k < times; k++) {
+      M.forEach((m) => S.forEach((s) => Q.forEach((q) => {
+        const isOld = m === 'hmr+slow+6' && s === 'HA' && q === 'WRWYCR';
+        const exists = k === 0 && isOld;
+        const mk = repMethod(m, k + (isOld && clash === 'new' ? 1 : 0));
+        const path = note(fill(sysTpl, Object.assign({}, blank, { method: mk, saccharide: s, sequence: q })));
+        let word = k === 0 ? 'ready' : 'repeat ' + k, ink = k === 0 ? 'var(--mint-strong)' : 'var(--lilac-strong)';
+        if (exists) {
+          ink = 'var(--butter-strong)';
+          word = clash === 'continue' ? 'continues at MULTIWALKER' : clash === 'skip' ? 'skipped · folder exists' : 'repeat · new folder ' + mk;
+        }
+        systems.push({ path: path, input: s + '.gro + ' + q + ' · PyMOL', word: word, ink: ink, resume: exists });
+      })));
+    }
+    const resumeRow = systems.find((x) => x.resume);
+    const n = systems.length;
+    const runN = n - (resumeRow && clash === 'skip' ? 1 : 0);
+    const SHOWN = 14;
+    const systemsShown = systems.slice(0, SHOWN);
+    const moreSystems = n > SHOWN ? '… and ' + (n - SHOWN) + ' more, in the same pattern' : '';
+
+    const first = { method: M[0] || ALL.method[0], saccharide: S[0] || ALL.saccharide[0], sequence: Q[0] || ALL.sequence[0], i: '1', date: DATE };
+    const fv = (extra) => Object.assign({}, first, extra);
+    const example = [
+      fill(root, fv({})).s,
+      fill(sysTpl, fv({})).s,
+      fill(stepTpl, fv({ n: '6', step: 'eqnpt' })).s,
+      fill(stemTpl, fv({ n: '6', step: 'eqnpt' })).s + '.gro'
+    ].join('/');
+
+    const tileRows = HEAVY.map((h) => {
+      const w = h.own === 'inherit' ? where : h.own;
+      const a = h.after === 'inherit' ? after : h.after;
+      return { name: h.name, where: w === 'local' ? 'local' : 'cluster · ' + a, source: h.own === 'inherit' ? 'inherits' : 'set on build', cluster: w === 'cluster' };
+    });
+    const perSystemJobs = tileRows.filter((r) => r.cluster).length;
+
+    const lanes = after === 'wait'
+      ? [
+        { name: 'system 1', segs: [seg(0, 8, 'var(--stone)'), seg(8, 30, 'var(--butter)'), seg(38, 8, 'var(--sky)')] },
+        { name: 'system 2', segs: [seg(46, 8, 'var(--stone)'), seg(54, 30, 'var(--butter)'), seg(84, 8, 'var(--sky)')] },
+        { name: 'system 3', segs: [seg(92, 8, 'var(--stone)')] }
+      ]
+      : [
+        { name: 'system 1', segs: [seg(0, 8, 'var(--stone)'), seg(8, 30, 'var(--butter)'), seg(38, 8, 'var(--sky)')] },
+        { name: 'system 2', segs: [seg(8, 8, 'var(--stone)'), seg(16, 30, 'var(--butter)'), seg(46, 8, 'var(--sky)')] },
+        { name: 'system 3', segs: [seg(16, 8, 'var(--stone)'), seg(24, 30, 'var(--butter)'), seg(54, 8, 'var(--sky)')] }
+      ];
+
+    const whens = ['first run', 'repeated once', 'repeated again', 'and again'];
+    const repRows = [0, 1, 2, 3].map((k) => ({
+      when: whens[k],
+      name: fill(root, fv({})).s + '/' + fill(sysTpl, fv({ method: repMethod(first.method, k) })).s,
+      ink: k <= reps ? 'var(--foreground)' : 'var(--muted-foreground)'
+    }));
+    const repText = reps === 0
+      ? 'every system runs once · set a number above to run it all again, or press run on a finished system and choose repeat: the letter goes after the number in the method name, so a repeat is a completely different folder and nothing is overwritten'
+      : 'each system runs ' + times + ' times, as ' + first.method + ', ' + repMethod(first.method, 1) + (reps > 1 ? ', ' + repMethod(first.method, 2) : '') + (reps > 2 ? ' …' : '') + ' · every repeat starts from the first tile';
+    const clashText = clash === 'continue'
+      ? 'reuses the folder and starts at the first tile whose step folder is missing · nothing is overwritten'
+      : clash === 'skip'
+        ? 'leaves that system alone and runs the others'
+        : 'the system runs again as a completely different folder, with r after the number in the method name: hmr+slow+6 becomes hmr+slow+6r, the next time hmr+slow+6r1 · nothing is overwritten';
+    const resumeText = clash === 'continue'
+      ? 'solutions/hmr+slow+6/HA/WRWYCR has 01.conf.gro up to 8.pull/pullx.xvg · it continues at MULTIWALKER and nothing is overwritten'
+      : clash === 'skip'
+        ? 'solutions/hmr+slow+6/HA/WRWYCR is left alone · the other systems run'
+        : 'solutions/hmr+slow+6/HA/WRWYCR stays as it is · the system runs again from the first tile in solutions/hmr+slow+6r/HA/WRWYCR';
+
+    const stg = st.stg || {};
+    const onN = STAGES.filter((x) => stg[x[0]] !== false).length;
+    const fail = st.fail || 'next';
+    const retry = st.retry || 'resume';
+    const attempts = st.attempts === undefined ? '1' : st.attempts;
+    return {
+      theme: this.props.theme ?? 'dark',
+      stageChips: STAGES.map((x) => {
+        const on = stg[x[0]] !== false;
+        return { name: x[1], on: on, edge: on ? 'var(--mint-strong)' : 'var(--input)', bg: on ? 'var(--mint-soft)' : 'transparent', ink: on ? 'var(--mint-strong)' : 'var(--muted-foreground)',
+          toggle: () => { const o = Object.assign({}, stg); o[x[0]] = !on; this.setState({ stg: o }); } };
+      }),
+      stageText: onN + ' of 7 stages in this run · like processes = [...] in the notebook · a stage left out reads what an earlier run left on disk · multiwalker starts once 8.pull/pullx.xvg exists',
+      fail: fail,
+      setFail: (v) => { if (v) this.setState({ fail: v }); },
+      failText: fail === 'next'
+        ? 'the system is marked FAILED with its stage and the error (for example "NPT: RuntimeError: GROMACS fatal error …") and the run goes on · the build summary lists it'
+        : 'the first failure stops the whole run · the systems after it are marked SKIPPED in the build summary',
+      retry: retry,
+      setRetry: (v) => { if (v) this.setState({ retry: v }); },
+      attempts: attempts,
+      onAttempts: (e) => this.setState({ attempts: e.target.value }),
+      retryText: retry === 'resume'
+        ? '# hmr+slow+6/PG/WRWACR failed at NPT\n→ runs NPT, AWH, PULL again in the same folder · up to ' + attempts + (attempts === '1' ? ' attempt' : ' attempts') + ' · the old record becomes RETRIED'
+        : '# hmr+slow+6/PG/WRWACR failed at NPT\nmv solutions/hmr+slow+6/PG/WRWACR → solutions/hmr+slow+6/PG/failed/WRWACR_20261104_181502/ (+ FAILED.txt with the error)\n→ runs every stage again from SOLUTION_BUILDER · up to ' + attempts + (attempts === '1' ? ' attempt' : ' attempts'),
+      where: where,
+      isLocal: where === 'local',
+      isCluster: where === 'cluster',
+      setWhere: (v) => { if (v) this.setState({ where: v }); },
+      after: after,
+      setAfter: (v) => { if (v) this.setState({ after: v }); },
+      afterText: after === 'wait'
+        ? 'the run stops at each cluster job until it ends, then goes on with that system · the next system starts when this one is finished'
+        : 'the run submits each job and starts the next system at once · a system goes on with its next tile when its job ends, and the dashboard lists it as waiting',
+      chartLabel: after === 'wait' ? 'three systems one after the other, each waiting for its cluster job' : 'three systems started one after the other, their cluster jobs overlapping',
+      lanes: lanes,
+      tileRows: tileRows,
+      methods: methods,
+      saccharides: saccharides,
+      sequences: sequences,
+      setMethods: (v) => this.setState({ methods: v }),
+      setSaccharides: (v) => this.setState({ saccharides: v }),
+      setSequences: (v) => this.setState({ sequences: v }),
+      root: root,
+      topTpl: topTpl,
+      sysTpl: sysTpl,
+      stepTpl: stepTpl,
+      stemTpl: stemTpl,
+      onRoot: (e) => this.setState({ root: e.target.value }),
+      onTop: (e) => this.setState({ topTpl: e.target.value }),
+      onSys: (e) => this.setState({ sysTpl: e.target.value }),
+      onStep: (e) => this.setState({ stepTpl: e.target.value }),
+      onStem: (e) => this.setState({ stemTpl: e.target.value }),
+      hasBad: !!bad,
+      bad: bad,
+      example: example,
+      clash: clash,
+      setClash: (v) => { if (v) this.setState({ clash: v }); },
+      clashText: clashText,
+      reps: String(st.reps === undefined ? '0' : st.reps),
+      onReps: (e) => this.setState({ reps: e.target.value }),
+      repRows: repRows,
+      repText: repText,
+      countText: String(n).padStart(2, '0'),
+      systems: systemsShown,
+      moreSystems: moreSystems,
+      hasMore: moreSystems !== '',
+      empty: n === 0,
+      resumeShown: !!resumeRow,
+      resumeText: resumeText,
+      stat: {
+        systems: String(runN),
+        systemsHint: reps ? 'of 12 × ' + times + ' runs' : 'of 12 possible',
+        jobs: String(runN * perSystemJobs),
+        jobsHint: perSystemJobs + ' per system',
+        local: String(runN * (TILES_TOTAL - perSystemJobs)),
+        localHint: (TILES_TOTAL - perSystemJobs) + ' per system'
+      },
+      runLabel: runN === 0 ? 'Run' : runN < n ? 'Run ' + runN + ' of ' + n : 'Run ' + runN + (runN === 1 ? ' system' : ' systems')
+    };
+  }
+}
+</script>
+</body>
+</html>

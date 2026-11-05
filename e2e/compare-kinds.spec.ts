@@ -56,7 +56,7 @@ function watch(page: Page) {
 
 test('an RMSF and an H-bond result in compare, exported, then opened offline', async ({ page, context }) => {
   const errors = watch(page)
-  await page.goto(url)
+  await page.goto(url + '#setup/inputs')
   await page.goto(url + '#compare?jobs=' + jobs.rmsf + ',' + jobs.hbond)
   const view = page.getByRole('region', { name: 'compare', exact: true })
   const rmsf = view.getByRole('region', { name: /^rmsf_nvt/ }), hbond = view.getByRole('region', { name: /^hbond_nvt/ })
@@ -100,7 +100,7 @@ for (const theme of ['light', 'dark'] as const) {
       const r = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).disableRules(['region']).analyze()
       expect([where, r.violations.filter(v => v.impact === 'serious' || v.impact === 'critical').map(v => v.id + ' ' + v.nodes[0].target.join(' '))]).toEqual([where, []])
     }
-    await page.goto(url)
+    await page.goto(url + '#setup/inputs')
     await expect(page.locator('html')).toHaveAttribute('data-theme', theme)
     for (const k of ['rmsf', 'hbond', 'rdf']) {
       await page.goto(url + '#results/' + jobs[k])

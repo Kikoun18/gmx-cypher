@@ -33,7 +33,7 @@ function useBatches() {
 
 export const FORM = '__form'
 /** What the cluster tab hands over (R15): a finished job's input folder as the root, and a recipe (FORM: the form). Nothing runs. */
-export interface BatchPreset { id: number; root: string; recipe: string }
+export interface BatchPreset { id: number; root: string; recipe: string; /** A path template (R10: a build's trajectories by the notebook's names). */ template?: string }
 
 /** One batch: its matches' states, cancel all (armed), and send all to the vault. */
 function BatchCard({ b, jobs, vault, onOpenJob }: { b: Batch; jobs: Job[]; vault: string | null; onOpenJob: (id: string) => void }) {
@@ -94,7 +94,7 @@ export function BatchView({ state, draft, jobs, onOpenJob, onMatches, preset }: 
   const [recipes, setRecipes] = React.useState<{ id: string; name: string }[]>([])
   const [recipeId, setRecipeId] = React.useState(preset?.recipe ?? FORM)
   const [root, setRoot] = React.useState(preset?.root ?? (state.config.allow[0] || ''))
-  const [template, setTemplate] = React.useState('')
+  const [template, setTemplate] = React.useState(preset?.template ?? '')
   const [concurrency, setConcurrency] = React.useState(String(state.config.concurrency))
   const [items, setItems] = React.useState<Item[] | null>(null)
   const [unread, setUnread] = React.useState<string[]>([])

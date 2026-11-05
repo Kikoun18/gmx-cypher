@@ -1,0 +1,82 @@
+Will write gro: Coordinate file in Gromos-87 format
+Reading file ../../8.pull/8.pull.tpr, VERSION 2025.4-PLUMED_spack (single precision)
+Reading file ../../8.pull/8.pull.tpr, VERSION 2025.4-PLUMED_spack (single precision)
+Group     0 (         System) has 33544 elements
+Group     1 (          Other) has   110 elements
+Group     2 (          BGLCN) has    29 elements
+Group     3 (           AGAL) has    21 elements
+Group     4 (           AGLC) has    20 elements
+Group     5 (           AFUC) has    40 elements
+Group     6 (             NA) has    30 elements
+Group     7 (             CL) has    30 elements
+Group     8 (        Protein) has    83 elements
+Group     9 (      Protein-H) has    41 elements
+Group    10 (        C-alpha) has     8 elements
+Group    11 (       Backbone) has    24 elements
+Group    12 (      MainChain) has    31 elements
+Group    13 (   MainChain+Cb) has    39 elements
+Group    14 (    MainChain+H) has    41 elements
+Group    15 (      SideChain) has    42 elements
+Group    16 (    SideChain-H) has    10 elements
+Group    17 (    Prot-Masses) has    83 elements
+Group    18 (    non-Protein) has 33461 elements
+Group    19 (          Water) has 33291 elements
+Group    20 (            SOL) has 33291 elements
+Group    21 (      non-Water) has   253 elements
+Group    22 (            Ion) has    60 elements
+Group    23 ( Water_and_ions) has 33351 elements
+Group    24 (           CARB) has   110 elements
+Select a group: 
+Reading frame       0 time    0.000   
+Precision of ../../8.pull/8.pull.xtc is 0.001 (nm)
+
+Reading frame       1 time   40.000   
+Reading frame       2 time   80.000   
+Reading frame       3 time  120.000   
+Reading frame       4 time  160.000   
+Reading frame       5 time  200.000   
+Reading frame       6 time  240.000   
+Reading frame       7 time  280.000   
+Reading frame       8 time  320.000   
+Reading frame       9 time  360.000   
+Reading frame      10 time  400.000   
+Reading frame      11 time  440.000   
+Reading frame      12 time  480.000   
+Reading frame      13 time  520.000   
+Reading frame      14 time  560.000   
+Reading frame      15 time  600.000   
+Reading frame      16 time  640.000   
+Reading frame      17 time  680.000   
+Reading frame      18 time  720.000   
+Reading frame      19 time  760.000   
+Reading frame      20 time  800.000   
+Reading frame      30 time 1200.000   
+Reading frame      40 time 1600.000   
+Reading frame      50 time 2000.000   
+Reading frame      60 time 2400.000   
+Reading frame      70 time 2800.000   
+Reading frame      80 time 3200.000   
+Reading frame      90 time 3600.000   
+Reading frame     100 time 4000.000   
+Reading frame     110 time 4400.000   
+Reading frame     120 time 4800.000   
+Reading frame     130 time 5200.000   
+Reading frame     140 time 5600.000   
+Reading frame     150 time 6000.000   
+Reading frame     160 time 6400.000   
+Reading frame     170 time 6800.000   
+Reading frame     180 time 7200.000   
+Reading frame     190 time 7600.000   
+Reading frame     200 time 8000.000   
+Reading frame     300 time 12000.000   
+Reading frame     400 time 16000.000   
+Reading frame     500 time 20000.000   
+Reading frame     600 time 24000.000   
+Reading frame     700 time 28000.000   
+Dumping frame at t= 29920 ps
+
+Last written: frame      0 time 29920.000
+
+Note that major changes are planned in future for trjconv, to improve usability and utility.
+Select group for output
+Selected 0: 'System'
