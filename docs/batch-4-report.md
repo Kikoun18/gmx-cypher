@@ -259,6 +259,8 @@ stale-answer guards of the debounced requests.
 ## 12. History
 
 ```
+5d04e52 Phase 7: the fresh-context review's findings, each fixed with a test first
+d74e50b Phase 7: the README's tabs and SymBuilder, the batch report, final screenshots
 1265bcc R8b: where each system's PMFs would land in the project, by the Matrix's planBatch
 b19c6fb R8a: systems from the connected project, or only the cells it lacks
 053dfc0 R4: what a build reads: the base folder, its files found or missing

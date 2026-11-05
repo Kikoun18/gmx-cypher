@@ -289,4 +289,5 @@ From [`batch-4.md`](batch-4.md) §6: SymBuilder inside gmx-cypher, four tabs (ho
 - Python scripts as tiles (the mock-up's library board), unless question 7 says otherwise.
 - The notebook's plots; the production tile (the notebook has none).
 - Requests for the Matrix and for Morpheus (section 23).
+- Found in the review (T225): the walkers' script needs an MPI gmx for `-multidir`; R7a should refuse a thread-MPI profile (MetaCentrum's GROMACS 2022.3 `gmx`) for the walkers, in words.
 - Found in Phase 0: (fixed in R1b) the page had no icon, so Chromium 1243 (the one installed here; Playwright 1.56.1 is pinned) logs a 404 for `/favicon.ico` and 12 of the 14 e2e tests fail on their "no console errors" check (report §1). A chart drawn in the page's first render takes the light palette in the dark theme: `usePageTheme` (`src/core/theme.ts`) reads `<html data-theme>` before `App`'s layout effect sets it, and its observer starts after the change (today's result pages escape it because their charts wait for data).
