@@ -40,16 +40,19 @@ export const ROLES: Record<string, readonly string[]> = {
 /** The only files in src/ that may name a colour by its hex value (R4b): Morpheus's tokens and the role layer. */
 export const COLOUR_FILES = ['src/tokens.json', 'src/roles.json']
 
-/** The tokens of UI state: never a data tone (contract §2). */
+/** The tokens of UI state (contract §2, T218): coral for the fill, coral-strong for the focus ring and underlines. */
 export const UI_STATE = ROLES['ui state']
 
-/** The four status levels (R9c, contract §4): an icon and a word before the text, so colour is never the only signal. */
+/**
+ * The four status levels (R9c, contract §4, T218): a dot and a word in the level's tone before the text, so colour is
+ * never the only signal.
+ */
 export type Level = 'ok' | 'info' | 'warning' | 'error'
-export const STATUS: Record<Level, { icon: string; word: string; token: string; when: string }> = {
-  ok: { icon: 'circle-check', word: 'ok', token: 'foreground', when: 'a check passed' },
-  info: { icon: 'info', word: 'note', token: 'foreground', when: 'worth knowing; nothing to do' },
-  warning: { icon: 'triangle-alert', word: 'check', token: 'foreground', when: 'a result may mislead: look before trusting it' },
-  error: { icon: 'circle-x', word: 'error', token: 'destructive', when: 'nothing ran or nothing can be read; it says how to fix it' },
+export const STATUS: Record<Level, { word: string; token: string; when: string }> = {
+  ok: { word: 'ok', token: 'mint-strong', when: 'a check passed' },
+  info: { word: 'note', token: 'sky-strong', when: 'worth knowing; nothing to do' },
+  warning: { word: 'check', token: 'butter-strong', when: 'a result may mislead: look before trusting it' },
+  error: { word: 'error', token: 'destructive', when: 'nothing ran or nothing can be read; it says how to fix it' },
 }
 
 /** The only files whose classes may colour text or a ground `destructive` (R4a, R9c): the status component and destructive buttons. */

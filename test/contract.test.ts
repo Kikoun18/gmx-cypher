@@ -2,7 +2,10 @@
 import { describe, expect, it } from 'vitest';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import { COLOUR_FILES, DESTRUCTIVE_FILES, INTERNAL_REFERENCE, NEVER_SHOWN, ROLES, STATUS } from '../src/core/contract';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { COLOUR_FILES, DESTRUCTIVE_FILES, INTERNAL_REFERENCE, NEVER_SHOWN, ROLES, STATUS, type Level } from '../src/core/contract';
+import { Status } from '../src/ui/status';
 import { RUNNER } from './helpers';
 import { stringsOf, uiStrings } from './ui-strings';
 
@@ -48,11 +51,22 @@ describe('one set of words (R3b)', () => {
 
 describe('one status component (R9c)', () => {
   const walk = (d: string): string[] => readdirSync(d).flatMap(n => { const p = join(d, n); return statSync(p).isDirectory() ? walk(p) : [p.slice(RUNNER.length)]; });
-  it('every level has an icon, a word, a token of a role and a rule for when it is used', () => {
+  it('every level has a dot and a word in its tone (T218), a token of a role and a rule for when it is used', () => {
     expect(Object.keys(STATUS)).toEqual(['ok', 'info', 'warning', 'error']);
+    expect(Object.values(STATUS).map(l => l.token)).toEqual(['mint-strong', 'sky-strong', 'butter-strong', 'destructive']);
     const tokens = new Set(Object.values(ROLES).flat());
-    for (const l of Object.values(STATUS)) { expect(l.icon && l.word && l.when).toBeTruthy(); expect(tokens.has(l.token)).toBe(true); }
+    for (const l of Object.values(STATUS)) { expect(l.word && l.when).toBeTruthy(); expect(tokens.has(l.token)).toBe(true); }
     expect(new Set(Object.values(STATUS).map(l => l.word)).size).toBe(4);
+  });
+  it('draws a dot, never an icon, and the word and text in the level\'s tone', () => {
+    for (const [level, l] of Object.entries(STATUS)) {
+      const html = renderToStaticMarkup(createElement(Status, { level: level as Level }, 'the inputs agree'));
+      expect(html).toContain('data-slot="status-dot"');
+      expect(html).toContain('bg-' + l.token);
+      expect(html).toContain('text-' + l.token);
+      expect(html).toContain('>' + l.word + '<');
+      expect(html).not.toContain('<svg');
+    }
   });
   it('no status is a ✓, ✗ or ⚠ caption in the page any more', () => {
     expect(uiStrings().filter(s => s.file.startsWith('src/') && /[✓✗⚠]/.test(s.text)).map(s => s.file + ':' + s.line + '  ' + s.text.trim())).toEqual([]);

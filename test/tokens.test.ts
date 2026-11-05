@@ -21,6 +21,11 @@ describe('tokens.css from Morpheus tokens.json', () => {
     expect(block('[data-theme="dark"]')).toContain('--primary: var(--coral);');
   });
 
+  it('is the design system\'s current Morpheus (T218): coral #ff5429', () => {
+    expect(block(':root, [data-theme="light"]')).toContain('--coral: #ff5429;');
+    expect(block('[data-theme="dark"]')).toContain('--coral: #ff5429;');
+  });
+
   it('turns aliases into variables', () => {
     expect(css).toContain('--ring: var(--coral-strong);');
     expect(css).not.toMatch(/\{[a-z-]+\}/);

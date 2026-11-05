@@ -253,7 +253,7 @@ From [`batch-4.md`](batch-4.md) §6: SymBuilder inside gmx-cypher, four tabs (ho
 ### Phase 1: The shell (R1, R2)
 - [x] R1a Contract amended for the new words (question 1, 2): §1's table, three phrases refused (T201, T202)
 - [x] R1b Four tabs, routes, every old address; the page's icon (T216, T220)
-- [ ] R1c The mock-up's look: Morpheus's current tokens, coral for UI state, status as a dot and word (T218)
+- [x] R1c The mock-up's look: Morpheus's current tokens, coral for UI state, status as a dot and word (T218); the light theme's error red moved to `#7a1030` to stay apart from the new coral-strong
 - [ ] R2 home
 
 ### Phase 2: The plan, with nothing run (R3, R4)
