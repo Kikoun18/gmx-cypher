@@ -15,8 +15,9 @@ const NAME: Record<ScriptedStage, string> = { min: 'minimisation', nvt: 'nvt', n
 export function ClusterScriptsView({ config }: { config: Config | undefined }) {
   const [draft] = React.useState(readBuildDraft)
   const ids = { ...DEFAULT_PROFILES, ...(config?.qqBuild?.profiles ?? {}) } as Record<ScriptedStage, string>
-  const [stage, setStage] = React.useState<ScriptedStage>('awh'), [picked, setPicked] = React.useState(ids[stage])
-  const sys = firstSystem(draft), profile = profileOf(ids[stage]) ?? PROFILES[0], shown = profileOf(picked) ?? profile
+  // The profile shown follows the settings until one is picked (they may load after this view does).
+  const [stage, setStage] = React.useState<ScriptedStage>('awh'), [picked, setPicked] = React.useState<string | null>(null)
+  const sys = firstSystem(draft), profile = profileOf(ids[stage]) ?? PROFILES[0], shown = (picked && profileOf(picked)) || profile
   const script = qqScript(stage, sys, profile, draft.plan.science.walkers.length)!
   const until = (st: ScriptedStage) => st === 'walkers' ? 'every walker has 9.multiwalker.gro' : SCRIPTED[st]!.deffnm + '.gro exists' + (['min', 'nvt', 'npt'].includes(st) ? ' · built here by default' : '')
   return (
@@ -52,7 +53,7 @@ export function ClusterScriptsView({ config }: { config: Config | undefined }) {
           <div className="overflow-hidden rounded-2xl border border-border bg-card text-caption">
             <div className="grid grid-cols-[110px_minmax(0,1fr)_minmax(0,0.8fr)] gap-2 border-b border-border px-4 py-1.5 text-label uppercase text-muted-foreground"><span>stage</span><span>resubmit until</span><span>profile</span></div>
             {SCRIPTED_STAGES.map(st => (
-              <button key={st} onClick={() => { setStage(st); setPicked(ids[st]) }} aria-current={stage === st ? 'true' : undefined} className={cn('grid w-full grid-cols-[110px_minmax(0,1fr)_minmax(0,0.8fr)] items-center gap-2 border-b border-border px-4 py-2 text-left last:border-0', stage === st && 'bg-muted shadow-[inset_3px_0_0_var(--state)]')}>
+              <button key={st} onClick={() => { setStage(st); setPicked(null) }} aria-current={stage === st ? 'true' : undefined} className={cn('grid w-full grid-cols-[110px_minmax(0,1fr)_minmax(0,0.8fr)] items-center gap-2 border-b border-border px-4 py-2 text-left last:border-0', stage === st && 'bg-muted shadow-[inset_3px_0_0_var(--state)]')}>
                 <b>{NAME[st]}</b><span className="text-muted-foreground">{until(st)}</span><span className="truncate">{profileOf(ids[st])?.name ?? ids[st]}</span>
               </button>
             ))}

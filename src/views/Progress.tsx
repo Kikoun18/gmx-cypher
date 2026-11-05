@@ -36,7 +36,7 @@ function SystemRow({ s, selected, onSelect }: { s: SystemRun; selected: boolean;
 
 /** symbuilder · progress (R5c): the last build, its systems one at a time, the step running and what it prints. */
 export function ProgressView({ runs, logs, loadLog, onCancel, onRetry }: {
-  runs: BuildRun[]; logs: Record<string, string>; loadLog: (id: string) => void; onCancel: (id: string) => void
+  runs: BuildRun[]; logs: Record<string, { text: string; end: number }>; loadLog: (id: string) => void; onCancel: (id: string) => void
   /** R6: a failed system again, resumed in its folder or rebuilt after its folder moves to failed/. */
   onRetry?: (run: string, dir: string, how: 'resume' | 'rebuild') => Promise<unknown>
 }) {
@@ -82,7 +82,7 @@ export function ProgressView({ runs, logs, loadLog, onCancel, onRetry }: {
               </div>)}
             {retryError && <Status level="error">{retryError}</Status>}
             {(sel.attempt ?? 1) > 1 && <span className="text-caption text-muted-foreground">try {sel.attempt}</span>}
-            {sel.notes.map(n => <Status key={n} level="info" word="note">{n}</Status>)}
+            {sel.notes.map((n, i) => <Status key={i + ' ' + n} level="info" word="note">{n}</Status>)}
             {sel.submit.length > 0 && <>
               <Head label="qq submit" n={sel.submit.length} />
               <span className="text-caption text-muted-foreground">nothing is submitted for you: run each where qq works, from the base folder</span>
@@ -91,7 +91,7 @@ export function ProgressView({ runs, logs, loadLog, onCancel, onRetry }: {
             </>}
             {job && <>
               <Head label={'log · ' + (sel.label ?? '')} />
-              <pre aria-live="off" className="m-0 max-h-[420px] overflow-auto whitespace-pre-wrap rounded-xl border border-border bg-background px-3 py-2 text-caption">{(logs[job] ?? '').split('\n').slice(-60).join('\n') || 'nothing printed yet'}</pre>
+              <pre aria-live="off" className="m-0 max-h-[420px] overflow-auto whitespace-pre-wrap rounded-xl border border-border bg-background px-3 py-2 text-caption">{(logs[job]?.text ?? '').split('\n').slice(-60).join('\n') || 'nothing printed yet'}</pre>
             </>}
           </Panel>
         )}

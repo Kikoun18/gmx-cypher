@@ -8,12 +8,13 @@
 
 import { createHash } from 'node:crypto';
 import { EventEmitter } from 'node:events';
-import { constants, copyFileSync, createReadStream, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs';
+import { constants, copyFileSync, createReadStream, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
+import { fileURLToPath } from 'node:url';
 import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 import { fatalText } from '../src/lib/build/fatal';
 import { writeSummary } from './build-report';
-import { BASE, NAMES, systemsOf, type BuildPlan, type Systems, type System } from '../src/lib/build/plan';
+import { BASE, NAMES, nameProblem, planProblems, systemsOf, type BuildPlan, type Systems, type System } from '../src/lib/build/plan';
 import { freeRepeat, hint, quarantineName, resumeAt } from '../src/lib/build/retry';
 import { PROFILES, qqScript, type Profile } from '../src/lib/build/qq';
 import type { StageId } from '../src/lib/build/plan';
@@ -94,8 +95,8 @@ export interface BuilderOptions {
   cancel?: (job: string) => void;
   /** The tools as the settings say now: gmx's path, python by name or path. */
   tools: () => { gmx: string | null; python: string | null };
-  /** Waiting for a local mdrun's .gro (R5c): every `every` ms, up to `max` ms. */
-  wait?: { every: number; max: number };
+  /** Waiting for a local mdrun's .gro (R5c): every `every` ms, up to `max` ms; a function reads the settings as they are now. */
+  wait?: { every: number; max: number } | (() => { every: number; max: number });
   /** The qq profile each stage's script is written for (R7a); a stage not named takes MetaCentrum 2025's. */
   profiles?: () => Partial<Record<StageId, Profile>>;
   /** The GROMACS version for the build summary's header (R9). */
@@ -105,11 +106,28 @@ export interface BuilderOptions {
 }
 
 /** The shipped python scripts (R5b), by the name the planner gives them. */
-export const PYTHON_DIR = new URL('./python/', import.meta.url).pathname;
+export const PYTHON_DIR = fileURLToPath(new URL('./python/', import.meta.url));
 
 const now = () => new Date().toISOString();
 const writeJson = (file: string, v: unknown) => { const part = file + '.' + process.pid + '.part'; writeFileSync(part, JSON.stringify(v, null, 2) + '\n'); renameSync(part, file); };
 const inside = (child: string, parent: string) => child === parent || child.startsWith(parent.endsWith(sep) ? parent : parent + sep);
+/**
+ * The first folder or file on the way from the base folder to `path` that is a link, relative to the base, or null: a
+ * build never writes through a link, which could lead anywhere (the review's finding 6). The base folder itself is
+ * real (settings resolve it).
+ */
+export function linkIn(base: string, path: string): string | null {
+  let cur = base;
+  for (const part of relative(base, path).split(sep).filter(Boolean)) {
+    cur = join(cur, part);
+    let st;
+    try { st = lstatSync(cur); } catch { return null; }
+    if (st.isSymbolicLink()) return relative(base, cur);
+  }
+  return null;
+}
+/** A file's size and time, or null: what a step changed, compared before and after. */
+const mark = (p: string) => { try { const st = statSync(p); return st.size + ':' + st.mtimeMs; } catch { return null; } };
 
 export function sha256File(path: string): Promise<string> {
   return new Promise((done, fail) => { const h = createHash('sha256'); createReadStream(path).on('data', d => h.update(d)).on('error', fail).on('end', () => done(h.digest('hex'))); });
@@ -171,7 +189,9 @@ export class Builder extends EventEmitter {
       for (let i = 0; i < list.length; i++) {
         const s = run.systems[i];
         if (this.current?.cancelled) { s.status = 'cancelled'; continue; }
-        await this.system(run, plan, list[i], s);
+        // Whatever goes wrong outside a step (a folder moved away, a record unreadable) stops this system, not gmx-cypher.
+        try { await this.system(run, plan, list[i], s); }
+        catch (e) { s.status = 'failed'; s.error = 'gmx-cypher could not go on with ' + s.dir + ': ' + (e as Error).message; s.ended = now(); s.job = undefined; }
         if (s.status === 'failed' && run.onFailure === 'stop') {
           for (const t of run.systems.slice(i + 1)) { t.status = 'skipped'; t.notes.push('the build stopped at ' + s.dir); }
           break;
@@ -203,9 +223,13 @@ export class Builder extends EventEmitter {
     const old = this.runs.get(runId), s = old?.systems.find(x => x.dir === dir);
     if (!old || !s) throw new Error('no system ' + dir + ' in build ' + runId);
     if (s.status !== 'failed' && s.status !== 'cancelled') throw new Error('only a failed or cancelled system is retried: ' + dir + ' is ' + s.status);
+    if (s.retried || s.wentOn) throw new Error(dir + ' was taken again by build ' + (s.retried ?? s.wentOn) + ': retry that one');
     if (this.current) throw new Error('a build is running: one at a time');
     const root = join(old.base, dir), rec = readRecord(root);
     if (!rec) throw new Error(dir + ' has no build.json of gmx-cypher\'s: nothing to retry from');
+    if (rec.build !== runId) throw new Error(dir + ' was taken again by build ' + rec.build + ': retry that one');
+    const link = linkIn(old.base, root);
+    if (link) throw new Error(link + ' is a link: nothing is moved or written through it');
     if (how === 'rebuild') {
       if (!rec.folders.includes(dir)) throw new Error(dir + ' was not created by a gmx-cypher build: it is not moved');
       const to = join(dirname(root), 'failed', quarantineName(rec.system.sequence, new Date()));
@@ -230,9 +254,11 @@ export class Builder extends EventEmitter {
     const old = this.runs.get(runId), s = old?.systems.find(x => x.dir === dir);
     if (!old || !s) throw new Error('no system ' + dir + ' in build ' + runId);
     if (s.status !== 'cluster') throw new Error(dir + ' does not wait for the cluster: it is ' + s.status);
+    if (s.retried || s.wentOn) throw new Error(dir + ' was taken on already by build ' + (s.wentOn ?? s.retried) + ': go on from that one');
     if (this.current) throw new Error('a build is running: one at a time');
     const rec = readRecord(join(old.base, dir));
     if (!rec) throw new Error(dir + ' has no build.json of gmx-cypher\'s');
+    if (rec.build !== runId) throw new Error(dir + ' was taken on already by build ' + rec.build + ': go on from that one');
     const plan: BuildPlan = { ...rec.plan, stages: rec.plan.stages.map(st => (st.id === 'walkers' ? { ...st, on: true, tiles: st.tiles.map(t => ({ ...t, on: true })) } : st)) };
     const started = this.start(plan, { methods: [rec.system.method], saccharides: [rec.system.saccharide], sequences: [rec.system.sequence], repeats: 0 }, { base: old.base, ifExists: 'continue', onFailure: 'next' });
     s.wentOn = started.run.id;
@@ -245,6 +271,8 @@ export class Builder extends EventEmitter {
     let sys = asked, root = join(base, sys.dir), prev: BuildRecord | null = null;
     s.status = 'building'; s.started = now(); this.save(run);
     const leave = (why: string) => { s.status = 'skipped'; s.ended = now(); s.notes.push(why); this.save(run); };
+    const linked = linkIn(base, root);
+    if (linked) { s.status = 'failed'; s.error = linked + ' is a link: nothing is written through it'; s.ended = now(); this.save(run); return; }
     // A folder that exists (R6): continued if a gmx-cypher build made it, else left as it is; skipped; or built beside it as a repeat.
     if (existsSync(root)) {
       if (run.ifExists === 'skip') return leave(sys.dir + ' exists: it is left as it is');
@@ -259,6 +287,8 @@ export class Builder extends EventEmitter {
         if (!prev) return leave(sys.dir + ' exists, and no gmx-cypher build made it (no build.json of its own): it is left as it is · choose repeat to build beside it');
       }
     }
+    // A continued system keeps what its earlier builds noted and the submit lines they printed (the review's finding 9).
+    if (prev) { s.notes.unshift(...prev.notes.filter(n => !n.startsWith('continued at ') && !n.startsWith('waits for '))); for (const l of prev.submit) if (!s.submit.includes(l)) s.submit.push(l); }
     const record: BuildRecord = prev
       ? { ...prev, runner: this.o.version, build: run.id, plan, started: s.started!, ended: undefined, status: 'building', notes: s.notes, submit: s.submit }
       : {
@@ -285,15 +315,20 @@ export class Builder extends EventEmitter {
     if (prev) { record.steps = [...prev.steps]; s.notes.push(from >= steps.length ? 'every step was done before' : 'continued at step ' + (from + 1) + ' of ' + steps.length + ': ' + steps[from].label); }
     let cluster = steps.slice(0, from).some(x => x.label === 'qq script' && CLUSTER.includes(x.stage));
     const failedWalkers = new Set<number>();
+    let frames = false;
     try {
       for (let i = from; i < steps.length; i++) {
         const step = steps[i];
         if (this.current?.cancelled) throw new Stop('cancelled', 'cancelled');
         // The walkers start from the pull's frames, which the cluster makes: without them the system waits (R7b).
-        if (step.stage === 'walkers' && !('t1' in values)) {
+        // Read each time the walkers' stage is reached, from the pull as it is now (the review's finding 10).
+        if (step.stage === 'walkers' && !frames) {
           const px = join(root, NAMES.pull, 'pullx.xvg'), xtc = join(root, NAMES.pull, NAMES.pull + '.xtc');
           if (!existsSync(px) || !existsSync(xtc)) { cluster = true; throw new Stop('cluster', 'waits for its pull: ' + NAMES.pull + '/' + (existsSync(px) ? NAMES.pull + '.xtc' : 'pullx.xvg')); }
-          for (const w of walkerFrames(pullx(readFileSync(px, 'utf8')), plan.science.walkers)) {
+          const pulled = pullx(readFileSync(px, 'utf8'));
+          if (!pulled.dists.length) { cluster = true; throw new Stop('cluster', 'waits for its pull: ' + NAMES.pull + '/pullx.xvg has no distances yet'); }
+          frames = true;
+          for (const w of walkerFrames(pulled, plan.science.walkers)) {
             values['t' + w.walker] = String(w.time);
             if (w.far) s.notes.push('walker ' + w.walker + ' starts at ' + w.distance.toFixed(3) + ' nm, ' + w.off.toFixed(2) + ' nm from its target ' + w.target + ' nm');
           }
@@ -354,6 +389,8 @@ export class Builder extends EventEmitter {
       const dir = folder(n), to = join(root, NAMES.walkers, 'failed', quarantineName(String(n), new Date()));
       if (existsSync(dir)) {
         if (!record.folders.includes(rel(dir))) throw new Stop('failed', 'WALKERS · walker ' + n + ': ' + rel(dir) + ' is not this build\'s folder: it is left as it is');
+        const link = linkIn(base, dir) ?? linkIn(base, dirname(to));
+        if (link) throw new Stop('failed', 'WALKERS · walker ' + n + ': ' + link + ' is a link: nothing is moved through it');
         if (!existsSync(dirname(to))) { mkdirSync(dirname(to)); record.folders.push(rel(dirname(to))); }
         renameSync(dir, to);
         // The record follows the files it moved; nothing is deleted.
@@ -365,7 +402,7 @@ export class Builder extends EventEmitter {
       record.files[rel(join(dir, 'start.gro'))] = await fileRecord(join(dir, 'start.gro'), -1);
       const grompp = steps.findIndex(x => x.label === 'walker ' + n + ': grompp');
       try { await this.step(run, plan, sys, steps[grompp], grompp, values, record); }
-      catch (e) { throw new Stop('failed', 'walker ' + n + ', rebuilt from walker ' + donor + '\'s start: ' + (e as Error).message); }
+      catch (e) { if (e instanceof Stop && e.status === 'cancelled') throw e; throw new Stop('failed', 'walker ' + n + ', rebuilt from walker ' + donor + '\'s start: ' + (e as Error).message); }
       s.notes.push('walker ' + n + ' (' + targets[n - 1] + ' nm) rebuilt once from walker ' + donor + '\'s start (' + targets[donor - 1] + ' nm); its failed folder is ' + rel(to));
     }
   }
@@ -376,8 +413,19 @@ export class Builder extends EventEmitter {
     const rec: StepRecord = { i, stage: step.stage, label: step.label, program: step.program, cwd: step.cwd, argv, ...(step.stdin != null ? { stdin: step.stdin } : {}), started: now(), status: 'done' };
     record.steps.push(rec);
     const stop = (status: 'failed' | 'cancelled', why: string, refused = false) => { rec.status = refused ? 'refused' : status; rec.error = why; rec.ended = now(); return new Stop(status, step.stage.toUpperCase() + ' · ' + step.label + ': ' + why); };
+    // What a step changed before it failed or was stopped (grompp's -po, a stopped mdrun's log) is this build's, so a
+    // resume may write over it (the review's finding 2); a step refused by the writing rule changed nothing.
+    const outs = [...step.writes, ...step.replaces], abs = (p: string) => resolve(run.base, p), before = new Map(outs.map(p => [p, mark(abs(p))]));
+    const backed = new Set(backupsOf(step, run.base));
     try { return await this.stepBody(run, plan, sys, step, i, record, rec, argv, stop); }
-    catch (e) { if (e instanceof Stop) throw e; throw stop('failed', (e as Error).message); }
+    catch (e) {
+      const st = e instanceof Stop ? e : stop('failed', (e as Error).message);
+      if (rec.status !== 'refused') {
+        for (const p of outs) { const now2 = mark(abs(p)); if (now2 && now2 !== before.get(p) && !(p.startsWith('scripts/') && !record.files[p])) record.files[p] = await fileRecord(abs(p), i); }
+        for (const b of backupsOf(step, run.base)) if (!backed.has(b) && !record.backups.includes(b)) { record.backups.push(b); record.files[b] = await fileRecord(abs(b), i); }
+      }
+      throw st;
+    }
   }
 
   private async stepBody(run: BuildRun, plan: BuildPlan, sys: System, step: Step, i: number, record: BuildRecord, rec: StepRecord, argv: string[],
@@ -386,6 +434,7 @@ export class Builder extends EventEmitter {
     const unresolved = argv.find(a => /\{\w+\}/.test(a));
     if (unresolved) throw stop('failed', 'no value for ' + unresolved);
     const scripts = join(base, 'scripts');
+    for (const p of [step.cwd, ...step.writes, ...step.replaces]) { const link = linkIn(base, abs(p)); if (link) throw stop('failed', link + ' is a link: nothing is written through it', true); }
     // The writing rule (T205).
     for (const p of [...step.writes, ...step.replaces]) {
       const a = abs(p), ours = !!record.files[p];
@@ -442,10 +491,12 @@ export class Builder extends EventEmitter {
           mkdirSync(dirname(from), { recursive: true });
           try { writeFileSync(from, s.text, { flag: 'wx', mode: 0o755 }); record.files[argv[0]] = await fileRecord(from, i); }
           catch { record.notes.push(argv[0] + ' exists: kept, and used'); }
-          if (CLUSTER.includes(step.stage)) record.submit.push(s.submit);
+          if (CLUSTER.includes(step.stage) && !record.submit.includes(s.submit)) record.submit.push(s.submit);
         }
         if (!existsSync(from)) throw stop('failed', 'no ' + argv[0]);
-        copyFileSync(from, to, constants.COPYFILE_EXCL);
+        // A copy this build made before is written over (a resume); any other file there was refused above.
+        if (existsSync(to)) { copyFileSync(from, to + '.part'); renameSync(to + '.part', to); }
+        else copyFileSync(from, to, constants.COPYFILE_EXCL);
         // T206: with the setting on, qq submit runs here, in the step's folder, with those fixed arguments; off, the line is printed.
         const sub = step.label === 'qq script' && CLUSTER.includes(step.stage) ? this.o.submit?.() : null;
         if (sub) {
@@ -458,13 +509,14 @@ export class Builder extends EventEmitter {
       case 'rename': renameSync(join(cwd, argv[0]), join(cwd, argv[1])); delete record.files[relative(base, join(cwd, argv[0]))]; break;
       case 'write': {
         const file = join(cwd, argv[0]), text = this.make(step, sys, plan, cwd, base);
-        if (step.replaces.length) { writeFileSync(file + '.part', text); renameSync(file + '.part', file); }
+        // Replacing, or writing again a file this build wrote (a resume): never over one it did not (refused above).
+        if (step.replaces.length || existsSync(file)) { writeFileSync(file + '.part', text); renameSync(file + '.part', file); }
         else writeFileSync(file, text, { flag: 'wx' });
         break;
       }
       case 'read': readFileSync(join(cwd, argv[0]), 'utf8'); break;
       case 'wait': {
-        const w = this.o.wait ?? { every: 10_000, max: 600_000 }, file = join(cwd, argv[0]);
+        const w0 = this.o.wait, w = (typeof w0 === 'function' ? w0() : w0) ?? { every: 10_000, max: 600_000 }, file = join(cwd, argv[0]);
         for (let t = 0; !existsSync(file); t += w.every) {
           if (t >= w.max) throw stop('failed', 'no ' + argv[0] + ' after ' + Math.round(w.max / 60_000) + ' min');
           if (this.current?.cancelled) throw stop('cancelled', 'cancelled');
@@ -482,7 +534,7 @@ export class Builder extends EventEmitter {
     if (missing.length) throw stop('failed', 'expected output missing: ' + missing.join(', '));
     // A script that was there before is not this build's (kept, not recorded).
     for (const p of [...step.writes, ...step.replaces]) if (existsSync(abs(p)) && !(p.startsWith('scripts/') && !record.files[p])) record.files[p] = await fileRecord(abs(p), i);
-    for (const b of backupsOf(step, base)) if (!before.has(b)) { record.backups.push(b); record.files[b] = await fileRecord(abs(b), i); }
+    for (const b of backupsOf(step, base)) if (!before.has(b) && !record.backups.includes(b)) { record.backups.push(b); record.files[b] = await fileRecord(abs(b), i); }
     rec.ended = now();
     return { ...(net != null ? { net } : {}) };
   }
@@ -510,10 +562,10 @@ async function fileRecord(path: string, step: number): Promise<FileRecord> {
   return { size: statSync(path).size, sha256: await sha256File(path), step };
 }
 
-/** GROMACS's backups (#name.N#) of the files a step replaces, relative to the base folder. */
+/** GROMACS's backups (#name.N#) of the files a step writes or replaces, relative to the base folder. */
 function backupsOf(step: Step, base: string): string[] {
   const out: string[] = [];
-  for (const p of step.replaces) {
+  for (const p of [...step.writes, ...step.replaces]) {
     const dir = dirname(join(base, p)), name = basename(p);
     if (!existsSync(dir)) continue;
     for (const f of readdirSync(dir)) if (f.startsWith('#' + name + '.') && f.endsWith('#')) out.push(relative(base, join(dir, f)));
@@ -543,9 +595,19 @@ export function jobsExec(jobs: Jobs): { exec: Exec; cancel: (id: string) => void
 }
 
 /** A system's record, when a gmx-cypher build of this version or older wrote it; null otherwise. */
+/**
+ * A system's record, when a gmx-cypher build of this version or older wrote it and it is whole: its lists are lists, its
+ * plan a build plan, its names names, its folder this one (the review's findings 5 and 7: a retry moves folders by it).
+ */
 export function readRecord(root: string): BuildRecord | null {
   try {
     const r = JSON.parse(readFileSync(join(root, 'build.json'), 'utf8')) as BuildRecord;
-    return r.format === BUILD_FORMAT && r.version >= 1 && r.version <= BUILD_VERSION ? r : null;
+    if (r.format !== BUILD_FORMAT || !(r.version >= 1 && r.version <= BUILD_VERSION)) return null;
+    if (![r.steps, r.folders, r.backups, r.notes, r.submit].every(Array.isArray) || !r.files || typeof r.files !== 'object' || Array.isArray(r.files)) return null;
+    if (planProblems(r.plan).length || !r.system) return null;
+    const { method, saccharide, sequence, dir } = r.system;
+    if (nameProblem('method', method) || nameProblem('saccharide', saccharide) || nameProblem('sequence', sequence)) return null;
+    if (dir !== [BASE.solutions, method, saccharide, sequence].join('/') || !root.replace(/\/+$/, '').endsWith('/' + dir)) return null;
+    return r;
   } catch { return null; }
 }

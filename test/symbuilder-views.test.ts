@@ -153,7 +153,7 @@ describe('symbuilder · progress (R5c)', () => {
     expect(view([])).toContain('nothing is building · plan a build in <a');
   });
   it('the system building, its step of all, the log of its step, and cancel', () => {
-    const html = view([run([sys({ status: 'building', step: 21, label: 'mdrun 4.minim', stage: 'min', job: 'j1' }), sys({ dir: 'x', sequence: 'cccccccc' })])], { j1: 'Steepest Descents converged to Fmax < 1000 in 635 steps\n' });
+    const html = view([run([sys({ status: 'building', step: 21, label: 'mdrun 4.minim', stage: 'min', job: 'j1' }), sys({ dir: 'x', sequence: 'cccccccc' })])], { j1: { text: 'Steepest Descents converged to Fmax < 1000 in 635 steps\n', end: 56 } });
     expect(html).toContain('hmr+fast+6 / o111 / hhhhhhhh</b> · MIN');
     expect(html).toContain('mdrun 4.minim · step 22 of 54');
     expect(html).toContain('aria-valuenow="21"');

@@ -32,7 +32,7 @@ Vitest is the check run before each commit (lint, build and every test; each com
 | R8c, R8d PMFs into the vault, their numbers | — | | | | waits for question 12 |
 | R9 reports | `2c6dfaa` | +326/−5 | +199/−5 | 1344 | |
 | R10 from a built system to analysis | `51f7fe1` | +34/−7 | +28/−1 | 1349 | |
-| review's fixes | (next commit) | | | | |
+| review's fixes | the commit after `a3f14a3` | +130/−45 | +159/−7 | 1359 | T227 |
 
 In all, `src server index.html`: 30 files, +1,518/−61; `test e2e`: 50 files, +2,705/−4. Playwright: 17 → 18 (one
 new spec: build a system from the page, follow it, read its summary, take it to analysis), all passing.
@@ -128,7 +128,28 @@ light and dark, from the real app after a build with the fakes.
 
 ## 7. Review
 
-A fresh-context review of the batch 5 diff (`af1c154..51f7fe1`) is running as this is written: the writing promises, the runner's state, the API, the views, what the tests claim. Its findings and what was done follow in the next commit.
+A fresh-context agent reviewed `af1c154..51f7fe1` with only the code, and reproduced each finding with a probe. All
+were fixed, each with a test written first (`test/build-review5.test.ts` and the updated ones; decision T227):
+
+| # | Finding | Fixed |
+|---|---|---|
+| 1 | **The server's builder never saw a settings change**: main.ts gave it a copy of the context the API changes, so gmx set after the start, *submit them for me* turned off, python, profiles, the queue and the wait were the start's | the builder is made on the very context the API changes (`withBuilds`), and reads the wait each time |
+| 2 | **A resume was refused after a real failure**: grompp writes its mdout before failing, a stopped mdrun leaves its log, and the rule refused to write over files it had not recorded | what a step changed before it failed or was stopped is recorded as this build's, so a resume writes over it (GROMACS backs it up); a refused step changed nothing. The fakes now write those files too |
+| 3 | **awh's script was submitted before its run input existed** (the script step came before make_ndx and grompp) | awh's script now follows its grompp, as the pull's and the walkers' do |
+| 4 | **A missing trajectory sent a resume back a stage, which then failed on its own qq script copy** | a missing trajectory or checkpoint is no reason to run again; a step run again writes over its own copies and texts |
+| 5 | **A malformed build.json crashed the server** (an unhandled rejection) | the record is checked whole before it is used; a system's unexpected error fails that system, never the server |
+| 6 | **A link in the base folder led writes out of it** (`solutions/`, `scripts/`, `logs/`) | nothing is written or moved through a link: each path from the base folder is checked, and the system says which link |
+| 7 | **A tampered build.json could make a rebuild move a folder anywhere** (a sequence with `../`) | the record's plan, names and folder are checked; one that fails is not gmx-cypher's |
+| 8 | **A retry of an old build moved a system a later build had built again** | retry and go-on only from the build that last made the system |
+| 9 | **A continued system lost its earlier notes and submit lines** (the pull report's charge went blank) | they are kept, and the submit lines once each |
+| 10 | **The walkers' frames were read once, even from an empty pullx.xvg** (`-dump undefined`), and never again | read each time the walkers' stage is reached; an empty pull waits |
+| 11 | A cancel during a walker's rebuild was reported as a failure | it is a cancel |
+| 12 | The shipped scripts' folder was a URL's path, percent-encoded with a space in it | a file path |
+| — | React: the summary did not refresh while building; cluster scripts fixed a profile before the settings loaded; a step's log could lose a chunk read meanwhile; notes keyed by text | each fixed: the summary reads again as systems change, the profile follows settings until picked, the log keeps where it ends, notes keyed by place |
+| — | Tests: the cancel test passed even if the kill did nothing; the fakes wrote nothing on failure | the cancel must end the build within 8 s (mdrun sleeps 20 s); the fakes leave what real tools leave |
+
+Checked and sound: no program through a shell, names from the page checked, qq scripts and logs created exclusively,
+one build at a time (409), interrupted runs marked on restart, the ordinary walker rebuild.
 
 ## 8. History
 

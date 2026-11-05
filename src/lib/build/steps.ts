@@ -101,9 +101,11 @@ export function planSystem(plan: BuildPlan, sys: System, o: { base: string; prof
       case 'charge': return add({ stage, tile: 'charge', label: 'charge check (in a temporary folder)', program: 'gmx', cwd: d, argv: ['grompp', '-f', inputs(sc.mdp.min), '-p', q + '.top', '-c', NAMES.npt + '/' + NAMES.npt + '.gro', '-r', NAMES.npt + '/' + NAMES.npt + '.gro', '-o', '{tmp}/_charge_check.tpr', '-po', '{tmp}/_charge_check_mdout.mdp', '-maxwarn', String(sc.maxwarn), '-quiet'],
         reads: [join(d, q + '.top'), join(d, NAMES.npt, NAMES.npt + '.gro')], resolves: ['tmp'] })
       case 'awh': {
-        const cwd = join(d, NAMES.awh); script('awh', cwd); index('awh', cwd, 'index.ndx', npt)
-        return add({ stage, tile: 'awh', label: 'grompp 7.awh', program: 'gmx', cwd, argv: ['grompp', '-f', inputs(hmr ? sc.mdp.awhHmr : sc.mdp.awh), '-p', '../' + q + '.top', '-n', 'index.ndx', '-c', npt, '-r', npt, '-o', NAMES.awh + '.tpr', '-po', NAMES.awh + '_mdout.mdp', '-maxwarn', String(sc.maxwarn), '-quiet'],
+        const cwd = join(d, NAMES.awh); index('awh', cwd, 'index.ndx', npt)
+        add({ stage, tile: 'awh', label: 'grompp 7.awh', program: 'gmx', cwd, argv: ['grompp', '-f', inputs(hmr ? sc.mdp.awhHmr : sc.mdp.awh), '-p', '../' + q + '.top', '-n', 'index.ndx', '-c', npt, '-r', npt, '-o', NAMES.awh + '.tpr', '-po', NAMES.awh + '_mdout.mdp', '-maxwarn', String(sc.maxwarn), '-quiet'],
           reads: [join(d, q + '.top'), join(cwd, 'index.ndx')], writes: [join(cwd, NAMES.awh + '.tpr'), join(cwd, NAMES.awh + '_mdout.mdp')] })
+        // The script after its run input, as the pull's and the walkers': it is submitted only once there is one (review).
+        return script('awh', cwd)
       }
       case 'pull': {
         const cwd = join(d, NAMES.pull); index('pull', d, NAMES.pull + '/index.ndx', NAMES.npt + '/' + NAMES.npt + '.gro')

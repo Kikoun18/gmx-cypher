@@ -34,10 +34,12 @@ describe('a failed system, again', () => {
     expect(first.systems[0].notes.at(-1)).toMatch(/^hint: the pull groups are farther apart than 0\.49 times the box: set pull-pbc-ref-prev-step-com = yes/);
     const salted = hash(join(base, S, '3.salted.gro')), top = hash(join(base, S, 'hhhhhhhh.top'));
     const again = b.retry(first.id, S, 'resume');
-    expect(() => b.retry(first.id, S, 'resume')).toThrow('a build is running: one at a time');
+    expect(() => b.retry(first.id, S, 'resume')).toThrow(/was taken again by build b\w+: retry that one/);
     const second = await again.done;
     expect(second.systems[0]).toMatchObject({ status: 'cluster', attempt: 2 });
-    expect(second.systems[0].notes[0]).toMatch(/^continued at step \d+ of \d+: grompp 7\.awh$/);
+    // It keeps its earlier notes (the ions), then says where it continued.
+    expect(second.systems[0].notes[0]).toBe('net charge 0.00 e: 30 NA_s and 30 CL_2s');
+    expect(second.systems[0].notes.find(n => n.startsWith('continued'))).toMatch(/^continued at step \d+ of \d+: grompp 7\.awh$/);
     expect(b.get(first.id)!.systems[0].retried).toBe(second.id);
     expect([hash(join(base, S, '3.salted.gro')), hash(join(base, S, 'hhhhhhhh.top'))]).toEqual([salted, top]);
     const rec: BuildRecord = JSON.parse(readFileSync(join(base, S, 'build.json'), 'utf8'));
@@ -102,7 +104,8 @@ describe('the walkers', () => {
     expect(s.submit.at(-1)).toBe('qq submit -q gpu ' + S + '/9.multiwalker/hmr+fast+6_awh_multi_hhhhhhhh.sh');
     for (let n = 1; n <= 8; n++) expect(existsSync(join(base, S, '9.multiwalker', String(n), '9.multiwalker.tpr'))).toBe(true);
     const [moved] = readdirSync(join(base, S, '9.multiwalker/failed'));
-    expect(readdirSync(join(base, S, '9.multiwalker/failed', moved))).toEqual(['start.gro']);
+    // grompp writes its mdout before it fails, as the real one does; both stay in the folder moved aside.
+    expect(readdirSync(join(base, S, '9.multiwalker/failed', moved)).sort()).toEqual(['9.multiwalker_mdout.mdp', 'start.gro']);
     const rec: BuildRecord = JSON.parse(readFileSync(join(base, S, 'build.json'), 'utf8'));
     expect(rec.moved).toEqual([{ from: S + '/9.multiwalker/8', to: S + '/9.multiwalker/failed/' + moved, walker: 8, donor: 7 }]);
     expect(rec.files[S + '/9.multiwalker/failed/' + moved + '/start.gro']).toBeDefined();

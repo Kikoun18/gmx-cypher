@@ -79,9 +79,8 @@ export function makeApi(ctx: Ctx): Api {
   const roots = () => [...ctx.config.allow, join(ctx.home, 'uploads')];
   const batches = new Batches(ctx, roots);
   const cluster = new Cluster(() => ({ qq: ctx.config.qq ?? null, gmxEta: ctx.config.gmxEta ?? null }));
-  // SymBuilder (R5): main.ts makes these, so stopping gmx-cypher cancels build steps too; tests get their own here.
-  const buildJobs = ctx.buildJobs ?? new Jobs(join(ctx.home, 'builds', 'jobs'));
-  const builder = ctx.builder ?? newBuilder(ctx, buildJobs);
+  // SymBuilder (R5): on this very context, so the builder reads the settings /api/config changes (the review's finding 1).
+  const { builder, buildJobs } = withBuilds(ctx) as Required<Pick<Ctx, 'builder' | 'buildJobs'>>;
   const checked = (r: unknown) => { const p = recipeFileProblems(r); if (p.length) throw new HttpError(400, p.join('; ')); return r as Recipe; };
   // A batch runs a recipe over trajectories: only a command with groups has that shape (energy and AWH batches are not built yet).
   const batchable = (r: Recipe) => {
@@ -270,18 +269,18 @@ export function makeApi(ctx: Ctx): Api {
       const plan = checkBuild(b.plan, b.systems);
       if (!ctx.gmx.ok) throw new HttpError(409, 'no working gmx: set it in settings → gmx');
       const ifExists = (['continue', 'skip', 'repeat'] as const).find(x => x === b.ifExists) ?? 'continue', onFailure = b.onFailure === 'stop' ? 'stop' : 'next';
-      try { return { body: builder.start(plan, b.systems, { base, ifExists, onFailure }).run }; } catch (e) { throw new HttpError(409, (e as Error).message); }
+      try { const st = builder.start(plan, b.systems, { base, ifExists, onFailure }); st.done.catch(() => {}); return { body: st.run }; } catch (e) { throw new HttpError(409, (e as Error).message); }
     }
     // A failed or cancelled system again (R6): resumed in its folder, or rebuilt after its folder moves to failed/.
     if (is(req, 'POST', url, '/api/build/retry')) {
       const b = await readJson<{ run?: string; dir?: string; how?: string }>(req);
       if (b.how !== 'resume' && b.how !== 'rebuild') throw new HttpError(400, 'how is resume or rebuild');
-      try { return { body: builder.retry(String(b.run ?? ''), String(b.dir ?? ''), b.how).run }; } catch (e) { throw new HttpError(409, (e as Error).message); }
+      try { const st = builder.retry(String(b.run ?? ''), String(b.dir ?? ''), b.how); st.done.catch(() => {}); return { body: st.run }; } catch (e) { throw new HttpError(409, (e as Error).message); }
     }
     // A system that waits for the cluster, taken on once its pull has ended (R7b): only when asked.
     if (is(req, 'POST', url, '/api/build/go-on')) {
       const b = await readJson<{ run?: string; dir?: string }>(req);
-      try { return { body: builder.goOn(String(b.run ?? ''), String(b.dir ?? '')).run }; } catch (e) { throw new HttpError(409, (e as Error).message); }
+      try { const st = builder.goOn(String(b.run ?? ''), String(b.dir ?? '')); st.done.catch(() => {}); return { body: st.run }; } catch (e) { throw new HttpError(409, (e as Error).message); }
     }
     if (is(req, 'GET', url, '/api/build/runs')) return { body: builder.list() };
     // A build's reports (R9): the summary, the pull and walker reports, the termini check, read from what it left.
@@ -440,6 +439,13 @@ export function makeApi(ctx: Ctx): Api {
   };
 }
 
+/** The build job list and the builder, made once on this context object (main.ts stops the jobs on its way out). */
+export function withBuilds(ctx: Ctx): Ctx {
+  ctx.buildJobs ??= new Jobs(join(ctx.home, 'builds', 'jobs'));
+  ctx.builder ??= newBuilder(ctx, ctx.buildJobs);
+  return ctx;
+}
+
 /** The builder of a server: steps through the build job list, the tools and the waiting as the settings say now. */
 export function newBuilder(ctx: Ctx, buildJobs: Jobs): Builder {
   return new Builder({
@@ -448,6 +454,6 @@ export function newBuilder(ctx: Ctx, buildJobs: Jobs): Builder {
     gmxVersion: () => ctx.gmx.version ?? 'unknown',
     profiles: () => Object.fromEntries(SCRIPTED_STAGES.map(st => [st, profileOf(ctx.config.qqBuild?.profiles?.[st] ?? DEFAULT_PROFILES[st])!])),
     submit: () => (ctx.config.qqBuild?.submit ? { qq: ctx.config.qq ?? 'qq', queue: ctx.config.qqBuild.queue } : null),
-    wait: { every: (ctx.config.buildWait?.every ?? 10) * 1000, max: (ctx.config.buildWait?.max ?? 600) * 1000 },
+    wait: () => ({ every: (ctx.config.buildWait?.every ?? 10) * 1000, max: (ctx.config.buildWait?.max ?? 600) * 1000 }),
   });
 }

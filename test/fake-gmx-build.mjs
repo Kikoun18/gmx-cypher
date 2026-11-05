@@ -66,12 +66,16 @@ export async function build(tool, argv) {
       const want = process.env.FAKE_GMX_FATAL, here = basename(process.cwd()) + '/' + name, once = process.env.FAKE_GMX_FATAL_ONCE;
       if ((want === name || want === here) && !(once && existsSync(once))) {
         if (once) writeFileSync(once, 'failed once\n');
+        // Like grompp: its -po file is written before the pull's check fails (an older one backed up first).
+        backUp(one('-po'));
+        writeFileSync(one('-po'), existsSync(one('-f')) ? readFileSync(one('-f'), 'utf8') : '');
         process.stderr.write(fixture(name === '9.multiwalker.tpr' ? 'build/notebook/grompp-walker-fatal.txt' : 'build/notebook/grompp-awh-fatal.txt'));
         return 1;
       }
       const which = { '3.pre_salted.tpr': 'grompp-pre-salted', '4.minim.tpr': 'grompp-minim', '5.eqnvt.tpr': 'grompp-eqnvt', '6.eqnpt.tpr': 'grompp-eqnpt', '7.awh.tpr': 'grompp-awh', '8.pull.tpr': 'grompp-pull', '9.multiwalker.tpr': 'grompp-walker', '_charge_check.tpr': 'grompp-pre-salted' }[name];
       if (!which) { process.stderr.write('fake gmx: no real grompp output for ' + name + '\n'); return 1; }
       process.stderr.write(real(which).replaceAll('hhhhhhhh', seq));
+      backUp(o); backUp(one('-po'));
       writeFileSync(o, 'fake: a run input, not a real .tpr\n');
       writeFileSync(one('-po'), existsSync(one('-f')) ? readFileSync(one('-f'), 'utf8') : '');
       return;
@@ -85,9 +89,10 @@ export async function build(tool, argv) {
       return;
     }
     case 'mdrun': {
-      const d = one('-deffnm'), slow = Number(process.env.FAKE_GMX_SLOW || 0);
+      const d = one('-deffnm'), slow = Number(process.env.FAKE_GMX_SLOW || 0), text = real('mdrun-' + d.split('.')[1]);
+      // Like mdrun: its log is open from the start, so a run stopped midway leaves it.
+      writeFileSync(d + '.log', text.split('\n').slice(0, 3).join('\n') + '\n');
       if (slow) await new Promise(r => setTimeout(r, slow));
-      const text = real('mdrun-' + d.split('.')[1]);
       process.stderr.write(text);
       writeFileSync(d + '.log', text);
       writeFileSync(d + '.edr', 'fake: an energy file, not a real .edr\n');

@@ -4,7 +4,7 @@ import { randomBytes } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { fileURLToPath } from 'node:url';
-import { makeApi, newBuilder, realFolders } from './api';
+import { makeApi, realFolders, withBuilds } from './api';
 import { detectGmx } from './gmx';
 import { Jobs } from './jobs';
 import { startServer } from './http';
@@ -27,10 +27,11 @@ const allow = args.flatMap((a, i) => (a === '--allow' && args[i + 1] ? [args[i +
 if (allow.length) { config.allow = [...new Set([...config.allow, ...realFolders(allow)])]; saveConfig(home, config); }
 const gmx = await detectGmx(config.gmx);
 const jobs = new Jobs(home + '/jobs');
-// SymBuilder's steps keep a job list of their own (T217).
-const buildJobs = new Jobs(home + '/builds/jobs');
-const ctx = { home, version: VERSION, config, gmx, jobs, buildJobs };
-const api = makeApi({ ...ctx, builder: newBuilder(ctx, buildJobs) });
+// SymBuilder's steps keep a job list of their own (T217); the builder is made on the context the API changes, so it
+// reads the settings as they are now.
+const ctx = withBuilds({ home, version: VERSION, config, gmx, jobs });
+const buildJobs = ctx.buildJobs!;
+const api = makeApi(ctx);
 
 let viteMiddleware: ((req: IncomingMessage, res: ServerResponse) => void) | null = null;
 const server = await startServer({

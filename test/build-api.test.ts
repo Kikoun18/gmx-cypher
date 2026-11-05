@@ -47,7 +47,10 @@ describe('POST /api/build/start', () => {
       const { json: run } = await s.call('/api/build/start', { plan: DEFAULT_PLAN, systems: SYSTEMS, ifExists: 'continue', onFailure: 'next' });
       await until(async () => { const [r] = (await s.call('/api/build/runs')).json; return r.systems[0].label === 'mdrun 4.minim' && r.systems[0].job ? r : undefined; });
       expect((await s.call('/api/build/runs/' + run.id + '/cancel', {})).status).toBe(200);
-      const done = await until(async () => { const [r] = (await s.call('/api/build/runs')).json; return r.status !== 'running' ? r : undefined; });
+      // mdrun would sleep 20 s: the build ends long before, so the kill reached it (the review: not just the status).
+      const t0 = Date.now();
+      const done = await until(async () => { const [r] = (await s.call('/api/build/runs')).json; return r.status !== 'running' ? r : undefined; }, 8000);
+      expect(Date.now() - t0).toBeLessThan(8000);
       expect(done).toMatchObject({ status: 'cancelled', systems: [{ status: 'cancelled', error: 'MIN · mdrun 4.minim: cancelled' }, { status: 'cancelled' }] });
       expect(existsSync(join(base, 'solutions/hmr+fast+6/o111/cccccccc'))).toBe(false);
       expect((await s.call('/api/build/runs/' + run.id + '/cancel', {})).status).toBe(409);

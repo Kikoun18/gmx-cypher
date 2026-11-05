@@ -7,7 +7,7 @@ import { dirname, join } from 'node:path';
 import { NAMES } from '../src/lib/build/plan';
 import { molSections, pullReport, summaryText, TERMINI_HEAD, terminiFooter, terminiRow, termini, walkerMark, walkerReport, type SummaryRow, type WalkerMark } from '../src/lib/build/report';
 import { pullx } from '../src/lib/build/text';
-import { readRecord, type BuildRun } from './build-run';
+import { linkIn, readRecord, type BuildRun } from './build-run';
 
 const two = (n: number) => String(n).padStart(2, '0');
 const local = (iso: string) => { const d = new Date(iso); return { d, day: d.getFullYear() + '-' + two(d.getMonth() + 1) + '-' + two(d.getDate()), hm: two(d.getHours()) + ':' + two(d.getMinutes()) }; };
@@ -64,6 +64,8 @@ export function reportOf(run: BuildRun, gmxVersion: string) {
 /** The build summary of a build that ended, written to <base>/logs/build_summary_<YYYYMMDD_HHMM>.log; a name taken gets _2, _3. */
 export function writeSummary(run: BuildRun, gmxVersion: string): string {
   const at = local(run.ended ?? run.created), stamp = at.day.replaceAll('-', '') + '_' + at.hm.replace(':', ''), dir = join(run.base, 'logs');
+  const link = linkIn(run.base, dir);
+  if (link) throw new Error(link + ' is a link: nothing is written through it');
   mkdirSync(dir, { recursive: true });
   const text = reportOf(run, gmxVersion).summary;
   for (let k = 1; ; k++) {

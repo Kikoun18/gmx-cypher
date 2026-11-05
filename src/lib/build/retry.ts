@@ -25,7 +25,9 @@ export const quarantineName = (name: string, d: Date) => name + '_' + stamp(d)
  */
 export function resumeAt(steps: Step[], done: { i: number; label: string; status: string }[], gone: (path: string) => boolean): number {
   const ok = new Set(done.filter(s => s.status === 'done').map(s => s.i + ' ' + s.label))
-  const i = steps.findIndex((s, k) => !ok.has(k + ' ' + s.label) || s.writes.some(p => !p.startsWith('scripts/') && gone(p)))
+  // A trajectory or checkpoint gone is no reason to run a stage again (the review's finding 4): only what later steps need.
+  const needed = (p: string) => !p.startsWith('scripts/') && !/\.(trr|cpt|xtc)$/.test(p)
+  const i = steps.findIndex((s, k) => !ok.has(k + ' ' + s.label) || s.writes.some(p => needed(p) && gone(p)))
   return i < 0 ? steps.length : i
 }
 

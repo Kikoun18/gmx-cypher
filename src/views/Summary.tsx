@@ -98,7 +98,8 @@ export function SummaryReport({ report }: { report: BuildReport }) {
 /** symbuilder · summary (R9): the last build's reports, read when it opens and again when that build changes. */
 export function SummaryView({ runs, onAnalyse }: { runs: BuildRun[]; onAnalyse?: (root: string, template: string) => void }) {
   const run = runs[0], [read, setRead] = React.useState<{ key: string; report: BuildReport } | null>(null), [error, setError] = React.useState('')
-  const key = run ? run.id + ' ' + run.status + ' ' + (run.ended ?? '') : ''
+  // Read again whenever a system of it changes state, not only when the build ends (the review).
+  const key = run ? run.id + ' ' + run.status + ' ' + run.systems.map(s => s.status).join(',') + ' ' + (run.ended ?? '') : ''
   React.useEffect(() => {
     if (!run) return
     let alive = true

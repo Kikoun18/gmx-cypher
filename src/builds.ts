@@ -21,7 +21,9 @@ const KEEP = 32_768
 
 export function useBuilds() {
   const [runs, setRuns] = React.useState<BuildRun[]>([])
-  const [logs, setLogs] = React.useState<Record<string, string>>({})
+  // Each step's log as far as it is known: its last 32 kB and where that ends in the whole log, so a chunk that came
+  // while the log was read is neither lost nor added twice (the review).
+  const [logs, setLogs] = React.useState<Record<string, { text: string; end: number }>>({})
   React.useEffect(() => {
     getJson<BuildRun[]>('/api/build/runs').then(setRuns, () => {})
     const es = new EventSource('/api/events')
@@ -30,14 +32,20 @@ export function useBuilds() {
       setRuns(list => [r, ...list.filter(x => x.id !== r.id)].sort((a, b) => b.created.localeCompare(a.created)))
     })
     es.addEventListener('build-out', e => {
-      const { id, s } = JSON.parse((e as MessageEvent).data) as { id: string; s: string }
-      setLogs(l => ({ ...l, [id]: ((l[id] ?? '') + s).slice(-KEEP) }))
+      const { id, s, end } = JSON.parse((e as MessageEvent).data) as { id: string; s: string; end: number }
+      setLogs(l => {
+        const had = l[id]
+        if (had && had.end >= end) return l
+        // Only what the log lacks: the chunk's tail past what is held (all of it when nothing was read yet).
+        const add = had ? s.slice(Math.max(0, s.length - (end - had.end))) : s
+        return { ...l, [id]: { text: ((had?.text ?? '') + add).slice(-KEEP), end } }
+      })
     })
     return () => es.close()
   }, [])
   // A step's log from the server, when the page opens on it after it began.
   const loadLog = React.useCallback((id: string) => {
-    getJson<{ text: string }>('/api/build/jobs/' + id + '/log').then(g => setLogs(l => ({ ...l, [id]: g.text.slice(-KEEP) })), () => {})
+    getJson<{ text: string; to: number }>('/api/build/jobs/' + id + '/log').then(g => setLogs(l => (l[id] && l[id].end >= g.to ? l : { ...l, [id]: { text: g.text.slice(-KEEP), end: g.to } })), () => {})
   }, [])
   const start = React.useCallback((d: BuildDraft) => postJson<BuildRun>('/api/build/start', { plan: d.plan, systems: d.systems, ifExists: d.ifExists, onFailure: d.onFailure })
     .then(r => { setRuns(list => [r, ...list.filter(x => x.id !== r.id)]); return r }), [])
