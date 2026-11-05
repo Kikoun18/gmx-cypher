@@ -6,7 +6,7 @@ the exact command before it runs, get every output with its record, compare resu
 one graph, export any chart, and hand results to **the Matrix** through its vault, where they land in the right row,
 column and run. A *cluster* tab shows your cluster jobs (`qq jobs` with `gmx-eta -a`), and **SymBuilder** plans the
 systems you simulate (peptide + saccharide in water and salt) step by step, as your solution-builder notebook builds
-them; in this version it plans and checks, and builds nothing.
+them, and builds them here, one system at a time, up to the qq scripts of the stages that run on the cluster.
 
 It runs on your machine (or the machine that has the trajectories), serves its page on 127.0.0.1 only, and never
 deletes or overwrites a file.
@@ -73,8 +73,9 @@ Four tabs, each at an address of its own, each opening where you left it:
 ## SymBuilder
 
 SymBuilder plans a build: every system (method × saccharide × sequence, with repeats) and every step each runs, from
-the PyMOL peptide to the walkers, as your notebook runs them. **In this version nothing is built or written**: you see
-each command before anything runs, and the build button says that building comes in the next version.
+the PyMOL peptide to the walkers, as your notebook runs them; you see each command before anything runs. *build N
+systems* then builds them in the base folder, one at a time: minimisation, nvt and npt run here, awh, the pull and the
+walkers are prepared and get their qq script and `qq submit` line (nothing is submitted for you).
 
 - **build**: the build plan as tiles in stages (solution builder, minimisation, nvt, npt, awh, pull, multiwalker), each
   stage checkable, tiles dragged (or moved with ↑ ↓) within a stage and from the palette. The selected tile shows its
@@ -92,7 +93,11 @@ each command before anything runs, and the build button says that building comes
 - **files**: what a build reads from the **base folder** (*settings → SymBuilder*; it must be inside an allowed
   folder): each saccharide's `.gro` and `-ADD.itp`, the force field and its includes, and the mdp file of each stage
   per method, each *found* or *missing*. Click an mdp file to read it.
-- The build being planned is kept in this browser; *progress* and *summary* fill when building comes.
+- **progress**: the last build, each system's step of all its steps and what the running step prints, the qq submit
+  lines of the systems that wait for the cluster, and *cancel the build* (it stops the running step's process group
+  and every system after it). A system stops at the first GROMACS fatal error, quoted with its stage, whatever the exit
+  code (or at any non-zero exit with strict mode on); the others go on, or the build stops, as you choose.
+- The build being planned is kept in this browser; *summary* fills with R9.
 
 Methods switch on what their name says: `hmr` hydrogen masses (gromologist), `fast` TIP3PF water; awh, the pull and the
 walkers get a qq script (the notebook's three profiles) and its `qq submit` line; submitting it for you will be a
@@ -288,6 +293,9 @@ words when it needs more than its walltime left.
 | Jobs (an event log each) | `~/.gmx-cypher/jobs/<id>.ndjson`; archived: `~/.gmx-cypher/jobs/archive/<id>.ndjson` |
 | Recipes, settings | `~/.gmx-cypher/recipes/<name>.json`, `~/.gmx-cypher/config.json` |
 | Build plans (SymBuilder) | `~/.gmx-cypher/builds/<name>.json` |
+| A built system | `<base>/solutions/<method>/<saccharide>/<sequence>/`, the notebook's names, with its record `build.json` (every file written or replaced, with its size and SHA-256) |
+| Its qq scripts | `<base>/scripts/<stage>/<method>_<stage>_<sequence>.sh` (kept if it exists), copied into the step's folder |
+| Builds and their steps' logs | `~/.gmx-cypher/builds/runs/<id>.json`, `~/.gmx-cypher/builds/jobs/<id>.ndjson` |
 | A sent result | `<vault>/<project folder>/_inbox/<name>` |
 | Its record's copy | `<vault>/gmx-cypher/records/<sha256 of the sent file>.run.json` |
 | Saved compare views | `<vault>/gmx-cypher/projects/<project id>/views/<name>.json` |
@@ -343,8 +351,13 @@ gmx-cypher can:
   at a time;
 - in SymBuilder: look up (stat) the files a build reads in the base folder, read an mdp or topology file there (at most
   256 kB, never through a link that leaves it), and read the connected project to say where results would land;
+- build: start the configured gmx (`pdb2gmx editconf trjconv solvate genion make_ndx grompp mdrun energy`) and the
+  configured python with its two shipped scripts (`server/python/build_peptide.py`, PyMOL; `hmr.py`, gromologist),
+  each argument from the build plan, never through a shell;
 - write new files: a job's outputs, under names that are free; files in its own state folder; a result you send, into
-  the project's `_inbox`; its own vault space; and a saved build plan in its state folder.
+  the project's `_inbox`; its own vault space; a saved build plan in its state folder; and a system's folder, which a
+  build creates (one that exists is left as it is), with every file in it new or written by that build, and its qq
+  scripts in `<base>/scripts/`, created only where none is.
 
 It cannot, by design:
 - overwrite or delete any of your files (new names are created exclusively; archive moves a job's file without copying

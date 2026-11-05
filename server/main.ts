@@ -4,7 +4,7 @@ import { randomBytes } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { fileURLToPath } from 'node:url';
-import { makeApi, realFolders } from './api';
+import { makeApi, newBuilder, realFolders } from './api';
 import { detectGmx } from './gmx';
 import { Jobs } from './jobs';
 import { startServer } from './http';
@@ -27,7 +27,10 @@ const allow = args.flatMap((a, i) => (a === '--allow' && args[i + 1] ? [args[i +
 if (allow.length) { config.allow = [...new Set([...config.allow, ...realFolders(allow)])]; saveConfig(home, config); }
 const gmx = await detectGmx(config.gmx);
 const jobs = new Jobs(home + '/jobs');
-const api = makeApi({ home, version: VERSION, config, gmx, jobs });
+// SymBuilder's steps keep a job list of their own (T217).
+const buildJobs = new Jobs(home + '/builds/jobs');
+const ctx = { home, version: VERSION, config, gmx, jobs, buildJobs };
+const api = makeApi({ ...ctx, builder: newBuilder(ctx, buildJobs) });
 
 let viteMiddleware: ((req: IncomingMessage, res: ServerResponse) => void) | null = null;
 const server = await startServer({
@@ -56,6 +59,6 @@ for (const s of [process.stdout, process.stderr]) s.on('error', () => {});
 process.on('SIGHUP', () => console.log('SIGHUP: the terminal closed; gmx-cypher keeps running (pid ' + process.pid + '). Stop it with: kill ' + process.pid));
 
 // Stopping the runner cancels its jobs first, so none is left running unrecorded (T6).
-const stop = async () => { server.close(); await jobs.stopAll(); process.exit(0); };
+const stop = async () => { server.close(); await Promise.all([jobs.stopAll(), buildJobs.stopAll()]); process.exit(0); };
 process.on('SIGINT', stop);
 process.on('SIGTERM', stop);

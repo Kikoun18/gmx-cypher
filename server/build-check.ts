@@ -25,6 +25,7 @@ export function baseFolder(base: string | null, roots: string[]): string {
 const exists = (p: string) => { try { return statSync(p).isFile(); } catch { return false; } };
 
 /** A plan and systems from the page, checked: a build plan, and every name one that can be a folder. */
+export function checkBuild(plan: unknown, systems: Systems): BuildPlan { return checked(plan, systems); }
 function checked(plan: unknown, systems: Systems): BuildPlan {
   const problems = planProblems(plan);
   if (problems.length) throw new HttpError(400, problems.join('; '));

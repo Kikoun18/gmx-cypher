@@ -9,6 +9,7 @@ import { KINDS, stepLine } from '../src/lib/build/tiles';
 import { InProject, SystemsView } from '../src/views/Systems';
 import type { FolderLanding } from '../src/lib/build/landing';
 import { BuildFilesView } from '../src/views/BuildFiles';
+import { ProgressView } from '../src/views/Progress';
 import type { Step } from '../src/lib/build/steps';
 
 const draft: BuildDraft = { ...EMPTY_BUILD, systems: { methods: ['hmr+fast+6'], saccharides: ['o111', 'pg'], sequences: ['aaaaaaaa', 'pppppppp'], repeats: 1 } };
@@ -139,5 +140,34 @@ describe('symbuilder · systems: where each lands in the project (R8b)', () => {
     expect(h).toContain('<span>system · in the project</span>');
     expect(h).toContain('where each PMF would land in innit, by the Matrix&#x27;s own planBatch · name pattern {method}_{column}_{seq}_t{time}.xvg · folder pattern none');
     expect(h.match(/>lands</g)).toHaveLength(1);
+  });
+});
+
+describe('symbuilder · progress (R5c)', () => {
+  const run = (systems: object[], status = 'running') => ({ id: 'b1', created: '2026-11-06T10:00:00Z', status, plan: 'peptide × saccharide', base: '/storage/brno/you/02_evomd/innit_tests', ifExists: 'continue', onFailure: 'next', systems }) as never;
+  const sys = (o: object) => ({ dir: 'solutions/hmr+fast+6/o111/hhhhhhhh', method: 'hmr+fast+6', saccharide: 'o111', sequence: 'hhhhhhhh', status: 'waiting', step: 0, steps: 54, notes: [], submit: [], ...o });
+  const view = (runs: never[], logs = {}) => renderToStaticMarkup(createElement(ProgressView, { runs, logs, loadLog: noop, onCancel: noop }));
+  it('says when nothing is building, and where to start one', () => {
+    expect(view([])).toContain('nothing is building · plan a build in <a');
+  });
+  it('the system building, its step of all, the log of its step, and cancel', () => {
+    const html = view([run([sys({ status: 'building', step: 21, label: 'mdrun 4.minim', stage: 'min', job: 'j1' }), sys({ dir: 'x', sequence: 'cccccccc' })])], { j1: 'Steepest Descents converged to Fmax < 1000 in 635 steps\n' });
+    expect(html).toContain('hmr+fast+6 / o111 / hhhhhhhh</b> · MIN');
+    expect(html).toContain('mdrun 4.minim · step 22 of 54');
+    expect(html).toContain('aria-valuenow="21"');
+    expect(html).toContain('Steepest Descents converged to Fmax &lt; 1000 in 635 steps');
+    expect(html).toContain('>cancel the build</button>');
+  });
+  it('a system waiting for the cluster shows its submit lines; a failed one its stage and GROMACS\'s text', () => {
+    const cluster = sys({ status: 'cluster', step: 54, submit: ['qq submit -q gpu solutions/hmr+fast+6/o111/hhhhhhhh/7.awh/hmr+fast+6_awh_hhhhhhhh.sh'] });
+    const waits = view([run([cluster], 'done')]);
+    expect(waits).toContain('>cluster<');
+    expect(waits).toContain('qq submit -q gpu solutions/hmr+fast+6/o111/hhhhhhhh/7.awh/hmr+fast+6_awh_hhhhhhhh.sh');
+    // The failed system is the one shown first.
+    const html = view([run([cluster, sys({ dir: 'y', sequence: 'rrrrrrrr', status: 'failed', step: 40, error: 'AWH · grompp 7.awh: Fatal error:\nDistance between pull groups 1 and 2' })], 'failed')]);
+    expect(html).toContain('<b class="text-heading">rrrrrrrr</b>');
+    expect(html).toContain('AWH · grompp 7.awh: Fatal error:');
+    expect(html).toContain('one system stopped at a step');
+    expect(html).not.toContain('cancel the build');
   });
 });

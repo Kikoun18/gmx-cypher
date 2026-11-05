@@ -70,10 +70,13 @@ export function Settings({ state, open, onOpenChange, onState, returnFocus }: { 
   const saveTools = async () => { try { onState(await postJson<AppState>('/api/config', { qq: tools.qq.trim() || null, gmxEta: tools.gmxEta.trim() || null })); setToolsError('') } catch (e) { setToolsError((e as Error).message) } }
   const toolsChanged = tools.qq.trim() !== (state.config.qq || '') || tools.gmxEta.trim() !== (state.config.gmxEta || '')
   // SymBuilder (R4): the base folder its builds read and write, and the python that builds peptides and masses.
-  const [sym, setSym] = React.useState({ base: state.config.base || '', python: state.config.python || '' })
+  const w0 = state.config.buildWait ?? { every: 10, max: 600 }
+  const [sym, setSym] = React.useState({ base: state.config.base || '', python: state.config.python || '', every: String(w0.every), max: String(w0.max) })
   const [symError, setSymError] = React.useState('')
-  const saveSym = async () => { try { onState(await postJson<AppState>('/api/config', { base: sym.base.trim() || null, python: sym.python.trim() || null })); setSymError('') } catch (e) { setSymError((e as Error).message) } }
-  const symChanged = sym.base.trim() !== (state.config.base || '') || sym.python.trim() !== (state.config.python || '')
+  const saveSym = async () => {
+    try { onState(await postJson<AppState>('/api/config', { base: sym.base.trim() || null, python: sym.python.trim() || null, buildWait: { every: Number(sym.every), max: Number(sym.max) } })); setSymError('') } catch (e) { setSymError((e as Error).message) }
+  }
+  const symChanged = sym.base.trim() !== (state.config.base || '') || sym.python.trim() !== (state.config.python || '') || sym.every !== String(w0.every) || sym.max !== String(w0.max)
   const savePmfUrl = async () => { try { onState(await postJson<AppState>('/api/config', { pmfUrl: pmfUrl.trim() || null })); setPmfError('') } catch (e) { setPmfError((e as Error).message) } }
   // The vault's projects, for the connected one (R14b): read again when the vault changes.
   const vaultAt = state.config.vault, [read, setRead] = React.useState<{ vault: string; projects: { id: string; name: string }[] } | null>(null)
@@ -189,6 +192,14 @@ export function Settings({ state, open, onOpenChange, onState, returnFocus }: { 
             <Field>
               <Label htmlFor="sym-python">python</Label>
               <Input id="sym-python" size="sm" value={sym.python} placeholder="python3, on PATH" onChange={e => setSym(x => ({ ...x, python: e.target.value }))} onKeyDown={e => pressed(e, 'enter') && saveSym()} />
+            </Field>
+            <Field>
+              <Label htmlFor="sym-every">wait for mdrun's .gro: look every (s)</Label>
+              <Input id="sym-every" size="sm" type="number" min={1} max={600} value={sym.every} onChange={e => setSym(x => ({ ...x, every: e.target.value }))} />
+            </Field>
+            <Field>
+              <Label htmlFor="sym-max">up to (s)</Label>
+              <Input id="sym-max" size="sm" type="number" min={1} max={86400} value={sym.max} onChange={e => setSym(x => ({ ...x, max: e.target.value }))} />
             </Field>
           </div>
           <div className="flex items-center gap-2">

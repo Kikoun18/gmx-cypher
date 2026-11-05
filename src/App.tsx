@@ -19,6 +19,7 @@ import { JobsView } from './views/Jobs'
 import { Settings } from './views/Settings'
 import { Setup } from './views/Setup'
 import { SymBuilder } from './views/SymBuilder'
+import { useBuilds } from './builds'
 import { Home, type ClusterSummary } from './views/Home'
 import { useDecypherSources } from './decypher/state'
 import type { LoadedFile } from './decypher/parse'
@@ -82,6 +83,7 @@ export function App() {
   const [settings, setSettings] = React.useState(false)
   const [route, go] = useRoute()
   const jobs = useJobs(useNaming(state?.config.vault ?? null, state?.config.project ?? null))
+  const builds = useBuilds()
   const [draft, setDraft] = useDraft()
   // Closing settings returns the focus to its button, wherever the dialog was opened from.
   const settingsButton = React.useRef<HTMLButtonElement>(null)
@@ -162,7 +164,7 @@ export function App() {
       <Tabs value={tab} onValueChange={v => go(last[v] ?? FIRST[v as Tab])} className="flex-1 gap-0">
         <TabsList className="px-3">
           <TabsTrigger value="home">home</TabsTrigger>
-          <TabsTrigger value="symbuilder">symbuilder</TabsTrigger>
+          <TabsTrigger value="symbuilder">symbuilder {builds.building > 0 && <TabsCount>{builds.building} building</TabsCount>}</TabsTrigger>
           <TabsTrigger value="analysis">analysis {jobs.jobs.length > 0 && <TabsCount>{running ? running + ' running' : String(jobs.jobs.length).padStart(2, '0')}</TabsCount>}</TabsTrigger>
           {/* Your cluster jobs (R10): another kind of job than gmx-cypher's own, so another tab. */}
           <TabsTrigger value="cluster">cluster</TabsTrigger>
@@ -178,7 +180,7 @@ export function App() {
           </Alert>
         )}
         <TabsContent value="home">{state && <Home state={state} jobs={jobs.jobs} cluster={clusterRead} />}</TabsContent>
-        <TabsContent value="symbuilder">{route.view === 'symbuilder' && <SymBuilder route={route} go={go} gmx={state?.gmx.ok ? state.gmx.name ?? 'gmx' : 'gmx'} base={state?.config.base} vault={state?.config.vault} projectId={state?.config.project} />}</TabsContent>
+        <TabsContent value="symbuilder">{route.view === 'symbuilder' && <SymBuilder route={route} go={go} gmx={state?.gmx.ok ? state.gmx.name ?? 'gmx' : 'gmx'} gmxOk={!!state?.gmx.ok} base={state?.config.base} vault={state?.config.vault} projectId={state?.config.project} builds={builds} />}</TabsContent>
         <TabsContent value="analysis">
           <SubTabs value={view === 'setup' ? 'setup' : 'results'} onValueChange={v => go(last[v] ?? (v === 'setup' ? FIRST.analysis : { view: 'results', job: null }))} label="analysis views"
             items={[{ value: 'setup', label: 'set-up' }, { value: 'results', label: 'results' }]}>

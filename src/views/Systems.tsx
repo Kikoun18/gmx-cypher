@@ -82,7 +82,12 @@ export function InProject({ folders }: { folders: FolderLanding[] | undefined })
 }
 
 /** symbuilder · systems (R3c): methods × saccharides × sequences, repeats, and a preview of every system before anything runs. */
-export function SystemsView({ draft, setDraft, missing = null, project = null, landing = null }: { draft: BuildDraft; setDraft: React.Dispatch<React.SetStateAction<BuildDraft>>; missing?: Record<string, string[]> | null; project?: ProjectLike | null; landing?: BuildLanding | null }) {
+export function SystemsView({ draft, setDraft, missing = null, project = null, landing = null, build }: {
+  draft: BuildDraft; setDraft: React.Dispatch<React.SetStateAction<BuildDraft>>; missing?: Record<string, string[]> | null; project?: ProjectLike | null; landing?: BuildLanding | null
+  /** Starting a build (R5c): why it can't start now, or null. */
+  build?: { blocked: string | null; start: () => Promise<void> }
+}) {
+  const [starting, setStarting] = React.useState(false), [failed, setFailed] = React.useState('')
   // A name added to a list drops `only` (the cells the project lacks): the new name has no cell listed.
   const grows = (o: Systems, patch: Partial<Systems>) => (['methods', 'saccharides', 'sequences'] as const).some(k => patch[k]?.some(v => !o[k].includes(v)))
   const s = draft.systems, all = React.useMemo(() => systemsOf(s), [s]), set = (patch: Partial<Systems>) => setDraft(d => {
@@ -95,6 +100,8 @@ export function SystemsView({ draft, setDraft, missing = null, project = null, l
   const rows = React.useMemo(() => all.slice(0, 200).map(sys => { const steps = planSystem(plan, sys, { base: '{base}' }); return { sys, steps, problems: orderProblems(steps) } }), [all, plan])
   const here = rows[0]?.steps.filter(x => x.where === 'here').length ?? 0
   const inProject = !!(project || landing)
+  const short = missing ? Object.keys(missing).length : 0, ordered = rows.filter(r => r.problems.length).length
+  const why = !build ? 'building is not available here' : build.blocked ?? (!all.length ? 'no system yet' : short ? (short === 1 ? 'one system misses' : short + ' systems miss') + ' a file: see files' : ordered ? 'a stack order can\'t work: see the check column' : null)
   return (
     <div className="grid grid-cols-[300px_minmax(0,1fr)_minmax(0,1.15fr)] items-start gap-5 max-[1180px]:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
       <Panel aria-label="where heavy steps run">
@@ -163,9 +170,10 @@ export function SystemsView({ draft, setDraft, missing = null, project = null, l
         )}
         {landing && <span className="text-caption text-muted-foreground">in the project: where each PMF would land in {landing.project.name}, by the Matrix's own planBatch · name pattern {landing.project.pattern} · folder pattern {landing.project.pathPattern || 'none'}{landing.more ? ' · the first 200 systems are checked' : ''}</span>}
         <div className="flex flex-wrap items-center gap-2">
-          <Button size="lg" disabled aria-describedby="build-later">build {all.length} {all.length === 1 ? 'system' : 'systems'}</Button>
-          <span id="build-later" className="text-caption text-muted-foreground">building comes in the next version · this preview is every command each system will run, before anything runs</span>
+          <Button size="lg" disabled={!!why || starting} aria-describedby="build-why" onClick={() => { if (!build) return; setStarting(true); setFailed(''); build.start().catch(e => setFailed((e as Error).message)).finally(() => setStarting(false)) }}>build {all.length} {all.length === 1 ? 'system' : 'systems'}</Button>
+          <span id="build-why" className="text-caption text-muted-foreground">{why ?? 'one system at a time, here · awh, the pull and the walkers get their qq script and submit line · nothing is overwritten'}</span>
         </div>
+        {failed && <Status level="error">{failed}</Status>}
         <Head label="stages" />
         <div className="flex flex-wrap gap-1.5">{STAGES.map(st => {
           const on = !!plan.stages.find(x => x.id === st.id)?.on

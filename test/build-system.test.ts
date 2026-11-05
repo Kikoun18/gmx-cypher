@@ -3,13 +3,13 @@
 // real text names its files. The folder tree has the notebook's names, the ions are counted from grompp's net charge
 // and the waters, nothing outside the system's folder (and the scripts) is written, and every file is in build.json.
 import { createHash } from 'node:crypto';
-import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { Builder, jobsExec, type BuildRecord } from '../server/build-run';
 import { Jobs } from '../server/jobs';
 import { DEFAULT_PLAN } from '../src/lib/build/plan';
-import { FAKE_GMX, RUNNER, tmp } from './helpers';
+import { baseFolder, FAKE_GMX, RUNNER, tmp } from './helpers';
 
 const SYSTEM = { methods: ['hmr+fast+6'], saccharides: ['o111'], sequences: ['hhhhhhhh'], repeats: 0 };
 const S = 'solutions/hmr+fast+6/o111/hhhhhhhh';
@@ -19,17 +19,6 @@ function listing(dir: string): Record<string, string> {
   const walk = (d: string) => { for (const e of readdirSync(d, { withFileTypes: true })) { const p = join(d, e.name); if (e.isDirectory()) walk(p); else out[relative(dir, p)] = createHash('sha256').update(readFileSync(p)).digest('hex'); } };
   walk(dir);
   return out;
-}
-
-/** A base folder as the notebook's: the saccharide (the first 110 atoms of a real system), the mdp files, ff/. */
-function baseFolder() {
-  const base = tmp('base'), system = readFileSync(new URL('./fixtures/decypher/9.multiwalker.gro', import.meta.url), 'utf8').split('\n');
-  for (const d of ['molecules/saccharides', 'inputs', 'ff/charmm36s-jul2022-prosECCo75.ff', 'ff/TIP3PF', 'ff/ions']) mkdirSync(join(base, d), { recursive: true });
-  writeFileSync(join(base, 'molecules/saccharides/o111.gro'), ['o111', '  110', ...system.slice(2, 112), system[2 + Number(system[1])], ''].join('\n'));
-  // Your mdp files are not in the fixtures (sample 4): a line each, which the fake grompp only copies to its mdout.
-  for (const f of ['minim', 'eq_nvt', 'eq_npt', 'awh', 'awh_hmr', 'pull', 'hmr_multi']) writeFileSync(join(base, 'inputs', f + '.mdp'), '; ' + f + '.mdp\n');
-  writeFileSync(join(base, 'ff/ADDff.itp'), '; yours\n');
-  return base;
 }
 
 function builder() {
