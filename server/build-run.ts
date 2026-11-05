@@ -44,6 +44,8 @@ export interface SystemRun {
   attempt?: number;
   /** The build that retried it, when one did. */
   retried?: string;
+  /** The build that took it on from the cluster's outputs (R7b), when one did. */
+  wentOn?: string;
 }
 
 export interface BuildRun {
@@ -205,6 +207,24 @@ export class Builder extends EventEmitter {
     started.run.systems[0].attempt = (s.attempt ?? 1) + 1;
     if (how === 'rebuild') started.run.systems[0].notes.push('the failed folder was moved to ' + relative(old.base, join(dirname(root), 'failed')) + '/');
     s.retried = started.run.id;
+    this.save(old);
+    return started;
+  }
+
+  /**
+   * Takes a system on from what the cluster left (R7b), on a press: its folder continued with its build plan and the
+   * walkers' stage on, so once the pull's pullx.xvg is there the walkers are prepared.
+   */
+  goOn(runId: string, dir: string): { run: BuildRun; done: Promise<BuildRun> } {
+    const old = this.runs.get(runId), s = old?.systems.find(x => x.dir === dir);
+    if (!old || !s) throw new Error('no system ' + dir + ' in build ' + runId);
+    if (s.status !== 'cluster') throw new Error(dir + ' does not wait for the cluster: it is ' + s.status);
+    if (this.current) throw new Error('a build is running: one at a time');
+    const rec = readRecord(join(old.base, dir));
+    if (!rec) throw new Error(dir + ' has no build.json of gmx-cypher\'s');
+    const plan: BuildPlan = { ...rec.plan, stages: rec.plan.stages.map(st => (st.id === 'walkers' ? { ...st, on: true, tiles: st.tiles.map(t => ({ ...t, on: true })) } : st)) };
+    const started = this.start(plan, { methods: [rec.system.method], saccharides: [rec.system.saccharide], sequences: [rec.system.sequence], repeats: 0 }, { base: old.base, ifExists: 'continue', onFailure: 'next' });
+    s.wentOn = started.run.id;
     this.save(old);
     return started;
   }

@@ -277,6 +277,11 @@ export function makeApi(ctx: Ctx): Api {
       if (b.how !== 'resume' && b.how !== 'rebuild') throw new HttpError(400, 'how is resume or rebuild');
       try { return { body: builder.retry(String(b.run ?? ''), String(b.dir ?? ''), b.how).run }; } catch (e) { throw new HttpError(409, (e as Error).message); }
     }
+    // A system that waits for the cluster, taken on once its pull has ended (R7b): only when asked.
+    if (is(req, 'POST', url, '/api/build/go-on')) {
+      const b = await readJson<{ run?: string; dir?: string }>(req);
+      try { return { body: builder.goOn(String(b.run ?? ''), String(b.dir ?? '')).run }; } catch (e) { throw new HttpError(409, (e as Error).message); }
+    }
     if (is(req, 'GET', url, '/api/build/runs')) return { body: builder.list() };
     const buildRun = /^\/api\/build\/runs\/([\w-]+)\/cancel$/.exec(url.pathname);
     if (buildRun && req.method === 'POST') { try { builder.cancel(buildRun[1]); } catch (e) { throw new HttpError(409, (e as Error).message); } return { body: builder.get(buildRun[1]) }; }

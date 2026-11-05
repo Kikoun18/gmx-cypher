@@ -274,7 +274,7 @@ From [`batch-4.md`](batch-4.md) §6: SymBuilder inside gmx-cypher, four tabs (ho
 
 ### Phase 5: The cluster (R7)
 - [x] R7a qq scripts and profiles (each stage's profile in settings, the walkers' an MPI gmx; submit for me, off by default, with qq's real answer from the older notebook)
-- [ ] R7b The cluster tab: scripts, and SymBuilder's systems among the jobs
+- [x] R7b The cluster tab: scripts, and SymBuilder's systems among the jobs (`#cluster/scripts`; a job matched by its input folder's end; go on, on a press, prepares the walkers once the pull ended)
 
 ### Phase 6: Results (R8c–R8e, R9, R10)
 - [ ] R8c PMFs into the vault; R8d PMF numbers with the Matrix's code

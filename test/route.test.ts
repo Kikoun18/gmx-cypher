@@ -61,6 +61,8 @@ describe('addresses', () => {
     ['#compare?other=1', { view: 'compare', jobs: [] }, true],
     ['#setup/inputs?mode=other', { view: 'setup', step: 'inputs', batch: false }, true],
     ['#cluster/' + ID, { view: 'cluster' }, true],
+    ['#cluster/scripts', { view: 'cluster', sub: 'scripts' }, false],
+    ['#cluster/scripts/x', { view: 'cluster' }, true],
   ];
   it.each(cases)('%s', (hash, route, redirect) => {
     expect(parseRoute(hash)).toEqual({ route, redirect });

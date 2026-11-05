@@ -68,7 +68,7 @@ Four tabs, each at an address of its own, each opening where you left it:
 - **symbuilder** (`#symbuilder/build`, `systems`, `files`, `progress`, `summary`): see *SymBuilder* below.
 - **analysis**: *set-up* (`#setup/inputs`, …) and *results* (`#results`, `#result/<id>`, `#compare/…`), as before;
   every older address still opens what it opened.
-- **cluster** (`#cluster`): see *The cluster view*.
+- **cluster** (`#cluster`, `#cluster/scripts`): see *The cluster view*.
 
 ## SymBuilder
 
@@ -287,7 +287,13 @@ words when it needs more than its walltime left.
   If they are not on `PATH`, set their paths in *settings*.
 - **How often:** once when the tab opens, then every minute while it is open and the page is visible, one read at a
   time, less often after a failure. *refresh* reads now.
-- **What it never does:** kill or submit a job, or run anything but those three commands.
+- **A build's jobs** (SymBuilder): a job whose input folder is a system's step folder (`…/<method>/<saccharide>/<sequence>/8.pull`)
+  is shown as that system's, at that stage. When a system's pull has ended, *go on: prepare the walkers* continues
+  that system with its walkers' stage on, only when you press it.
+- **scripts** (`#cluster/scripts`): the three profiles, each stage's (as set in settings), and the qq script a build
+  writes for the first system planned, with its submit line.
+- **What it never does:** kill a job, or run anything but those three commands; it submits only a build's scripts, and
+  only with *submit them for me* on.
 
 ## Where files go
 

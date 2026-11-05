@@ -10,6 +10,7 @@ import { InProject, SystemsView } from '../src/views/Systems';
 import type { FolderLanding } from '../src/lib/build/landing';
 import { BuildFilesView } from '../src/views/BuildFiles';
 import { ProgressView } from '../src/views/Progress';
+import { ClusterScriptsView } from '../src/views/ClusterScripts';
 import type { Step } from '../src/lib/build/steps';
 
 const draft: BuildDraft = { ...EMPTY_BUILD, systems: { methods: ['hmr+fast+6'], saccharides: ['o111', 'pg'], sequences: ['aaaaaaaa', 'pppppppp'], repeats: 1 } };
@@ -169,5 +170,20 @@ describe('symbuilder · progress (R5c)', () => {
     expect(html).toContain('AWH · grompp 7.awh: Fatal error:');
     expect(html).toContain('one system stopped at a step');
     expect(html).not.toContain('cancel the build');
+  });
+});
+
+describe('cluster · scripts (R7b)', () => {
+  it('the profiles, each stage\'s, and the awh script a build writes for the first system planned', () => {
+    const html = renderToStaticMarkup(createElement(ClusterScriptsView, { config: undefined }));
+    expect(html).toContain('<h2 class="m-0 text-title">cluster scripts</h2>');
+    for (const p of ['MetaCentrum · GROMACS 2025.4 cuda', 'MetaCentrum · GROMACS 2022.3 plumed', 'LUMI · multidir']) expect(html).toContain(p);
+    expect(html).toContain('>5 stages<');
+    expect(html).toContain('>unused<');
+    expect(html).toContain('every walker has 9.multiwalker.gro');
+    expect(html).toContain('# qq job-type continuous');
+    expect(html).toContain('a build prints this line; you submit it');
+    const on = renderToStaticMarkup(createElement(ClusterScriptsView, { config: { qqBuild: { profiles: {}, submit: true, queue: 'gpu' } } as never }));
+    expect(on).toContain('a build submits it for you (settings: submit them for me, queue gpu)');
   });
 });

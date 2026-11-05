@@ -10,7 +10,7 @@ export interface SystemRun {
   dir: string; method: string; saccharide: string; sequence: string; status: SystemStatus
   step: number; steps: number; label?: string; stage?: string; job?: string
   started?: string; ended?: string; error?: string; notes: string[]; submit: string[]
-  attempt?: number; retried?: string
+  attempt?: number; retried?: string; wentOn?: string
 }
 export interface BuildRun {
   id: string; created: string; ended?: string; status: 'running' | 'done' | 'failed' | 'cancelled' | 'interrupted'
@@ -44,6 +44,8 @@ export function useBuilds() {
   const cancel = React.useCallback((id: string) => postJson<BuildRun>('/api/build/runs/' + id + '/cancel', {}).then(() => {}), [])
   const retry = React.useCallback((run: string, dir: string, how: 'resume' | 'rebuild') => postJson<BuildRun>('/api/build/retry', { run, dir, how })
     .then(r => { setRuns(list => [r, ...list.filter(x => x.id !== r.id)]); return r }), [])
+  const goOn = React.useCallback((run: string, dir: string) => postJson<BuildRun>('/api/build/go-on', { run, dir })
+    .then(r => { setRuns(list => [r, ...list.filter(x => x.id !== r.id)]); return r }), [])
   const building = runs.find(r => r.status === 'running')?.systems.filter(s => s.status === 'building').length ?? 0
-  return { runs, logs, loadLog, start, cancel, retry, building }
+  return { runs, logs, loadLog, start, cancel, retry, goOn, building }
 }

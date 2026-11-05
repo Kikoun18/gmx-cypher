@@ -20,6 +20,8 @@ import { Settings } from './views/Settings'
 import { Setup } from './views/Setup'
 import { SymBuilder } from './views/SymBuilder'
 import { useBuilds } from './builds'
+import { jobSystem } from './lib/build/jobs'
+import { ClusterScriptsView } from './views/ClusterScripts'
 import { Home, type ClusterSummary } from './views/Home'
 import { useDecypherSources } from './decypher/state'
 import type { LoadedFile } from './decypher/parse'
@@ -84,6 +86,11 @@ export function App() {
   const [route, go] = useRoute()
   const jobs = useJobs(useNaming(state?.config.vault ?? null, state?.config.project ?? null))
   const builds = useBuilds()
+  // A qq job as a build's system (R7b), by its input folder; the newest build that has the system says where it stands.
+  const systemOfJob = React.useCallback((inputDir: string | null) => {
+    for (const r of builds.runs) { const m = jobSystem(inputDir, r.systems); if (m) return { ...m, run: r.id, status: r.systems.find(x => x.dir === m.dir)!.status } }
+    return null
+  }, [builds.runs])
   const [draft, setDraft] = useDraft()
   // Closing settings returns the focus to its button, wherever the dialog was opened from.
   const settingsButton = React.useRef<HTMLButtonElement>(null)
@@ -195,7 +202,13 @@ export function App() {
           )}
           </SubTabs>
         </TabsContent>
-        <TabsContent value="cluster"><ClusterView onOffer={offerBatch} onRead={setClusterRead} /></TabsContent>
+        <TabsContent value="cluster">
+          <SubTabs value={route.view === 'cluster' && route.sub === 'scripts' ? 'scripts' : 'jobs'} onValueChange={v => go(v === 'scripts' ? { view: 'cluster', sub: 'scripts' } : { view: 'cluster' })} label="cluster views"
+            items={[{ value: 'jobs', label: 'jobs' }, { value: 'scripts', label: 'scripts' }]}>
+            {route.view === 'cluster' && route.sub === 'scripts' ? <ClusterScriptsView config={state?.config} />
+              : <ClusterView onOffer={offerBatch} onRead={setClusterRead} systemOf={systemOfJob} onGoOn={builds.goOn} />}
+          </SubTabs>
+        </TabsContent>
       </main>
       </Tabs>
       <Toaster />

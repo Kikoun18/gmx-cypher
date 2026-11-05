@@ -17,7 +17,8 @@ export interface BuildDraft {
 const KEY = 'gmx-cypher-build'
 export const EMPTY_BUILD: BuildDraft = { plan: DEFAULT_PLAN, systems: { methods: ['hmr+fast+6'], saccharides: [], sequences: [], repeats: 0 }, ifExists: 'continue', onFailure: 'next' }
 
-function read(): BuildDraft {
+/** The draft as this browser keeps it, read once (cluster · scripts shows its first system's scripts). */
+export function readBuildDraft(): BuildDraft {
   try {
     const d = { ...EMPTY_BUILD, ...JSON.parse(localStorage.getItem(KEY) || '{}') } as BuildDraft
     return planProblems(d.plan).length ? { ...d, plan: DEFAULT_PLAN } : d
@@ -25,7 +26,7 @@ function read(): BuildDraft {
 }
 
 export function useBuildDraft(): [BuildDraft, React.Dispatch<React.SetStateAction<BuildDraft>>] {
-  const [d, setD] = React.useState<BuildDraft>(read)
+  const [d, setD] = React.useState<BuildDraft>(readBuildDraft)
   React.useEffect(() => { try { localStorage.setItem(KEY, JSON.stringify(d)) } catch { /* a convenience only */ } }, [d])
   return [d, setD]
 }

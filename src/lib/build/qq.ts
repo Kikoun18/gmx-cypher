@@ -70,4 +70,5 @@ export function qqScript(stage: StageId, sys: System, p: Profile, walkers = 8): 
   return { file, text, submit: 'qq submit -q gpu ' + sys.dir + '/' + STEP_FOLDER[stage] + '/' + file.split('/').pop() }
 }
 
-const STEP_FOLDER: Record<StageId, string> = { sb: '', min: '4.minim', nvt: '5.eqnvt', npt: '6.eqnpt', awh: '7.awh', pull: '8.pull', walkers: '9.multiwalker' }
+/** The folder each stage's step runs in, in a system's folder. */
+export const STEP_FOLDER: Record<StageId, string> = { sb: '', min: '4.minim', nvt: '5.eqnvt', npt: '6.eqnpt', awh: '7.awh', pull: '8.pull', walkers: '9.multiwalker' }
