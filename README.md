@@ -96,7 +96,12 @@ walkers are prepared and get their qq script and `qq submit` line (nothing is su
 - **progress**: the last build, each system's step of all its steps and what the running step prints, the qq submit
   lines of the systems that wait for the cluster, and *cancel the build* (it stops the running step's process group
   and every system after it). A system stops at the first GROMACS fatal error, quoted with its stage, whatever the exit
-  code (or at any non-zero exit with strict mode on); the others go on, or the build stops, as you choose.
+  code (or at any non-zero exit with strict mode on), with a hint for the pull's two box errors; the others go on, or
+  the build stops, as you choose. A failed system can be *resumed at the step that stopped* (in its folder, nothing
+  before it rewritten) or *rebuilt anew* (its folder moved to `failed/` first, with `FAILED.txt`). A folder that
+  exists is continued if a gmx-cypher build made it, skipped, or built beside as the next repeat, as you choose. A
+  walker whose preparation fails is moved to `9.multiwalker/failed/` and prepared again, once, from the start of the
+  nearest working walker, as your notebook's retry does.
 - The build being planned is kept in this browser; *summary* fills with R9.
 
 Methods switch on what their name says: `hmr` hydrogen masses (gromologist), `fast` TIP3PF water; awh, the pull and the
@@ -295,6 +300,7 @@ words when it needs more than its walltime left.
 | Build plans (SymBuilder) | `~/.gmx-cypher/builds/<name>.json` |
 | A built system | `<base>/solutions/<method>/<saccharide>/<sequence>/`, the notebook's names, with its record `build.json` (every file written or replaced, with its size and SHA-256) |
 | Its qq scripts | `<base>/scripts/<stage>/<method>_<stage>_<sequence>.sh` (kept if it exists), copied into the step's folder |
+| A system rebuilt, a walker rebuilt | its old folder moved to `<base>/solutions/<method>/<saccharide>/failed/<sequence>_<stamp>/` with `FAILED.txt`; a walker's to `9.multiwalker/failed/<n>_<stamp>/` |
 | Builds and their steps' logs | `~/.gmx-cypher/builds/runs/<id>.json`, `~/.gmx-cypher/builds/jobs/<id>.ndjson` |
 | A sent result | `<vault>/<project folder>/_inbox/<name>` |
 | Its record's copy | `<vault>/gmx-cypher/records/<sha256 of the sent file>.run.json` |
@@ -357,7 +363,8 @@ gmx-cypher can:
 - write new files: a job's outputs, under names that are free; files in its own state folder; a result you send, into
   the project's `_inbox`; its own vault space; a saved build plan in its state folder; and a system's folder, which a
   build creates (one that exists is left as it is), with every file in it new or written by that build, and its qq
-  scripts in `<base>/scripts/`, created only where none is.
+  scripts in `<base>/scripts/`, created only where none is. Retrying **moves** a folder a build created to `failed/`;
+  nothing is deleted.
 
 It cannot, by design:
 - overwrite or delete any of your files (new names are created exclusively; archive moves a job's file without copying

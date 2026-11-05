@@ -1,6 +1,6 @@
 // SymBuilder's build and systems views (R3c) in a browser: systems typed, the preview, the inspector's command for the
 // first system, a tile moved by its buttons and one dragged from the palette, the draft kept over a reload. Nothing
-// runs: building comes later.
+// runs here (the base folder lacks files, so the build button says why); e2e/build.spec.ts builds.
 import { spawn, type ChildProcess } from 'node:child_process'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'

@@ -34,7 +34,7 @@ export async function build(tool, argv) {
   switch (tool) {
     case 'trjconv': {
       const f = one('-f'), o = one('-o');
-      if (argv.includes('-dump')) { writeFileSync(o, fixture(SYSTEM)); process.stderr.write('fake gmx: no real output of trjconv -dump in the fixtures yet\n'); return; }
+      if (argv.includes('-dump')) { say('trjconv-dump'); writeFileSync(o, fixture(SYSTEM)); return; }
       say(f.endsWith('.pdb') ? 'trjconv-peptide' : 'trjconv-saccharide');
       if (f.endsWith('.pdb')) { writeFileSync(o, fixture('decypher/mmmmmmmm.gro')); return; }
       const text = readFileSync(f, 'utf8');
@@ -61,8 +61,15 @@ export async function build(tool, argv) {
     }
     case 'grompp': {
       const o = one('-o'), name = basename(o);
-      if (process.env.FAKE_GMX_FATAL === name) { process.stderr.write(fixture('build/notebook/grompp-awh-fatal.txt')); return 1; }
-      const which = { '3.pre_salted.tpr': 'grompp-pre-salted', '4.minim.tpr': 'grompp-minim', '5.eqnvt.tpr': 'grompp-eqnvt', '6.eqnpt.tpr': 'grompp-eqnpt', '7.awh.tpr': 'grompp-awh', '8.pull.tpr': 'grompp-pull', '9.multiwalker.tpr': 'grompp-awh', '_charge_check.tpr': 'grompp-pre-salted' }[name];
+      // FAKE_GMX_FATAL=7.awh.tpr, or 8/9.multiwalker.tpr for one walker's folder; with FAKE_GMX_FATAL_ONCE=<file>, only
+      // until that file exists (it is made at the first failure), so a retry gets through.
+      const want = process.env.FAKE_GMX_FATAL, here = basename(process.cwd()) + '/' + name, once = process.env.FAKE_GMX_FATAL_ONCE;
+      if ((want === name || want === here) && !(once && existsSync(once))) {
+        if (once) writeFileSync(once, 'failed once\n');
+        process.stderr.write(fixture(name === '9.multiwalker.tpr' ? 'build/notebook/grompp-walker-fatal.txt' : 'build/notebook/grompp-awh-fatal.txt'));
+        return 1;
+      }
+      const which = { '3.pre_salted.tpr': 'grompp-pre-salted', '4.minim.tpr': 'grompp-minim', '5.eqnvt.tpr': 'grompp-eqnvt', '6.eqnpt.tpr': 'grompp-eqnpt', '7.awh.tpr': 'grompp-awh', '8.pull.tpr': 'grompp-pull', '9.multiwalker.tpr': 'grompp-walker', '_charge_check.tpr': 'grompp-pre-salted' }[name];
       if (!which) { process.stderr.write('fake gmx: no real grompp output for ' + name + '\n'); return 1; }
       process.stderr.write(real(which).replaceAll('hhhhhhhh', seq));
       writeFileSync(o, 'fake: a run input, not a real .tpr\n');

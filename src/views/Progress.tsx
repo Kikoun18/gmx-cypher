@@ -35,9 +35,13 @@ function SystemRow({ s, selected, onSelect }: { s: SystemRun; selected: boolean;
 }
 
 /** symbuilder · progress (R5c): the last build, its systems one at a time, the step running and what it prints. */
-export function ProgressView({ runs, logs, loadLog, onCancel }: { runs: BuildRun[]; logs: Record<string, string>; loadLog: (id: string) => void; onCancel: (id: string) => void }) {
+export function ProgressView({ runs, logs, loadLog, onCancel, onRetry }: {
+  runs: BuildRun[]; logs: Record<string, string>; loadLog: (id: string) => void; onCancel: (id: string) => void
+  /** R6: a failed system again, resumed in its folder or rebuilt after its folder moves to failed/. */
+  onRetry?: (run: string, dir: string, how: 'resume' | 'rebuild') => Promise<unknown>
+}) {
   const run = runs[0]
-  const [picked, setPicked] = React.useState<string | null>(null)
+  const [picked, setPicked] = React.useState<string | null>(null), [retryError, setRetryError] = React.useState('')
   const sel = run && (run.systems.find(s => s.dir === picked) ?? run.systems.find(s => s.status === 'building') ?? run.systems.find(s => s.status === 'failed') ?? run.systems[0])
   const job = sel?.job
   React.useEffect(() => { if (job && logs[job] == null) loadLog(job) }, [job, logs, loadLog])
@@ -69,6 +73,15 @@ export function ProgressView({ runs, logs, loadLog, onCancel }: { runs: BuildRun
             <div className="flex items-center justify-between gap-3"><b className="text-heading">{sel.sequence}</b><Status inline level={STATE[sel.status].level} word={STATE[sel.status].word} /></div>
             <span className="text-caption text-muted-foreground">{sel.dir} · its record is build.json in that folder</span>
             {sel.error && <Status level="error" word="error"><span className="whitespace-pre-wrap">{sel.error}</span></Status>}
+            {(sel.status === 'failed' || sel.status === 'cancelled') && onRetry && run.status !== 'running' && (sel.retried
+              ? <span className="text-caption text-muted-foreground">retried in a later build</span>
+              : <div className="flex flex-wrap items-center gap-2">
+                <Button size="sm" onClick={() => { setRetryError(''); onRetry(run.id, sel.dir, 'resume').catch(e => setRetryError((e as Error).message)) }}>resume at the step that stopped</Button>
+                <Button size="sm" variant="outline" onClick={() => { setRetryError(''); onRetry(run.id, sel.dir, 'rebuild').catch(e => setRetryError((e as Error).message)) }}>rebuild it anew</Button>
+                <span className="text-caption text-muted-foreground">rebuild moves its folder to failed/, with FAILED.txt; nothing is deleted</span>
+              </div>)}
+            {retryError && <Status level="error">{retryError}</Status>}
+            {(sel.attempt ?? 1) > 1 && <span className="text-caption text-muted-foreground">try {sel.attempt}</span>}
             {sel.notes.map(n => <Status key={n} level="info" word="note">{n}</Status>)}
             {sel.submit.length > 0 && <>
               <Head label="qq submit" n={sel.submit.length} />

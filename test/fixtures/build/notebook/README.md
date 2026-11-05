@@ -10,5 +10,6 @@ by `/storage/brno/you`. Fakes and tests answer with these texts; none is invente
   the notebook added between them (its stage banners, path echoes, its progress bar, "Waiting for…") left out; the
   `/cvmfs/…` software path is `/opt/gromacs-2025.4`, the gromologist user and host `you` and `host`. The fake gmx
   (`test/fake-gmx-build.mjs`) and the fake python (`test/fake-python.mjs`) print them.
-- Not in the notebook, so not here: `mdrun -v`'s own progress lines, `trjconv -dump` (the walkers' start frames),
+- `tools/trjconv-dump.txt`, `tools/grompp-walker.txt`: walker 1 of hhhhhhhh, its start frame and its grompp.
+- Not in the notebook, so not here: `mdrun -v`'s own progress lines,
   `insert-molecules` (glucose), PyMOL's own output, `gmx awh`'s output names (Phase 0 §6, samples 5–8).

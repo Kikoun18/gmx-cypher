@@ -55,6 +55,13 @@ describe('POST /api/build/start', () => {
     await s.close();
   }, 60_000);
 
+  it('a retry says what it needs: resume or rebuild, of a failed system of a known build', async () => {
+    const { s } = await server();
+    expect((await s.call('/api/build/retry', { run: 'b1', dir: 'x', how: 'again' })).status).toBe(400);
+    expect(await s.call('/api/build/retry', { run: 'b1', dir: 'solutions/m/c/q', how: 'resume' })).toMatchObject({ status: 409, json: { error: 'no system solutions/m/c/q in build b1' } });
+    await s.close();
+  });
+
   it('the wait for mdrun\'s .gro is a setting, checked', async () => {
     const { s } = await server();
     expect((await s.call('/api/config', { buildWait: { every: 0, max: 10 } })).status).toBe(400);

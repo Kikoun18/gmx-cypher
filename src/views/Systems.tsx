@@ -134,7 +134,7 @@ export function SystemsView({ draft, setDraft, missing = null, project = null, l
         <ToggleGroup type="single" size="sm" value={draft.ifExists} onValueChange={v => v && setDraft(d => ({ ...d, ifExists: v as IfExists }))} aria-label="if a folder already exists">
           <ToggleGroupItem value="continue">continue</ToggleGroupItem><ToggleGroupItem value="skip">skip</ToggleGroupItem><ToggleGroupItem value="repeat">repeat (r, r1 …)</ToggleGroupItem>
         </ToggleGroup>
-        <span className="text-caption text-muted-foreground">{draft.ifExists === 'continue' ? 'from the first step whose output is missing · nothing is overwritten' : draft.ifExists === 'skip' ? 'a system whose folder exists is left as it is' : 'a new folder tree beside it, with the next repeat\'s name'}</span>
+        <span className="text-caption text-muted-foreground">{draft.ifExists === 'continue' ? 'a folder a gmx-cypher build made goes on from the first step not done · one it did not make is left as it is · nothing is overwritten' : draft.ifExists === 'skip' ? 'a system whose folder exists is left as it is' : 'a new folder tree beside it, with the next repeat\'s name'}</span>
         <Head label="repeats" />
         <label className="flex items-center gap-3 text-control">build every system again, as repeats
           <Input size="sm" type="number" min={0} max={9} value={s.repeats} onChange={e => set({ repeats: Math.max(0, Math.min(9, Number(e.target.value) || 0)) })} className="w-[64px]" /></label>

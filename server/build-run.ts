@@ -12,10 +12,11 @@ import { constants, copyFileSync, createReadStream, existsSync, mkdirSync, mkdte
 import { tmpdir } from 'node:os';
 import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 import { fatalText } from '../src/lib/build/fatal';
-import { NAMES, systemsOf, type BuildPlan, type Systems, type System } from '../src/lib/build/plan';
+import { BASE, NAMES, systemsOf, type BuildPlan, type Systems, type System } from '../src/lib/build/plan';
+import { freeRepeat, hint, quarantineName, resumeAt } from '../src/lib/build/retry';
 import { PROFILES, qqScript, type Profile } from '../src/lib/build/qq';
 import { planSystem, type Step } from '../src/lib/build/steps';
-import { carbGroup, hmrTopology, ionCounts, mergeGro, moleculetype, netCharge, pullx, renameWater, topologyText, walkerFrames, waters } from '../src/lib/build/text';
+import { carbGroup, hmrTopology, ionCounts, mergeGro, moleculetype, nearestWalker, netCharge, pullx, renameWater, topologyText, walkerFrames, waters } from '../src/lib/build/text';
 import type { Job, JobStatus, Jobs } from './jobs';
 
 export const BUILD_FORMAT = 'gmx-cypher build', BUILD_VERSION = 1;
@@ -38,6 +39,10 @@ export interface SystemRun {
   notes: string[];
   /** The qq submit lines of its cluster stages (T206: printed, not run). */
   submit: string[];
+  /** Its try: 1, or more when it is a retry (R6). */
+  attempt?: number;
+  /** The build that retried it, when one did. */
+  retried?: string;
 }
 
 export interface BuildRun {
@@ -66,6 +71,10 @@ export interface BuildRecord {
   /** Folders this build created, relative to the base folder. */
   folders: string[];
   notes: string[]; submit: string[];
+  /** What earlier steps found (the net charge, the ions, the walkers' frames), for a build that continues (R6). */
+  values?: Record<string, string>;
+  /** Folders moved aside, never deleted (R6): a walker's that failed, with the walker it was rebuilt from. */
+  moved?: { from: string; to: string; walker?: number; donor?: number }[];
 }
 
 /** How a gmx or python step runs: the build's job list, or a test's stand-in. Its id is known at once, its end later. */
@@ -170,31 +179,81 @@ export class Builder extends EventEmitter {
     if (this.current.job) this.o.cancel?.(this.current.job);
   }
 
-  private async system(run: BuildRun, plan: BuildPlan, sys: System, s: SystemRun) {
-    const base = run.base, root = join(base, sys.dir), rel = (abs: string) => relative(base, abs);
+  /**
+   * Retries a failed or cancelled system (R6): `resume` continues its folder at the first step not done; `rebuild`
+   * first moves its folder to failed/<sequence>_<stamp>/ with FAILED.txt (never deleted), then builds it anew.
+   */
+  retry(runId: string, dir: string, how: 'resume' | 'rebuild'): { run: BuildRun; done: Promise<BuildRun> } {
+    const old = this.runs.get(runId), s = old?.systems.find(x => x.dir === dir);
+    if (!old || !s) throw new Error('no system ' + dir + ' in build ' + runId);
+    if (s.status !== 'failed' && s.status !== 'cancelled') throw new Error('only a failed or cancelled system is retried: ' + dir + ' is ' + s.status);
+    if (this.current) throw new Error('a build is running: one at a time');
+    const root = join(old.base, dir), rec = readRecord(root);
+    if (!rec) throw new Error(dir + ' has no build.json of gmx-cypher\'s: nothing to retry from');
+    if (how === 'rebuild') {
+      if (!rec.folders.includes(dir)) throw new Error(dir + ' was not created by a gmx-cypher build: it is not moved');
+      const to = join(dirname(root), 'failed', quarantineName(rec.system.sequence, new Date()));
+      mkdirSync(dirname(to), { recursive: true });
+      renameSync(root, to);
+      writeFileSync(join(to, 'FAILED.txt'), (s.error ?? s.status) + '\n\nbuild ' + runId + ', ' + (s.ended ?? '') + '; moved here by gmx-cypher to build ' + dir + ' anew\n', { flag: 'wx' });
+    }
+    const systems: Systems = { methods: [rec.system.method], saccharides: [rec.system.saccharide], sequences: [rec.system.sequence], repeats: 0 };
+    const started = this.start(rec.plan, systems, { base: old.base, ifExists: 'continue', onFailure: 'next' });
+    started.run.systems[0].attempt = (s.attempt ?? 1) + 1;
+    if (how === 'rebuild') started.run.systems[0].notes.push('the failed folder was moved to ' + relative(old.base, join(dirname(root), 'failed')) + '/');
+    s.retried = started.run.id;
+    this.save(old);
+    return started;
+  }
+
+  private async system(run: BuildRun, plan: BuildPlan, asked: System, s: SystemRun) {
+    const base = run.base, rel = (abs: string) => relative(base, abs);
+    let sys = asked, root = join(base, sys.dir), prev: BuildRecord | null = null;
     s.status = 'building'; s.started = now(); this.save(run);
-    // The folder is this build's: created here, exclusively; one that exists is left as it is (continue, skip and
-    // repeat for it: R6).
-    if (existsSync(root)) { s.status = 'skipped'; s.ended = now(); s.notes.push(sys.dir + ' exists: it is left as it is'); this.save(run); return; }
-    const record: BuildRecord = {
-      format: BUILD_FORMAT, version: BUILD_VERSION, runner: this.o.version, build: run.id, system: { dir: sys.dir, method: sys.method, saccharide: sys.saccharide, sequence: sys.sequence },
-      plan, started: s.started!, status: 'building', steps: [], files: {}, backups: [], folders: [], notes: s.notes, submit: s.submit,
-    };
-    const made = (dir: string) => {
-      const missing: string[] = [];
-      for (let d = dir; !existsSync(d) && inside(d, base); d = dirname(d)) missing.unshift(d);
-      for (const d of missing) { mkdirSync(d); record.folders.push(rel(d)); }
-    };
-    try { made(dirname(root)); mkdirSync(root); record.folders.push(sys.dir); }
-    catch (e) { s.status = 'failed'; s.error = 'could not create ' + sys.dir + ': ' + (e as Error).message; s.ended = now(); this.save(run); return; }
+    const leave = (why: string) => { s.status = 'skipped'; s.ended = now(); s.notes.push(why); this.save(run); };
+    // A folder that exists (R6): continued if a gmx-cypher build made it, else left as it is; skipped; or built beside it as a repeat.
+    if (existsSync(root)) {
+      if (run.ifExists === 'skip') return leave(sys.dir + ' exists: it is left as it is');
+      if (run.ifExists === 'repeat') {
+        const m = freeRepeat(sys.method, x => existsSync(join(base, BASE.solutions, x, sys.saccharide, sys.sequence)));
+        sys = { ...sys, method: m, dir: [BASE.solutions, m, sys.saccharide, sys.sequence].join('/') };
+        root = join(base, sys.dir);
+        s.notes.push(asked.dir + ' exists: built as the repeat ' + m + ' beside it');
+        s.dir = sys.dir; s.method = m;
+      } else {
+        prev = readRecord(root);
+        if (!prev) return leave(sys.dir + ' exists, and no gmx-cypher build made it (no build.json of its own): it is left as it is · choose repeat to build beside it');
+      }
+    }
+    const record: BuildRecord = prev
+      ? { ...prev, runner: this.o.version, build: run.id, plan, started: s.started!, ended: undefined, status: 'building', notes: s.notes, submit: s.submit }
+      : {
+        format: BUILD_FORMAT, version: BUILD_VERSION, runner: this.o.version, build: run.id, system: { dir: sys.dir, method: sys.method, saccharide: sys.saccharide, sequence: sys.sequence },
+        plan, started: s.started!, status: 'building', steps: [], files: {}, backups: [], folders: [], notes: s.notes, submit: s.submit,
+      };
     const recordFile = join(root, 'build.json');
-    writeFileSync(recordFile, JSON.stringify(record, null, 2) + '\n', { flag: 'wx' });
+    if (!prev) {
+      const made = (dir: string) => {
+        const missing: string[] = [];
+        for (let d = dir; !existsSync(d) && inside(d, base); d = dirname(d)) missing.unshift(d);
+        for (const d of missing) { mkdirSync(d); record.folders.push(rel(d)); }
+      };
+      try { made(dirname(root)); mkdirSync(root); record.folders.push(sys.dir); }
+      catch (e) { s.status = 'failed'; s.error = 'could not create ' + sys.dir + ': ' + (e as Error).message; s.ended = now(); this.save(run); return; }
+      writeFileSync(recordFile, JSON.stringify(record, null, 2) + '\n', { flag: 'wx' });
+    }
     const steps = planSystem(plan, sys, { base, profile: this.o.profile?.() ?? PROFILES[0] });
     s.steps = steps.length;
-    const values: Record<string, string> = {};
-    let cluster = false;
+    const values: Record<string, string> = { ...(prev?.values ?? {}) };
+    record.values = values;
+    // Continue: from the first step the record does not have as done, or whose output is gone.
+    const from = prev ? resumeAt(steps, prev.steps, p => p in prev.files && !existsSync(resolve(base, p))) : 0;
+    if (prev) { record.steps = [...prev.steps]; s.notes.push(from >= steps.length ? 'every step was done before' : 'continued at step ' + (from + 1) + ' of ' + steps.length + ': ' + steps[from].label); }
+    let cluster = steps.slice(0, from).some(x => x.label === 'qq script' && CLUSTER.includes(x.stage));
+    const failedWalkers = new Set<number>();
     try {
-      for (const [i, step] of steps.entries()) {
+      for (let i = from; i < steps.length; i++) {
+        const step = steps[i];
         if (this.current?.cancelled) throw new Stop('cancelled', 'cancelled');
         // The walkers start from the pull's frames, which the cluster makes: without them the system waits (R7b).
         if (step.stage === 'walkers' && !('t1' in values)) {
@@ -205,6 +264,11 @@ export class Builder extends EventEmitter {
             if (w.far) s.notes.push('walker ' + w.walker + ' starts at ' + w.distance.toFixed(3) + ' nm, ' + w.off.toFixed(2) + ' nm from its target ' + w.target + ' nm');
           }
         }
+        // A walker that failed keeps the others going (the notebook's cell does); once they are all prepared, each failed
+        // one is rebuilt from the nearest working walker, once (T219).
+        const wk = /^walker (\d+): /.exec(step.label);
+        if (wk && failedWalkers.has(Number(wk[1]))) { s.step = i + 1; continue; }
+        if (step.stage === 'walkers' && step.label === 'qq script' && failedWalkers.size) await this.rebuildWalkers(run, plan, sys, steps, failedWalkers, values, record, s);
         // Ions for prosECCo75's charges, from grompp's net charge and the waters in the topology (neutralizing_counts).
         if (step.resolves?.includes('np')) {
           const ions = ionCounts(Number(values.net ?? 0), waters(readFileSync(join(root, sys.sequence + '.top'), 'utf8')), plan.science);
@@ -213,23 +277,63 @@ export class Builder extends EventEmitter {
         }
         if (step.resolves?.includes('tmp')) values.tmp = mkdtempSync(join(tmpdir(), 'gmx-cypher-charge-'));
         s.step = i; s.label = step.label; s.stage = step.stage; this.save(run);
-        const r = await this.step(run, plan, sys, step, i, values, record);
+        let r: { net?: number };
+        try { r = await this.step(run, plan, sys, step, i, values, record); }
+        catch (e) {
+          if (!wk || !(e instanceof Stop) || e.status !== 'failed') throw e;
+          failedWalkers.add(Number(wk[1]));
+          s.notes.push('walker ' + wk[1] + ' failed: ' + e.message.split('\n').slice(0, 2).join(' '));
+          s.step = i + 1;
+          continue;
+        }
         // awh, the pull and the walkers run on the cluster; min, nvt and npt get a script too, but run here.
         if (step.label === 'qq script' && CLUSTER.includes(step.stage)) cluster = true;
         if (r.net != null) values.net = String(r.net);
         s.step = i + 1;
+        writeJson(recordFile, record);
       }
       record.status = s.status = cluster ? 'cluster' : 'built';
     } catch (e) {
       const stop = e instanceof Stop ? e : new Stop('failed', (e as Error).message);
       record.status = s.status = stop.status;
       if (stop.status === 'cluster') s.notes.push(stop.message);
-      else s.error = stop.message;
+      else {
+        s.error = stop.message;
+        const h = hint(stop.message);
+        if (h) s.notes.push('hint: ' + h);
+      }
     }
     s.job = undefined;
     record.ended = s.ended = now();
     writeJson(recordFile, record);
     this.save(run);
+  }
+
+  /** Each failed walker's folder moved to 9.multiwalker/failed/<n>_<stamp>/, and the walker prepared again from the start of the nearest working one. */
+  private async rebuildWalkers(run: BuildRun, plan: BuildPlan, sys: System, steps: Step[], failed: Set<number>, values: Record<string, string>, record: BuildRecord, s: SystemRun) {
+    const base = run.base, root = join(base, sys.dir), rel = (abs: string) => relative(base, abs), targets = plan.science.walkers;
+    const folder = (n: number | string) => join(root, NAMES.walkers, String(n));
+    const working = targets.map((_, k) => k + 1).filter(n => !failed.has(n) && existsSync(join(folder(n), NAMES.walkers + '.tpr')));
+    for (const n of [...failed].sort((a, b) => a - b)) {
+      const donor = nearestWalker(n, working, targets);
+      if (donor == null) throw new Stop('failed', 'WALKERS · walker ' + n + ': no working walker to rebuild it from');
+      const dir = folder(n), to = join(root, NAMES.walkers, 'failed', quarantineName(String(n), new Date()));
+      if (existsSync(dir)) {
+        if (!record.folders.includes(rel(dir))) throw new Stop('failed', 'WALKERS · walker ' + n + ': ' + rel(dir) + ' is not this build\'s folder: it is left as it is');
+        if (!existsSync(dirname(to))) { mkdirSync(dirname(to)); record.folders.push(rel(dirname(to))); }
+        renameSync(dir, to);
+        // The record follows the files it moved; nothing is deleted.
+        for (const k of Object.keys(record.files)) if (k.startsWith(rel(dir) + '/')) { record.files[rel(to) + k.slice(rel(dir).length)] = record.files[k]; delete record.files[k]; }
+        (record.moved ??= []).push({ from: rel(dir), to: rel(to), walker: n, donor });
+      } else record.folders.push(rel(dir));
+      mkdirSync(dir);
+      copyFileSync(join(folder(donor), 'start.gro'), join(dir, 'start.gro'), constants.COPYFILE_EXCL);
+      record.files[rel(join(dir, 'start.gro'))] = await fileRecord(join(dir, 'start.gro'), -1);
+      const grompp = steps.findIndex(x => x.label === 'walker ' + n + ': grompp');
+      try { await this.step(run, plan, sys, steps[grompp], grompp, values, record); }
+      catch (e) { throw new Stop('failed', 'walker ' + n + ', rebuilt from walker ' + donor + '\'s start: ' + (e as Error).message); }
+      s.notes.push('walker ' + n + ' (' + targets[n - 1] + ' nm) rebuilt once from walker ' + donor + '\'s start (' + targets[donor - 1] + ' nm); its failed folder is ' + rel(to));
+    }
   }
 
   /** One step: the writing rule, then the program, then its outputs required and recorded. */
@@ -392,4 +496,12 @@ export function jobsExec(jobs: Jobs): { exec: Exec; cancel: (id: string) => void
     },
     cancel: id => jobs.cancel(id),
   };
+}
+
+/** A system's record, when a gmx-cypher build of this version or older wrote it; null otherwise. */
+export function readRecord(root: string): BuildRecord | null {
+  try {
+    const r = JSON.parse(readFileSync(join(root, 'build.json'), 'utf8')) as BuildRecord;
+    return r.format === BUILD_FORMAT && r.version >= 1 && r.version <= BUILD_VERSION ? r : null;
+  } catch { return null; }
 }

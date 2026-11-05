@@ -26,7 +26,7 @@ export function SymBuilder({ route, go, gmx, gmxOk = true, base, vault, projectI
       {route.sub === 'systems' && <SystemsView draft={draft} setDraft={setDraft} missing={check?.missing ?? null} project={project} landing={landing}
         build={{ blocked: !base ? 'set a base folder in settings → SymBuilder first' : !gmxOk ? 'no working gmx: set it in settings → gmx' : builds.runs[0]?.status === 'running' ? 'a build is running: one at a time' : null,
           start: () => builds.start(draft).then(() => go({ view: 'symbuilder', sub: 'progress' })) }} />}
-      {route.sub === 'progress' && <ProgressView runs={builds.runs} logs={builds.logs} loadLog={builds.loadLog} onCancel={id => void builds.cancel(id)} />}
+      {route.sub === 'progress' && <ProgressView runs={builds.runs} logs={builds.logs} loadLog={builds.loadLog} onCancel={id => void builds.cancel(id)} onRetry={builds.retry} />}
       {route.sub === 'files' && <BuildFilesView draft={draft} check={check} error={error} base={base} />}
       {LATER[route.sub] && <p className="m-0 text-control text-muted-foreground">{LATER[route.sub]}</p>}
     </SubTabs>
