@@ -8,8 +8,9 @@ rebuilt once from the nearest working walker, as your notebook does. The reports
 A built system goes to analysis's batch set-up in one press. The two follow-ups you asked for after batch 4 (the
 second line of tabs as a bar) and one found on the way (the theme race) are in too.
 
-**Not done: R8c and R8d** (a built system's PMF into the vault, and its numbers). They wait for question 12, which PMF
-file your vault holds (sample 10): sending a guessed one would put the wrong curve in the Matrix.
+**R8c and R8d came after your answer to question 12** (§9): the PMF is the multiwalker one, so the landing check, the
+summary's *PMF in set-up* and its numbers all follow walker 1's energy file. Your force field and mdp files brought
+two more checks (§9): pdb2gmx's answers against the force field's own menus, and the time step of methods without hmr.
 
 Same branch, `cypher-batch-4`, after `bc34ce5` (batch 4's end). `matrix/` is unchanged.
 
@@ -29,10 +30,12 @@ Vitest is the check run before each commit (lint, build and every test; each com
 | R6 failures, retries, repeats, resume | `fae2f10` | +198/−29 | +347/−5 | 1318 | T219 |
 | R7a qq profiles, submit when set | `f0935ad` | +80/−9 | +51/−2 | 1324 | T206, T213 |
 | R7b the cluster tab's scripts, systems among jobs | `b7c3209` | +163/−14 | +60/−1 | 1335 | T204 |
-| R8c, R8d PMFs into the vault, their numbers | — | | | | waits for question 12 |
+| R8c, R8d PMFs into the vault, their numbers | `46d8edb` (after `ced1c87`, R8b to the multiwalker PMF) | +151/−15 | +117/−6 | 1365 | T228, T229 |
 | R9 reports | `2c6dfaa` | +326/−5 | +199/−5 | 1344 | |
 | R10 from a built system to analysis | `51f7fe1` | +34/−7 | +28/−1 | 1349 | |
-| review's fixes | the commit after `a3f14a3` | +130/−45 | +159/−7 | 1359 | T227 |
+| review's fixes | `ef7b89c` | +130/−45 | +159/−7 | 1359 | T227 |
+| R8b the landing check follows the multiwalker PMF | `ced1c87` | +61/−104 | +59/−73 | 1360 | T228 |
+| R4 pdb2gmx's answers against the force field; the time step without hmr | `dcd8253` | +262/−18 | +319/−5 | 1379 | T230, T231 |
 
 In all, `src server index.html`: 30 files, +1,518/−61; `test e2e`: 50 files, +2,705/−4. Playwright: 17 → 18 (one
 new spec: build a system from the page, follow it, read its summary, take it to analysis), all passing.
@@ -91,7 +94,8 @@ with a path template: the build's `solutions/` and `{method}/{column}/{seq}/9.mu
 Matrix's folder-pattern tokens. The batch's `matchTrajectory` reads the built tree with it. Nothing runs before run.
 
 ### R8c, R8d, R8e
-Not built: they wait for question 12. R8e (the vault stays the Matrix's) holds: nothing new writes to a vault.
+Built after question 12 (§9). R8e (the vault stays the Matrix's) holds: the PMF goes to the vault only by the AWH
+result's own send, into the project's `_inbox/`.
 
 ## 3. Real text, and what is still missing
 
@@ -165,3 +169,31 @@ d1014d7 R5b: the steps run, with fake tools answering with the notebook's own bu
 af1c154 The page's theme before the first render: no light-to-dark transition, no light chart
 73505d0 The second line of tabs as a bar: a rounded track, the current view a filled pill
 ```
+
+## 9. After your answers (questions 12 and 34, your force field and mdp files)
+
+- **Question 12: the multiwalker PMF.** The walkers share one bias (`awh-share-multisim = yes` in your
+  `awh_multi.mdp`), so `gmx awh` on walker 1's energy file gives it; 7.awh is prepared, not run. **R8b** now checks
+  where that one PMF per system would land, from `9.multiwalker/1`, instead of 7.awh and each walker as runs (T228).
+  **R8c**: once the walkers ran, the summary's *PMF in set-up* fills set-up's AWH command with walker 1's
+  `9.multiwalker.edr` and `.tpr` (offered only inside the allowed folders); its result is sent as every AWH result.
+  **R8d**: the summary shows the newest PMF's minimum, where it is and its area. They come from the Matrix's own
+  `transformXY`, `runStats` and `wellArea` (a test checks them against its `curveStats`), at walker 1's `ref_t`, and
+  the file is checked against its job's SHA-256 (T229). The e2e build test goes from the built system to set-up, runs
+  the job and reads the numbers back in the summary.
+- **Question 34: the building machine has a GPU.** Recorded (T228); the local mdrun steps take no GPU flags unless
+  the build plan's mdrun flags say so (T210).
+- **Your force field: pdb2gmx's menus** (T230). GROMACS's `filter_ter` is ported; on your `.tdb` files it gives your
+  notebook's HIS menus entry for entry. MET's menus start with the ethers' MET1 and MET2, so the plan's `1 8 0 0`
+  would cap a methionine with a methyl group. Such a sequence now stops the build, and files offers `1 8 1 1` in one
+  press. GLY and PRO keep `1 8 0 0` (GLY-NH3+, PRO-NH2+), as your termini check showed. Only the block names are in
+  the repository.
+- **Your mdp files** (T231). `pull.mdp` and `awh_multi.mdp` set `dt = 0.004`. A method without hmr would run them at
+  4 fs, and the pull and the walkers have one mdp for every method, so that is now flagged (not stopped). The upload
+  has `awh.mdp` and `awh_multi.mdp` but no `awh_hmr.mdp` or `hmr_multi.mdp`. Your notebook's run used those two (its
+  grompp warnings name them), so the plan keeps them. If your `inputs/` is the upload, set the walkers' mdp to
+  `awh_multi.mdp` and hmr's awh to `awh.mdp` in build (files will say what is missing). The mdp files are not in the
+  repository.
+- **Still waiting**: sample 6, `mdrun -v`'s own lines, for a progress bar inside each local mdrun step (or, if you
+  prefer, your notebook's own patterns, ported); samples 3, 5, 7 and 8 as before.
+- **Tests**: Vitest 1359 → 1379 passed (1 skipped); Playwright 18, all passing.
