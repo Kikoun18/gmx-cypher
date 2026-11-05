@@ -258,7 +258,7 @@ From [`batch-4.md`](batch-4.md) §6: SymBuilder inside gmx-cypher, four tabs (ho
 
 ### Phase 2: The plan, with nothing run (R3, R4)
 - [x] R3a The build model, saved build plans (frozen format fixture first): `src/lib/build/plan.ts`, `server/builds.ts`, `test/fixtures/build/build-plan-v1.json`
-- [ ] R3b The planners: every step's argv, stdin and files, golden against the notebook
+- [x] R3b The planners: every step's argv, stdin and files, golden against the notebook (with the qq script text; T222)
 - [ ] R3c Build and systems views; the preview
 - [ ] R4 Files, mdp files, force field check, settings
 
