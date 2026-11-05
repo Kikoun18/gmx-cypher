@@ -1,0 +1,20 @@
+Reading file 4.minim.tpr, VERSION 2025.4-PLUMED_spack (single precision)
+1 GPU selected for this run.
+Mapping of GPU IDs to the 1 GPU task in the 1 rank on this node:
+  PP:0
+PP tasks will do (non-perturbed) short-ranged interactions on the GPU
+PP task will update and constrain coordinates on the CPU
+Using 1 MPI process
+Using 24 OpenMP threads 
+
+
+Steepest Descents:
+   Tolerance (Fmax)   =  1.00000e+03
+   Number of steps    =         5000
+
+writing lowest energy coordinates.
+
+Steepest Descents converged to Fmax < 1000 in 635 steps
+Potential Energy  = -5.4492900e+05
+Maximum force     =  9.9165137e+02 on atom 213
+Norm of force     =  2.1648414e+01

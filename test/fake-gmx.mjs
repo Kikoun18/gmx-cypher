@@ -13,6 +13,12 @@ const FIX = new URL('./fixtures/gmx-2025.4/', import.meta.url);
 const read = name => readFileSync(new URL(name, FIX), 'utf8');
 const argv = process.argv.slice(2);
 const [tool] = argv;
+// SymBuilder's build tools (R5b) have a module of their own.
+const buildTools = await import('./fake-gmx-build.mjs');
+if (buildTools.isBuild(tool, argv) && argv[1] !== '-h') {
+  buildTools.exitWhenWritten((await buildTools.build(tool, argv)) ?? 0);
+  await new Promise(() => {}); // the exit above ends it; nothing below runs
+}
 const banner = t => '                       :-) GROMACS - gmx ' + t + ', 2025.4-PLUMED_spack (-:\n\nExecutable:   ' + process.argv[1]
   + '\nData prefix:  /opt/gromacs-2025.4\nWorking dir:  ' + process.cwd() + '\nCommand line:\n  ' + commandLine() + '\n\n';
 const quote = '\nGROMACS reminds you: "Is This the Right Room for an Argument ?" (Monty Python)\n\n';

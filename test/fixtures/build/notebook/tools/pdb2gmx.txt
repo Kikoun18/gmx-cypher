@@ -1,0 +1,259 @@
+               :-) GROMACS - gmx pdb2gmx, 2025.4-PLUMED_spack (-:
+
+Executable:   /opt/gromacs-2025.4/bin/gmx_mpi
+Data prefix:  /opt/gromacs-2025.4
+Working dir:  /storage/brno/you/02_evomd/innit_tests/ff
+Command line:
+  gmx_mpi pdb2gmx -f hhhhhhhh.gro -v -ignh -i ../solutions/hmr+fast+6/o111/hhhhhhhh/hhhhhhhh_restraints.itp -p ../solutions/hmr+fast+6/o111/hhhhhhhh/hhhhhhhh.top -o ../solutions/hmr+fast+6/o111/hhhhhhhh/pre.gro -ter
+
+Opening force field file ./charmm36s-jul2022-prosECCo75.ff/watermodels.dat
+Opening force field file ./charmm36s-jul2022-prosECCo75.ff/aminoacids.r2b
+Opening force field file ./charmm36s-jul2022-prosECCo75.ff/carb.r2b
+Opening force field file ./charmm36s-jul2022-prosECCo75.ff/cgenff.r2b
+Opening force field file ./charmm36s-jul2022-prosECCo75.ff/ethers.r2b
+Opening force field file ./charmm36s-jul2022-prosECCo75.ff/lipid.r2b
+Opening force field file ./charmm36s-jul2022-prosECCo75.ff/metals.r2b
+Opening force field file ./charmm36s-jul2022-prosECCo75.ff/na.r2b
+Opening force field file ./charmm36s-jul2022-prosECCo75.ff/silicates.r2b
+Opening force field file ./charmm36s-jul2022-prosECCo75.ff/solvent.r2b
+No occupancies in hhhhhhhh.gro
+Opening force field file ./charmm36s-jul2022-prosECCo75.ff/atomtypes.atp
+Opening force field file ./charmm36s-jul2022-prosECCo75.ff/aminoacids.rtp
+Opening force field file ./charmm36s-jul2022-prosECCo75.ff/carb.rtp
+Opening force field file ./charmm36s-jul2022-prosECCo75.ff/cgenff.rtp
+Opening force field file ./charmm36s-jul2022-prosECCo75.ff/ethers.rtp
+Opening force field file ./charmm36s-jul2022-prosECCo75.ff/lipid.rtp
+Opening force field file ./charmm36s-jul2022-prosECCo75.ff/metals.rtp
+Opening force field file ./charmm36s-jul2022-prosECCo75.ff/na.rtp
+Opening force field file ./charmm36s-jul2022-prosECCo75.ff/silicates.rtp
+Opening force field file ./charmm36s-jul2022-prosECCo75.ff/solvent.rtp
+Opening force field file ./charmm36s-jul2022-prosECCo75.ff/aminoacids.hdb
+Opening force field file ./charmm36s-jul2022-prosECCo75.ff/carb.hdb
+Opening force field file ./charmm36s-jul2022-prosECCo75.ff/cgenff.hdb
+Opening force field file ./charmm36s-jul2022-prosECCo75.ff/ethers.hdb
+Opening force field file ./charmm36s-jul2022-prosECCo75.ff/lipid.hdb
+Opening force field file ./charmm36s-jul2022-prosECCo75.ff/metals.hdb
+Opening force field file ./charmm36s-jul2022-prosECCo75.ff/na.hdb
+Opening force field file ./charmm36s-jul2022-prosECCo75.ff/silicates.hdb
+Opening force field file ./charmm36s-jul2022-prosECCo75.ff/solvent.hdb
+Opening force field file ./charmm36s-jul2022-prosECCo75.ff/aminoacids.n.tdb
+Opening force field file ./charmm36s-jul2022-prosECCo75.ff/carb.n.tdb
+Opening force field file ./charmm36s-jul2022-prosECCo75.ff/cgenff.n.tdb
+Opening force field file ./charmm36s-jul2022-prosECCo75.ff/ethers.n.tdb
+Opening force field file ./charmm36s-jul2022-prosECCo75.ff/lipid.n.tdb
+Opening force field file ./charmm36s-jul2022-prosECCo75.ff/metals.n.tdb
+Opening force field file ./charmm36s-jul2022-prosECCo75.ff/na.n.tdb
+Opening force field file ./charmm36s-jul2022-prosECCo75.ff/silicates.n.tdb
+Opening force field file ./charmm36s-jul2022-prosECCo75.ff/solvent.n.tdb
+Opening force field file ./charmm36s-jul2022-prosECCo75.ff/aminoacids.c.tdb
+Opening force field file ./charmm36s-jul2022-prosECCo75.ff/carb.c.tdb
+Opening force field file ./charmm36s-jul2022-prosECCo75.ff/cgenff.c.tdb
+Opening force field file ./charmm36s-jul2022-prosECCo75.ff/ethers.c.tdb
+Opening force field file ./charmm36s-jul2022-prosECCo75.ff/lipid.c.tdb
+Opening force field file ./charmm36s-jul2022-prosECCo75.ff/metals.c.tdb
+Opening force field file ./charmm36s-jul2022-prosECCo75.ff/na.c.tdb
+Opening force field file ./charmm36s-jul2022-prosECCo75.ff/silicates.c.tdb
+Opening force field file ./charmm36s-jul2022-prosECCo75.ff/solvent.c.tdb
+Analysing hydrogen-bonding network for automated assignment of histidine
+ protonation. 24 donors and 7 acceptors were found.
+There are 14 hydrogen bonds
+Will use HISE for residue 1
+Will use HISE for residue 2
+Will use HISE for residue 3
+Will use HISE for residue 4
+Will use HISE for residue 5
+Will use HISE for residue 6
+Will use HISE for residue 7
+Will use HISE for residue 8
+9 out of 9 lines of specbond.dat converted successfully
+Special Atom Distance matrix:
+                    HIS1    HIS2    HIS3    HIS4    HIS5    HIS6    HIS7
+                   NE210   NE220   NE230   NE240   NE250   NE260   NE270
+    HIS2   NE220   1.049
+    HIS3   NE230   0.721   1.049
+    HIS4   NE240   1.463   0.721   1.049
+    HIS5   NE250   1.441   1.462   0.720   1.049
+    HIS6   NE260   2.053   1.441   1.462   0.720   1.049
+    HIS7   NE270   2.161   2.053   1.441   1.462   0.721   1.049
+    HIS8   NE280   2.707   2.162   2.053   1.441   1.463   0.721   1.049
+Opening force field file ./charmm36s-jul2022-prosECCo75.ff/aminoacids.arn
+Before cleaning: 335 pairs
+Before cleaning: 375 dihedrals
+Note that more recent versions of the CHARMM force field may be downloaded from
+http://mackerell.umaryland.edu/charmm_ff.shtml#gromacs.
+
+Select the Force Field:
+
+From current directory:
+
+ 1: CHARMM all-atom force field
+
+From '/opt/gromacs-2025.4/share/gromacs/top':
+
+ 2: AMBER03 protein, nucleic AMBER94 (Duan et al., J. Comp. Chem. 24, 1999-2012, 2003)
+
+ 3: AMBER94 force field (Cornell et al., JACS 117, 5179-5197, 1995)
+
+ 4: AMBER96 protein, nucleic AMBER94 (Kollman et al., Acc. Chem. Res. 29, 461-469, 1996)
+
+ 5: AMBER99 protein, nucleic AMBER94 (Wang et al., J. Comp. Chem. 21, 1049-1074, 2000)
+
+ 6: AMBER99SB protein, nucleic AMBER94 (Hornak et al., Proteins 65, 712-725, 2006)
+
+ 7: AMBER99SB-ILDN protein, nucleic AMBER94 (Lindorff-Larsen et al., Proteins 78, 1950-58, 2010)
+
+ 8: AMBERGS force field (Garcia & Sanbonmatsu, PNAS 99, 2782-2787, 2002)
+
+ 9: CHARMM27 all-atom force field (CHARM22 plus CMAP for proteins)
+
+10: GROMOS96 43a1 force field
+
+11: GROMOS96 43a2 force field (improved alkane dihedrals)
+
+12: GROMOS96 45a3 force field (Schuler JCC 2001 22 1205)
+
+13: GROMOS96 53a5 force field (JCC 2004 vol 25 pag 1656)
+
+14: GROMOS96 53a6 force field (JCC 2004 vol 25 pag 1656)
+
+15: GROMOS96 54a7 force field (Eur. Biophys. J. (2011), 40,, 843-856, DOI: 10.1007/s00249-011-0700-9)
+
+16: OPLS-AA/L all-atom force field (2001 aminoacid dihedrals)
+
+Using the Charmm36s-jul2022-prosECCo75 force field in directory ./charmm36s-jul2022-prosECCo75.ff
+
+Select the Water Model:
+
+ 1: TIP3P      CHARMM-modified TIP3P water model (recommended over original TIP3P)
+
+ 2: TIP3P_ORIGINAL Original TIP3P water model
+
+ 3: SPC        SPC water model
+
+ 4: SPCE       SPC/E water model
+
+ 5: TIP5P      TIP5P water model
+
+ 6: TIP4P      TIP4P water model
+
+ 7: TIP4PEW    TIP4P/Ew water model
+
+ 8: None
+
+going to rename ./charmm36s-jul2022-prosECCo75.ff/aminoacids.r2b
+
+going to rename ./charmm36s-jul2022-prosECCo75.ff/carb.r2b
+
+going to rename ./charmm36s-jul2022-prosECCo75.ff/cgenff.r2b
+
+going to rename ./charmm36s-jul2022-prosECCo75.ff/ethers.r2b
+
+going to rename ./charmm36s-jul2022-prosECCo75.ff/lipid.r2b
+
+going to rename ./charmm36s-jul2022-prosECCo75.ff/metals.r2b
+
+going to rename ./charmm36s-jul2022-prosECCo75.ff/na.r2b
+
+going to rename ./charmm36s-jul2022-prosECCo75.ff/silicates.r2b
+
+going to rename ./charmm36s-jul2022-prosECCo75.ff/solvent.r2b
+Reading hhhhhhhh.gro...
+Read 'Generated by trjconv', 81 atoms
+
+Analyzing pdb file
+Splitting chemical chains based on TER records or chain id changing.
+
+There are 1 chains and 0 blocks of water and 8 residues with 81 atoms
+
+  chain  #res #atoms
+
+  1 ' '     8     81  
+
+No occupancies in hhhhhhhh.gro
+
+Reading residue database... (Charmm36s-jul2022-prosECCo75)
+
+Processing chain 1 (81 atoms, 8 residues)
+
+Identified residue HIS1 as a starting terminus.
+
+Identified residue HIS8 as a ending terminus.
+
+Changing rtp entry of residue 1 HIS to 'HSE'
+
+Changing rtp entry of residue 2 HIS to 'HSE'
+
+Changing rtp entry of residue 3 HIS to 'HSE'
+
+Changing rtp entry of residue 4 HIS to 'HSE'
+
+Changing rtp entry of residue 5 HIS to 'HSE'
+
+Changing rtp entry of residue 6 HIS to 'HSE'
+
+Changing rtp entry of residue 7 HIS to 'HSE'
+
+Changing rtp entry of residue 8 HIS to 'HSE'
+Select start terminus type for HIS-1
+ 0: NH3+
+ 1: NH2
+ 2: HYD1
+ 3: MET1
+ 4: 5TER
+ 5: 5MET
+ 6: 5PHO
+ 7: 5POM
+ 8: None
+Start terminus HIS-1: NH3+
+Select end terminus type for HIS-8
+ 0: COO-
+ 1: COOH
+ 2: CT2
+ 3: CT1
+ 4: HYD2
+ 5: MET2
+ 6: 3TER
+ 7: None
+End terminus HIS-8: COO-
+
+Deleting atom 'OXT' in residue 'HSE' 8
+
+Deleting atom 'OXT' in residue 'HSE' 8
+
+Checking for duplicate atoms....
+
+Generating any missing hydrogen atoms and/or adding termini.
+
+Now there are 8 residues with 139 atoms
+
+Making bonds...
+
+Number of bonds was 146, now 146
+
+Generating angles, dihedrals and pairs...
+
+Making cmap torsions...
+
+There are    6 cmap torsion pairs
+
+There are  375 dihedrals,   63 impropers,  251 angles
+           335 pairs,      146 bonds and     0 virtual sites
+
+Total
+GROMACS reminds you: "I didn't want to just know names of things. I remember really wanting to know how it all worked." (Elizabeth Blackburn)
+
+ mass 1115.155 a.m.u.
+
+Total charge 0.000 e
+
+Writing topology
+
+Writing coordinate file...
+
+		--------- PLEASE NOTE ------------
+
+You have successfully generated a topology from: hhhhhhhh.gro.
+
+The Charmm36s-jul2022-prosECCo75 force field is used.
+
+		--------- ETON ESAELP ------------

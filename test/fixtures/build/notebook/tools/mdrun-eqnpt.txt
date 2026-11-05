@@ -1,0 +1,31 @@
+Reading file 6.eqnpt.tpr, VERSION 2025.4-PLUMED_spack (single precision)
+Changing nstlist from 20 to 100, rlist from 1.214 to 1.394
+
+1 GPU selected for this run.
+Mapping of GPU IDs to the 2 GPU tasks in the 1 rank on this node:
+  PP:0,PME:0
+PP tasks will do (non-perturbed) short-ranged interactions on the GPU
+PP task will update and constrain coordinates on the CPU
+PME tasks will do all aspects on the GPU
+Using 1 MPI process
+Using 12 OpenMP threads 
+
+starting mdrun 'o111 with hhhhhhhh system in water'
+200000 steps,    200.0 ps.
+
+step 15300: timed with pme grid 60 60 60, coulomb cutoff 1.200: 118.9 M-cycles
+
+step 15500: timed with pme grid 52 52 52, coulomb cutoff 1.346: 141.7 M-cycles
+
+step 15700: timed with pme grid 56 56 56, coulomb cutoff 1.250: 131.2 M-cycles
+
+step 15900: timed with pme grid 60 60 60, coulomb cutoff 1.200: 122.7 M-cycles
+
+              optimal pme grid 60 60 60, coulomb cutoff 1.200
+
+Writing final coordinates.
+
+               Core t (s)   Wall t (s)        (%)
+       Time:      786.513       65.556     1199.8
+                 (ns/day)    (hour/ns)
+Performance:      263.592        0.091

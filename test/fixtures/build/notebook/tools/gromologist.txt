@@ -1,0 +1,7 @@
+Gromacs files found in directory /opt/gromacs-2025.4/share/gromacs/top
+Keeping all conditional (#ifdef/#endif) sections, this might lead to issues if sections are being merged or moved around - look out for messages & check your topology afterwards!
+Merging sections [Subsection dihedraltypes with interaction type 9, Subsection dihedraltypes with interaction type 9, Subsection dihedraltypes with interaction type - 1, Subsection dihedraltypes with interaction type 2] together
+Merging sections [Subsection atomtypes with interaction type - 1, Subsection atomtypes with interaction type - 1, Subsection atomtypes with interaction type - 1] together
+Subection position_restraints-185 in molecule CARB recognized as conditional
+Subection dihedral_restraints-88 in molecule CARB recognized as conditional
+Subection position_restraints-186 in molecule Protein recognized as conditional

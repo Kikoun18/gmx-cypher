@@ -1,0 +1,63 @@
+WARNING 1 [file ADDff.itp, line 7]:
+  Atomtype OC311 was defined previously (e.g. in the forcefield files), and
+  has now been defined again. This could happen e.g. if you would use a
+  self-contained molecule .itp file that duplicates or replaces the
+  contents of the standard force-field files. You should check the contents
+  of your files and remove such repetition. If you know you should override
+  the previous definition, then you could choose to suppress this warning
+  with -maxwarn.
+
+
+WARNING 2 [file ADDff.itp, line 8]:
+  Atomtype HCP1 was defined previously (e.g. in the forcefield files), and
+  has now been defined again. This could happen e.g. if you would use a
+  self-contained molecule .itp file that duplicates or replaces the
+  contents of the standard force-field files. You should check the contents
+  of your files and remove such repetition. If you know you should override
+  the previous definition, then you could choose to suppress this warning
+  with -maxwarn.
+
+Generating 1-4 interactions: fudge = 1
+Number of degrees of freedom in T-Coupling group rest is 67471.00
+The integrator does not provide a ensemble temperature, there is no system ensemble temperature
+
+NOTE 1 [file /storage/brno/you/02_evomd/innit_tests/inputs/minim.mdp]:
+  Removing center of mass motion in the presence of position restraints
+  might cause artifacts. When you are using position restraints to
+  equilibrate a macro-molecule, the artifacts are usually negligible.
+
+
+There was 1 NOTE
+
+There were 2 WARNINGs
+Setting the LD random seed to -6686773
+
+Generated 174936 of the 174936 non-bonded parameter combinations
+
+Generated 124458 of the 174936 1-4 parameter combinations
+
+Excluding 3 bonded neighbours molecule type 'CARB'
+
+turning H bonds into constraints...
+
+Excluding 3 bonded neighbours molecule type 'Protein'
+
+turning H bonds into constraints...
+
+Excluding 2 bonded neighbours molecule type 'TIP3F'
+
+turning H bonds into constraints...
+Analysing residue names:
+There are:     5      Other residues
+There are:     8    Protein residues
+There are: 11140      Water residues
+Analysing residues not classified as Protein/DNA/RNA/Water and splitting into groups...
+Analysing Protein...
+
+The largest distance between excluded atoms is 0.386 nm between atom 80 and 87
+Calculating fourier grid dimensions for X Y Z
+Using a fourier grid of 60x60x60, spacing 0.117 0.117 0.117
+
+Estimate for the relative computational load of the PME mesh part: 0.21
+
+This run will generate roughly 3 Mb of data

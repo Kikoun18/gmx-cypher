@@ -16,7 +16,7 @@ import { NAMES, systemsOf, type BuildPlan, type Systems, type System } from '../
 import { PROFILES, qqScript, type Profile } from '../src/lib/build/qq';
 import { planSystem, type Step } from '../src/lib/build/steps';
 import { carbGroup, hmrTopology, ionCounts, mergeGro, moleculetype, netCharge, pullx, renameWater, topologyText, walkerFrames, waters } from '../src/lib/build/text';
-import type { JobStatus } from './jobs';
+import type { Job, JobStatus, Jobs } from './jobs';
 
 export const BUILD_FORMAT = 'gmx-cypher build', BUILD_VERSION = 1;
 
@@ -93,6 +93,8 @@ const inside = (child: string, parent: string) => child === parent || child.star
 export function sha256File(path: string): Promise<string> {
   return new Promise((done, fail) => { const h = createHash('sha256'); createReadStream(path).on('data', d => h.update(d)).on('error', fail).on('end', () => done(h.digest('hex'))); });
 }
+
+const CLUSTER = ['awh', 'pull', 'walkers'];
 
 class Stop extends Error {
   readonly status: 'failed' | 'cancelled' | 'cluster';
@@ -212,7 +214,8 @@ export class Builder extends EventEmitter {
         if (step.resolves?.includes('tmp')) values.tmp = mkdtempSync(join(tmpdir(), 'gmx-cypher-charge-'));
         s.step = i; s.label = step.label; s.stage = step.stage; this.save(run);
         const r = await this.step(run, plan, sys, step, i, values, record);
-        if (step.where === 'cluster' && step.label === 'qq script') cluster = true;
+        // awh, the pull and the walkers run on the cluster; min, nvt and npt get a script too, but run here.
+        if (step.label === 'qq script' && CLUSTER.includes(step.stage)) cluster = true;
         if (r.net != null) values.net = String(r.net);
         s.step = i + 1;
       }
@@ -252,10 +255,12 @@ export class Builder extends EventEmitter {
       if (existsSync(a) && !ours && !(inside(a, scripts) && step.label === 'qq script'))
         throw stop('failed', p + ' exists, and this build did not write it: nothing is ' + (step.replaces.includes(p) ? 'replaced' : 'overwritten'), true);
     }
-    if (!existsSync(cwd)) {
-      if (!inside(cwd, root)) throw stop('failed', 'no folder ' + step.cwd);
+    // Its folder and its outputs' folders (visualization/, 8.pull/), inside the system's folder, created by the build.
+    for (const dir of [cwd, ...step.writes.filter(p => !p.startsWith('scripts/')).map(p => dirname(abs(p)))]) {
+      if (existsSync(dir)) continue;
+      if (!inside(dir, root)) throw stop('failed', 'no folder ' + relative(base, dir));
       const missing: string[] = [];
-      for (let d = cwd; !existsSync(d); d = dirname(d)) missing.unshift(d);
+      for (let d = dir; !existsSync(d); d = dirname(d)) missing.unshift(d);
       for (const d of missing) { mkdirSync(d); record.folders.push(relative(base, d)); }
     }
     const before = new Set(backupsOf(step, base));
@@ -279,7 +284,11 @@ export class Builder extends EventEmitter {
         if (fatal) throw stop('failed', fatal);
         // Strict mode stops on any non-zero exit; off, only GROMACS's fatal text does (the notebook's STRICT=False).
         // python is not GROMACS: its failure stops the system either way.
-        if (r.status !== 'done' && (plan.science.strict || step.program === 'python' || r.code == null)) throw stop('failed', r.error ?? 'exit ' + r.code);
+        if (r.status !== 'done' && (plan.science.strict || step.program === 'python' || r.code == null)) {
+          // python's own last line says why (a traceback's), gmx's error is its fatal block or its exit.
+          const last = step.program === 'python' ? r.log.trim().split('\n').pop() : undefined;
+          throw stop('failed', (last ? last + ' (exit ' + r.code + ')' : r.error) ?? 'exit ' + r.code);
+        }
         if (step.label === 'grompp before the salt') net = netCharge(r.log);
         if (step.tile === 'charge') record.notes.push('net charge after npt: ' + netCharge(r.log).toFixed(2) + ' e');
         break;
@@ -292,7 +301,7 @@ export class Builder extends EventEmitter {
           mkdirSync(dirname(from), { recursive: true });
           try { writeFileSync(from, s.text, { flag: 'wx', mode: 0o755 }); record.files[argv[0]] = await fileRecord(from, i); }
           catch { record.notes.push(argv[0] + ' exists: kept, and used'); }
-          record.submit.push(s.submit);
+          if (CLUSTER.includes(step.stage)) record.submit.push(s.submit);
         }
         if (!existsSync(from)) throw stop('failed', 'no ' + argv[0]);
         copyFileSync(from, to, constants.COPYFILE_EXCL);
@@ -362,4 +371,25 @@ function backupsOf(step: Step, base: string): string[] {
     for (const f of readdirSync(dir)) if (f.startsWith('#' + name + '.') && f.endsWith('#')) out.push(relative(base, join(dir, f)));
   }
   return out;
+}
+
+/** Steps run as jobs of the build's own list (T217): each its own process group, its log kept, cancel as for jobs. */
+export function jobsExec(jobs: Jobs): { exec: Exec; cancel: (id: string) => void } {
+  return {
+    exec: spec => {
+      const j = jobs.start({ kind: 'build', title: spec.title, file: spec.file, args: spec.args, cwd: spec.cwd, env: spec.env, meta: spec.meta, ...(spec.stdin != null ? { stdin: spec.stdin } : {}) });
+      const done = new Promise<{ status: JobStatus; code: number | null; log: string; error?: string }>(resolve => {
+        const end = (x: Job) => {
+          if (x.id !== j.id || !x.ended) return;
+          jobs.off('job', end);
+          resolve({ status: x.status, code: x.exit?.code ?? null, log: jobs.logText(x.id), ...(x.error ? { error: x.error } : {}) });
+        };
+        jobs.on('job', end);
+        const now = jobs.get(j.id);
+        if (now) end(now);
+      });
+      return { id: j.id, done };
+    },
+    cancel: id => jobs.cancel(id),
+  };
 }

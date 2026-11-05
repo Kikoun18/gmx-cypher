@@ -1,0 +1,48 @@
+              :-) GROMACS - gmx editconf, 2025.4-PLUMED_spack (-:
+
+Executable:   /opt/gromacs-2025.4/bin/gmx_mpi
+Data prefix:  /opt/gromacs-2025.4
+Working dir:  /storage/brno/you/02_evomd/innit_tests/solutions/hmr+fast+6/o111/hhhhhhhh
+Command line:
+  gmx_mpi editconf -f pre.gro -o pre_princ.gro -princ
+
+
+Select group for the determining the orientation
+Group     0 (         System) has   139 elements
+Group     1 (        Protein) has   139 elements
+Group     2 (      Protein-H) has    81 elements
+Group     3 (        C-alpha) has     8 elements
+Group     4 (       Backbone) has    24 elements
+Group     5 (      MainChain) has    31 elements
+Group     6 (   MainChain+Cb) has    39 elements
+Group     7 (    MainChain+H) has    41 elements
+Group     8 (      SideChain) has    98 elements
+Group     9 (    SideChain-H) has    50 elements
+Select a group: 
+GROMACS reminds you: "I didn't want to just know names of things. I remember really wanting to know how it all worked." (Elizabeth Blackburn)
+
+Note that major changes are planned in future for editconf, to improve usability and utility.
+Read 139 atoms
+Volume: 1 nm^3, corresponds to roughly 400 electrons
+No velocities found
+    system size :  2.940  2.011  0.615 (nm)
+    center      :  0.495  0.496  0.495 (nm)
+    box vectors :  1.000  1.000  1.000 (nm)
+    box angles  :  90.00  90.00  90.00 (degrees)
+    box volume  :   1.00               (nm^3)
+
+WARNING: Masses and atomic (Van der Waals) radii will be guessed
+         based on residue and atom names, since they could not be
+         definitively assigned from the information in your input
+         files. These guessed numbers might deviate from the mass
+         and radius of the atom type. Please check the output
+         files if necessary. Note, that this functionality may
+         be removed in a future GROMACS version. Please, consider
+         using another file format for your input.
+
+Selected 0: 'System'
+new system size :  3.002  1.250  0.326
+new center      :  0.487  0.519  0.500 (nm)
+new box vectors :  1.000  1.000  1.000 (nm)
+new box angles  :  90.00  90.00  90.00 (degrees)
+new box volume  :   1.00               (nm^3)

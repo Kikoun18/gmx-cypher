@@ -1,0 +1,47 @@
+               :-) GROMACS - gmx trjconv, 2025.4-PLUMED_spack (-:
+
+Executable:   /opt/gromacs-2025.4/bin/gmx_mpi
+Data prefix:  /opt/gromacs-2025.4
+Working dir:  /storage/brno/you/02_evomd/innit_tests/solutions/hmr+fast+6/o111/hhhhhhhh
+Command line:
+  gmx_mpi trjconv -f ./hhhhhhhh.pdb -s ./hhhhhhhh.pdb -o hhhhhhhh.gro -center -box 1 1 1
+
+Will write gro: Coordinate file in Gromos-87 format
+Group     0 (         System) has   139 elements
+Group     1 (        Protein) has   139 elements
+Group     2 (      Protein-H) has    81 elements
+Group     3 (        C-alpha) has     8 elements
+Group     4 (       Backbone) has    24 elements
+Group     5 (      MainChain) has    33 elements
+Group     6 (   MainChain+Cb) has    41 elements
+Group     7 (    MainChain+H) has    41 elements
+Group     8 (      SideChain) has    98 elements
+Group     9 (    SideChain-H) has    48 elements
+Select a group: Group     0 (         System) has   139 elements
+Group     1 (        Protein) has   139 elements
+Group     2 (      Protein-H) has    81 elements
+Group     3 (        C-alpha) has     8 elements
+Group     4 (       Backbone) has    24 elements
+Group     5 (      MainChain) has    33 elements
+Group     6 (   MainChain+Cb) has    41 elements
+Group     7 (    MainChain+H) has    41 elements
+Group     8 (      SideChain) has    98 elements
+Group     9 (    SideChain-H) has    48 elements
+Select a group: Reading frames from pdb file
+Reading frame       0 time    0.000   
+Precision of ./hhhhhhhh.pdb is 0.0001 (nm)
+ '', 139 atoms
+
+Last frame          0 time    0.000   
+ ->  frame      0 time    0.000      
+Last written: frame      0 time    0.000
+
+
+GROMACS reminds you: "The aim of science is not to open the door to infinite wisdom, but to set a limit to infinite error." (Bertolt Brecht, Life of Galileo)
+
+Note that major changes are planned in future for trjconv, to improve usability and utility.
+Select group for centering
+Selected 0: 'System'
+Select group for output
+Selected 0: 'System'
+Buildingo111: 
