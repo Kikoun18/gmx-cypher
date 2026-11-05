@@ -4,7 +4,10 @@
 
 import { readFileSync, realpathSync, statSync } from 'node:fs';
 import { extname, isAbsolute, join, normalize } from 'node:path';
+import { mergeSettings } from '../../matrix/src/lib/seq';
+import type { Store } from '../../matrix/src/lib/types';
 import { inputsOf, type Input } from '../src/lib/build/inputs';
+import { systemLanding, type FolderLanding } from '../src/lib/build/landing';
 import { nameProblem, planProblems, systemsOf, type BuildPlan, type Systems } from '../src/lib/build/plan';
 import { within } from './files';
 import { HttpError } from './http';
@@ -21,11 +24,20 @@ export function baseFolder(base: string | null, roots: string[]): string {
 
 const exists = (p: string) => { try { return statSync(p).isFile(); } catch { return false; } };
 
-export function checkInputs(base: string, plan: unknown, systems: Systems): { base: string; files: (Input & { found: boolean })[]; missing: Record<string, string[]> } {
+/** A plan and systems from the page, checked: a build plan, and every name one that can be a folder. */
+function checked(plan: unknown, systems: Systems): BuildPlan {
   const problems = planProblems(plan);
   if (problems.length) throw new HttpError(400, problems.join('; '));
-  for (const [kind, names] of [['method', systems.methods], ['saccharide', systems.saccharides], ['sequence', systems.sequences]] as const)
-    for (const n of names) { const p = nameProblem(kind, n); if (p) throw new HttpError(400, p); }
+  if (!systems || typeof systems !== 'object') throw new HttpError(400, 'no systems');
+  for (const [kind, names] of [['method', systems.methods], ['saccharide', systems.saccharides], ['sequence', systems.sequences]] as const) {
+    if (!Array.isArray(names)) throw new HttpError(400, 'no ' + kind + ' list');
+    for (const n of names) { const p = nameProblem(kind, String(n)); if (p) throw new HttpError(400, p); }
+  }
+  return plan as BuildPlan;
+}
+
+export function checkInputs(base: string, plan: unknown, systems: Systems): { base: string; files: (Input & { found: boolean })[]; missing: Record<string, string[]> } {
+  checked(plan, systems);
   const files = new Map<string, Input & { found: boolean }>(), missing: Record<string, string[]> = {};
   for (const sys of systemsOf(systems)) {
     for (const i of inputsOf(plan as BuildPlan, sys)) {
@@ -34,6 +46,19 @@ export function checkInputs(base: string, plan: unknown, systems: Systems): { ba
     }
   }
   return { base, files: [...files.values()], missing };
+}
+
+/** The most systems a landing check reads (the preview lists 200). */
+export const LANDING_MAX = 200;
+/**
+ * Where each system's PMFs would land in the connected project (R8b): the project read, nothing written. `base` is
+ * the base folder as set (the folders a header would carry), or none.
+ */
+export function checkLanding(read: { store: Store; state: { project: { name: string } } }, plan: unknown, systems: Systems, base: string | null) {
+  const p = checked(plan, systems), all = systemsOf(systems), st = mergeSettings({}, read.store.settings);
+  const out: Record<string, FolderLanding[]> = {};
+  for (const sys of all.slice(0, LANDING_MAX)) out[sys.dir] = systemLanding(read.store, p, sys, base);
+  return { project: { name: read.state.project.name, pattern: st.pattern, pathPattern: st.pathPattern }, systems: out, more: Math.max(0, all.length - LANDING_MAX) };
 }
 
 const TEXT = ['.mdp', '.itp', '.top'];

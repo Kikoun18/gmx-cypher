@@ -20,7 +20,7 @@ import { Batches, checkRunInputs, findTrajectories, sendAll } from './batch';
 import { Cluster } from './cluster';
 import { listRecipes, readRecipe, saveRecipe } from './recipes';
 import { listPlans, readPlan, savePlan } from './builds';
-import { baseFolder, checkInputs as checkBuildInputs, readText } from './build-check';
+import { baseFolder, checkInputs as checkBuildInputs, checkLanding, readText } from './build-check';
 import type { Systems } from '../src/lib/build/plan';
 import { recipeFileProblems, type Recipe } from '../src/lib/recipe';
 import { cpus } from 'node:os';
@@ -247,6 +247,12 @@ export function makeApi(ctx: Ctx): Api {
       return { body: await sendAll(ctx, b, (await readJson<{ project: string }>(req)).project) };
     }
     if (is(req, 'POST', url, '/api/build/check')) { const b = await readJson<{ plan: unknown; systems: Systems }>(req); return { body: checkBuildInputs(baseFolder(ctx.config.base, ctx.config.allow), b.plan, b.systems) }; }
+    if (is(req, 'POST', url, '/api/build/landing')) {
+      if (!ctx.config.vault || !ctx.config.project) throw new HttpError(409, 'connect a project in settings → vault to see where each system lands');
+      const v = await openVault(ctx.config.vault), b = await readJson<{ plan: unknown; systems: Systems }>(req);
+      if (!(await listProjects(v)).some(p => p.id === ctx.config.project)) throw new HttpError(404, 'no project ' + ctx.config.project + ' in the vault');
+      return { body: checkLanding(await readProject(v, ctx.config.project), b.plan, b.systems, ctx.config.base ?? null) };
+    }
     if (is(req, 'GET', url, '/api/build/text')) return { body: { text: readText(baseFolder(ctx.config.base, ctx.config.allow), url.searchParams.get('path') ?? '') } };
     if (is(req, 'GET', url, '/api/builds')) return { body: listPlans(ctx.home) };
     if (is(req, 'POST', url, '/api/builds')) return { body: savePlan(ctx.home, await readJson(req), url.searchParams.get('replace') === '1') };

@@ -1,6 +1,8 @@
 import * as React from 'react'
 import { X } from 'lucide-react'
+import type { BuildLanding } from '../buildCheck'
 import type { BuildDraft, IfExists } from '../buildDraft'
+import type { FolderLanding } from '../lib/build/landing'
 import { nameProblem, repeatName, STAGES, switches, systemsOf, type Systems } from '../lib/build/plan'
 import { systemsFromProject, type ProjectLike } from '../lib/build/project'
 import { orderProblems, planSystem } from '../lib/build/steps'
@@ -57,8 +59,30 @@ function FromProject({ project, systems, set }: { project: ProjectLike | null; s
   )
 }
 
+const runList = (ns: number[]) => {
+  const out: string[] = []
+  for (let i = 0; i < ns.length; i++) { let j = i; while (j + 1 < ns.length && ns[j + 1] === ns[j] + 1) j++; out.push(j > i ? ns[i] + '–' + ns[j] : String(ns[i])); i = j }
+  return out.join(', ')
+}
+/** Where one system's PMFs would land (R8b): the first problem in words, or the row, column and runs. */
+export function InProject({ folders }: { folders: FolderLanding[] | undefined }) {
+  if (!folders) return <span />
+  if (!folders.length) return <span className="text-muted-foreground">no awh or walkers in this build</span>
+  // One problem is often every folder's (a new row, a column): each is said once, with where when not everywhere.
+  const all = [...new Set(folders.flatMap(f => f.problems))]
+  if (all.length) {
+    const at = folders.filter(f => f.problems.includes(all[0])), where = at.length === folders.length ? '' : (at[0].what === 'awh' ? '7.awh' : 'walker ' + at[0].n) + ': '
+    return <Status inline level="error" word="elsewhere">{where}{all[0]}{all.length > 1 ? ' · and ' + (all.length - 1) + ' more' : ''}</Status>
+  }
+  const f = folders[0], awh = folders.filter(x => x.what === 'awh').map(x => x.run), walkers = folders.filter(x => x.what === 'walker').map(x => x.run)
+  const runs = [awh.length ? 'run ' + awh[0] : '', walkers.length ? 'walkers ' + runList(walkers) : ''].filter(Boolean).join(', ')
+  const text = f.row + (f.rowNew ? ' (new row)' : '') + ' · ' + f.col + (f.colNew ? ' (new column)' : '') + ' · ' + runs
+  const replaced = folders.filter(x => x.replaces).map(x => x.run)
+  return replaced.length ? <Status inline level="warning" word="replaces">{text} · replaces {replaced.length === 1 ? 'run' : 'runs'} {runList([...new Set(replaced)].sort((a, b) => a - b))}</Status> : <Status inline level="ok" word="lands">{text}</Status>
+}
+
 /** symbuilder · systems (R3c): methods × saccharides × sequences, repeats, and a preview of every system before anything runs. */
-export function SystemsView({ draft, setDraft, missing = null, project = null }: { draft: BuildDraft; setDraft: React.Dispatch<React.SetStateAction<BuildDraft>>; missing?: Record<string, string[]> | null; project?: ProjectLike | null }) {
+export function SystemsView({ draft, setDraft, missing = null, project = null, landing = null }: { draft: BuildDraft; setDraft: React.Dispatch<React.SetStateAction<BuildDraft>>; missing?: Record<string, string[]> | null; project?: ProjectLike | null; landing?: BuildLanding | null }) {
   // A name added to a list drops `only` (the cells the project lacks): the new name has no cell listed.
   const grows = (o: Systems, patch: Partial<Systems>) => (['methods', 'saccharides', 'sequences'] as const).some(k => patch[k]?.some(v => !o[k].includes(v)))
   const s = draft.systems, all = systemsOf(s), set = (patch: Partial<Systems>) => setDraft(d => {
@@ -70,9 +94,10 @@ export function SystemsView({ draft, setDraft, missing = null, project = null }:
   const plan = draft.plan, scripted = plan.stages.filter(x => x.on && x.tiles.some(t => t.on) && x.id !== 'sb').length
   const rows = React.useMemo(() => all.map(sys => { const steps = planSystem(plan, sys, { base: '{base}' }); return { sys, steps, problems: orderProblems(steps) } }), [all, plan])
   const here = rows[0]?.steps.filter(x => x.where === 'here').length ?? 0
+  const inProject = !!(project || landing)
   return (
     <div className="grid grid-cols-[300px_minmax(0,1fr)_minmax(0,1.15fr)] items-start gap-5 max-[1180px]:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
-      <Panel aria-label="where heavy steps run" className="max-[1180px]:col-span-2">
+      <Panel aria-label="where heavy steps run">
         <Head label="where heavy steps run" />
         <p className="m-0 text-caption text-muted-foreground">minimise, nvt and npt run here, with a progress bar, as in the notebook · awh, pull and the walkers get a qq script and its submit line · the next system starts while one waits for the cluster</p>
         <div role="img" aria-label="three systems: each prepared here, then its qq job on the cluster, then it goes on; the next system starts while the first waits" className="flex flex-col gap-1.5 rounded-lg border border-border bg-background p-3">
@@ -124,15 +149,18 @@ export function SystemsView({ draft, setDraft, missing = null, project = null }:
         {!all.length && <p className="m-0 text-control text-muted-foreground">{s.only ? 'none of the cells the project lacks is in these lists' : 'add a method, a saccharide and a sequence: every combination is a system'}</p>}
         {all.length > 0 && (
           <div className="overflow-hidden rounded-xl border border-border">
-            <div className="grid grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] gap-2 border-b border-border px-3 py-1.5 text-label uppercase text-muted-foreground"><span>system</span><span>check</span></div>
+            <div className="grid grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] gap-2 border-b border-border px-3 py-1.5 text-label uppercase text-muted-foreground"><span>system{inProject ? ' · in the project' : ''}</span><span>check</span></div>
             {rows.slice(0, 200).map(({ sys, problems }) => (
-              <div key={sys.dir} className="grid grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] items-center gap-2 border-b border-border px-3 py-1.5 text-caption last:border-0">
+              <div key={sys.dir} className="grid grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] items-center gap-x-2 gap-y-0.5 border-b border-border px-3 py-1.5 text-caption last:border-0">
                 <span className="truncate">{sys.method} / <span className={toneText[sacTone(sys.saccharide)]}>{sys.saccharide}</span> / <b>{sys.sequence}</b>{switches(sys.method).hmr ? <span className={cn('ml-2 rounded px-1', toneSoft.sky)}>hmr</span> : null}{switches(sys.method).fast ? <span className={cn('ml-1 rounded px-1', toneSoft.aqua)}>fast</span> : null}</span>
-                {missing?.[sys.dir] ? <Status inline level="error" word="missing">{missing[sys.dir].join(', ')}</Status> : problems.length ? <Status inline level="error" word="order">{problems[0]}</Status> : <Status inline level="ok" word="ready" />}
+                {missing?.[sys.dir] ? <Status inline level="error" word="missing" className="w-full"><span className="block truncate" title={missing[sys.dir].join(', ')}>{missing[sys.dir].join(', ')}</span></Status>
+                  : problems.length ? <Status inline level="error" word="order" className="w-full"><span className="block truncate" title={problems[0]}>{problems[0]}</span></Status> : <Status inline level="ok" word="ready" />}
+                {inProject && <div className="col-span-2 pl-3"><InProject folders={landing?.systems[sys.dir]} /></div>}
               </div>
             ))}
           </div>
         )}
+        {landing && <span className="text-caption text-muted-foreground">in the project: where each PMF would land in {landing.project.name}, by the Matrix's own planBatch · name pattern {landing.project.pattern} · folder pattern {landing.project.pathPattern || 'none'}{landing.more ? ' · the first 200 systems are checked' : ''}</span>}
         <div className="flex flex-wrap items-center gap-2">
           <Button size="lg" disabled aria-describedby="build-later">build {all.length} {all.length === 1 ? 'system' : 'systems'}</Button>
           <span id="build-later" className="text-caption text-muted-foreground">building comes in the next version · this preview is every command each system will run, before anything runs</span>
