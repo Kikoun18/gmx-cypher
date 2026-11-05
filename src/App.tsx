@@ -19,6 +19,7 @@ import { JobsView } from './views/Jobs'
 import { Settings } from './views/Settings'
 import { Setup } from './views/Setup'
 import { SymBuilder } from './views/SymBuilder'
+import { Home, type ClusterSummary } from './views/Home'
 import { useDecypherSources } from './decypher/state'
 import type { LoadedFile } from './decypher/parse'
 import { keyLabel, matches, typing, useBindings } from './lib/shortcuts'
@@ -140,6 +141,8 @@ export function App() {
   const openJob = (id: string) => go({ view: 'results', job: id })
   // A cluster job's folder and a recipe (R15): batch set-up opens filled with them; nothing runs until run.
   const [batchPreset, setBatchPreset] = React.useState<BatchPreset | null>(null)
+  // The cluster tab's last read, for home (T215).
+  const [clusterRead, setClusterRead] = React.useState<ClusterSummary | null>(null)
   const offerBatch = (root: string, recipe: string) => { setBatchPreset({ id: Date.now(), root, recipe }); go({ view: 'setup', step: 'inputs', batch: true }) }
 
   return (
@@ -174,7 +177,7 @@ export function App() {
             <AlertActions><Button variant="outline" size="sm" onClick={() => setSettings(true)}>set gmx</Button></AlertActions>
           </Alert>
         )}
-        <TabsContent value="home"><p className="m-0 text-control text-muted-foreground">home: gmx, the vault, your jobs and builds at a glance</p></TabsContent>
+        <TabsContent value="home">{state && <Home state={state} jobs={jobs.jobs} cluster={clusterRead} />}</TabsContent>
         <TabsContent value="symbuilder">{route.view === 'symbuilder' && <SymBuilder route={route} go={go} />}</TabsContent>
         <TabsContent value="analysis">
           <SubTabs value={view === 'setup' ? 'setup' : 'results'} onValueChange={v => go(last[v] ?? (v === 'setup' ? FIRST.analysis : { view: 'results', job: null }))} label="analysis views"
@@ -190,7 +193,7 @@ export function App() {
           )}
           </SubTabs>
         </TabsContent>
-        <TabsContent value="cluster"><ClusterView onOffer={offerBatch} /></TabsContent>
+        <TabsContent value="cluster"><ClusterView onOffer={offerBatch} onRead={setClusterRead} /></TabsContent>
       </main>
       </Tabs>
       <Toaster />

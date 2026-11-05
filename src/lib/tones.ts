@@ -64,3 +64,15 @@ export const groupText = (g: { role?: string; tone: Tone }) => (g.role === "refe
 
 /** CSS colour of a hue's strong ink, for SVG strokes and fills. */
 export const toneVar = (t: Tone) => `var(--${t}-strong)`
+
+/** The hue as a mark on any ground (≥ 3:1): status and state dots. */
+export const toneDot: Record<Tone, string> = {
+  coral: "bg-coral-strong",
+  sky: "bg-sky-strong",
+  mint: "bg-mint-strong",
+  butter: "bg-butter-strong",
+  lilac: "bg-lilac-strong",
+  aqua: "bg-aqua-strong",
+  rose: "bg-rose-strong",
+  stone: "bg-stone-strong",
+}

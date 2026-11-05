@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { FORM } from './Batch'
 import { cn } from '../lib/utils'
 import { Status } from '../ui/status'
+import type { ClusterSummary } from './Home'
 
 /** What POST /api/cluster answers (server/cluster.ts): one read of qq jobs and gmx-eta -a. */
 type Part<T> = ({ ok: true } & T) | { ok: false; error: string }
@@ -114,7 +115,7 @@ function EndedJob({ e, recipes, onOffer }: { e: ClusterRead['ended'][number]; re
 }
 
 /** The cluster tab (R10c): your jobs from qq jobs, each with gmx-eta's time left; watch only. */
-export function ClusterView({ onOffer }: { onOffer: (root: string, recipe: string) => void }) {
+export function ClusterView({ onOffer, onRead }: { onOffer: (root: string, recipe: string) => void; onRead?: (s: ClusterSummary) => void }) {
   const [finished, setFinished] = React.useState(false)
   const { read, error, busy, refresh, failures } = useCluster(finished)
   const now = useNow()
@@ -129,6 +130,8 @@ export function ClusterView({ onOffer }: { onOffer: (root: string, recipe: strin
     for (const { state } of rows) m.set(state.word, { state, n: (m.get(state.word)?.n ?? 0) + 1 })
     return [...m.values()]
   }, [rows])
+  // The last read, handed up for home (T215): home never reads qq itself.
+  React.useEffect(() => { if (read) onRead?.({ at: read.at, states: states.map(({ state, n }) => ({ word: state.word, tone: state.tone, n })) }) }, [read, states]) // eslint-disable-line react-hooks/exhaustive-deps -- onRead is the page's setter
   const shown = rows.filter(r => !hidden.has(r.state.word) && nameOf(r).toLowerCase().includes(name.trim().toLowerCase()))
   if (sort) shown.sort((a, b) => sort.dir * SORTS[sort.key](a, b))
   const at = read ? new Date(read.at) : null
