@@ -277,7 +277,8 @@ From [`batch-4.md`](batch-4.md) §6: SymBuilder inside gmx-cypher, four tabs (ho
 - [x] R7b The cluster tab: scripts, and SymBuilder's systems among the jobs (`#cluster/scripts`; a job matched by its input folder's end; go on, on a press, prepares the walkers once the pull ended)
 
 ### Phase 6: Results (R8c–R8e, R9, R10)
-- [ ] R8c PMFs into the vault; R8d PMF numbers with the Matrix's code: **waits for question 12** (which PMF file the vault holds, 7.awh's or a walker's; sample 10). Sending a guessed one would put the wrong curve in the Matrix, so nothing is sent until you answer
+- [x] R8c PMFs into the vault: the summary's *PMF in set-up* on walker 1's energy file and run input (question 12: the multiwalker PMF), sent by the AWH result's own send (T229)
+- [x] R8d PMF numbers with the Matrix's code: min, where and area of the newest PMF in `9.multiwalker/1/awh/`, by `transformXY`, `runStats` and `wellArea` at walker 1's `ref_t` (T229)
 - [x] R9 Reports (`src/lib/build/report.ts`, golden against the notebook's saved summary of 42 systems, pull and walker reports and termini; a build's warnings by stage reproduce the notebook's row for hhhhhhhh; symbuilder · summary; `logs/build_summary_<stamp>.log`)
 - [x] R10 From a built system to analysis (`src/lib/build/analyse.ts`: the summary opens set-up's batch mode with the build's `solutions/` and a template by the notebook's names, through the cluster tab's offer; matched by `matchTrajectory`)
 

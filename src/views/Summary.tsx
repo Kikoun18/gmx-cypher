@@ -17,7 +17,15 @@ export interface BuildReport {
   pull: string; pullRows: { name: string; charge: number | null; min: number | null; max: number | null }[]
   walkers: string; walkerRows: { name: string; marks: WalkerMark[] }[]
   termini: string; terminiRows: { name: string; line: string; odd: boolean; missing?: boolean }[]
+  pmfRows: PmfRow[]
 }
+/** A system's multiwalker PMF (server/build-report.ts). */
+export interface PmfRow {
+  name: string; dir: string; edr: string | null; tpr: string | null; refused: string | null
+  pmf: { file: string; time: number; job: string; temp: number; tempFrom: string; numbers: { min: number; at: number; area: number; points: number } | null; problem: string | null } | null
+}
+/** Set-up on a system's walker 1: its energy file and run input, and the system's name. */
+export type OnPmf = (edr: string, tpr: string, name: string) => void
 
 const Head = ({ label, n }: { label: string; n?: number }) => (
   <div className="flex items-center gap-2"><span className="text-label uppercase text-muted-foreground">{label}</span><span className="h-px flex-1 bg-border" />{n != null && <span className="text-control">{String(n).padStart(2, '0')}</span>}</div>
@@ -26,8 +34,37 @@ const LEVEL: Record<SummaryRow['status'], Level> = { OK: 'ok', FAILED: 'error', 
 const MARK: Record<WalkerMark, { tone: string; word: string }> = { x: { tone: toneSoft.mint, word: 'output' }, o: { tone: toneSoft.butter, word: 'tpr ready' }, '-': { tone: 'bg-muted text-muted-foreground', word: 'missing' } }
 const f2 = (v: number | null) => (v == null ? '–' : v.toFixed(2))
 
+/** Each system's multiwalker PMF (R8c, R8d): set-up on walker 1's files, and the newest PMF's numbers by the Matrix's code. */
+export function PmfReport({ rows, onPmf }: { rows: PmfRow[]; onPmf?: OnPmf }) {
+  return (
+    <section aria-label="PMF" className="flex flex-col gap-2">
+      <Head label="PMF · multiwalker" n={rows.length} />
+      <div className="overflow-x-auto rounded-2xl border border-border bg-card">
+        <table className="w-full text-caption">
+          <thead><tr className="border-b border-border text-left text-label uppercase text-muted-foreground">{['system', 'min kJ/mol', 'at nm', 'area', 'from', ''].map((h, i) => <th key={i} scope="col" className="px-3 py-1.5 font-normal">{h}</th>)}</tr></thead>
+          <tbody>{rows.map(p => {
+            const n = p.pmf?.numbers
+            return (
+              <tr key={p.dir} className="border-b border-border/60 last:border-0">
+                <td className="px-3 py-1.5"><b>{p.name}</b></td>
+                <td className="px-3 tabular-nums">{n ? n.min.toFixed(2) : ''}</td>
+                <td className="px-3 tabular-nums">{n ? n.at.toFixed(2) : ''}</td>
+                <td className="px-3 tabular-nums">{n ? n.area.toFixed(2) : ''}</td>
+                <td className="px-3">{p.pmf ? (p.pmf.problem ? <Status inline level="warning" word="check">{p.pmf.problem}</Status> : <span className="text-muted-foreground">{p.pmf.file.split('/').pop()} · {p.pmf.temp} K, {p.pmf.tempFrom}</span>) : <span className="text-muted-foreground">{p.edr ? 'no PMF from set-up yet' : 'the walkers have not made 9.multiwalker/1/9.multiwalker.edr'}</span>}</td>
+                <td className="px-3 py-1 text-right">{p.edr && p.tpr && (p.refused ? <Status inline level="warning" word="check">{p.refused}</Status>
+                  : onPmf && <Button size="sm" variant="outline" aria-label={'PMF of ' + p.name + ' in set-up'} onClick={() => onPmf(p.edr!, p.tpr!, p.name)}>PMF in set-up</Button>)}</td>
+              </tr>
+            )
+          })}</tbody>
+        </table>
+      </div>
+      <span className="text-caption text-muted-foreground">the walkers share one bias, so gmx awh on walker 1&apos;s energy file gives the PMF · set-up runs it in 9.multiwalker/1, and its result sends the last frame to the vault by the project&apos;s name pattern · min, at and area after the Matrix&apos;s PMF correction (+2kT ln r, the tail at zero), by the Matrix&apos;s own code</span>
+    </section>
+  )
+}
+
 /** The reports of one build (R9): as the page shows them, and as the notebook printed them. */
-export function SummaryReport({ report }: { report: BuildReport }) {
+export function SummaryReport({ report, onPmf }: { report: BuildReport; onPmf?: OnPmf }) {
   const r = report.rows, n = (s: SummaryRow['status']) => r.filter(x => x.status === s).length
   return (
     <div className="flex flex-col gap-5">
@@ -58,6 +95,7 @@ export function SummaryReport({ report }: { report: BuildReport }) {
         </div>
         <span className="text-caption text-muted-foreground">warnings by stage are GROMACS's WARNING and NOTE lines, counted as the notebook counts them · {report.log ? 'written to ' + report.log + ' in the base folder' : 'written to logs/ in the base folder when the build ends'}</span>
       </section>
+      <PmfReport rows={report.pmfRows} onPmf={onPmf} />
       <div className="grid grid-cols-2 items-start gap-5 max-[1100px]:grid-cols-1">
         <section aria-label="pull report" className="flex flex-col gap-2">
           <Head label="pull report" n={report.pullRows.length} />
@@ -96,7 +134,7 @@ export function SummaryReport({ report }: { report: BuildReport }) {
 }
 
 /** symbuilder · summary (R9): the last build's reports, read when it opens and again when that build changes. */
-export function SummaryView({ runs, onAnalyse }: { runs: BuildRun[]; onAnalyse?: (root: string, template: string) => void }) {
+export function SummaryView({ runs, onAnalyse, onPmf }: { runs: BuildRun[]; onAnalyse?: (root: string, template: string) => void; onPmf?: OnPmf }) {
   const run = runs[0], [read, setRead] = React.useState<{ key: string; report: BuildReport } | null>(null), [error, setError] = React.useState('')
   // Read again whenever a system of it changes state, not only when the build ends (the review).
   const key = run ? run.id + ' ' + run.status + ' ' + run.systems.map(s => s.status).join(',') + ' ' + (run.ended ?? '') : ''
@@ -118,7 +156,7 @@ export function SummaryView({ runs, onAnalyse }: { runs: BuildRun[]; onAnalyse?:
         </div>
       )}
       {error && <Status level="error">{error}</Status>}
-      {read?.key === key ? <SummaryReport report={read.report} /> : !error && <p className="m-0 text-caption text-muted-foreground" aria-live="polite">reading the reports…</p>}
+      {read?.key === key ? <SummaryReport report={read.report} onPmf={onPmf} /> : !error && <p className="m-0 text-caption text-muted-foreground" aria-live="polite">reading the reports…</p>}
     </div>
   )
 }

@@ -1,13 +1,18 @@
 // SymBuilder's reports (R9), from what a build left on disk: each system's build.json (its charge before the salt,
-// its ions, its time, its warnings per stage), the pull's pullx.xvg, the walkers' folders, and the topology's Protein
-// moleculetype. Read only, except the build summary, written once per build into <base>/logs/ (dated, never replaced).
+// its ions, its time, its warnings per stage), the pull's pullx.xvg, the walkers' folders, the topology's Protein
+// moleculetype, and its multiwalker PMF (R8c, R8d). Read only, except the build summary, written once per build into
+// <base>/logs/ (dated, never replaced).
 
+import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { dirname, join, relative } from 'node:path';
+import { DEFAULT_TEMP } from '../../matrix/src/lib/seq';
 import { NAMES } from '../src/lib/build/plan';
+import { lastFrame, pmfNumbers, PMF_FROM, refT, type PmfNumbers } from '../src/lib/build/pmf';
 import { molSections, pullReport, summaryText, TERMINI_HEAD, terminiFooter, terminiRow, termini, walkerMark, walkerReport, type SummaryRow, type WalkerMark } from '../src/lib/build/report';
 import { pullx } from '../src/lib/build/text';
-import { linkIn, readRecord, type BuildRun } from './build-run';
+import { linkIn, readRecord, type BuildRun, type SystemRun } from './build-run';
+import { inside } from './files';
 
 const two = (n: number) => String(n).padStart(2, '0');
 const local = (iso: string) => { const d = new Date(iso); return { d, day: d.getFullYear() + '-' + two(d.getMonth() + 1) + '-' + two(d.getDate()), hm: two(d.getHours()) + ':' + two(d.getMinutes()) }; };
@@ -28,8 +33,48 @@ function pullRange(root: string): { min: number; max: number } | null {
   try { const d = pullx(readFileSync(join(root, NAMES.pull, 'pullx.xvg'), 'utf8')).dists; return d.length ? { min: Math.min(...d), max: Math.max(...d) } : null; } catch { return null; }
 }
 
-/** Every report of one build: the summary (text and rows), the pull report, the walker report, the termini check. */
-export function reportOf(run: BuildRun, gmxVersion: string) {
+/** A system's multiwalker PMF (R8c, R8d): walker 1's files set-up takes, and the newest PMF set-up made from them. */
+export interface PmfRow {
+  name: string; dir: string
+  /** Walker 1's energy file and run input, whole paths, when both are there (the walkers ran). */
+  edr: string | null; tpr: string | null
+  /** Why set-up is not offered on them, in words. */
+  refused: string | null
+  /** The last frame of the newest AWH job of set-up's in 9.multiwalker/1/awh/, with the Matrix's numbers. */
+  pmf: { file: string; time: number; job: string; temp: number; tempFrom: string; numbers: PmfNumbers | null; problem: string | null } | null
+}
+
+function newestPmf(base: string, w1: string): PmfRow['pmf'] {
+  const out = join(w1, PMF_FROM.out);
+  if (!existsSync(out) || linkIn(base, out)) return null;
+  const jobs = readdirSync(out).filter(n => n.endsWith('.run.json')).flatMap(n => {
+    try { const r = JSON.parse(readFileSync(join(out, n), 'utf8')), f = lastFrame(r); return f ? [{ r, f }] : []; } catch { return []; }
+  }).sort((a, b) => String(b.r.ended).localeCompare(String(a.r.ended)));
+  if (!jobs.length) return null;
+  const { r, f } = jobs[0], file = join(out, f.name);
+  let temp = DEFAULT_TEMP, tempFrom = 'the Matrix\'s default (no ' + PMF_FROM.mdout + ')';
+  try { const t = refT(readFileSync(join(w1, PMF_FROM.mdout), 'utf8')); if (t) { temp = t; tempFrom = 'ref_t of ' + PMF_FROM.mdout; } } catch { /* the default */ }
+  const at = { file: relative(base, file), time: f.frame.time, job: String(r.job), temp, tempFrom };
+  if (!existsSync(file) || linkIn(base, file)) return { ...at, numbers: null, problem: f.name + ' is gone from ' + relative(base, out) };
+  const bytes = readFileSync(file);
+  if (createHash('sha256').update(bytes).digest('hex') !== f.sha256) return { ...at, numbers: null, problem: f.name + ' changed since its job wrote it' };
+  const n = pmfNumbers(bytes.toString('utf8'), temp);
+  return 'error' in n ? { ...at, numbers: null, problem: f.name + ': ' + n.error } : { ...at, numbers: n, problem: null };
+}
+
+function pmfRow(run: BuildRun, s: SystemRun, roots: string[] | null): PmfRow {
+  const w1 = join(run.base, s.dir, PMF_FROM.folder), edr = join(w1, PMF_FROM.edr), tpr = join(w1, PMF_FROM.tpr);
+  const has = existsSync(edr) && existsSync(tpr) && !linkIn(run.base, edr) && !linkIn(run.base, tpr);
+  let refused: string | null = null;
+  if (has && roots) try { inside(edr, roots); inside(tpr, roots); } catch (e) { refused = 'not offered: ' + (e as Error).message + ' · add the base folder\'s folder in settings'; }
+  return { name: s.method + '/' + s.saccharide + '/' + s.sequence, dir: s.dir, edr: has ? edr : null, tpr: has ? tpr : null, refused, pmf: newestPmf(run.base, w1) };
+}
+
+/**
+ * Every report of one build: the summary (text and rows), the pull report, the walker report, the termini check, and
+ * each system's PMF. `roots` are the allowed folders set-up reads from: the PMF is offered only inside them.
+ */
+export function reportOf(run: BuildRun, gmxVersion: string, roots: string[] | null = null) {
   const at = local(run.created), rows = run.systems.map((_, i) => summaryRow(run, i)), walkers = run.systems.length ? (readRecord(join(run.base, run.systems[0].dir))?.plan.science.walkers.length ?? 8) : 8;
   const pull = run.systems.map(s => {
     const root = join(run.base, s.dir), rec = readRecord(root), r = pullRange(root);
@@ -58,6 +103,7 @@ export function reportOf(run: BuildRun, gmxVersion: string) {
     summary: summaryText(rows, at.day + ' ' + at.hm, gmxVersion), rows, log: run.log ?? null,
     pull: pullReport(pull), pullRows: pull, walkers: walkerReport(marks, walkers), walkerRows: marks,
     termini: [TERMINI_HEAD, ...terminiLines.map(l => l.line), '', terminiFooter(odd)].join('\n') + '\n', terminiRows: terminiLines,
+    pmfRows: run.systems.map(s => pmfRow(run, s, roots)),
   };
 }
 

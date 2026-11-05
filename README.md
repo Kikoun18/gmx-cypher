@@ -110,7 +110,11 @@ walkers are prepared and get their qq script and `qq submit` line (nothing is su
 - **From a build to analysis**: the summary's *analyse the walkers in set-up* (or *awh*) opens set-up's batch mode
   with the build's `solutions/` as its root and a path template by the notebook's names
   (`{method}/{column}/{seq}/9.multiwalker/{run}/9.multiwalker.xtc`); you preview, choose, and press run.
-- Sending a built system's PMF to the Matrix waits for your answer to which PMF file the vault holds (question 12).
+- **A built system's PMF**: the multiwalker one (the walkers share one bias, so `gmx awh` on walker 1's energy file
+  gives it). Once the walkers ran, the summary's *PMF in set-up* fills set-up's AWH command with walker 1's
+  `9.multiwalker.edr` and `.tpr` (inside the allowed folders only). Its result is sent to the vault as every AWH result
+  is. The summary then shows the newest PMF's minimum, where it is and its area, by the Matrix's own code at walker
+  1's `ref_t`.
 - The build being planned is kept in this browser.
 
 Methods switch on what their name says: `hmr` hydrogen masses (gromologist), `fast` TIP3PF water; awh, the pull and the

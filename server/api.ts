@@ -288,7 +288,7 @@ export function makeApi(ctx: Ctx): Api {
     if (buildReport && req.method === 'GET') {
       const r = builder.get(buildReport[1]);
       if (!r) throw new HttpError(404, 'no build ' + buildReport[1]);
-      return { body: reportOf(r, ctx.gmx.version ?? 'unknown') };
+      return { body: reportOf(r, ctx.gmx.version ?? 'unknown', roots()) };
     }
     const buildRun = /^\/api\/build\/runs\/([\w-]+)\/cancel$/.exec(url.pathname);
     if (buildRun && req.method === 'POST') { try { builder.cancel(buildRun[1]); } catch (e) { throw new HttpError(409, (e as Error).message); } return { body: builder.get(buildRun[1]) }; }

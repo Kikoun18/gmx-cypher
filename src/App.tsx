@@ -189,7 +189,8 @@ export function App() {
         )}
         <TabsContent value="home">{state && <Home state={state} jobs={jobs.jobs} cluster={clusterRead} />}</TabsContent>
         <TabsContent value="symbuilder">{route.view === 'symbuilder' && <SymBuilder route={route} go={go} gmx={state?.gmx.ok ? state.gmx.name ?? 'gmx' : 'gmx'} gmxOk={!!state?.gmx.ok} base={state?.config.base} vault={state?.config.vault} projectId={state?.config.project} builds={builds}
-          onAnalyse={(root, template) => offerBatch(root, FORM, template)} />}</TabsContent>
+          onAnalyse={(root, template) => offerBatch(root, FORM, template)}
+          onPmf={(edr, tpr, name) => { const why = 'walker 1 of ' + name; setDraft(d => ({ ...withCommand(d, 'awh'), inputs: { edr: { path: edr, why }, runInput: { path: tpr, why } }, outDir: null })); go({ view: 'setup', step: 'command', batch: false }) }} />}</TabsContent>
         <TabsContent value="analysis">
           <SubTabs value={view === 'setup' ? 'setup' : 'results'} onValueChange={v => go(last[v] ?? (v === 'setup' ? FIRST.analysis : { view: 'results', job: null }))} label="analysis views"
             items={[{ value: 'setup', label: 'set-up' }, { value: 'results', label: 'results' }]}>

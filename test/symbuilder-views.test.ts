@@ -11,7 +11,7 @@ import type { PmfLanding } from '../src/lib/build/landing';
 import { BuildFilesView } from '../src/views/BuildFiles';
 import { ProgressView } from '../src/views/Progress';
 import { ClusterScriptsView } from '../src/views/ClusterScripts';
-import { SummaryReport, SummaryView } from '../src/views/Summary';
+import { PmfReport, SummaryReport, SummaryView, type OnPmf, type PmfRow } from '../src/views/Summary';
 import type { Step } from '../src/lib/build/steps';
 
 const draft: BuildDraft = { ...EMPTY_BUILD, systems: { methods: ['hmr+fast+6'], saccharides: ['o111', 'pg'], sequences: ['aaaaaaaa', 'pppppppp'], repeats: 1 } };
@@ -194,7 +194,7 @@ describe('symbuilder · summary (R9)', () => {
       { name: 'hmr+fast+6/o111/rrrrrrrr', charge: 6, ions: [30, 38] as [number, number], min: 0.43, elapsed: 120, status: 'FAILED' as const, warn: [], note: 'AWH · grompp 7.awh: Fatal error:' }],
     pull: '', pullRows: [{ name: 'hmr+fast+6/o111/rrrrrrrr', charge: 6, min: 0.43, max: 3.27 }],
     walkers: '', walkerRows: [{ name: 'hmr+fast+6/o111/rrrrrrrr', marks: ['x', 'o', '-'] as ('x' | 'o' | '-')[] }],
-    termini: 'SYSTEM …\n', terminiRows: [{ name: 'hmr+fast+6/pg/pppppppp', line: '…', odd: true }],
+    termini: 'SYSTEM …\n', terminiRows: [{ name: 'hmr+fast+6/pg/pppppppp', line: '…', odd: true }], pmfRows: [],
   };
   it('the summary\'s rows, their warnings by stage, a failed one\'s note; the pull and walker reports; the termini check', () => {
     const html = renderToStaticMarkup(createElement(SummaryReport, { report }));
@@ -209,5 +209,24 @@ describe('symbuilder · summary (R9)', () => {
   });
   it('no build yet', () => {
     expect(renderToStaticMarkup(createElement(SummaryView, { runs: [] }))).toContain('no build yet');
+  });
+  it('each system\'s PMF (R8c, R8d): its numbers, set-up on walker 1, or why not', () => {
+    const w1 = '/b/solutions/hmr+fast+6/o111/hhhhhhhh/9.multiwalker/1';
+    const row = (o: Partial<PmfRow>): PmfRow => ({ name: 'hmr+fast+6/o111/hhhhhhhh', dir: 'solutions/hmr+fast+6/o111/hhhhhhhh', edr: null, tpr: null, refused: null, pmf: null, ...o });
+    const html = (rows: PmfRow[], onPmf?: OnPmf) => renderToStaticMarkup(createElement(PmfReport, { rows, onPmf }));
+    expect(html([row({})], noop)).toContain('the walkers have not made 9.multiwalker/1/9.multiwalker.edr');
+    expect(html([row({})], noop)).not.toContain('PMF in set-up');
+    const ran = row({ edr: w1 + '/9.multiwalker.edr', tpr: w1 + '/9.multiwalker.tpr' });
+    expect(html([ran], noop)).toContain('aria-label="PMF of hmr+fast+6/o111/hhhhhhhh in set-up"');
+    expect(html([ran], noop)).toContain('no PMF from set-up yet');
+    expect(html([ran])).not.toContain('PMF in set-up');
+    expect(html([{ ...ran, refused: 'not offered: x is outside the allowed folders' }], noop)).toContain('not offered: x is outside the allowed folders');
+    const pmf = { file: 'solutions/hmr+fast+6/o111/hhhhhhhh/9.multiwalker/1/awh/awh_9.multiwalker_t20.xvg', time: 20, job: 'j1', temp: 310.15, tempFrom: 'ref_t of 9.multiwalker_mdout.mdp', problem: null };
+    const h = html([{ ...ran, pmf: { ...pmf, numbers: { min: -5.6527, at: 0.3, area: -0.9671, points: 115 } } }], noop);
+    expect(h).toContain('-5.65');
+    expect(h).toContain('0.30');
+    expect(h).toContain('-0.97');
+    expect(h).toContain('awh_9.multiwalker_t20.xvg · 310.15 K, ref_t of 9.multiwalker_mdout.mdp');
+    expect(html([{ ...ran, pmf: { ...pmf, numbers: null, problem: 'awh_9.multiwalker_t20.xvg changed since its job wrote it' } }], noop)).toContain('changed since its job wrote it');
   });
 });

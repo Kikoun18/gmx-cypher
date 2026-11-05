@@ -2,17 +2,18 @@
 // followed on progress until it waits for the cluster with its submit lines. The base folder holds every file a build
 // reads, so the build button is there to press.
 import { spawn, type ChildProcess } from 'node:child_process'
-import { writeFileSync } from 'node:fs'
+import { copyFileSync, mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test } from '@playwright/test'
 import { baseFolder, tmp } from '../test/helpers'
 
 const RUNNER = new URL('..', import.meta.url).pathname
-let runner: ChildProcess, url: string
+let runner: ChildProcess, url: string, base: string
 
 test.beforeAll(async () => {
-  const base = baseFolder(), home = tmp('e2e-build-home')
+  base = baseFolder()
+  const home = tmp('e2e-build-home')
   writeFileSync(join(home, 'config.json'), JSON.stringify({ allow: [dirname(base)], base, python: join(RUNNER, 'test/fake-python.mjs'), buildWait: { every: 1, max: 10 } }))
   runner = spawn(process.execPath, ['--import', './server/register.mjs', 'server/main.ts', '--port', '0', '--gmx', join(RUNNER, 'test/fake-gmx.mjs')],
     { cwd: RUNNER, env: { ...process.env, GMX_CYPHER_HOME: home } })
@@ -24,7 +25,7 @@ test.beforeAll(async () => {
 })
 test.afterAll(() => { runner?.kill() })
 
-test('build a system from systems, follow it on progress until it waits for the cluster (R5c), read its summary (R9), and take it to analysis (R10)', async ({ page }) => {
+test('build a system from systems, follow it on progress until it waits for the cluster (R5c), read its summary (R9), its PMF in set-up and back with the Matrix\'s numbers (R8c, R8d), and take it to analysis (R10)', async ({ page }) => {
   const errors: string[] = []
   page.on('console', m => { if (m.type() === 'error') errors.push(m.text()) })
   page.on('pageerror', e => errors.push(e.message))
@@ -46,6 +47,23 @@ test('build a system from systems, follow it on progress until it waits for the 
   await expect(page.getByRole('region', { name: 'build summary' }).getByText('SB 7 · MIN 4 · NVT 4 · NPT 4 · AWH 4 · PULL 3')).toBeVisible()
   const axe2 = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).disableRules(['region']).analyze()
   expect(axe2.violations.filter(v => v.impact === 'serious' || v.impact === 'critical').map(v => v.id + ' ' + v.nodes[0].target.join(' '))).toEqual([])
+  // Its PMF (R8c, R8d): once the walkers ran (walker 1's files, the real AWH test run's), set-up on walker 1 in one
+  // press; its job's last frame comes back to the summary with the Matrix's numbers.
+  const w1 = join(base, 'solutions/hmr+fast+6/o111/hhhhhhhh/9.multiwalker/1')
+  mkdirSync(w1, { recursive: true })
+  copyFileSync(join(RUNNER, 'test/fixtures/awh/awh.edr'), join(w1, '9.multiwalker.edr'))
+  copyFileSync(join(RUNNER, 'test/fixtures/awh/topol.tpr'), join(w1, '9.multiwalker.tpr'))
+  await page.getByRole('tab', { name: 'progress' }).click()
+  await page.getByRole('tab', { name: 'summary' }).click()
+  await page.getByRole('button', { name: 'PMF of hmr+fast+6/o111/hhhhhhhh in set-up' }).click()
+  await expect(page).toHaveURL(/#setup\/command$/)
+  await page.getByRole('button', { name: 'run', exact: true }).click()
+  await expect(page).toHaveURL(/#results\//)
+  await page.getByRole('tab', { name: /^symbuilder/ }).click()
+  await page.getByRole('tab', { name: 'summary' }).click()
+  const pmf = page.getByRole('region', { name: 'PMF' })
+  await expect(pmf.getByText('awh_9.multiwalker_t20.xvg · 310.15 K, the Matrix\'s default (no 9.multiwalker_mdout.mdp)')).toBeVisible()
+  await expect(pmf.getByText('-5.81')).toBeVisible()
   // From the built system to analysis (R10): set-up's batch mode, filled in; nothing runs before its own run.
   await page.getByRole('button', { name: 'analyse the walkers in set-up' }).click()
   await expect(page).toHaveURL(/#setup\/inputs\?mode=batch$/)
